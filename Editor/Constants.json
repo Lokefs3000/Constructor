@@ -1,0 +1,8 @@
+[
+    {
+        "Name": "Gui",
+        "Values": {
+            "DynAtlasInitialSize": 512
+        }
+    }
+]

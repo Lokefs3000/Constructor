@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Editor": {
+      "commandName": "Project",
+      "commandLineArgs": "D:\\source\\repos\\Constructor\\Project",
+      "nativeDebugging": false,
+      "hotReloadEnabled": true
+    }
+  }
+}

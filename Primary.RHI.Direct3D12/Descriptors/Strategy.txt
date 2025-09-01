@@ -1,0 +1,20 @@
+CpuDescriptorHeap:
+	Rent:
+		For each heap in the internal list try to allocate:
+			On success: Pass on the returned value to the caller
+			On failure: Continue iterating through the list
+		If no heap has space create a new one and add it to the list
+		Allocate from the new heap and pass returned value to the caller
+	Return:
+		Find the corresponding heap that the allocation was made from and call Free on it.
+	ReleaseStaleAllocations:
+		Iterate through all the internal heaps and call ReleaseStaleAllocations on it
+		
+DescriptorHeapAllocationManager:
+	Allocate:
+		Allocate a range of descriptors from the internal heap.
+	Free:
+		Add the allocation onto a deferred allocation list
+	ReleaseStaleAllocations:
+		For each allocation in the deferred list:
+			Free

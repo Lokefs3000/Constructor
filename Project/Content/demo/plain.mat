@@ -1,0 +1,4 @@
+shader = "Standard/Unlit"
+
+[properties]
+Albedo = "Content/demo/plaingrid.dds"

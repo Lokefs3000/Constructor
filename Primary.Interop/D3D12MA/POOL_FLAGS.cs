@@ -1,0 +1,11 @@
+namespace Primary.Interop
+{
+    public enum POOL_FLAGS
+    {
+        POOL_FLAG_NONE = 0,
+        POOL_FLAG_ALGORITHM_LINEAR = 0x1,
+        POOL_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED = 0x2,
+        POOL_FLAG_ALWAYS_COMMITTED = 0x4,
+        POOL_FLAG_ALGORITHM_MASK = POOL_FLAG_ALGORITHM_LINEAR,
+    }
+}

@@ -1,0 +1,38 @@
+Entity{
+	SceneEntityData{
+		Enabled = true
+		Name = "Ground"
+	}
+	Transform{
+		Position = [0, 0, 0]
+		Rotation = [0, 0, 0, 1]
+		Scale = [1, 1, 1]
+	}
+	MeshRenderer{
+		Mesh{
+			Model = "Content/plane.emdf"
+			Name = "Plane"
+		}
+		Material = "Content/Tiles079.mat"
+	}
+	@Children{}
+}
+Entity{
+	SceneEntityData{
+		Enabled = true
+		Name = "Viewer"
+	}
+	Transform{
+		Position = [0, 2, -6]
+		Rotation = [0, 0, 0, 1]
+		Scale = [1, 1, 1]
+	}
+	Camera{
+		Clear = "Solid",
+		ClearColor = [0.1, 0.1, 0.13, 1.0]
+		FieldOfView = 1.22173048,
+		NearClip = 0.02
+		FarClip = 1000
+	}
+	@Children{}
+}

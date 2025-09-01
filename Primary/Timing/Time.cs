@@ -1,0 +1,55 @@
+﻿using Primary.Common;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Primary.Timing
+{
+    public sealed class Time
+    {
+        private static Time? s_instance = null;
+        private static Time Instance => NullableUtility.ThrowIfNull(s_instance);
+
+        private bool _isFirstFrame;
+        private long _lastFrameTimestamp;
+
+        private double _deltaTimeDouble;
+        private float _deltaTime;
+
+        internal Time()
+        {
+            s_instance = this;
+
+            _isFirstFrame = true;
+            _lastFrameTimestamp = 0;
+        }
+
+        public void BeginNewFrame()
+        {
+            long timestampThisFrame = Stopwatch.GetTimestamp();
+
+            if (_isFirstFrame)
+            {
+                _deltaTimeDouble = 0.0;
+                _deltaTime = 0.0f;
+
+                _isFirstFrame = false;
+            }
+            else
+            {
+                _deltaTimeDouble = (timestampThisFrame - _lastFrameTimestamp) / (double)Stopwatch.Frequency;
+                _deltaTime = (float)_deltaTimeDouble;
+            }
+
+            _lastFrameTimestamp = timestampThisFrame;
+        }
+
+        public static double DeltaTimeDouble => Instance._deltaTimeDouble;
+        public static float DeltaTime => Instance._deltaTime;
+
+        public static long TimestampForActiveFrame => Instance._lastFrameTimestamp;
+    }
+}

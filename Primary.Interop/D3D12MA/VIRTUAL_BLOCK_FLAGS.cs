@@ -1,0 +1,11 @@
+using static Primary.Interop.POOL_FLAGS;
+
+namespace Primary.Interop
+{
+    public enum VIRTUAL_BLOCK_FLAGS
+    {
+        VIRTUAL_BLOCK_FLAG_NONE = 0,
+        VIRTUAL_BLOCK_FLAG_ALGORITHM_LINEAR = POOL_FLAG_ALGORITHM_LINEAR,
+        VIRTUAL_BLOCK_FLAG_ALGORITHM_MASK = POOL_FLAG_ALGORITHM_MASK,
+    }
+}

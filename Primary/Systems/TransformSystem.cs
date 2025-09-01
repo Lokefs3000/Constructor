@@ -1,0 +1,76 @@
+﻿using Arch.Core;
+using Arch.Core.Extensions;
+using Primary.Common;
+using Primary.Components;
+using Primary.Profiling;
+using Primary.Scenes;
+using Schedulers;
+using System.Numerics;
+using System.Runtime.CompilerServices;
+
+namespace Primary.Systems
+{
+    public struct TransformSystem : ISystem
+    {
+        public void Schedule(World world, JobScheduler scheduler)
+        {
+            using (new ProfilingScope("Transform"))
+            {
+                SceneManager manager = Engine.GlobalSingleton.SceneManager;
+                IReadOnlyList<Scene> scenes = manager.Scenes;
+
+                for (int i = 0; i < scenes.Count; i++)
+                {
+                    Scene scene = scenes[i];
+
+                    ref Transform tr = ref scene.Root.WrappedEntity.Get<Transform>();
+                    if (tr.Invalid || true)
+                    {
+                        IterateThroughHierchy(scene.Root.WrappedEntity, Matrix4x4.Identity);
+                        tr.Invalid = false;
+                    }
+                }
+            }
+        }
+
+        private void IterateThroughHierchy(SceneEntity e, Matrix4x4 parent)
+        {
+            foreach (var child in e.Children)
+            {
+                Entity childEntity = child.WrappedEntity;
+
+                ref Transform tr = ref childEntity.Get<Transform>();
+                if (tr.Invalid || true)
+                {
+                    ref WorldTransform wt = ref childEntity.Get<WorldTransform>();
+                    ref LocalTransform lt = ref childEntity.Get<LocalTransform>();
+
+                    if (!Unsafe.IsNullRef(ref wt) && !Unsafe.IsNullRef(ref lt))
+                    {
+                        if (tr.SelfInvalid)
+                        {
+                            lt.Transformation =
+                                    Matrix4x4.CreateScale(tr.Scale) *
+                                    Matrix4x4.CreateFromQuaternion(tr.Rotation) *
+                                    Matrix4x4.CreateTranslation(tr.Position);
+
+                            tr.SelfInvalid = false;
+                        }
+
+                        wt.Transformation = lt.Transformation * parent;
+
+                        if (!child.Children.IsEmpty)
+                            IterateThroughHierchy(childEntity, wt.Transformation);
+                    }
+                    else
+                    {
+                        IterateThroughHierchy(childEntity, parent);
+                    }
+                }
+            }
+        }
+
+        public ref readonly QueryDescription Description => ref QueryDescription.Null;
+        public bool SystemNeedsFullExecutionTime => true;
+    }
+}

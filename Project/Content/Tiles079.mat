@@ -1,0 +1,4 @@
+shader = "Standard/Unlit"
+
+[properties]
+Albedo = "Content/Tiles079_Color.dds"

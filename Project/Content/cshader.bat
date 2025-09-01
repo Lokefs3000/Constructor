@@ -1,0 +1,1 @@
+@call D:\source\repos\Constructor\Editor\bin\Debug\net9.0\Editor.exe shader -i %1.hlsl -o %1.sbc -t Direct3D12 -c .\

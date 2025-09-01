@@ -1,0 +1,34 @@
+﻿-------- ATTRIBUTES --------
+
+Syntax:
+	[x?(x...)]
+	<expression>
+
+List:
+
+	"[vertex]"
+		Valid: Function
+		Requires: None,
+		Description: Mark a function as the vertex shader entrypoint
+
+	"[pixel]"
+		Valid: Function
+		Requires: None,
+		Description: Mark a function as the pixel shader entrypoint
+
+	"[constants]"
+		Valid: ConstantBuffer<>
+		Requires: None,
+		Description: Indicate that a constant buffer should use 32bit constants instead of a buffer object.
+					 Note: Shaders are limited to 128 bytes of data.
+
+	"[ialayout(Name: string, Offset: int?, Slot: int?, Class: InputClassification?, Format: InputElementFormat?)]"
+		Valid: Function
+		Requires: "vertex"
+		Arguments:
+			Name: Name of the input element to alter.
+			Offset: The new byte offset to use for the input element.
+			Slot: The new input slot to use for the input element
+			Class: The input classification to use for the input element
+			Format: The new format to use for the input element
+		Description: Change the data of an input element.

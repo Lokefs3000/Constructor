@@ -1,0 +1,199 @@
+﻿using TerraFX.Interop.Windows;
+using Vortice.DXGI;
+
+namespace Primary.RHI.Direct3D12.Utility
+{
+    internal static class FormatConverter
+    {
+        internal static Format Convert(RenderTargetFormat format)
+        {
+            return format switch
+            {
+                RenderTargetFormat.Undefined => Format.Unknown,
+                RenderTargetFormat.RGBA32sf => Format.R32G32B32A32_Float,
+                RenderTargetFormat.RGBA32ui => Format.R32G32B32A32_UInt,
+                RenderTargetFormat.RGBA32si => Format.R32G32B32A32_SInt,
+                RenderTargetFormat.RGB32sf => Format.R32G32B32_Float,
+                RenderTargetFormat.RGB32ui => Format.R32G32B32_UInt,
+                RenderTargetFormat.RGB32si => Format.R32G32B32_SInt,
+                RenderTargetFormat.RGBA16sf => Format.R16G16B16A16_Float,
+                RenderTargetFormat.RGBA16un => Format.R16G16B16A16_UNorm,
+                RenderTargetFormat.RGBA16ui => Format.R16G16B16A16_UInt,
+                RenderTargetFormat.RGBA16sn => Format.R16G16B16A16_SNorm,
+                RenderTargetFormat.RGBA16si => Format.R16G16B16A16_SInt,
+                RenderTargetFormat.RG32sf => Format.R32G32_Float,
+                RenderTargetFormat.RG32ui => Format.R32G32_UInt,
+                RenderTargetFormat.RG32si => Format.R32G32_SInt,
+                RenderTargetFormat.RGB10A2un => Format.R10G10B10A2_UNorm,
+                RenderTargetFormat.RGB10A2ui => Format.R10G10B10A2_UInt,
+                RenderTargetFormat.RG11B10sf => Format.R11G11B10_Float,
+                RenderTargetFormat.RGBA8un => Format.R8G8B8A8_UNorm,
+                RenderTargetFormat.RGBA8un_sRGB => Format.R8G8B8A8_UNorm_SRgb,
+                RenderTargetFormat.RGBA8ui => Format.R8G8B8A8_UInt,
+                RenderTargetFormat.RGBA8sn => Format.R8G8B8A8_SNorm,
+                RenderTargetFormat.RGBA8si => Format.R8G8B8A8_SInt,
+                RenderTargetFormat.RG16sf => Format.R16G16_Float,
+                RenderTargetFormat.RG16un => Format.R16G16_UNorm,
+                RenderTargetFormat.RG16ui => Format.R16G16_UInt,
+                RenderTargetFormat.RG16sn => Format.R16G16_SNorm,
+                RenderTargetFormat.RG16si => Format.R16G16_SInt,
+                RenderTargetFormat.R32sf => Format.R32_Float,
+                RenderTargetFormat.R32ui => Format.R32_UInt,
+                RenderTargetFormat.R32si => Format.R32_SInt,
+                RenderTargetFormat.RG8un => Format.R8G8_UNorm,
+                RenderTargetFormat.RG8ui => Format.R8G8_UInt,
+                RenderTargetFormat.RG8sn => Format.R8G8_SNorm,
+                RenderTargetFormat.RG8si => Format.R8G8_SInt,
+                RenderTargetFormat.R16sf => Format.R16_Float,
+                RenderTargetFormat.R16un => Format.R16_UNorm,
+                RenderTargetFormat.R16ui => Format.R16_UInt,
+                RenderTargetFormat.R16sn => Format.R16_SNorm,
+                RenderTargetFormat.R16si => Format.R16_SInt,
+                RenderTargetFormat.R8un => Format.R8_UNorm,
+                RenderTargetFormat.R8ui => Format.R8_UInt,
+                RenderTargetFormat.R8sn => Format.R8_SNorm,
+                RenderTargetFormat.R8si => Format.R8_SInt,
+                RenderTargetFormat.A8un => Format.A8_UNorm,
+                RenderTargetFormat.B5G6R6un => Format.B5G6R5_UNorm,
+                RenderTargetFormat.BGR5A1un => Format.B5G5R5A1_UNorm,
+                RenderTargetFormat.BGRA8un => Format.B8G8R8A8_UNorm,
+                RenderTargetFormat.BGRA8un_sRGB => Format.B8G8R8A8_UNorm_SRgb,
+                RenderTargetFormat.BGRX8un => Format.B8G8R8X8_UNorm,
+                RenderTargetFormat.BGRX8un_sRGB => Format.B8G8R8X8_UNorm_SRgb,
+                _ => Format.Unknown
+            };
+        }
+
+        internal static Format Convert(InputElementFormat format)
+        {
+            return format switch
+            {
+                InputElementFormat.Padding => Format.Unknown,
+                InputElementFormat.Float1 => Format.R32_Float,
+                InputElementFormat.Float2 => Format.R32G32_Float,
+                InputElementFormat.Float3 => Format.R32G32B32_Float,
+                InputElementFormat.Float4 => Format.R32G32B32A32_Float,
+                InputElementFormat.UInt1 => Format.R32_UInt,
+                InputElementFormat.UInt2 => Format.R32G32_UInt,
+                InputElementFormat.UInt3 => Format.R32G32B32_UInt,
+                InputElementFormat.UInt4 => Format.R32G32B32A32_UInt,
+                InputElementFormat.Byte4 => Format.R8G8B8A8_UNorm,
+                _ => Format.Unknown
+            };
+        }
+
+        //so i dont confuse myself: "useAccurateTypes" is a switch to change whether we want an accurate type or an operable types (or the type used to represent the on-device resource)
+        internal static Format Convert(DepthStencilFormat format, bool useAccurateTypes = true)
+        {
+            return format switch
+            {
+                DepthStencilFormat.Undefined => Format.Unknown,
+                DepthStencilFormat.D32sfS8X24ui => Format.D32_Float_S8X24_UInt,
+                DepthStencilFormat.D32sf => Format.D32_Float,
+                DepthStencilFormat.D24unS8ui => Format.D24_UNorm_S8_UInt,
+                DepthStencilFormat.D16un => Format.D16_UNorm,
+                DepthStencilFormat.R32t => useAccurateTypes ? Format.R32_Typeless : Format.D32_Float,
+                _ => Format.Unknown
+            };
+        }
+
+        internal static Format Convert(TextureFormat format)
+        {
+            return format switch
+            {
+                TextureFormat.Undefined => Format.Unknown,
+                TextureFormat.RGBA32t => Format.R32G32B32A32_Typeless,
+                TextureFormat.RGBA32sf => Format.R32G32B32A32_Float,
+                TextureFormat.RGBA32ui => Format.R32G32B32A32_UInt,
+                TextureFormat.RGBA32si => Format.R32G32B32A32_SInt,
+                TextureFormat.RGB32t => Format.R32G32B32_Typeless,
+                TextureFormat.RGB32sf => Format.R32G32B32_Float,
+                TextureFormat.RGB32ui => Format.R32G32B32_UInt,
+                TextureFormat.RGB32si => Format.R32G32B32_SInt,
+                TextureFormat.RGBA16t => Format.R16G16B16A16_Typeless,
+                TextureFormat.RGBA16sf => Format.R16G16B16A16_Float,
+                TextureFormat.RGBA16ui => Format.R16G16B16A16_UInt,
+                TextureFormat.RGBA16si => Format.R16G16B16A16_SInt,
+                TextureFormat.RG32t => Format.R32G32_Typeless,
+                TextureFormat.RG32sf => Format.R32G32_Float,
+                TextureFormat.RG32ui => Format.R32G32_UInt,
+                TextureFormat.RG32si => Format.R32G32_SInt,
+                TextureFormat.R32G8X24t => Format.R32G8X24_Typeless,
+                TextureFormat.R32sfX8X24t => Format.R32_Float_X8X24_Typeless,
+                TextureFormat.X32tG8X24ui => Format.X32_Typeless_G8X24_UInt,
+                TextureFormat.RGB10A2t => Format.R10G10B10A2_Typeless,
+                TextureFormat.RGB10A2un => Format.R10G10B10A2_UNorm,
+                TextureFormat.RGB10A2ui => Format.R10G10B10A2_UInt,
+                TextureFormat.RGBA8t => Format.R8G8B8A8_Typeless,
+                TextureFormat.RGBA8un => Format.R8G8B8A8_UNorm,
+                TextureFormat.RGBA8un_sRGB => Format.R8G8B8A8_UNorm_SRgb,
+                TextureFormat.RGBA8ui => Format.R8G8B8A8_UInt,
+                TextureFormat.RGBA8sn => Format.R8G8B8A8_SNorm,
+                TextureFormat.RGBA8si => Format.R8G8B8A8_SInt,
+                TextureFormat.RG16t => Format.R16G16_Typeless,
+                TextureFormat.RG16sf => Format.R16G16_Float,
+                TextureFormat.RG16un => Format.R16G16_UNorm,
+                TextureFormat.RG16ui => Format.R16G16_UInt,
+                TextureFormat.RG16sn => Format.R16G16_SNorm,
+                TextureFormat.RG16si => Format.R16G16_SInt,
+                TextureFormat.R32t => Format.R32_Typeless,
+                TextureFormat.R32sf => Format.R32_Float,
+                TextureFormat.R32ui => Format.R32_UInt,
+                TextureFormat.R32si => Format.R32_SInt,
+                TextureFormat.R24G8t => Format.R24G8_Typeless,
+                TextureFormat.R24unX8t => Format.R24_UNorm_X8_Typeless,
+                TextureFormat.X24tG8ui => Format.X24_Typeless_G8_UInt,
+                TextureFormat.RG8t => Format.R8G8_Typeless,
+                TextureFormat.RG8un => Format.R8G8_UNorm,
+                TextureFormat.RG8ui => Format.R8G8_UInt,
+                TextureFormat.RG8sn => Format.R8G8_SNorm,
+                TextureFormat.RG8si => Format.R8G8_SInt,
+                TextureFormat.R16t => Format.R16_Typeless,
+                TextureFormat.R16sf => Format.R16_Float,
+                TextureFormat.R16un => Format.R16_UNorm,
+                TextureFormat.R16ui => Format.R16_UInt,
+                TextureFormat.R16sn => Format.R16_SNorm,
+                TextureFormat.R16si => Format.R16_SInt,
+                TextureFormat.R8t => Format.R8_Typeless,
+                TextureFormat.R8un => Format.R8_UNorm,
+                TextureFormat.R8ui => Format.R8_UInt,
+                TextureFormat.R8sn => Format.R8_SNorm,
+                TextureFormat.R8si => Format.R8_SInt,
+                TextureFormat.A8un => Format.R8_UNorm,
+                TextureFormat.R1un => Format.R1_UNorm,
+                TextureFormat.RG8BG8un => Format.R8G8_B8G8_UNorm,
+                TextureFormat.GR8GB8un => Format.G8R8_G8B8_UNorm,
+                TextureFormat.BC1t => Format.BC1_Typeless,
+                TextureFormat.BC1un => Format.BC1_UNorm,
+                TextureFormat.BC1un_sRGB => Format.BC1_UNorm_SRgb,
+                TextureFormat.BC2t => Format.BC2_Typeless,
+                TextureFormat.BC2un => Format.BC2_UNorm,
+                TextureFormat.BC2un_sRGB => Format.BC2_UNorm_SRgb,
+                TextureFormat.BC3t => Format.BC3_Typeless,
+                TextureFormat.BC3un => Format.BC3_UNorm,
+                TextureFormat.BC3un_sRGB => Format.BC3_UNorm_SRgb,
+                TextureFormat.BC4t => Format.BC4_Typeless,
+                TextureFormat.BC4un => Format.BC4_UNorm,
+                TextureFormat.BC4sn => Format.BC4_SNorm,
+                TextureFormat.BC5t => Format.BC5_Typeless,
+                TextureFormat.BC5un => Format.BC5_UNorm,
+                TextureFormat.BC5sn => Format.BC5_SNorm,
+                TextureFormat.B5G6R5un => Format.B5G6R5_UNorm,
+                TextureFormat.BGR5A1un => Format.B5G5R5A1_UNorm,
+                TextureFormat.BGRA8un => Format.B8G8R8A8_UNorm,
+                TextureFormat.BGRX8un => Format.B8G8R8X8_UNorm,
+                TextureFormat.BGRA8t => Format.B8G8R8A8_Typeless,
+                TextureFormat.BGRA8un_sRGB => Format.B8G8R8A8_UNorm_SRgb,
+                TextureFormat.BGRX8t => Format.B8G8R8X8_Typeless,
+                TextureFormat.BGRX8un_sRGB => Format.B8G8R8X8_UNorm_SRgb,
+                TextureFormat.BC6Ht => Format.BC6H_Typeless,
+                TextureFormat.BC6Huf16 => Format.BC6H_Uf16,
+                TextureFormat.BC6Hsf16 => Format.BC6H_Sf16,
+                TextureFormat.BC7t => Format.BC7_UNorm,
+                TextureFormat.BC7un => Format.BC7_UNorm_SRgb,
+                TextureFormat.BC7un_sRGB => Format.Unknown,
+                _ => Format.Unknown,
+            };
+        }
+    }
+}

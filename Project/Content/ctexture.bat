@@ -1,0 +1,1 @@
+@call D:\source\repos\Constructor\Editor\bin\Debug\net9.0\Editor.exe texture -i %1 -o %~n1.dds -f %2 %3

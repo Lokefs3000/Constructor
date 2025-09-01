@@ -1,0 +1,12 @@
+Content/FloatingIcons.png;Content/FloatingIcons.toml
+Content/EdGui_Font.hlsl;Content/EdGui_Common.hlsl;Content/EdGui_Font.toml
+Content/DearImGui.hlsl;Content/DearImGui.toml
+Content/EdGui_Solid.hlsl;Content/EdGui_Common.hlsl;Content/EdGui_Solid.toml
+Content/EdGui_Image.hlsl;Content/EdGui_Common.hlsl;Content/EdGui_Image.toml
+Content/Missing.hlsl;Content/Buffers.hlsl;Content/Converters.hlsl;Content/Missing.toml
+Content/ShadowPass.hlsl;Content/Buffers.hlsl;Content/Converters.hlsl;Content/ShadowPass.toml
+Content/Unlit.hlsl;Content/Buffers.hlsl;Content/Converters.hlsl;Content/Lighting.hlsl;Content/TextureUtil.hlsl;Content/Unlit.toml
+Content/ShadowBlit.hlsl;Content/ShadowBlit.toml
+Content/IconBillboard.hlsl;Content/IconBillboard.toml
+Content/demo/rust/color.jpg;Content/demo/rust/color.toml
+Content/Blit.hlsl;Content/Blit.toml

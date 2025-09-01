@@ -1,0 +1,12 @@
+flip_vertical = true
+image_format = "RGBA8"
+cutout_dither = false
+cutout_threshold = 127
+gamma_correct = false
+premultiplied_alpha = false
+mipmap_filter = "Box"
+max_mipmap_count = 2147483647
+min_mipmap_size = 1
+generate_mipmaps = false
+image_type = "Grayscale"
+scale_alpha_for_mipmaps = false
