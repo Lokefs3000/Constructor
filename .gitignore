@@ -400,6 +400,7 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
+/ProjectBK
 /Project
 /Project/Library
 
