@@ -35,6 +35,11 @@ namespace Editor.Assets.Importers
                 return;
             }
 
+            string localInputFile = fullFilePath.Substring(Editor.GlobalSingleton.ProjectPath.Length);
+            string localOutputFile = outputFilePath.Substring(Editor.GlobalSingleton.ProjectPath.Length);
+
+            Editor.GlobalSingleton.ProjectSubFilesystem.RemapFile(localInputFile, localOutputFile);
+            pipeline.ReloadAsset(fullFilePath);
         }
 
         public string CustomFileIcon => "Content/Icons/FileModel.png";

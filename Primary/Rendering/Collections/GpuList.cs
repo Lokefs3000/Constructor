@@ -258,13 +258,11 @@ namespace Primary.Rendering.Collections
                         {
                             case OccupancyType.Removed:
                                 {
-                                    Debug.Assert(idxStart != -1 && idxEnd != -1);
-
                                     if (idxStart != -1 && idxEnd != -1)
                                     {
-                                        int length = idxEnd - i;
+                                        int length = idxStart - i;
 
-                                        commandBuffer.CopyBufferRegion(_buffer, (uint)(idxStart * sizeof(T)), _buffer, (uint)(idxEnd * sizeof(T)), (uint)(length * sizeof(T)));
+                                        commandBuffer.CopyBufferRegion(_buffer, (uint)(idxEnd * sizeof(T)), _buffer, (uint)(idxStart * sizeof(T)), (uint)(length * sizeof(T)));
                                         NativeMemory.Copy(&_array[idxStart], &_array[idxEnd], (nuint)(length * sizeof(T)));
 
                                         i = idxEnd - 1;

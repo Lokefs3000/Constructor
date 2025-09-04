@@ -11,11 +11,9 @@ namespace Editor.Assets.Importers
 {
     internal class TextureAssetImporter : IAssetImporter
     {
-        private TextureProcessor _processor;
-
         public TextureAssetImporter()
         {
-            _processor = new TextureProcessor();
+            TextureProcessor.Logger = EdLog.Assets;
         }
 
         public void Dispose()
@@ -28,17 +26,21 @@ namespace Editor.Assets.Importers
             string tomlFile = Path.ChangeExtension(fullFilePath, ".toml");
             if (!File.Exists(tomlFile))
             {
-                return;
+                File.WriteAllText(tomlFile, DefaultTomlContents);
             }
 
             TextureConfig cfg = Toml.ToModel<TextureConfig>(File.ReadAllText(tomlFile));
+            if (!cfg.ImportFile)
+            {
+                return;
+            }
 
-            bool r = _processor.Execute(new TextureProcessorArgs
+            bool r = new TextureProcessor().Execute(new TextureProcessorArgs
             {
                 AbsoluteFilepath = fullFilePath,
                 AbsoluteOutputPath = outputFilePath,
 
-                FlipVertical = cfg.FlipVertical,
+                FlipVertical = !cfg.FlipVertical, //directx
                 ImageFormat = cfg.ImageFormat,
                 CutoutDither = cfg.CutoutDither,
                 CutoutThreshold = cfg.CutoutThreshold,
@@ -69,8 +71,25 @@ namespace Editor.Assets.Importers
 
         public string CustomFileIcon => "Content/Icons/FileTexture.png";
 
+        private const string DefaultTomlContents = @"
+flip_vertical = false
+image_format = ""BC3""
+cutout_dither = false
+cutout_threshold = 127
+gamma_correct = false
+premultiplied_alpha = false
+mipmap_filter = ""Box""
+max_mipmap_count = 2147483647
+min_mipmap_size = 1
+generate_mipmaps = false
+image_type = ""Colormap""
+scale_alpha_for_mipmaps = false
+";
+
         private class TextureConfig
         {
+            public bool ImportFile { get; set; } = true;
+
             public bool FlipVertical { get; set; }
             public TextureImageFormat ImageFormat { get; set; }
             public bool CutoutDither { get; set; }

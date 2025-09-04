@@ -36,16 +36,23 @@ namespace Primary.Assets
 
         public string? ReadAsString(ReadOnlySpan<char> path, BundleReader? bundleToReadFrom = null)
         {
-            if (bundleToReadFrom?.ContainsFile(path.ToString()) ?? false)
+            try
             {
-                return bundleToReadFrom.ReadString(path.ToString());
-            }
+                if (bundleToReadFrom?.ContainsFile(path.ToString()) ?? false)
+                {
+                    return bundleToReadFrom.ReadString(path.ToString());
+                }
 
-            for (int i = 0; i < _filesystem.Count; i++)
+                for (int i = 0; i < _filesystem.Count; i++)
+                {
+                    ISubFilesystem filesystem = _filesystem[i];
+                    if (filesystem.Exists(path))
+                        return filesystem.ReadString(path);
+                }
+            }
+            catch (Exception ex)
             {
-                ISubFilesystem filesystem = _filesystem[i];
-                if (filesystem.Exists(path))
-                    return filesystem.ReadString(path);
+                
             }
 
             return null;
@@ -53,17 +60,24 @@ namespace Primary.Assets
 
         public Stream? OpenAsStream(ReadOnlySpan<char> path, BundleReader? bundleToReadFrom = null)
         {
-            if (bundleToReadFrom?.ContainsFile(path.ToString()) ?? false)
+            try
             {
-                Memory<byte> memory = bundleToReadFrom.ReadBytes(path.ToString());
-                return memory.AsStream();
-            }
+                if (bundleToReadFrom?.ContainsFile(path.ToString()) ?? false)
+                {
+                    Memory<byte> memory = bundleToReadFrom.ReadBytes(path.ToString());
+                    return memory.AsStream();
+                }
 
-            for (int i = 0; i < _filesystem.Count; i++)
+                for (int i = 0; i < _filesystem.Count; i++)
+                {
+                    ISubFilesystem filesystem = _filesystem[i];
+                    if (filesystem.Exists(path))
+                        return filesystem.OpenStream(path);
+                }
+            }
+            catch (Exception ex)
             {
-                ISubFilesystem filesystem = _filesystem[i];
-                if (filesystem.Exists(path))
-                    return filesystem.OpenStream(path);
+
             }
 
             return null;
@@ -71,18 +85,25 @@ namespace Primary.Assets
 
         public bool DoesFileExist(ReadOnlySpan<char> path, BundleReader? bundleToReadFrom = null)
         {
-            if (bundleToReadFrom != null)
+            try
             {
-                return bundleToReadFrom.ContainsFile(path.ToString());
-            }
-            else
-            {
-                for (int i = 0; i < _filesystem.Count; i++)
+                if (bundleToReadFrom != null)
                 {
-                    ISubFilesystem filesystem = _filesystem[i];
-                    if (filesystem.Exists(path))
-                        return true;
+                    return bundleToReadFrom.ContainsFile(path.ToString());
                 }
+                else
+                {
+                    for (int i = 0; i < _filesystem.Count; i++)
+                    {
+                        ISubFilesystem filesystem = _filesystem[i];
+                        if (filesystem.Exists(path))
+                            return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+
             }
 
             return false;

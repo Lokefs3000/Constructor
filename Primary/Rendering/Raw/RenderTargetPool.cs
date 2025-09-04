@@ -32,6 +32,13 @@ namespace Primary.Rendering.Raw
 
                 _renderTargets.Add(id, rt);
             }
+            else if (rt.Description.Dimensions.AsVector2() != clientSize)
+            {
+                rt.Dispose();
+                _renderTargets.Remove(id);
+
+                return GetOrCreate(id, clientSize);
+            }
 
             return rt;
         }

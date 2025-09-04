@@ -1,4 +1,5 @@
 ﻿using Arch.Core.Extensions;
+using Primary.Assets;
 using Primary.Common;
 using Primary.Components;
 using Primary.Editor;
@@ -8,8 +9,10 @@ using Primary.Rendering.Data;
 using Primary.Rendering.Forward;
 using Primary.Rendering.Pooling;
 using Primary.Rendering.Raw;
+using Primary.RenderLayer;
 using Primary.RHI;
 using Serilog;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace Primary.Rendering
@@ -30,9 +33,13 @@ namespace Primary.Rendering
         private RenderTargetPool _renderTargetPool;
         private Blitter _blitter;
 
+        private MaterialAsset _missingMaterial;
+
         private IRenderPath _path;
 
         private Window? _defaultWindow;
+
+        private RenderingConfig _config;
 
         private bool _disposedValue;
 
@@ -52,13 +59,13 @@ namespace Primary.Rendering
             _renderTargetPool = new RenderTargetPool(_graphicsDevice);
             _blitter = new Blitter();
 
+            _missingMaterial = AssetManager.LoadAsset<MaterialAsset>("Content/Missing.mat", true)!;
+
             _path = new ForwardRenderPath(this);
 
             _defaultWindow = null;
 
-            _renderPassManager.AddRenderPass<ShadowPass>();
-            _renderPassManager.AddRenderPass<ForwardOpaquePass>();
-            _renderPassManager.AddRenderPass<FinalBlitPass>();
+            _config = new RenderingConfig();
         }
 
         protected virtual void Dispose(bool disposing)
@@ -108,7 +115,7 @@ namespace Primary.Rendering
                 _commandBufferPool.PrepareNewFrame();
                 _renderPassManager.ReorganizePassesIfRequired();
                 _frameCollector.SetupScene(_renderScene);
-                _frameCollector.CollectWorld(_renderBatcher);
+                _frameCollector.CollectWorld(_renderBatcher, _missingMaterial);
 
                 //_frameUploadManager.UploadPending();
                 //_frameUploadManager.OpenBuffersForFrame();
@@ -148,8 +155,12 @@ namespace Primary.Rendering
         private void SetupRenderState(ref RSOutputViewport outputViewport)
         {
             {
+                Vector2 outputSize = outputViewport.ClientSize;
+                if (outputSize.X >= 1.0f && outputSize.Y >= 1.0f)
+                    outputSize = _config.OutputViewport;
+
                 RenderPassViewportData rpViewportData = _renderPassData.Get<RenderPassViewportData>()!;
-                rpViewportData.CameraRenderTarget = _renderTargetPool.GetOrCreate(outputViewport.Id, outputViewport.ClientSize);
+                rpViewportData.CameraRenderTarget = _renderTargetPool.GetOrCreate(outputViewport.Id, outputSize);
                 rpViewportData.BackBufferRenderTarget = _swapChainCache.GetOrAddDefault(_defaultWindow!).BackBuffer;
                 rpViewportData.RefCameraSetter = outputViewport.RootEntity.Get<Camera>();
                 rpViewportData.View = outputViewport.ViewMatrix;
@@ -157,6 +168,10 @@ namespace Primary.Rendering
                 rpViewportData.VP = outputViewport.ViewMatrix * outputViewport.ProjectionMatrix;
                 rpViewportData.ViewPosition = outputViewport.ViewPosition;
                 rpViewportData.ViewDirection = outputViewport.ViewDirection;
+
+                //cfg
+                if (!_config.OutputRenderTarget.IsNull)
+                    rpViewportData.BackBufferRenderTarget = _config.OutputRenderTarget.RHIRenderTarget!;
             }
 
             {
@@ -176,8 +191,31 @@ namespace Primary.Rendering
 
         public IRenderPath RenderPath => _path;
 
+        public ref RenderingConfig Configuration => ref _config;
+
         internal event Action<IDebugCallbacks>? EmitDebugData;
 
         public static GraphicsDevice Device => NullableUtility.ThrowIfNull((GraphicsDevice?)s_gd.Target);
+    }
+    
+    public struct RenderingConfig
+    {
+        public GfxRenderTarget OutputRenderTarget;
+        public Vector2 OutputViewport;
+
+        public RenderingMode RenderMode;
+    }
+
+    public enum RenderingMode : byte
+    {
+        Lit = 0,
+        Unlit,
+        Wireframe,
+        Normals,
+        Lighting,
+        DetailLighting,
+        Reflections,
+        ShaderComplexity,
+        Overdraw
     }
 }

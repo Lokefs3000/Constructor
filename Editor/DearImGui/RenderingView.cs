@@ -25,6 +25,7 @@ namespace Editor.DearImGui
         internal RenderingView()
         {
             _components = [
+                new GarbageCollectorVC(),
                 new LightManagerVC()
                 ];
         }
@@ -35,6 +36,7 @@ namespace Editor.DearImGui
             foreach (IViewComponent component in _components)
             {
                 component.Render(ref cursor);
+                cursor.Y += 24.0f;
             }
         }
 
@@ -61,6 +63,30 @@ namespace Editor.DearImGui
         internal interface IViewComponent
         {
             public void Render(ref Vector2 cursor);
+        }
+
+        private class GarbageCollectorVC : IViewComponent
+        {
+            private long _prevUsage;
+
+            public void Render(ref Vector2 cursor)
+            {
+                ImDrawListPtr drawList = ImGui.GetForegroundDrawList();
+
+                LightManager lightManager = Unsafe.As<ForwardRenderPath>(Editor.GlobalSingleton.RenderingManager.RenderPath).Lights;
+
+                GCMemoryInfo memoryInfo = GC.GetGCMemoryInfo();
+                long memUsage = GC.GetTotalMemory(false);
+
+                long growth = memUsage - (memUsage < _prevUsage ? (memUsage + _prevUsage) : _prevUsage);
+                _prevUsage = memUsage;
+
+                DrawHeader(drawList, ref cursor, "Garbage collector");
+                DrawText(drawList, ref cursor, "Managed:", $"{FileUtility.FormatSize(memUsage, "F4", CultureInfo.InvariantCulture)}/{FileUtility.FormatSize(memoryInfo.HeapSizeBytes, "F4", CultureInfo.InvariantCulture)} ({FileUtility.FormatSize(growth, "F2", CultureInfo.InvariantCulture)}/s)");
+                DrawText(drawList, ref cursor, "Objects:", $"f:{memoryInfo.FinalizationPendingCount} p:{memoryInfo.PinnedObjectsCount}");
+                DrawText(drawList, ref cursor, "Bytes:", $"f:{FileUtility.FormatSize(memoryInfo.FragmentedBytes, "N", CultureInfo.InvariantCulture)} t:{FileUtility.FormatSize(memoryInfo.TotalAvailableMemoryBytes, "N", CultureInfo.InvariantCulture)} c:{FileUtility.FormatSize(memoryInfo.TotalCommittedBytes, "N", CultureInfo.InvariantCulture)}");
+                DrawText(drawList, ref cursor, "Recent:", memoryInfo.Generation == 2 ? $"gen{memoryInfo.Generation} !!!" : $"gen{memoryInfo.Generation}");
+            }
         }
 
         private class LightManagerVC : IViewComponent

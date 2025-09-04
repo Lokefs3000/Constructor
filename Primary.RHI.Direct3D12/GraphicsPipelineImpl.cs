@@ -190,12 +190,16 @@ namespace Primary.RHI.Direct3D12
             }
             _stateDescription.BlendState = modBlend;
 
+            int j = 0;
             for (int i = 0; i < desc.InputElements.Length; i++)
             {
                 ref InputElementDescription input = ref desc.InputElements[i];
+                if (input.Format == InputElementFormat.Padding)
+                    continue;
+
                 DecodeSemantic(input.Semantic, out string name, out uint index);
 
-                _stateDescription.InputLayout.Elements[i] = new Vortice.Direct3D12.InputElementDescription
+                _stateDescription.InputLayout.Elements[j++] = new Vortice.Direct3D12.InputElementDescription
                 {
                     SemanticName = name,
                     SemanticIndex = index,
@@ -210,6 +214,14 @@ namespace Primary.RHI.Direct3D12
                     },
                     InstanceDataStepRate = (uint)input.InstanceDataStepRate
                 };
+            }
+
+            if (j != _stateDescription.InputLayout.Elements.Length)
+            {
+                Vortice.Direct3D12.InputElementDescription[] old = _stateDescription.InputLayout.Elements;
+                _stateDescription.InputLayout.Elements = new Vortice.Direct3D12.InputElementDescription[j];
+
+                Array.Copy(old, _stateDescription.InputLayout.Elements, j);
             }
 
             ResultChecker.ThrowIfUnhandled(device.D3D12Device.CreateGraphicsPipelineState(_stateDescription, out ID3D12PipelineState? pipelineState), _device);

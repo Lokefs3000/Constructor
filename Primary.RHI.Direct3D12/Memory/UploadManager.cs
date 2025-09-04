@@ -98,31 +98,43 @@ namespace Primary.RHI.Direct3D12.Memory
             return (uploadBuffer.Resource, uploadBuffer.CalculateOffset(mapped));
         }
 
-        private (ID3D12Resource Resource, uint Offset) UploadToInternalAllocationSliced(Span<nint> dataSlices, Span<uint> dataSizes, uint totalDataSize)
+        private (ID3D12Resource Resource, uint Offset) UploadToInternalAllocationSliced(Span<nint> dataSlices, PlacedSubresourceFootPrint[] layouts, uint[] rows, ulong[] rowSizesInBytes, ulong totalSizeInBytes, FormatInfo info)
         {
             Terra.D3D12MA_VirtualAllocation allocation = new Terra.D3D12MA_VirtualAllocation();
 
             SubUploadBuffer uploadBuffer = _uploadBuffers[_uploadBuffers.Count - 1];
-            nint mapped = uploadBuffer.Rent(&allocation, totalDataSize);
+            nint mapped = uploadBuffer.Rent(&allocation, (uint)totalSizeInBytes);
 
             if (mapped == nint.Zero)
             {
-                while (_baselineUploadSize < totalDataSize) _baselineUploadSize *= 2;
+                while (_baselineUploadSize < totalSizeInBytes) _baselineUploadSize *= 2;
 
                 uploadBuffer = new SubUploadBuffer(_device, _baselineUploadSize);
                 _uploadBuffers.Add(uploadBuffer);
 
-                mapped = uploadBuffer.Rent(&allocation, totalDataSize);
+                mapped = uploadBuffer.Rent(&allocation, (uint)totalSizeInBytes);
                 ExceptionUtility.Assert(mapped != nint.Zero);
             }
 
-            for (int i = 0; i < dataSizes.Length; i++)
+            for (int i = 0; i < layouts.Length; i++)
             {
-                NativeMemory.Copy(dataSlices[i].ToPointer(), mapped.ToPointer(), dataSizes[i]);
+                ref PlacedSubresourceFootPrint footPrint = ref layouts[i];
+                CopyToDestination(mapped + (nint)footPrint.Offset, dataSlices[i], (uint)info.CalculatePitch(footPrint.Footprint.Width), rows[i], footPrint.Footprint.RowPitch);
             }
 
             uploadBuffer.Return(allocation);
             return (uploadBuffer.Resource, uploadBuffer.CalculateOffset(mapped));
+
+            void CopyToDestination(nint dataPointer, nint sourcePointer, uint srcRowPitch, uint row, ulong rowSizeInBytes)
+            {
+                byte* dstSlice = (byte*)dataPointer.ToPointer();
+                byte* srcSlice = (byte*)sourcePointer.ToPointer();
+
+                for (uint y = 0; y < row; y++)
+                {
+                    NativeMemory.Copy(srcSlice + srcRowPitch * y, dstSlice + rowSizeInBytes * y, (nuint)rowSizeInBytes);
+                }
+            }
         }
 
         //TODO: improve this by caching using the TLSF allocator and do it all in one big buffer at frame start
@@ -149,6 +161,11 @@ namespace Primary.RHI.Direct3D12.Memory
             UInt3 size = new UInt3((uint)desc.Width, desc.Height, desc.Depth);
             uint mask = D3D12.TextureDataPitchAlignment - 1;
 
+            PlacedSubresourceFootPrint[] dstLayouts = new PlacedSubresourceFootPrint[dataSlices.Length];
+            uint[] dstRows = new uint[dataSlices.Length];
+            ulong[] dstRowSizeInBytes = new ulong[dataSlices.Length];
+            _device.D3D12Device.GetCopyableFootprints(resource.Description, 0, (uint)dataSlices.Length, 0, dstLayouts.AsSpan(), dstRows.AsSpan(), dstRowSizeInBytes.AsSpan(), out ulong totalBytes);
+
             uint* dataSizes = stackalloc uint[dataSlices.Length];
             for (int i = 0; i < dataSlices.Length; i++)
             {
@@ -161,7 +178,7 @@ namespace Primary.RHI.Direct3D12.Memory
                 dataSizes[i] = sliceDataSize;
             }
 
-            (ID3D12Resource srcRes, uint srcOffset) = UploadToInternalAllocationSliced(dataSlices, new Span<uint>(dataSizes, dataSlices.Length), dataSize);
+            (ID3D12Resource srcRes, uint srcOffset) = UploadToInternalAllocationSliced(dataSlices, dstLayouts, dstRows, dstRowSizeInBytes, totalBytes, info);
 
             using ID3D12CommandAllocator commandAllocator = _device.D3D12Device.CreateCommandAllocator(CommandListType.Copy);
             using ID3D12GraphicsCommandList commandList = _device.D3D12Device.CreateCommandList<ID3D12GraphicsCommandList>(CommandListType.Copy, commandAllocator);
@@ -169,18 +186,10 @@ namespace Primary.RHI.Direct3D12.Memory
             uint totalDataOffset = srcOffset;
             for (int i = 0; i < dataSlices.Length; i++)
             {
-                UInt3 mipSize = new UInt3(size.X >> i, size.Y >> i, size.Z);
+                ref PlacedSubresourceFootPrint footPrint = ref dstLayouts[i];
+                footPrint.Offset += srcOffset;
 
-                //uint byteWidth = mipSize.X * (uint)info.BytesPerPixel;
-                uint rowPitch = (uint)info.CalculatePitch(mipSize.X);//(uint)(byteWidth + (-byteWidth & mask));
-   
-                commandList.CopyTextureRegion(new TextureCopyLocation(resource, (uint)i), Int3.Zero, new TextureCopyLocation(srcRes, new PlacedSubresourceFootPrint
-                {
-                    Offset = totalDataOffset,
-                    Footprint = new SubresourceFootPrint(desc.Format, (uint)desc.Width, desc.Height, desc.Depth, rowPitch)
-                }));
-
-                totalDataOffset += rowPitch * mipSize.Y;
+                commandList.CopyTextureRegion(new TextureCopyLocation(resource, (uint)i), Int3.Zero, new TextureCopyLocation(srcRes, footPrint));
             }
 
             commandList.Close();

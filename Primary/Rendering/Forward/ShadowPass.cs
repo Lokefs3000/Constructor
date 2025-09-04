@@ -62,19 +62,22 @@ namespace Primary.Rendering.Forward
 
             CommandBuffer commandBuffer = CommandBufferPool.Get();
 
-            commandBuffer.SetDepthStencil(shadows.ShadowAtlas);
-            commandBuffer.ClearDepthStencil(shadows.ShadowAtlas, RHI.ClearFlags.Depth);
-
-            commandBuffer.SetScissorRect(new RHI.ScissorRect(0, 0, 10000, 10000));
-
-            commandBuffer.SetShader(_shadowPassShader);
-            commandBuffer.SetBindGroups(forward.BuffersBindGroup, forward.LightingBindGroup, _shadowBindGroup);
-
-            Span<ShadowManager.FrameCasterData> casters = shadows.FrameCasters;
-            for (int i = 0; i < casters.Length; i++)
+            using (new CommandBufferEventScope(commandBuffer, "ForwardRP - Shadows"))
             {
-                ref ShadowManager.FrameCasterData lightData = ref casters[i];
-                DrawCasterView(commandBuffer, forward, batcher, ref lightData);
+                commandBuffer.SetDepthStencil(shadows.ShadowAtlas);
+                commandBuffer.ClearDepthStencil(shadows.ShadowAtlas, RHI.ClearFlags.Depth);
+
+                commandBuffer.SetScissorRect(new RHI.ScissorRect(0, 0, 10000, 10000));
+
+                commandBuffer.SetShader(_shadowPassShader);
+                commandBuffer.SetBindGroups(forward.BuffersBindGroup, forward.LightingBindGroup, _shadowBindGroup);
+
+                Span<ShadowManager.FrameCasterData> casters = shadows.FrameCasters;
+                for (int i = 0; i < casters.Length; i++)
+                {
+                    ref ShadowManager.FrameCasterData lightData = ref casters[i];
+                    DrawCasterView(commandBuffer, forward, batcher, ref lightData);
+                }
             }
 
             CommandBufferPool.Return(commandBuffer);

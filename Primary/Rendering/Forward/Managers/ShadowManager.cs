@@ -143,7 +143,7 @@ namespace Primary.Rendering.Forward.Managers
                 {
                     Matrix4x4 lightProjection =
                         Matrix4x4.CreateLookTo(transform.Transformation.Translation, transform.ForwardVector, transform.UpVector) *
-                        Matrix4x4.CreatePerspectiveFieldOfView(light.OuterCutOff * 2.0f, 1.0f, 0.1f, 20.0f);
+                        Matrix4x4.CreatePerspectiveFieldOfView(light.OuterCutOff * 2.0f/*float.DegreesToRadians(125.0f)*/, 1.0f, 0.1f, 20.0f);
 
                     _frameCasters.Add(new FrameCasterData(lightProjection, transform.Transformation.Translation, Vector2.Zero, casterData.Importance switch
                     {

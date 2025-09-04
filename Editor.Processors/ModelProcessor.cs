@@ -213,6 +213,8 @@ namespace Editor.Processors
 
         private void WriteMaterials(BinaryWriter bw, Scene* scene)
         {
+            bw.Write((ushort)0);
+            return;
             bw.Write((ushort)scene->MNumMaterials);
 
             for (uint i = 0; i < scene->MNumMaterials; i++)
@@ -256,6 +258,8 @@ namespace Editor.Processors
 
         private void WriteLights(BinaryWriter bw, Scene* scene)
         {
+            bw.Write((ushort)0);
+            return;
             bw.Write((ushort)scene->MNumLights);
 
             for (uint j = 0; j < scene->MNumLights; j++)

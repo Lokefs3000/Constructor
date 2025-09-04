@@ -23,7 +23,7 @@ using RHI = Primary.RHI;
 
 namespace Editor.Rendering.Gizmos
 {
-    [RenderPassPriority(true, typeof(FinalBlitPass))]
+    //[RenderPassPriority(true, typeof(FinalBlitPass))]
     internal sealed class GizmoRenderPass : IRenderPass
     {
         private ObjectPool<PooledList<IconDrawArgs>> _iconPool;

@@ -95,7 +95,7 @@ float CalculatePointShadowIntensity(sbRawLight lightData, float3 normal, float3 
         return 0.0;
     }
     
-    float normalBias = saturate(1.0 - dot(normal, lightDir)) * 0.05 + 0.00005;
+    float normalBias = saturate(1.0 - dot(normal, lightDir)) * 0.00005;
     pos += normal * normalBias;
 
     float3 fragToLight = pos - lightPos;
@@ -128,7 +128,7 @@ float CalculateSpotShadowIntensity(sbRawLight lightData, float3 normal, float3 l
 
     sbShadowData shadowData = sbShadowBuffer[lightData.ShadowIndex];
     
-    float normalBias = saturate(1.0 - dot(normal, lightDir)) * 0.05 + 0.05;
+    float normalBias = saturate(1.0 - dot(normal, lightDir)) * 0.005 + 0.05;
     pos += normal * normalBias;
 
     float4 fragPosLightSpace = mul(shadowData.LightProjection, float4(pos, 1.0));
@@ -179,7 +179,7 @@ void ComputePointLight(sbRawLight light, MatProps mat, float3 fragPos, float3 vi
     float spec = pow(max(dot(normal, halfwayDir), 0.0), mat.Shininess);
     
     float distance = length(light.Position - fragPos);
-    float attenutation = 1.0 / (distance * distance);
+    float attenutation = 1.0 / (1.0 + distance * distance);
     
     diffuse = light.Diffuse * (diff * attenutation);
     specular = light.Specular * (spec * attenutation);
@@ -214,7 +214,7 @@ void ComputeSpotLight(sbRawLight light, MatProps mat, float3 fragPos, float3 ver
     }
 
     float distance = length(light.Position - fragPos);
-    float attenutation = 1.0 / (distance * distance);
+    float attenutation = 1.0 / (1.0 + distance * distance);
 
     attenutation *= intensity;
 
@@ -243,7 +243,7 @@ float3 ComputeLightColor(MatProps mat, float3 ambient, float3 diffuse, float3 sp
 float3 ComputeAllLights(MatProps mat, float3 fragPos, float3 vertexPos, float3 normal)
 {
     float3 ambient, diffuse, specular;
-    float3 color = mat.Diffuse * 0.05;
+    float3 color = mat.Diffuse * 0.2;
 
     float3 viewDir = normalize( cbWorld.ViewPos - fragPos);
     

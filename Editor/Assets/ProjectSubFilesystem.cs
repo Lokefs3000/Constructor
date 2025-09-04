@@ -143,16 +143,19 @@ namespace Editor.Assets
             else
             {
                 bool hasNewRemap = false;
-                if (pipeline.CanBeImported(path))
+                if (!pipeline.IsAssetUpToDate(localPath))
                 {
-                    EdLog.Assets.Information("Waiting on new file import: {lc}", path.ToString());
-                    Task? task = pipeline.ImportChangesOrGetRunning(path);
-                    task?.Wait();
-
-                    if (_fileRemappings.TryGetValue(localPath, out remap))
+                    if (pipeline.CanBeImported(path))
                     {
-                        absolutePath = Path.Combine(_absolutePath, remap);
-                        hasNewRemap = true;
+                        EdLog.Assets.Information("Waiting on new file import: {lc}", path.ToString());
+                        Task? task = pipeline.ImportChangesOrGetRunning(path);
+                        task?.Wait();
+
+                        if (_fileRemappings.TryGetValue(localPath, out remap))
+                        {
+                            absolutePath = Path.Combine(_absolutePath, remap);
+                            hasNewRemap = true;
+                        }
                     }
                 }
 
@@ -160,7 +163,7 @@ namespace Editor.Assets
                     absolutePath = Path.Combine(_absolutePath, localPath);
             }
 
-            return File.Open(absolutePath, FileMode.Open, FileAccess.Read);
+            return FileUtility.TryWaitOpen(absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         }
 
         public bool Exists(ReadOnlySpan<char> path)

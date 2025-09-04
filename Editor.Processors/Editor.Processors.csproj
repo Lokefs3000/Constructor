@@ -10,7 +10,7 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.0" />
     <PackageReference Include="Silk.NET.Assimp" Version="2.22.0" />
-    <PackageReference Include="System.Text.Json" Version="9.0.6" />
+    <PackageReference Include="System.Text.Json" Version="9.0.8" />
     <PackageReference Include="Tomlyn" Version="0.19.0" />
     <PackageReference Include="Vortice.Direct3D12" Version="3.6.2" />
     <PackageReference Include="Vortice.Dxc" Version="3.6.2" />

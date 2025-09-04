@@ -39,6 +39,7 @@ namespace Primary.Common
             {
                 if (dbSize <= 1024.0)
                     return $"{dbSize.ToString(format, provider)}{s_fileSizes[i]}";
+                dbSize /= 1024.0;
             }
 
             return $"{dbSize.ToString(format, provider)}pb";

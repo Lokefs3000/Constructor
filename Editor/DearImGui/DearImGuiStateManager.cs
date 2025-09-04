@@ -1,4 +1,5 @@
-﻿using Editor.Rendering.Gui;
+﻿using Editor.Rendering.Gizmos;
+using Editor.Rendering.Gui;
 using Hexa.NET.ImGui;
 using Hexa.NET.ImGui.Backends.SDL3;
 using Primary.Assets;
@@ -109,7 +110,8 @@ namespace Editor.DearImGui
 
         private static void EventRecived(SDL_Event @event) => ImGuiImplSDL3.ProcessEvent(ref Unsafe.As<SDL_Event, SDLEvent>(ref @event));
 
-        [RenderPassPriority(true, typeof(FinalBlitPass))]
+        //[RenderPassPriority(true, typeof(FinalBlitPass))]
+        [RenderPassPriority(true, typeof(GizmoRenderPass))]
         private class DearImGuiRenderPass : IRenderPass
         {
             private RHI.GraphicsDevice _device;
@@ -291,7 +293,8 @@ namespace Editor.DearImGui
                                 if (cmd.TexRef.TexID.Handle == 0)
                                     continue;
 
-                                _bindGroup.SetResource("txTexture", RHI.Resource.FromIntPtr((nint)cmd.TexRef.TexID.Handle) as RHI.Texture);
+                                RHI.Resource? resource = RHI.Resource.FromIntPtr((nint)cmd.TexRef.TexID.Handle);
+                                _bindGroup.SetResource("txTexture", resource);
                             }
 
                             commandBuffer.SetScissorRect(new RHI.ScissorRect((int)cmd.ClipRect.X, (int)cmd.ClipRect.Y, (int)cmd.ClipRect.Z, (int)cmd.ClipRect.W));

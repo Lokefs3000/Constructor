@@ -19,12 +19,19 @@ namespace Primary.Timing
         private double _deltaTimeDouble;
         private float _deltaTime;
 
+        private int _frameIndex;
+
         internal Time()
         {
             s_instance = this;
 
             _isFirstFrame = true;
             _lastFrameTimestamp = 0;
+
+            _deltaTimeDouble = 0;
+            _deltaTime = 0;
+
+            _frameIndex = 0;
         }
 
         public void BeginNewFrame()
@@ -45,11 +52,15 @@ namespace Primary.Timing
             }
 
             _lastFrameTimestamp = timestampThisFrame;
+
+            _frameIndex++;
         }
 
         public static double DeltaTimeDouble => Instance._deltaTimeDouble;
         public static float DeltaTime => Instance._deltaTime;
 
         public static long TimestampForActiveFrame => Instance._lastFrameTimestamp;
+
+        public static int FrameIndex => Instance._frameIndex;
     }
 }

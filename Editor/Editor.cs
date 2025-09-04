@@ -41,7 +41,7 @@ namespace Editor
         private RenderingView _renderingView;
         private EditorTaskViewer _editorTaskViewer;
         private ContentView _contentView;
-        private DebugStatisticsView _debugStatisticsView;
+        private SceneView _sceneView;
 
         internal Editor(string baseProjectPath) : base()
         {
@@ -71,7 +71,7 @@ namespace Editor
             _renderingView = new RenderingView();
             _editorTaskViewer = new EditorTaskViewer();
             _contentView = new ContentView();
-            _debugStatisticsView = new DebugStatisticsView();
+            _sceneView = new SceneView();
         }
 
         public override void Dispose()
@@ -98,7 +98,7 @@ namespace Editor
 
             Scene scene = SceneManager.CreateScene("Demo");
 
-            StaticDemoScene1.Load(this);
+            StaticDemoScene2.Load(this);
 
             EventManager.PumpDefaultPause += PumpEditorLoop;
 
@@ -183,6 +183,7 @@ namespace Editor
             _renderingView.Render();
             _editorTaskViewer.Render();
             _contentView.Render();
+            _sceneView.Render();
             //_debugStatisticsView.Render();
 
             GCMemoryInfo memoryInfo = GC.GetGCMemoryInfo();
@@ -210,6 +211,8 @@ namespace Editor
         {
             AssetFilesystem.AddFilesystem(_projectSubFilesystem);
             AssetFilesystem.ShaderLibrary.AddSubLibrary(_projectShaderLibrary);
+
+            _assetPipeline.PollRemainingEvents();
         }
 
         public string ProjectPath => _baseProjectPath;

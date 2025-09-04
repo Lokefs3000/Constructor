@@ -6,6 +6,7 @@ using Primary.GUI.ImGui;
 using Primary.Profiling;
 using Primary.Rendering.Collections;
 using Primary.Scenes;
+using Primary.Timing;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -120,6 +121,7 @@ namespace Primary.Rendering.Forward.Managers
                 Shadows = shadowManager,
 
                 BypassDirtyRequirement = bypassDirtyRequirement,
+                FrameIndex = Time.FrameIndex,
             };
 
             World world = Engine.GlobalSingleton.SceneManager.World;
@@ -145,10 +147,11 @@ namespace Primary.Rendering.Forward.Managers
             public ShadowManager Shadows;
 
             public bool BypassDirtyRequirement;
+            public int FrameIndex;
 
             public void Update(Entity e, ref EntityEnabled enabled, ref WorldTransform transform, ref LightRenderingData renderingData, ref Light light)
             {
-                if (light.Dirty || BypassDirtyRequirement)
+                if ((light.Dirty || transform.UpdateIndex == FrameIndex) || BypassDirtyRequirement)
                 {
                     if (light.Type > LightType.DirectionalLight)
                     {

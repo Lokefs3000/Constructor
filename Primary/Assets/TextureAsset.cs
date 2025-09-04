@@ -18,6 +18,10 @@ namespace Primary.Assets
 
         public ResourceStatus Status => _assetData.Status;
 
+        public int Width => _assetData.Width;
+        public int Height => _assetData.Height;
+        public RHI.TextureFormat Format => _assetData.Format;
+
         public nint Handle => _assetData.Texture?.Handle ?? nint.Zero;
     }
 
@@ -29,6 +33,10 @@ namespace Primary.Assets
 
         private RHI.Texture? _texture;
 
+        private int _width;
+        private int _height;
+        private RHI.TextureFormat _format;
+
         internal TextureAssetData()
         {
             _asset = new WeakReference(null);
@@ -36,6 +44,10 @@ namespace Primary.Assets
             _status = ResourceStatus.Pending;
 
             _texture = null;
+
+            _width = 0;
+            _height = 0;
+            _format = RHI.TextureFormat.Undefined;
         }
 
         public void Dispose()
@@ -46,6 +58,10 @@ namespace Primary.Assets
 
             _texture?.Dispose();
             _texture = null;
+
+            _width = 0;
+            _height = 0;
+            _format = RHI.TextureFormat.Undefined;
         }
 
         public void ResetInternalState()
@@ -68,6 +84,10 @@ namespace Primary.Assets
             _status = ResourceStatus.Success;
 
             _texture = texture;
+
+            _width = (int)texture.Description.Width;
+            _height = (int)texture.Description.Height;
+            _format = texture.Description.Format;
         }
 
         internal void UpdateAssetFailed(TextureAsset asset)
@@ -80,6 +100,10 @@ namespace Primary.Assets
         internal ResourceStatus Status => _status;
 
         internal RHI.Texture? Texture => _texture;
+
+        internal int Width => _width;
+        internal int Height => _height;
+        internal RHI.TextureFormat Format => _format;
 
         public Type AssetType => typeof(TextureAsset);
     }

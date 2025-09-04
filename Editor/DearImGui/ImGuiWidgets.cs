@@ -83,6 +83,88 @@ namespace Editor.DearImGui
 
             return ret;
         }
+
+        public static bool SliderInt(in string headerText, ref int value, int minimum = int.MinValue, int maximum = int.MaxValue)
+        {
+            Vector2 contentAvail = ImGui.GetContentRegionAvail();
+            Vector2 screenCursor = ImGui.GetCursorScreenPos();
+
+            ImGui.TextUnformatted(headerText);
+            ImGui.SameLine();
+
+            ImGui.PushID(headerText);
+
+            ImGui.SetCursorScreenPos(screenCursor + new Vector2(contentAvail.X * 0.4f, 0.0f));
+            ImGui.SetNextItemWidth(contentAvail.X * 0.6f);
+
+            byte def = 1;
+            bool ret = ImGui.SliderInt(ref def, ref value, minimum, maximum);
+
+            ImGui.PopID();
+
+            return ret;
+        }
+
+        public static bool Checkbox(in string headerText, ref bool value)
+        {
+            Vector2 contentAvail = ImGui.GetContentRegionAvail();
+            Vector2 screenCursor = ImGui.GetCursorScreenPos();
+
+            ImGui.TextUnformatted(headerText);
+            ImGui.SameLine();
+
+            ImGui.PushID(headerText);
+
+            ImGui.SetCursorScreenPos(screenCursor + new Vector2(contentAvail.X * 0.4f, 0.0f));
+            ImGui.SetNextItemWidth(contentAvail.X * 0.6f);
+
+            byte def = 1;
+            bool ret = ImGui.Checkbox(&def, ref value);
+
+            ImGui.PopID();
+
+            return ret;
+        }
+
+        public static bool ComboBox(in string headerText, ref string selected, ReadOnlySpan<string> options)
+        {
+            Vector2 contentAvail = ImGui.GetContentRegionAvail();
+            Vector2 screenCursor = ImGui.GetCursorScreenPos();
+
+            ImGui.TextUnformatted(headerText);
+            ImGui.SameLine();
+
+            ImGui.PushID(headerText);
+
+            ImGui.SetCursorScreenPos(screenCursor + new Vector2(contentAvail.X * 0.4f, 0.0f));
+            ImGui.SetNextItemWidth(contentAvail.X * 0.6f);
+
+            bool ret = false;
+
+            int hash = selected.GetDjb2HashCode();
+
+            byte def = 1;
+            if (ImGui.BeginCombo(&def, selected))
+            {
+                for (int i = 0; i < options.Length; i++)
+                {
+                    ref readonly string curr = ref options[i];
+                    if (ImGui.Selectable(curr, hash == curr.GetDjb2HashCode()))
+                    {
+                        selected = curr;
+                        ret = true;
+
+                        break;
+                    }
+                }
+
+                ImGui.EndCombo();
+            }
+
+            ImGui.PopID();
+
+            return ret;
+        }
         #endregion
     }
 }

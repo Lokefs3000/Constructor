@@ -18,10 +18,18 @@
 
 	<ItemGroup>
 		<PackageReference Include="CommandLineParser" Version="2.9.1" />
+		<PackageReference Include="CsToml.Generator" Version="1.7.2">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
 		<PackageReference Include="Hexa.NET.ImGui" Version="2.2.8.5" />
 		<PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.17.4" />
 		<PackageReference Include="RectpackSharp" Version="1.2.0" />
 		<PackageReference Include="StbImageSharper" Version="1.0.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Rendering\Paths\" />
 	</ItemGroup>
 
 	<Target Name="PatchExec" AfterTargets="PostBuildEvent">

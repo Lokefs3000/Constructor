@@ -20,6 +20,9 @@ namespace Primary.Assets
         private FrozenDictionary<Type, AssetLoader> _loaders;
 
         private SemaphoreSlim _semaphore;
+
+        private Lazy<ImmutableAssets> _immutableAssets;
+
         private bool _disposedValue;
 
         internal AssetManager()
@@ -35,7 +38,14 @@ namespace Primary.Assets
 
             _semaphore = new SemaphoreSlim(1);
 
-            s_instance = this;
+            _immutableAssets = new Lazy<ImmutableAssets>(() =>
+            {
+                return new ImmutableAssets(
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Content/DefaultTex_White.png", true)),
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Content/DefaultTex_Normal.png", true)));
+            }, LazyThreadSafetyMode.PublicationOnly);
+
+            s_instance = this; 
         }
 
         private void Dispose(bool disposing)
@@ -152,6 +162,8 @@ namespace Primary.Assets
         public static T? LoadAsset<T>(ReadOnlySpan<char> sourcePath, bool synchronous = false, BundleReader? bundleToReadFrom = null) where T : class, IAssetDefinition
             => NullableUtility.ThrowIfNull(s_instance).LoadAssetImpl<T>(sourcePath, synchronous, bundleToReadFrom);
 
+        public static ImmutableAssets Static => NullableUtility.ThrowIfNull(s_instance)._immutableAssets.Value;
+
         private readonly record struct LoadedAsset
         {
             public readonly WeakReference AssetReference;
@@ -178,4 +190,8 @@ namespace Primary.Assets
             }
         }
     }
+
+    public record class ImmutableAssets(
+        TextureAsset DefaultWhite,
+        TextureAsset DefaultNormal);
 }

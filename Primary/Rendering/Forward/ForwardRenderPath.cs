@@ -4,6 +4,8 @@ using Primary.Editor;
 using Primary.Profiling;
 using Primary.Rendering.Batching;
 using Primary.Rendering.Data;
+using Primary.Rendering.Forward;
+using Primary.Rendering.Forward.Debugging;
 using Primary.Rendering.Forward.Managers;
 using Primary.Rendering.Raw;
 using Serilog;
@@ -32,6 +34,14 @@ namespace Primary.Rendering
 
         private ShaderBindGroup _buffersBindGroup;
         private ShaderBindGroup _lightingBindGroup;
+
+        private ForwardOpaquePass _opaquePass;
+
+        private ShadowPass _shadowPass;
+
+        private FinalBlitPass _finalBlit;
+
+        private SDebugOpaquePass _sDebugOpaquePass;
 
         internal ForwardRenderPath(RenderingManager manager)
         {
@@ -76,6 +86,14 @@ namespace Primary.Rendering
                 new ShaderBindGroupVariable(ShaderVariableType.StructuredBuffer, "sbShadowBuffer"),
                 new ShaderBindGroupVariable(ShaderVariableType.StructuredBuffer, "sbShadowCubemaps"),
                 new ShaderBindGroupVariable(ShaderVariableType.Texture2D, "txShadowAtlas"));
+
+            _opaquePass = new ForwardOpaquePass();
+
+            _shadowPass = new ShadowPass();
+
+            _finalBlit = new FinalBlitPass();
+
+            _sDebugOpaquePass = new SDebugOpaquePass();
         }
 
         private void Dispose(bool disposing)
@@ -84,6 +102,12 @@ namespace Primary.Rendering
             {
                 if (disposing)
                 {
+                    _opaquePass?.Dispose();
+                    _shadowPass?.Dispose();
+                    _finalBlit?.Dispose();
+                    _sDebugOpaquePass?.Dispose();
+
+                    _shadowManager?.Dispose();
                     _lightManager?.Dispose();
 
                     _matrixBuffer?.Dispose();
@@ -118,6 +142,37 @@ namespace Primary.Rendering
 
                 _copyCommandBuffer.End();
                 Engine.GlobalSingleton.RenderingManager.GraphicsDevice.Submit(_copyCommandBuffer);
+            }
+
+            switch (renderer.Configuration.RenderMode)
+            {
+                case RenderingMode.Lit:
+                    {
+                        _shadowPass.ExecutePass(this, passData);
+                        _opaquePass.ExecutePass(this, passData);
+                        _finalBlit.ExecutePass(this, passData);
+
+                        break;
+                    }
+                case RenderingMode.Lighting:
+                case RenderingMode.DetailLighting:
+                case RenderingMode.Wireframe:
+                case RenderingMode.Normals:
+                case RenderingMode.Overdraw:
+                case RenderingMode.Unlit:
+                    {
+                        _sDebugOpaquePass.ExecutePass(this, passData);
+                        _finalBlit.ExecutePass(this, passData);
+                        break;
+                    }
+                case RenderingMode.Reflections:
+                    {
+                        break;
+                    }
+                case RenderingMode.ShaderComplexity:
+                    {
+                        break;
+                    }
             }
         }
 

@@ -80,7 +80,7 @@ namespace Editor.Assets
                     string? directory = Path.GetDirectoryName(localFile);
                     if (directory != null)
                     {
-                        string localDirectory = directory.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/');
+                        string localDirectory = (Path.IsPathFullyQualified(directory) ? directory.Substring(Editor.GlobalSingleton.ProjectPath.Length) : directory).Replace('\\', '/');
                         AddLocalDirectory(localFile, directory, localDirectory);
                     }
                 }

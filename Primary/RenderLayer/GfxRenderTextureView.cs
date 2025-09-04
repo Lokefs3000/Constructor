@@ -27,7 +27,7 @@ namespace Primary.RenderLayer
         public string Name { set => NullableUtility.ThrowIfNull(_internal).Name = value; }
 
         public bool IsNull => _internal == null;
-        public RHI.RenderTextureView? RHIBuffer => _internal;
+        public RHI.RenderTextureView? RHIRenderTextureView => _internal;
         public GfxResource Resource => new GfxResource(_internal);
 
         public static GfxRenderTextureView Null = new GfxRenderTextureView(null);

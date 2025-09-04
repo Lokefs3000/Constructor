@@ -34,11 +34,17 @@ namespace Primary.Assets.Loaders
             try
             {
                 using Stream? stream = AssetFilesystem.OpenStream(sourcePath, bundleToReadFrom);
+                if (stream == null)
+                {
+                    materialData.UpdateAssetFailed(material);
+                    return;
+                }
+
                 ExceptionUtility.Assert(stream != null);
 
-                TomlDocument document = CsTomlSerializer.Deserialize<TomlDocument>(stream);
+                TomlDocument document = CsTomlSerializer.Deserialize<TomlDocument>(stream!);
                 TomlDocumentNode root = document.RootNode;
-
+            
                 string shader = string.Empty;
                 ExceptionUtility.Assert(root["shader"u8].TryGetString(out shader));
 
@@ -76,6 +82,8 @@ namespace Primary.Assets.Loaders
                                 },
                                 VariableName = variable.Name,
                             });
+
+                            defaultGroup.SetResource(variable.Name, AssetManager.Static.DefaultWhite);
                         }
                     }
                 }

@@ -32,7 +32,7 @@ namespace Primary.Assets.Loaders
             {
                 if (!AssetFilesystem.ShaderLibrary.ReadGraphicsShader(sourcePath, out RHI.GraphicsPipelineDescription desc, out RHI.GraphicsPipelineBytecode bytecode, out ShaderVariable[] variables))
                 {
-                    throw new Exception();
+                    return;
                 }
 
                 int j;

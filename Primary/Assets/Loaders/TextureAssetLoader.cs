@@ -250,7 +250,7 @@ namespace Primary.Assets.Loaders
 
                 textureData.UpdateAssetData(texture, rhiTexture);
             }
-#if DEBUG
+#if DEBUG && false
             finally
             {
 

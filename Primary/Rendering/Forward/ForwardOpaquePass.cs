@@ -47,7 +47,7 @@ namespace Primary.Rendering.Forward
         public unsafe void ExecutePass(IRenderPath path, RenderPassData passData)
         {
             CommandBuffer commandBuffer = CommandBufferPool.Get();
-
+            
             using (new CommandBufferEventScope(commandBuffer, "ForwardRP - Opaque"))
             {
                 ForwardRenderPath renderPath = (ForwardRenderPath)path;

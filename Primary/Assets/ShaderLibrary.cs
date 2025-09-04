@@ -197,6 +197,15 @@ namespace Primary.Assets
                                 desc.ImmutableSamplers[i] = new KeyValuePair<uint, RHI.ImmutableSamplerDescription>((uint)index, br.Read<RHI.ImmutableSamplerDescription>());
                             }
                         }
+
+                        //temp
+                        for (int i = 0; i < desc.ImmutableSamplers.Length; i++)
+                        {
+                            var kvp = desc.ImmutableSamplers[i].Value;
+                            kvp.MaxAnistropy = 16;
+
+                            desc.ImmutableSamplers[i] = new KeyValuePair<uint, RHI.ImmutableSamplerDescription>(desc.ImmutableSamplers[i].Key, kvp);
+                        }
                     }
 
                     {

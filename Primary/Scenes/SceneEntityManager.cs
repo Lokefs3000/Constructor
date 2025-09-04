@@ -52,6 +52,9 @@ namespace Primary.Scenes
             EntityRelationships relationships = new EntityRelationships();
             entity.Add(relationships);
 
+            SceneEntity se = entity;
+            AddComponent<Transform>(ref se);
+
             _relationships[entity] = relationships;
             return new SceneEntity(entity);
         }

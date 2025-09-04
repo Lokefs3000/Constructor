@@ -1139,7 +1139,7 @@ namespace Editor.Processors.Shaders
                 if (!hasEqualsSign)
                     throw new ArgumentException("no eq");
 
-                Span<char> value = ReadString(ref current, source);
+                Span<char> value = (source[current] == '"' || source[current] == '\'') ? ReadString(ref current, source) : ReadIdentifier(ref current, source);
                 if (value.IsEmpty)
                     throw new ArgumentException("no val");
 
@@ -1368,8 +1368,8 @@ namespace Editor.Processors.Shaders
             public string Name;
             public int? Offset;
             public int? Slot;
-            public RHI.InputClassification Class;
-            public RHI.InputElementFormat Format;
+            public RHI.InputClassification? Class;
+            public RHI.InputElementFormat? Format;
         }
 
         private record struct AttributeProperty

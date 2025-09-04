@@ -83,6 +83,7 @@ namespace Editor.Assets
             AddImporter<ModelAssetImporter>(".fbx", ".obj");
             AddImporter<ShaderAssetImporter>(".hlsl");
             AddImporter<TextureAssetImporter>(".png", ".jpg", ".jpeg");
+            AddImporter<MaterialAssetImporter>(".mat");
 
             if (needsDbRefresh)
                 RefreshDatabase();
@@ -98,6 +99,9 @@ namespace Editor.Assets
                     _sourceWatcher.Dispose();
 
                     _semaphore.Dispose();
+
+                    Editor.GlobalSingleton.ProjectShaderLibrary.FlushFileMappings();
+                    Editor.GlobalSingleton.ProjectSubFilesystem.FlushFileRemappings();
 
                     FlushAssociationsFile();
                 }
@@ -322,6 +326,25 @@ namespace Editor.Assets
             }
 
             return false;
+        }
+
+        internal bool IsAssetUpToDate(ReadOnlySpan<char> path)
+        {
+            string str = path.ToString();
+
+            lock (_runningImports)
+            {
+                if (_runningImports.ContainsKey(str))
+                    return false;
+            }
+
+            lock (_pendingImports)
+            {
+                if (_pendingImports.Contains(str))
+                    return false;
+            }
+
+            return true;
         }
 
         internal bool IsImportingAsset(ReadOnlySpan<char> path)
@@ -563,7 +586,7 @@ namespace Editor.Assets
                 foreach (string asset in _assetsToReload)
                 {
                     EdLog.Assets.Debug("Reloading asset: {x}", asset);
-                    manager.ForceReloadAsset(asset);
+                    manager?.ForceReloadAsset(asset);
                 }
 
                 _assetsToReload.Clear();

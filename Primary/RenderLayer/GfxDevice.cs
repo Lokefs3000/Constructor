@@ -21,7 +21,7 @@ namespace Primary.RenderLayer
 
         #region Base
 
-        public void SynchronizeDevice(RHI.SynchronizeDeviceTargets targets) => _internal.SynchronizeDevice(targets);
+        public void SynchronizeDevice(RHI.SynchronizeDeviceTargets targets) => NullableUtility.ThrowIfNull(_internal).SynchronizeDevice(targets);
 
         public void BeginFrame() => NullableUtility.ThrowIfNull(_internal).BeginFrame();
         public void FinishFrame() => NullableUtility.ThrowIfNull(_internal).FinishFrame();

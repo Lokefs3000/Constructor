@@ -1,276 +1,335 @@
 ﻿using Editor.Interop.NVTT;
 using Primary.Common;
+using Serilog;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Editor.Processors
 {
     public class TextureProcessor : IAssetProcessor
     {
+        public static ILogger? Logger
+        {
+            get => s_logger;
+            set
+            {
+                unsafe
+                {
+                    s_logger = value;
+
+                    //if (value != null)
+                    //    NVTT.SetMessageCallback(&MessageReporter, null);
+                    //else
+                    //    NVTT.SetMessageCallback(null, null);
+                }
+            }
+        }
+        private static ILogger? s_logger = null;
+
+        private ILogger? _logger;
+
         public unsafe bool Execute(object args_in)
         {
             TextureProcessorArgs args = (TextureProcessorArgs)args_in;
 
-            NVTT.nvttErrorHandlerDelegate errorHandlerDelegate = ErrorReporter;
-            //NVTT.SetMessageCallback(errorHandlerDelegate, null);
-
-            NvttBoolean hasAlpha = NvttBoolean.False;
-            byte alphaBits = 8;
-
-            Span<byte> imageBytes;
-            using (FileStream stream = NullableUtility.AlwaysThrowIfNull(FileUtility.TryWaitOpen(args.AbsoluteFilepath, FileMode.Open, FileAccess.Read, FileShare.Read)))
+            try
             {
-                //TODO: use ArrayPool!!
-                imageBytes = new Span<byte>(new byte[stream.Length]);
-                stream.ReadExactly(imageBytes);
-            }
+                //unsafe
+                //{
+                //    NVTT.SetMessageCallback(&MessageReporter, (void*)GCHandle.ToIntPtr(handle));
+                //}
 
-            NvttSurface* surface = NVTT.nvttCreateSurface();
-            if (NVTT.nvttSurfaceLoadFromMemory(surface, Unsafe.AsPointer(ref imageBytes[0]), (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
-            {
-                //report error
-                return false;
-            }
+                NvttBoolean hasAlpha = NvttBoolean.False;
+                byte alphaBits = 8;
 
-            if (args.FlipVertical)
-                NVTT.nvttSurfaceFlipY(surface, null);
-
-            NvttCompressionOptions* compressionOptions = NVTT.nvttCreateCompressionOptions();
-            NVTT.nvttSetCompressionOptionsQuality(compressionOptions, NvttQuality.Normal);
-
-            NvttOutputOptions* outputOptions = NVTT.nvttCreateOutputOptions();
-            NVTT.nvttSetOutputOptionsErrorHandler(outputOptions, errorHandlerDelegate);
-
-            switch (args.ImageFormat)
-            {
-                case TextureImageFormat.BC7: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC7); break;
-                case TextureImageFormat.BC6s: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC6S); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); break;
-                case TextureImageFormat.BC6u: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC6U); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedFloat); break;
-                case TextureImageFormat.ASTC: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.ASTC_LDR_4x4); break;
-                case TextureImageFormat.BC5u: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC5); break;
-                case TextureImageFormat.BC4u: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC4); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); break;
-                case TextureImageFormat.BC3: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC3); break;
-                case TextureImageFormat.BC3n: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC3n); break;
-                //case ImageFormat.BC3n_agbr: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.(BC3_RGBM); break;
-                case TextureImageFormat.BC2:
-                    NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC2);
-                    if (args.CutoutDither)
-                    {
-                        byte bits = 4;
-                        if (alphaBits != bits)
-                            bits = alphaBits;
-                        NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, bits);
-                        NVTT.nvttSetCompressionOptionsQuantization(compressionOptions, NvttBoolean.False, NvttBoolean.True, NvttBoolean.False, 0);
-                    }
-                    break;
-                case TextureImageFormat.BC1a: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC1a); NVTT.nvttSetCompressionOptionsQuantization(compressionOptions, NvttBoolean.False, args.CutoutDither ? NvttBoolean.True : NvttBoolean.False, NvttBoolean.False, 0); break;
-                case TextureImageFormat.BC1: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC1); break;
-                case TextureImageFormat.R8a: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 8, 0xff, 0, 0, 0); break;
-                case TextureImageFormat.R8l: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 8, 0xff, 0, 0, 0); break;
-                case TextureImageFormat.BGR8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGB); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 0); break;
-                case TextureImageFormat.BGRA8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 8); break;
-                case TextureImageFormat.BGRX8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 8); break;
-                case TextureImageFormat.RGB8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGB); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 0); break;
-                case TextureImageFormat.RGBA8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); /*NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 8);*/ break;
-                case TextureImageFormat.R16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 0, 0, 0); break;
-                case TextureImageFormat.RG16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 16, 0, 0); break;
-                case TextureImageFormat.RGBA16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 16, 16, 16); break;
-                case TextureImageFormat.R32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 0, 0, 0); break;
-                case TextureImageFormat.RG32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 32, 0, 0); break;
-                case TextureImageFormat.RGBA32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 32, 32, 32); break;
-                default: break;
-            }
-
-            NVTT.nvttSetOutputOptionsContainer(outputOptions, args.ImageFormat <= TextureImageFormat.BC6u ? NvttContainer.DDS10 : NvttContainer.DDS);
-
-            if (args.CutoutDither && hasAlpha == NvttBoolean.True && args.ImageFormat != TextureImageFormat.BC2 && args.ImageFormat != TextureImageFormat.BC1a)
-            {
-                NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, alphaBits);
-                NVTT.nvttSetCompressionOptionsQuantization(compressionOptions, NvttBoolean.False, NvttBoolean.True, NvttBoolean.False, args.CutoutThreshold);
-            }
-
-            if (args.GammaCorrect)
-                NVTT.nvttSurfaceToSrgbUnclamped(surface, null);
-
-            NvttAlphaMode alphaMode = NVTT.nvttSurfaceAlphaMode(surface);
-
-            alphaMode = args.PremultipliedAlpha ? NvttAlphaMode.Premultiplied : alphaMode;
-            if (args.ImageFormat == TextureImageFormat.BC6u || args.ImageFormat == TextureImageFormat.BC6s)
-                alphaMode = NvttAlphaMode.None;
-
-            NVTT.nvttSetSurfaceAlphaMode(surface, alphaMode);
-
-            NvttMipmapFilter filter = NvttMipmapFilter.Box;
-            switch (args.MipmapFilter)
-            {
-                case TextureMipmapFilter.Box: filter = NvttMipmapFilter.Box; break;
-                case TextureMipmapFilter.Kaiser: filter = NvttMipmapFilter.Kaiser; break;
-                case TextureMipmapFilter.Triangle: filter = NvttMipmapFilter.Triangle; break;
-                case TextureMipmapFilter.Mitchell: filter = NvttMipmapFilter.Mitchell; break;
-                case TextureMipmapFilter.Min: filter = NvttMipmapFilter.Min; break;
-                case TextureMipmapFilter.Max: filter = NvttMipmapFilter.Max; break;
-            }
-
-            int mip0Width = NVTT.nvttSurfaceWidth(surface);
-            int mip0Height = NVTT.nvttSurfaceHeight(surface);
-            int mip0Depth = NVTT.nvttSurfaceDepth(surface);
-
-            List<(int width, int height)> sizes = new List<(int, int)>();
-
-            int mipmapCount = 0;
-            if (args.GenerateMipmaps)
-            {
-                while (mipmapCount < args.MaxMipmapCount)
+                Span<byte> imageBytes;
+                using (FileStream stream = NullableUtility.AlwaysThrowIfNull(FileUtility.TryWaitOpen(args.AbsoluteFilepath, FileMode.Open, FileAccess.Read, FileShare.Read)))
                 {
-                    int mipWidth = Math.Max(1, mip0Width >> mipmapCount);
-                    int mipHeight = Math.Max(1, mip0Height >> mipmapCount);
+                    //TODO: use ArrayPool!!
+                    imageBytes = new Span<byte>(new byte[stream.Length]);
+                    stream.ReadExactly(imageBytes);
+                }
 
-                    if (mipWidth < args.MinMipmapSize || mipHeight < args.MinMipmapSize)
-                    {
+                NvttSurface* surface = NVTT.nvttCreateSurface();
+                if (NVTT.nvttSurfaceLoadFromMemory(surface, Unsafe.AsPointer(ref imageBytes[0]), (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
+                {
+                    //report error
+                    args.Logger?.Error("[NVTT]: Failed to load surface from image bytes: {af}", args.AbsoluteFilepath);
+                    return false;
+                }
+
+                if (args.FlipVertical)
+                    NVTT.nvttSurfaceFlipY(surface, null);
+
+                NvttCompressionOptions* compressionOptions = NVTT.nvttCreateCompressionOptions();
+                NVTT.nvttSetCompressionOptionsQuality(compressionOptions, NvttQuality.Normal);
+
+                NvttOutputOptions* outputOptions = NVTT.nvttCreateOutputOptions();
+                NVTT.nvttErrorHandlerDelegate @delegate = ErrorReporter;
+                NVTT.nvttSetOutputOptionsErrorHandler(outputOptions, ErrorReporter);
+
+                switch (args.ImageFormat)
+                {
+                    case TextureImageFormat.BC7: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC7); break;
+                    case TextureImageFormat.BC6s: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC6S); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); break;
+                    case TextureImageFormat.BC6u: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC6U); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedFloat); break;
+                    case TextureImageFormat.ASTC: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.ASTC_LDR_4x4); break;
+                    case TextureImageFormat.BC5u: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC5); break;
+                    case TextureImageFormat.BC4u: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC4); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); break;
+                    case TextureImageFormat.BC3: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC3); break;
+                    case TextureImageFormat.BC3n: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC3n); break;
+                    //case ImageFormat.BC3n_agbr: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.(BC3_RGBM); break;
+                    case TextureImageFormat.BC2:
+                        NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC2);
+                        if (args.CutoutDither)
+                        {
+                            byte bits = 4;
+                            if (alphaBits != bits)
+                                bits = alphaBits;
+                            NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, bits);
+                            NVTT.nvttSetCompressionOptionsQuantization(compressionOptions, NvttBoolean.False, NvttBoolean.True, NvttBoolean.False, 0);
+                        }
                         break;
+                    case TextureImageFormat.BC1a: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC1a); NVTT.nvttSetCompressionOptionsQuantization(compressionOptions, NvttBoolean.False, args.CutoutDither ? NvttBoolean.True : NvttBoolean.False, NvttBoolean.False, 0); break;
+                    case TextureImageFormat.BC1: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC1); break;
+                    case TextureImageFormat.R8a: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 8, 0xff, 0, 0, 0); break;
+                    case TextureImageFormat.R8l: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 8, 0xff, 0, 0, 0); break;
+                    case TextureImageFormat.BGR8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGB); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 0); break;
+                    case TextureImageFormat.BGRA8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 8); break;
+                    case TextureImageFormat.BGRX8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 8); break;
+                    case TextureImageFormat.RGB8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGB); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 0); break;
+                    case TextureImageFormat.RGBA8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); /*NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 8);*/ break;
+                    case TextureImageFormat.R16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 0, 0, 0); break;
+                    case TextureImageFormat.RG16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 16, 0, 0); break;
+                    case TextureImageFormat.RGBA16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 16, 16, 16); break;
+                    case TextureImageFormat.R32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 0, 0, 0); break;
+                    case TextureImageFormat.RG32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 32, 0, 0); break;
+                    case TextureImageFormat.RGBA32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 32, 32, 32); break;
+                    default: break;
+                }
+
+                NVTT.nvttSetOutputOptionsContainer(outputOptions, args.ImageFormat <= TextureImageFormat.BC6u ? NvttContainer.DDS10 : NvttContainer.DDS);
+
+                if (args.CutoutDither && hasAlpha == NvttBoolean.True && args.ImageFormat != TextureImageFormat.BC2 && args.ImageFormat != TextureImageFormat.BC1a)
+                {
+                    NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, alphaBits);
+                    NVTT.nvttSetCompressionOptionsQuantization(compressionOptions, NvttBoolean.False, NvttBoolean.True, NvttBoolean.False, args.CutoutThreshold);
+                }
+
+                if (args.GammaCorrect)
+                    NVTT.nvttSurfaceToSrgbUnclamped(surface, null);
+
+                NvttAlphaMode alphaMode = NVTT.nvttSurfaceAlphaMode(surface);
+
+                alphaMode = args.PremultipliedAlpha ? NvttAlphaMode.Premultiplied : alphaMode;
+                if (args.ImageFormat == TextureImageFormat.BC6u || args.ImageFormat == TextureImageFormat.BC6s)
+                    alphaMode = NvttAlphaMode.None;
+
+                NVTT.nvttSetSurfaceAlphaMode(surface, alphaMode);
+
+                NvttMipmapFilter filter = NvttMipmapFilter.Box;
+                switch (args.MipmapFilter)
+                {
+                    case TextureMipmapFilter.Box: filter = NvttMipmapFilter.Box; break;
+                    case TextureMipmapFilter.Kaiser: filter = NvttMipmapFilter.Kaiser; break;
+                    case TextureMipmapFilter.Triangle: filter = NvttMipmapFilter.Triangle; break;
+                    case TextureMipmapFilter.Mitchell: filter = NvttMipmapFilter.Mitchell; break;
+                    case TextureMipmapFilter.Min: filter = NvttMipmapFilter.Min; break;
+                    case TextureMipmapFilter.Max: filter = NvttMipmapFilter.Max; break;
+                }
+
+                int mip0Width = NVTT.nvttSurfaceWidth(surface);
+                int mip0Height = NVTT.nvttSurfaceHeight(surface);
+                int mip0Depth = NVTT.nvttSurfaceDepth(surface);
+
+                List<(int width, int height)> sizes = new List<(int, int)>();
+
+                int mipmapCount = 0;
+                if (args.GenerateMipmaps)
+                {
+                    while (mipmapCount < args.MaxMipmapCount)
+                    {
+                        int mipWidth = Math.Max(1, mip0Width >> mipmapCount);
+                        int mipHeight = Math.Max(1, mip0Height >> mipmapCount);
+                        sizes.Add((mipWidth, mipHeight));
+
+                        if (mipWidth <= args.MinMipmapSize || mipHeight <= args.MinMipmapSize)
+                        {
+                            break;
+                        }
+
+                        mipmapCount++;
                     }
-
-                    sizes.Add((mipWidth, mipHeight));
-                    mipmapCount++;
                 }
-            }
 
-            mipmapCount = Math.Max(1, mipmapCount);
+                mipmapCount = Math.Max(1, mipmapCount);
 
-            OutputHandler outputHandler = new OutputHandler(args.AbsoluteOutputPath);
-            NVTT.nvttSetOutputOptionsOutputHandler(outputOptions, outputHandler.nvttBeginImage, outputHandler.nvttWriteData, outputHandler.nvttEndImage);
+                OutputHandler outputHandler = new OutputHandler(args.AbsoluteOutputPath);
+                NVTT.nvttSetOutputOptionsOutputHandler(outputOptions, outputHandler.nvttBeginImage, outputHandler.nvttWriteData, outputHandler.nvttEndImage);
 
-            switch (args.ImageType)
-            {
-                case TextureImageType.Colormap: break;
-                case TextureImageType.Grayscale: NVTT.nvttSurfaceToGreyScale(surface, 1.0f, 1.0f, 1.0f, 1.0f, null); break;
-                case TextureImageType.NormalMap_TangentSpace: NVTT.nvttSetSurfaceNormalMap(surface, NvttBoolean.True); break;
-                case TextureImageType.NormalMap_ObjectSpace: NVTT.nvttSetSurfaceNormalMap(surface, NvttBoolean.True); break;
-            }
-
-            NvttBatchList* batchList = NVTT.nvttCreateBatchList();
-
-            if (NVTT.nvttSurfaceIsNormalMap(surface) == NvttBoolean.True)
-            {
-                if (args.ImageType == TextureImageType.NormalMap_ObjectSpace)
+                switch (args.ImageType)
                 {
-                    NVTT.nvttSurfaceToGreyScale(surface, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, 0.0f, null);
-                    NVTT.nvttSurfaceToNormalMap(surface, 1.0f / 1.875f, 0.5f / 1.875f, 0.25f / 1.875f, 0.125f / 1.875f, null);
-                }
-            }
-            else
-            {
-                if (mipmapCount > 1 && args.GammaCorrect)
-                {
-                    NVTT.nvttSurfaceToLinearFromSrgbUnclamped(surface, null);
-                }
-            }
-
-            NvttSurface* temp = NVTT.nvttSurfaceClone(surface);
-            if (NVTT.nvttSurfaceIsNormalMap(temp) == NvttBoolean.False && mipmapCount > 1 && args.GammaCorrect)
-            {
-                NVTT.nvttSurfaceToSrgbUnclamped(surface, null);
-            }
-
-            List<nint> surfaces = new List<nint>();
-
-            NvttContext* context = NVTT.nvttCreateContext();
-            NVTT.nvttSetContextCudaAcceleration(context, NvttBoolean.False);
-            NVTT.nvttContextQuantize(context, temp, compressionOptions);
-
-            NvttSurface* surf = temp;
-
-            NVTT.nvttBatchListAppend(batchList, surf, 0, 0, outputOptions);
-            surfaces.Add((nint)surf);
-
-            bool scaleMipAlpha = hasAlpha == NvttBoolean.True && mipmapCount > 1 && args.ScaleAlphaForMipmaps;
-            float threshold = args.CutoutThreshold / 255.0f;
-            float mip0Coverage = scaleMipAlpha ? NVTT.nvttSurfaceAlphaTestCoverage(surface, threshold, 3) : 0.0f;
-
-            float* kaiserParams = stackalloc float[] { 1.0f, 4.0f };
-
-            for (int m = 0; m < mipmapCount; m++)
-            {
-                if (filter == NvttMipmapFilter.Kaiser)
-                {
-                    NVTT.nvttSurfaceBuildNextMipmap(surface, NvttMipmapFilter.Kaiser, 3.0f, kaiserParams, 1, null);
-                }
-                else
-                {
-                    NVTT.nvttSurfaceBuildNextMipmapDefaults(surface, filter, 1, null);
+                    case TextureImageType.Colormap: break;
+                    case TextureImageType.Grayscale: NVTT.nvttSurfaceToGreyScale(surface, 1.0f, 1.0f, 1.0f, 1.0f, null); break;
+                    case TextureImageType.NormalMap_TangentSpace: NVTT.nvttSetSurfaceNormalMap(surface, NvttBoolean.True); break;
+                    case TextureImageType.NormalMap_ObjectSpace: NVTT.nvttSetSurfaceNormalMap(surface, NvttBoolean.True); break;
                 }
 
-                if (scaleMipAlpha)
-                {
-                    NVTT.nvttSurfaceScaleAlphaToCoverage(surface, mip0Coverage, threshold, 3, null);
-                }
+                NvttBatchList* batchList = NVTT.nvttCreateBatchList();
 
                 if (NVTT.nvttSurfaceIsNormalMap(surface) == NvttBoolean.True)
                 {
-                    temp = NVTT.nvttSurfaceClone(surface);
+                    if (args.ImageType == TextureImageType.NormalMap_ObjectSpace)
+                    {
+                        NVTT.nvttSurfaceToGreyScale(surface, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, 0.0f, null);
+                        NVTT.nvttSurfaceToNormalMap(surface, 1.0f / 1.875f, 0.5f / 1.875f, 0.25f / 1.875f, 0.125f / 1.875f, null);
+                    }
                 }
                 else
                 {
-                    temp = NVTT.nvttSurfaceClone(surface);
-                    if (args.GammaCorrect)
+                    if (mipmapCount > 1 && args.GammaCorrect)
                     {
-                        NVTT.nvttSurfaceToSrgbUnclamped(temp, null);
+                        NVTT.nvttSurfaceToLinearFromSrgbUnclamped(surface, null);
                     }
                 }
 
+                NvttSurface* temp = NVTT.nvttSurfaceClone(surface);
+                if (NVTT.nvttSurfaceIsNormalMap(temp) == NvttBoolean.False && mipmapCount > 1 && args.GammaCorrect)
+                {
+                    NVTT.nvttSurfaceToSrgbUnclamped(surface, null);
+                }
+
+                List<nint> surfaces = new List<nint>();
+
+                NvttContext* context = NVTT.nvttCreateContext();
+                NVTT.nvttSetContextCudaAcceleration(context, NvttBoolean.False);
                 NVTT.nvttContextQuantize(context, temp, compressionOptions);
 
-                surf = temp;
+                NvttSurface* surf = temp;
 
                 NVTT.nvttBatchListAppend(batchList, surf, 0, 0, outputOptions);
                 surfaces.Add((nint)surf);
-            }
 
-            var cleanup = () =>
-            {
-                for (int i = 0; i < surfaces.Count; i++)
+                bool scaleMipAlpha = hasAlpha == NvttBoolean.True && mipmapCount > 1 && args.ScaleAlphaForMipmaps;
+                float threshold = args.CutoutThreshold / 255.0f;
+                float mip0Coverage = scaleMipAlpha ? NVTT.nvttSurfaceAlphaTestCoverage(surface, threshold, 3) : 0.0f;
+
+                float* kaiserParams = stackalloc float[] { 1.0f, 4.0f };
+
+                for (int m = 0; m < mipmapCount; m++)
                 {
-                    NVTT.nvttDestroySurface((NvttSurface*)surfaces[i]);
+                    if (filter == NvttMipmapFilter.Kaiser)
+                    {
+                        NVTT.nvttSurfaceBuildNextMipmap(surface, NvttMipmapFilter.Kaiser, 3.0f, kaiserParams, 1, null);
+                    }
+                    else
+                    {
+                        NVTT.nvttSurfaceBuildNextMipmapDefaults(surface, filter, 1, null);
+                    }
+
+                    if (scaleMipAlpha)
+                    {
+                        NVTT.nvttSurfaceScaleAlphaToCoverage(surface, mip0Coverage, threshold, 3, null);
+                    }
+
+                    if (NVTT.nvttSurfaceIsNormalMap(surface) == NvttBoolean.True)
+                    {
+                        temp = NVTT.nvttSurfaceClone(surface);
+                    }
+                    else
+                    {
+                        temp = NVTT.nvttSurfaceClone(surface);
+                        if (args.GammaCorrect)
+                        {
+                            NVTT.nvttSurfaceToSrgbUnclamped(temp, null);
+                        }
+                    }
+
+                    NVTT.nvttContextQuantize(context, temp, compressionOptions);
+
+                    surf = temp;
+
+                    NVTT.nvttBatchListAppend(batchList, surf, 0, 0, outputOptions);
+                    surfaces.Add((nint)surf);
                 }
 
-                NVTT.nvttDestroyBatchList(batchList);
+                var cleanup = () =>
+                {
+                    for (int i = 0; i < surfaces.Count; i++)
+                    {
+                        NVTT.nvttDestroySurface((NvttSurface*)surfaces[i]);
+                    }
 
-                NVTT.nvttDestroySurface(surface);
-                NVTT.nvttDestroyContext(context);
+                    NVTT.nvttDestroyBatchList(batchList);
 
-                NVTT.nvttDestroyOutputOptions(outputOptions);
-                NVTT.nvttDestroyCompressionOptions(compressionOptions);
+                    NVTT.nvttDestroySurface(surface);
+                    NVTT.nvttDestroyContext(context);
 
-                outputHandler.Dispose();
-            };
+                    NVTT.nvttDestroyOutputOptions(outputOptions);
+                    NVTT.nvttDestroyCompressionOptions(compressionOptions);
 
-            if (NVTT.nvttContextOutputHeaderData(context, NvttTextureType._2D, mip0Width, mip0Height, mip0Depth, mipmapCount, NVTT.nvttSurfaceIsNormalMap(surface), compressionOptions, outputOptions) != NvttBoolean.True)
-            {
+                    outputHandler.Dispose();
+                };
+
+                if (NVTT.nvttContextOutputHeaderData(context, NvttTextureType._2D, mip0Width, mip0Height, mip0Depth, mipmapCount, NVTT.nvttSurfaceIsNormalMap(surface), compressionOptions, outputOptions) != NvttBoolean.True)
+                {
+                    cleanup();
+                    //bad
+                    return false;
+                }
+
+                if (NVTT.nvttContextCompressBatch(context, batchList, compressionOptions) != NvttBoolean.True)
+                {
+                    cleanup();
+                    //bad
+                    return false;
+                }
+
                 cleanup();
-                //bad
-                return false;
+                return true;
             }
-
-            if (NVTT.nvttContextCompressBatch(context, batchList, compressionOptions) != NvttBoolean.True)
+            finally
             {
-                cleanup();
-                //bad
-                return false;
+                
             }
-
-            cleanup();
-            return true;
         }
 
-        private static unsafe void ErrorReporter(NvttError error)
+        private unsafe void ErrorReporter(NvttError error)
         {
             byte* str = (byte*)NVTT.nvttErrorString(error);
 
             int length = 0;
             while (str[length++] != 0) ;
-
             string text = Encoding.UTF8.GetString(str, length);
-            throw new Exception(text);
+
+            _logger?.Error("[NVTT]: {err}", text);
+        }
+
+        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+        private static unsafe void MessageReporter(NvttSeverity severity, NvttError error, sbyte* desc, void* userData)
+        {
+            GCHandle handle = GCHandle.FromIntPtr((nint)userData);
+            TextureProcessor processor = NullableUtility.ThrowIfNull(handle.Target as TextureProcessor);
+
+            byte* str = (byte*)NVTT.nvttErrorString(error);
+            byte* ptrDesc = (byte*)desc;
+
+            int length = 0;
+            while (str[length++] != 0) ;
+            string text = Encoding.UTF8.GetString(str, length);
+
+            length = 0;
+            while (ptrDesc[length++] != 0) ;
+            string description = Encoding.UTF8.GetString(ptrDesc, length);
+
+            switch (severity)
+            {
+                case NvttSeverity.Info: processor._logger?.Information("[NVTT]: {err}: {dsc}", text, description); break;
+                case NvttSeverity.Warning: processor._logger?.Warning("[NVTT]: {err}: {dsc}", text, description); break;
+                case NvttSeverity.Error: processor._logger?.Error("[NVTT]: {err}: {dsc}", text, description); break;
+            }
         }
 
         public class OutputHandler : IDisposable
@@ -321,6 +380,8 @@ namespace Editor.Processors
     {
         public string AbsoluteFilepath;
         public string AbsoluteOutputPath;
+
+        public ILogger? Logger;
 
         public bool FlipVertical;
         public TextureImageFormat ImageFormat;

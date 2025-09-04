@@ -25,6 +25,17 @@ namespace Editor.DearImGui.Properties
             TargetData td = (TargetData)target;
             SceneEntity entity = td.Entity;
 
+            bool enabled = entity.Enabled;
+            if (ImGui.Checkbox("##ENABLED", ref enabled))
+                entity.Enabled = enabled;
+
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+
+            string name = entity.Name;
+            if (ImGui.InputText("##NAME", ref name, 127))
+                entity.Name = name;
+
             _modifiedComponents.Clear();
             foreach (object component in entity.Components)
             {
@@ -65,6 +76,11 @@ namespace Editor.DearImGui.Properties
                     entity.SetComponent(result, result.GetType());
                 }
             }
+        }
+
+        public void Changed(object? target)
+        {
+
         }
 
         private static readonly FrozenDictionary<Type, InspectorDelegate> s_inspectorTypes = new Dictionary<Type, InspectorDelegate>

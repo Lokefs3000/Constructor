@@ -44,14 +44,19 @@ SamplerState ssSampler : defaultLinear;
 [property(Name = "Albedo")]
 Texture2D<float4> txAlbedo : register(t0);
 
+[property(Name = "Specular")]
+Texture2D<float4> txSpecular : register(t1);
+
 [pixel]
 float4 PixelMain(PsInput input) : SV_Target
 {
+    float4 spec = txSpecular.Sample(ssSampler, input.UV);
+
     MatProps props =
     {
         txAlbedo.Sample(ssSampler, input.UV).rgb,
-        float3(0.75, 0.75, 0.75),
-        12.0
+        spec.rgb,
+        spec.r
     };
 
     float3 normal = normalize(input.Normal);

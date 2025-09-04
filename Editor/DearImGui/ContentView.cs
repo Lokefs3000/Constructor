@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Editor.Assets;
 using Editor.DearImGui.Components;
+using Editor.DearImGui.Properties;
 using Editor.Gui;
 using Hexa.NET.ImGui;
 using Primary.Common;
@@ -326,7 +327,9 @@ namespace Editor.DearImGui
                             }
                             else
                             {
-
+                                string ext = Path.GetExtension(fullLocalPath);
+                                if (ext == ".png" || ext == ".jpg" || ext == ".jpeg")
+                                    Editor.GlobalSingleton.PropertiesView.SetInspected(new TextureProperties.TargetData(fullLocalPath));
                             }
                         }
 
@@ -363,7 +366,14 @@ namespace Editor.DearImGui
                             {
                                 if (!isDirectory)
                                 {
-                                    _fileLength = new FileInfo(Path.Combine(Editor.GlobalSingleton.ProjectPath, fullLocalPath)).Length;
+                                    try
+                                    {
+                                        _fileLength = new FileInfo(Path.Combine(Editor.GlobalSingleton.ProjectPath, fullLocalPath)).Length;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        EdLog.Gui.Error(ex, "Failed to resolve file length");
+                                    }
                                 }
 
                                 _activeTooltipPath = fullLocalPath;
