@@ -1,1 +1,0 @@
-@call "D:\source\repos\Constructor\Editor\bin\Debug\net9.0\Editor.exe" model -i %1 -o %~n1.emdf
