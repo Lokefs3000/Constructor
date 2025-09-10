@@ -26,6 +26,7 @@ namespace Editor.DearImGui
             _viewers = new Dictionary<Type, IObjectPropertiesViewer>
             {
                 { typeof(TextureProperties.TargetData), new TextureProperties() },
+                { typeof(ShaderProperties.TargetData), new ShaderProperties() },
                 { typeof(EntityProperties.TargetData), new EntityProperties() }
             }.ToFrozenDictionary();
         }

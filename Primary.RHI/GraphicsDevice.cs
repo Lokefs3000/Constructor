@@ -32,6 +32,9 @@ namespace Primary.RHI
         public abstract bool IsSupported(RenderTargetFormat format);
         public abstract bool IsSupported(DepthStencilFormat format);
         public abstract bool IsSupported(TextureFormat format, TextureDimension dimension);
+
+        public abstract void InstallTracker(IObjectTracker tracker);
+        public abstract void UninstallTracker(IObjectTracker tracker);
     }
 
     [Flags]

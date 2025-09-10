@@ -141,9 +141,9 @@ namespace Editor.Gui
                             using Stream? stream = AssetFilesystem.OpenStream(icon);
                             using ImageResult result = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
 
-                            ExceptionUtility.Assert(result.Width == result.Height);
-                            ExceptionUtility.Assert(BitOperations.IsPow2(result.Width));
-                            ExceptionUtility.Assert(result.Width <= DynamicSubAtlas.DynAtlasInitialTileSize);
+                            ExceptionUtility.Assert(result.Width == result.Height, "Icon width and height must match");
+                            ExceptionUtility.Assert(BitOperations.IsPow2(result.Width), "Icon dimensions must be a power of 2");
+                            ExceptionUtility.Assert(result.Width <= DynamicSubAtlas.DynAtlasInitialTileSize, "Icon must be smaller than " + DynamicSubAtlas.DynAtlasInitialTileSize);
 
                             setData.ImageData[i] = result.Data.ToArray();
                             setData.Sizes[i] = result.Width;

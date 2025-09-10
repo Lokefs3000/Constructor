@@ -104,7 +104,7 @@ namespace Primary.Rendering
                 {
                     _opaquePass?.Dispose();
                     _shadowPass?.Dispose();
-                    _finalBlit?.Dispose();
+                    //_finalBlit?.Dispose();
                     _sDebugOpaquePass?.Dispose();
 
                     _shadowManager?.Dispose();
@@ -143,14 +143,19 @@ namespace Primary.Rendering
                 _copyCommandBuffer.End();
                 Engine.GlobalSingleton.RenderingManager.GraphicsDevice.Submit(_copyCommandBuffer);
             }
+        }
+
+        public void ExecutePasses(RenderPass renderPass)
+        {
+            RenderingManager renderer = Engine.GlobalSingleton.RenderingManager;
 
             switch (renderer.Configuration.RenderMode)
             {
                 case RenderingMode.Lit:
                     {
-                        _shadowPass.ExecutePass(this, passData);
-                        _opaquePass.ExecutePass(this, passData);
-                        _finalBlit.ExecutePass(this, passData);
+                        _shadowPass.ExecutePass(renderPass);
+                        _opaquePass.ExecutePass(renderPass);
+                        _finalBlit.ExecutePass(renderPass);
 
                         break;
                     }
@@ -161,8 +166,8 @@ namespace Primary.Rendering
                 case RenderingMode.Overdraw:
                 case RenderingMode.Unlit:
                     {
-                        _sDebugOpaquePass.ExecutePass(this, passData);
-                        _finalBlit.ExecutePass(this, passData);
+                        _sDebugOpaquePass.ExecutePass(renderPass);
+                        _finalBlit.ExecutePass(renderPass);
                         break;
                     }
                 case RenderingMode.Reflections:
@@ -174,11 +179,6 @@ namespace Primary.Rendering
                         break;
                     }
             }
-        }
-
-        public void CleanupPasses(RenderPassData passData)
-        {
-
         }
 
         public void EmitDebugStatistics(DebugDataContainer container)

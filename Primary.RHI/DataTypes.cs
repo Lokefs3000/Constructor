@@ -62,6 +62,10 @@
         D32sf,
         D24unS8ui,
         D16un,
-        R32t
+
+        R32tX8X24ui,
+        R32t,
+        R24tX8ui,
+        R16t,
     }
 }

@@ -212,7 +212,7 @@ namespace Primary.Rendering.Raw
                                 {
                                     TextureAsset? asset = Unsafe.As<TextureAsset>(staticRes.Resource);
                                     if (asset == null || asset.Status != ResourceStatus.Success)
-                                        resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), null);
+                                        resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), AssetManager.Static.DefaultWhite.Texture);
                                     else
                                         resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), asset.Texture);
                                     break;
@@ -287,19 +287,17 @@ namespace Primary.Rendering.Raw
 
     public record struct CommandBufferEventScope : IDisposable
     {
-        private readonly CommandBuffer _commandBuffer;
+        private readonly RHI.CommandBuffer _commandBuffer;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public CommandBufferEventScope(CommandBuffer commandBuffer, ReadOnlySpan<char> name)
+        public CommandBufferEventScope(RasterCommandBuffer commandBuffer, ReadOnlySpan<char> name)
         {
-            _commandBuffer = commandBuffer;
-            commandBuffer!.Wrapped.BeginEvent(new Color32((uint)name.GetDjb2HashCode() | 0x000000ffu), name);
+            _commandBuffer = commandBuffer.Wrapped;
+            _commandBuffer.BeginEvent(new Color32((uint)name.GetDjb2HashCode() | 0x000000ffu), name);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Dispose()
         {
-            _commandBuffer!.Wrapped.EndEvent();
+            _commandBuffer.EndEvent();
         }
     }
 }

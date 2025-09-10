@@ -37,8 +37,6 @@ namespace Editor.Gui
             _eventManager = new UIEventManager();
             _dragManager = new UIDragManager();
 
-            Engine.GlobalSingleton.RenderingManager.RenderPassManager.AddRenderPass<GuiRenderPass>();
-
             s_instance.Target = this;
         }
 

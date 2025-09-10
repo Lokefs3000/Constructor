@@ -15,6 +15,7 @@ namespace Primary.RHI
 
         public abstract RenderTextureView? ColorTexture { get; }
         public abstract RenderTextureView? DepthTexture { get; }
+        public abstract RenderTextureView? StencilTexture { get; }
     }
 
     public abstract class RenderTextureView : Resource
@@ -41,7 +42,8 @@ namespace Primary.RHI
 
         Color = 1 << 0,
         Depth = 1 << 1,
+        Stencil = 1 << 2,
 
-        Both = Color | Depth
+        All = Color | Depth | Stencil
     }
 }

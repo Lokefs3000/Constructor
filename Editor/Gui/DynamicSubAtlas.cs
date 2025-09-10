@@ -116,7 +116,9 @@ namespace Editor.Gui
                         Format = Primary.RHI.TextureFormat.RGBA8un,
                         Memory = Primary.RHI.MemoryUsage.Immutable,
                         Usage = Primary.RHI.TextureUsage.ShaderResource,
-                        CpuAccessFlags = Primary.RHI.CPUAccessFlags.None
+                        CpuAccessFlags = Primary.RHI.CPUAccessFlags.None,
+
+                        Swizzle = Primary.RHI.TextureSwizzle.Default,
                     }, new Span<nint>(ref basePixelsPtr));
 
                     _texture.Name = $"DynAtlas-{_fittedIcons.Count}";
@@ -212,7 +214,7 @@ namespace Editor.Gui
         private void CreateAtlasOfSize(int size)
         {
             int tileCount = size / DynAtlasInitialTileSize;
-            int lastIndex = BitOperations.TrailingZeroCount(DynAtlasInitialTileSize) - 7;
+            int lastIndex = 0;
 
             for (int y = 0; y < tileCount; y++)
             {
@@ -233,7 +235,7 @@ namespace Editor.Gui
             bool hasTriedSubdivideOnce = false;
 
         TryDequeueTile:
-            int currentIndex = BitOperations.TrailingZeroCount(size) - 7;
+            int currentIndex = Math.Min(BitOperations.LeadingZeroCount((uint)size) - 23, 3);
             if (_tileSizes[currentIndex].TryDequeue(out AtlasTile tile))
             {
                 offset = tile.Offset;
@@ -259,10 +261,10 @@ namespace Editor.Gui
 
         private bool TrySubdivideLargerTiles(int currentIndex)
         {
-            Queue<AtlasTile> nextInLine = _tileSizes[currentIndex + 1];
+            Queue<AtlasTile> nextInLine = _tileSizes[currentIndex - 1];
             if (nextInLine.Count == 0)
             {
-                if (!TrySubdivideLargerTiles(currentIndex + 1))
+                if (!TrySubdivideLargerTiles(currentIndex - 1))
                     return false;
             }
 

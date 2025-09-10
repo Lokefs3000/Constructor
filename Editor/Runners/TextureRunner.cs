@@ -79,7 +79,7 @@ namespace Editor.Runners
             [Option("mipmaps")]
             public bool GenerateMipmaps { get; set; } = false;
             [Option('t', "type")]
-            public TextureImageType ImageType { get; set; } = TextureImageType.Colormap;
+            public TextureImageType ImageType { get; set; } = TextureImageType.Color;
             [Option("scaleMipAlpha")]
             public bool ScaleAlphaForMipmaps { get; set; } = false;
         }

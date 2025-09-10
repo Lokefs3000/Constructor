@@ -211,6 +211,11 @@ namespace Editor.Processors.Shaders
                                                 attribute.Name = kvp.Value;
                                                 break;
                                             }
+                                        case "Default":
+                                            {
+                                                attribute.Default = Enum.Parse<ShaderPropertyDefault>(kvp.Value);
+                                                break;
+                                            }
                                         default: throw new ArgumentException(key);
                                     }
                                 }
@@ -346,7 +351,7 @@ namespace Editor.Processors.Shaders
                             string dsString = defaultState.ToString();
                             if (dsString != "register")
                             {
-                                ImmutableSampler sampler = PresetSamplerTypes[dsString];
+                                ImmutableSampler sampler = PresetSamplerTypes.TryGetValue(dsString, out ImmutableSampler val) ? val : PresetSamplerTypes["defaultLinear"];
                                 sampler.Index = result.ImmutableSamplers.Count;
                                 sampler.Name = name.ToString();
 
@@ -408,6 +413,7 @@ namespace Editor.Processors.Shaders
                                             case "MipLODBias": sampler.MipLODBias = MathF.Max(float.Parse(ReadIdentifier(ref current, source)), 0.0f); break;
                                             case "MinLOD": sampler.MinLOD = MathF.Max(float.Parse(ReadIdentifier(ref current, source)), 0.0f); break;
                                             case "MaxLOD": sampler.MaxLOD = MathF.Max(float.Parse(ReadIdentifier(ref current, source)), 0.0f); break;
+                                            case "Border": sampler.Border = Enum.Parse<RHI.SamplerBorder>(ReadString(ref current, source)); break;
                                             default: throw new ArgumentException("unknown sampler decleration: " + declStr);
                                         }
 
@@ -1258,7 +1264,7 @@ namespace Editor.Processors.Shaders
             switch (attrib.Type)
             {
                 case AttribType.Constants: return new ShaderAttribute { Type = ShaderAttributeType.Constants, Value = null };
-                case AttribType.Property: return new ShaderAttribute { Type = ShaderAttributeType.Property, Value = new ShaderAttribProperty { Name = ((AttributeProperty)attrib.Value).Name } };
+                case AttribType.Property: return new ShaderAttribute { Type = ShaderAttributeType.Property, Value = new ShaderAttribProperty { Name = ((AttributeProperty)attrib.Value).Name, Default = ((AttributeProperty)attrib.Value).Default } };
             }
 
             throw new NotImplementedException(attrib.Type.ToString());
@@ -1375,6 +1381,7 @@ namespace Editor.Processors.Shaders
         private record struct AttributeProperty
         {
             public string Name;
+            public ShaderPropertyDefault Default;
         }
 
         private record struct AttributeBindGroup

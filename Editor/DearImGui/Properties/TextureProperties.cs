@@ -3,34 +3,33 @@ using Editor.Assets.Importers;
 using Editor.Processors;
 using Hexa.NET.ImGui;
 using Primary.Assets;
+using Primary.Assets.Loaders;
 using Primary.Common;
-using System;
-using System.Buffers;
-using System.Collections.Generic;
-using System.Linq;
+using System.Diagnostics;
 using System.Numerics;
 using System.Text;
-using System.Threading.Tasks;
+using Tomlyn;
+using Tomlyn.Model;
+using Primary.Common.Streams;
+using Primary.Utility;
+using System.Globalization;
 
 namespace Editor.DearImGui.Properties
 {
     internal sealed class TextureProperties : IObjectPropertiesViewer
     {
-        private TextureAsset? _texture;
+        private string? _localPath;
 
-        private bool _flipVertical;
-        private TextureImageFormat _imageFormat;
-        private bool _cutoutDither;
-        private int _cutoutThreshold;
-        private bool _gammaCorrect;
-        private bool _premultipliedAlpha;
-        private TextureMipmapFilter _mipMapFilter;
-        private int _maxMipMapCount;
-        private int _minMipMapSize;
-        private bool _generateMipMaps;
-        private TextureImageType _imageType;
-        private bool _scaleAlphaForMipMaps;
-        
+        private TextureAsset? _texture;
+        private string? _configFile;
+
+        private TextureProcessorArgs _args;
+
+        private TextureHeader? _query;
+        private long _textureMemorySize;
+
+        private bool _isImported;
+
         internal TextureProperties()
         {
 
@@ -40,87 +39,144 @@ namespace Editor.DearImGui.Properties
         {
             TargetData td = (TargetData)target;
 
-            string imageFormat = _imageFormat.ToString();
-            string imageType = _imageType.ToString();
+            string imageType = _args.ImageType.ToString();
 
             if (ImGuiWidgets.ComboBox("Type:", ref imageType, s_imageTypes))
             {
-                _imageType = Enum.Parse<TextureImageType>(imageType);
+                _args.ImageType = Enum.Parse<TextureImageType>(imageType);
             }
 
-            if (ImGuiWidgets.ComboBox("Format:", ref imageFormat, s_imageFormats))
+            switch (_args.ImageType)
             {
-                _imageFormat = Enum.Parse<TextureImageFormat>(imageFormat);
+                case TextureImageType.Normal:
+                    {
+                        if (ImGui.CollapsingHeader("Normal", ImGuiTreeNodeFlags.DefaultOpen))
+                        {
+                            string source = _args.ImageMetadata.NormalArgs.Source.ToString();
+
+                            if (ImGuiWidgets.ComboBox("Source:", ref source, s_normalSource))
+                            {
+                                _args.ImageMetadata.NormalArgs.Source = Enum.Parse<TextureNormalSource>(source);
+                            }
+                        }
+
+                        break;
+                    }
+                case TextureImageType.Specular:
+                    {
+                        if (ImGui.CollapsingHeader("Specular", ImGuiTreeNodeFlags.DefaultOpen))
+                        {
+                            string source = _args.ImageMetadata.SpecularArgs.Source.ToString();
+
+                            if (ImGuiWidgets.ComboBox("Source:", ref source, s_specularSource))
+                            {
+                                _args.ImageMetadata.SpecularArgs.Source = Enum.Parse<TextureSpecularSource>(source);
+                            }
+                        }
+
+                        break;
+                    }
             }
 
-            ImGuiWidgets.Checkbox("Cut-out dither:", ref _cutoutDither);
+            if (ImGui.CollapsingHeader("Source", ImGuiTreeNodeFlags.DefaultOpen))
             {
-                ImGui.Indent();
+                string imageFormat = _args.ImageFormat.ToString();
+                string alphaSource = _args.AlphaSource.ToString();
 
-                if (!_cutoutDither)
-                    ImGui.BeginDisabled();
-
-                ImGuiWidgets.SliderInt("Threshold:", ref _cutoutThreshold, byte.MinValue, byte.MaxValue);
-
-                if (!_cutoutDither)
-                    ImGui.EndDisabled();
-
-                ImGui.Unindent();
-            }
-
-            ImGuiWidgets.Checkbox("Gamma correct:", ref _gammaCorrect);
-            ImGuiWidgets.Checkbox("Premultiplied alpha:", ref _premultipliedAlpha);
-            
-            ImGuiWidgets.Checkbox("Generate mip maps:", ref _generateMipMaps);
-
-            if (ImGui.CollapsingHeader("Mip mapping"))
-            {
-                string mipMapFilter = _mipMapFilter.ToString();
-
-                if (!_generateMipMaps)
-                    ImGui.BeginDisabled();
-
-                if (ImGuiWidgets.ComboBox("Filter:", ref mipMapFilter, s_mipMapFilters))
+                bool isActive = _args.ImageFormat > TextureImageFormat.Undefined;
+                if (ImGuiWidgets.CheckedComboBox("Format:", ref imageFormat, ref isActive, s_imageFormats.AsSpan(1)))
                 {
-                    _mipMapFilter = Enum.Parse<TextureMipmapFilter>(mipMapFilter);
+                    if (isActive && _args.ImageFormat == TextureImageFormat.Undefined)
+                        _args.ImageFormat = TextureImageFormat.BC1;
+                    else
+                        _args.ImageFormat = isActive ? Enum.Parse<TextureImageFormat>(imageFormat) : TextureImageFormat.Undefined;
                 }
 
-                int width = 0;
-                int height = 0;
-                if (_texture != null && _texture.Status == ResourceStatus.Success)
+                if (ImGuiWidgets.ComboBox("Alpha:", ref alphaSource, s_alphaSource))
                 {
-                    width = _texture.Width;
-                    height = _texture.Height;
+                    _args.AlphaSource = Enum.Parse<TextureAlphaSource>(alphaSource);
                 }
-
-                int maxMipCount = (int)Math.Log2(Math.Max(width, height)) + 1;
-
-                ImGuiWidgets.SliderInt("Max mipmap count:", ref _maxMipMapCount, -1, maxMipCount);
-                ImGuiWidgets.SliderInt("Min mipmap size:", ref _minMipMapSize, 1, Math.Min(width, height) - 1);
-
-                ImGuiWidgets.Checkbox("Scale mip alpha:", ref _scaleAlphaForMipMaps);
-
-                if (!_generateMipMaps)
-                    ImGui.EndDisabled();
-            }
-            
-            if (ImGui.Button("Revert"))
-            {
-
             }
 
-            ImGui.SameLine();
-
-            if (ImGui.Button("Apply"))
+            if (ImGui.CollapsingHeader("Process", ImGuiTreeNodeFlags.DefaultOpen))
             {
-                try
+                int cutoutThreshold = _args.CutoutThreshold;
+
+                ImGuiWidgets.Checkbox("Gamma correct:", ref _args.GammaCorrect);
+                ImGuiWidgets.Checkbox("Premultiplied alpha:", ref _args.PremultipliedAlpha);
+
+                ImGuiWidgets.Checkbox("Cutout dither:", ref _args.CutoutDither);
+
+                if (_args.CutoutDither)
                 {
-                    string fullImagePath = Path.Combine(Editor.GlobalSingleton.ProjectPath, td.FullPath);
-                    WriteToDisk(Path.ChangeExtension(fullImagePath, ".toml"));
+                    ImGui.Indent();
+                    if (ImGuiWidgets.InputInt("Threshold:", ref cutoutThreshold, 0, byte.MaxValue))
+                        _args.CutoutThreshold = (byte)cutoutThreshold;
+                    ImGui.Unindent();
                 }
-                catch (Exception ex)
+
+                ImGuiWidgets.Checkbox("Flip vertical:", ref _args.FlipVertical);
+            }
+
+            if (ImGui.CollapsingHeader("Mip maps", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                ImGuiWidgets.Checkbox("Generate mip maps:", ref _args.GenerateMipmaps);
+
+                if (_args.GenerateMipmaps)
                 {
-                    EdLog.Gui.Error(ex, "Writing updated texture data to disk failed: {f}", td.FullPath);
+                    string mipmapFilter = _args.MipmapFilter.ToString();
+
+                    ImGui.Indent();
+
+                    ImGuiWidgets.Checkbox("Scale alpha for mip maps:", ref _args.ScaleAlphaForMipmaps);
+
+                    ImGuiWidgets.SliderInt("Max mip map count:", ref _args.MaxMipmapCount, 0, 10);
+                    ImGuiWidgets.SliderInt("Min mip map size:", ref _args.MinMipmapSize, 1, 1023);
+
+                    if (ImGuiWidgets.ComboBox("Filter:", ref mipmapFilter, s_mipMapFilters))
+                    {
+                        _args.MipmapFilter = Enum.Parse<TextureMipmapFilter>(mipmapFilter);
+                    }
+
+                    ImGui.Unindent();
+                }
+            }
+
+            SwizzleComboBox("Swizzle:", ref _args.TextureSwizzle);
+
+            if (_isImported)
+            {
+                if (ImGui.Button("Revert"))
+                {
+
+                }
+
+                ImGui.SameLine();
+
+                if (ImGui.Button("Apply"))
+                {
+                    try
+                    {
+                        SerializeArgumentsToDisk();
+                    }
+                    catch (Exception ex)
+                    {
+                        EdLog.Gui.Error(ex, "Writing updated texture data to disk failed: {f}", td.LocalPath);
+                    }
+                }
+            }
+            else
+            {
+                if (ImGui.Button("Import"))
+                {
+                    try
+                    {
+                        SerializeArgumentsToDisk();
+                    }
+                    catch (Exception ex)
+                    {
+                        EdLog.Gui.Error(ex, "Writing importing texture data to disk failed: {f}", td.LocalPath);
+                    }
                 }
             }
 
@@ -144,83 +200,256 @@ namespace Editor.DearImGui.Properties
                     drawList.AddImage(ImGuiUtility.GetTextureRef(_texture.Handle), center - halfAspectCorrect, center + halfAspectCorrect);
                 }
 
+                if (_query.HasValue)
+                {
+                    TextureHeader query = _query.Value;
+
+                    string text = $"{query.Width}x{query.Height} | {query.Format} | {FileUtility.FormatSize(_textureMemorySize, "F3", CultureInfo.InvariantCulture)}";
+
+                    Vector2 textSize = ImGui.CalcTextSize(text);
+                    Vector2 start = screen + new Vector2((avail.X - textSize.X) * 0.5f, avail.Y - textSize.Y * 2.0f);
+
+                    drawList.AddRectFilled(start - new Vector2(4.0f, 2.0f), start + textSize + new Vector2(4.0f, 2.0f), 0x80000000);
+                    drawList.AddText(start, 0xffffffff, text);
+                }
+
                 ImGui.EndChild();
             }
         }
 
         public void Changed(object? target)
         {
-        BeginCheck:
             TargetData? td = target as TargetData;
             if (td != null)
             {
-                string altToml = Path.ChangeExtension(td.FullPath, ".toml");
-                if (!AssetFilesystem.Exists(altToml))
+                string localPath = td.LocalPath;
+                string altToml = Editor.GlobalSingleton.AssetPipeline.Configuration.GetFilePath(localPath, "Texture");
+
+                _localPath = localPath;
+
+                if (!File.Exists(altToml))
                 {
-                    td = null;
-                    goto BeginCheck;
+                    _texture = null;
+                    _configFile = altToml;
+                    _query = null;
+
+                    _args = new TextureProcessorArgs
+                    {
+                        ImageType = TextureImageType.Color,
+                        ImageMetadata = new TextureProcessorArgs.Metadata(),
+
+                        TextureSwizzle = new TextureProcessorArgs.Swizzle(),
+
+                        ImageFormat = TextureImageFormat.Undefined,
+                        AlphaSource = TextureAlphaSource.None,
+
+                        GammaCorrect = false,
+                        PremultipliedAlpha = false,
+
+                        CutoutDither = false,
+                        CutoutThreshold = 127,
+
+                        GenerateMipmaps = true,
+                        ScaleAlphaForMipmaps = false,
+                        MaxMipmapCount = int.MaxValue,
+                        MinMipmapSize = 1,
+                        MipmapFilter = TextureMipmapFilter.Box,
+
+                        FlipVertical = false
+                    };
+
+                    _isImported = false;
+                    return;
                 }
 
-                _texture = AssetManager.LoadAsset<TextureAsset>(td.FullPath);
+                _texture = AssetManager.LoadAsset<TextureAsset>(td.LocalPath);
+                _configFile = altToml;
 
-                using Stream stream = AssetFilesystem.OpenStream(altToml)!;
-                TomlDocument document = CsTomlSerializer.Deserialize<TomlDocument>(stream);
+                using FileStream stream = FileUtility.TryWaitOpen(_configFile, FileMode.Open, FileAccess.Read, FileShare.Read);
+                TomlTable document = Toml.ToModel<TomlTable>(File.ReadAllText(_configFile), localPath, new TomlModelOptions { IncludeFields = true });
 
-                _flipVertical = document.RootNode["flip_vertical"].GetBool();
-                _imageFormat = Enum.Parse<TextureImageFormat>(document.RootNode["image_format"].GetString());
-                _cutoutDither = document.RootNode["cutout_dither"].GetBool();
-                _cutoutThreshold = (int)document.RootNode["cutout_threshold"].GetInt64();
-                _gammaCorrect = document.RootNode["gamma_correct"].GetBool();
-                _premultipliedAlpha = document.RootNode["premultiplied_alpha"].GetBool();
-                _mipMapFilter = Enum.Parse<TextureMipmapFilter>(document.RootNode["mipmap_filter"].GetString());
-                _maxMipMapCount = (int)document.RootNode["max_mipmap_count"].GetInt64();
-                _minMipMapSize = (int)document.RootNode["min_mipmap_size"].GetInt64();
-                _generateMipMaps = document.RootNode["generate_mipmaps"].GetBool();
-                _imageType = Enum.Parse<TextureImageType>(document.RootNode["image_type"].GetString());
-                _scaleAlphaForMipMaps = document.RootNode["scale_alpha_for_mipmaps"].GetBool();
+                _args = TextureAssetImporter.ReadTomlDocument(document);
+                _isImported = true;
 
-                if (_maxMipMapCount == int.MaxValue)
-                    _maxMipMapCount = -1;
+                try
+                {
+                    using Stream? tempStream = AssetFilesystem.OpenStream(localPath);
+                    if (tempStream == null)
+                    {
+                        EdLog.Gui.Warning("Failed to open stream for texture header query!");
+
+                        _query = null;
+                        _textureMemorySize = 0;
+                    }
+                    else
+                    {
+                        TextureHeader query = tempStream.Read<TextureHeader>();
+
+                        if (query.FileHeader != TextureHeader.Header || query.FileVersion != TextureHeader.Version)
+                        {
+                            EdLog.Gui.Warning("Texture header contains invalid data");
+
+                            _query = null;
+                            _textureMemorySize = 0;
+                        }
+                        else
+                        {
+                            _query = query;
+                            _textureMemorySize = tempStream.Length - tempStream.Position;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    EdLog.Gui.Warning(ex, "Failed to query texture header!");
+                    _query = null;
+                    _textureMemorySize = 0;
+                }
             }
             else
             {
+                _localPath = null;
                 _texture = null;
+                _configFile = null;
+                _query = null;
+                _textureMemorySize = 0;
             }
         }
 
-        private void WriteToDisk(string fullPath)
+        private void SerializeArgumentsToDisk()
         {
-            using FileStream? stream = FileUtility.TryWaitOpen(fullPath, FileMode.Create, FileAccess.Write, FileShare.None);
-            if (stream == null)
+            Debug.Assert(_configFile != null);
+            Debug.Assert(_localPath != null);
+
+            using (FileStream stream = FileUtility.TryWaitOpen(_configFile, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                EdLog.Gui.Error("Failed to write texture toml data to disk: {f}", fullPath);
-                return;
+                if (stream == null)
+                {
+                    EdLog.Gui.Error("Failed to write texture toml data to disk: {f}", _configFile);
+                    return;
+                }
+
+                TomlTable root = new TomlTable();
+                root["image_type"] = _args.ImageType.ToString();
+                
+                root["swizzle"] = new TomlArray() { _args.TextureSwizzle.R.ToString(), _args.TextureSwizzle.G.ToString(), _args.TextureSwizzle.B.ToString(), _args.TextureSwizzle.A.ToString() };
+
+                root["image_format"] = _args.ImageFormat.ToString();
+                root["alpha_source"] = _args.AlphaSource.ToString();
+
+                root["gamma_correct"] = _args.GammaCorrect;
+                root["premultiplied_alpha"] = _args.PremultipliedAlpha;
+
+                root["cutout_dither"] = _args.CutoutDither;
+                root["cutout_threshold"] = _args.CutoutThreshold;
+
+                root["generate_mipmaps"] = _args.GenerateMipmaps;
+                root["scale_alpha_for_mipmaps"] = _args.ScaleAlphaForMipmaps;
+                root["max_mipmap_count"] = _args.MaxMipmapCount;
+                root["min_mipmap_size"] = _args.MinMipmapSize;
+                root["mipmap_filter"] = _args.MipmapFilter.ToString();
+
+                root["flip_vertical"] = _args.FlipVertical;
+
+                switch (_args.ImageType)
+                {
+                    case TextureImageType.Normal:
+                        {
+                            TomlTable normal = new TomlTable();
+                            root["normal"] = normal;
+
+                            TextureProcessorNormalArgs normalArgs = _args.ImageMetadata.NormalArgs;
+                            normal["source"] = normalArgs.Source.ToString();
+
+                            break;
+                        }
+                    case TextureImageType.Specular:
+                        {
+                            TomlTable specular = new TomlTable();
+                            root["specular"] = specular;
+
+                            TextureProcessorSpecularArgs normalArgs = _args.ImageMetadata.SpecularArgs;
+                            specular["source"] = normalArgs.Source.ToString();
+
+                            break;
+                        }
+                }
+
+                string source = Toml.FromModel(root, new TomlModelOptions
+                {
+                    IncludeFields = true,
+                });
+
+                stream.Write(Encoding.UTF8.GetBytes(source));
             }
 
-            TexturePropertiesToml data = new TexturePropertiesToml
+            if (Editor.GlobalSingleton.AssetPipeline.ImportChangesOrGetRunning(_localPath) != null)
             {
-                FlipVertical = _flipVertical,
-                ImageFormat = _imageFormat,
-                CutoutDither = _cutoutDither,
-                CutoutThreshold = (byte)_cutoutThreshold,
-                GammaCorrect = _gammaCorrect,
-                PremultipliedAlpha = _premultipliedAlpha,
-                MipmapFilter = _mipMapFilter,
-                MaxMipmapCount = _maxMipMapCount == -1 ? int.MaxValue : _maxMipMapCount,
-                MinMipmapSize = _minMipMapSize,
-                GenerateMipmaps = _generateMipMaps,
-                ImageType = _imageType,
-                ScaleAlphaForMipmaps = _scaleAlphaForMipMaps
-            };
+                _texture = AssetManager.LoadAsset<TextureAsset>(_localPath);
 
-            CsTomlSerializer.Serialize(stream, data);
+                _isImported = true;
+            }
+        }
+
+        private static void SwizzleComboBox(in string headerText, ref TextureProcessorArgs.Swizzle swizzle)
+        {
+            Vector3 data = ImGuiWidgets.Header(headerText);
+
+            ImGuiContextPtr context = ImGui.GetCurrentContext();
+
+            float fullWidth = data.Z / 4.0f;
+            float individualWidth = data.Z / 4.0f;
+
+            ImGui.PushID(headerText);
+
+            string swizzleR = s_swizzleChannel[(int)swizzle.R];
+            string swizzleG = s_swizzleChannel[(int)swizzle.G];
+            string swizzleB = s_swizzleChannel[(int)swizzle.B];
+            string swizzleA = s_swizzleChannel[(int)swizzle.A];
+
+            ImGui.SetCursorScreenPos(new Vector2(data.X, data.Y));
+            ImGui.SetNextItemWidth(individualWidth);
+            if (ImGuiWidgets.ComboBox(1, ref swizzleR, s_swizzleChannel))
+                swizzle.R = Choose(swizzleR[0]);
+
+            ImGui.SetCursorScreenPos(new Vector2(data.X + fullWidth, data.Y));
+            ImGui.SetNextItemWidth(individualWidth);
+            if (ImGuiWidgets.ComboBox(2, ref swizzleG, s_swizzleChannel))
+                swizzle.G = Choose(swizzleG[0]);
+
+            ImGui.SetCursorScreenPos(new Vector2(data.X + fullWidth * 2.0f, data.Y));
+            ImGui.SetNextItemWidth(individualWidth);
+            if (ImGuiWidgets.ComboBox(3, ref swizzleB, s_swizzleChannel))
+                swizzle.B = Choose(swizzleB[0]);
+
+            ImGui.SetCursorScreenPos(new Vector2(data.X + fullWidth * 3.0f, data.Y));
+            ImGui.SetNextItemWidth(individualWidth);
+            if (ImGuiWidgets.ComboBox(4, ref swizzleA, s_swizzleChannel))
+                swizzle.A = Choose(swizzleA[0]);
+
+            ImGui.PopID();
+
+            static Processors.TextureSwizzleChannel Choose(char c) => c switch
+            {
+                'R' => Processors.TextureSwizzleChannel.R,
+                'G' => Processors.TextureSwizzleChannel.G,
+                'B' => Processors.TextureSwizzleChannel.B,
+                'A' => Processors.TextureSwizzleChannel.A,
+                'Z' => Processors.TextureSwizzleChannel.Zero,
+                'O' => Processors.TextureSwizzleChannel.One,
+                _ => Processors.TextureSwizzleChannel.R,
+            };
         }
 
         private static readonly string[] s_imageFormats = Enum.GetNames<TextureImageFormat>();
         private static readonly string[] s_mipMapFilters = Enum.GetNames<TextureMipmapFilter>();
         private static readonly string[] s_imageTypes = Enum.GetNames<TextureImageType>();
+        private static readonly string[] s_normalSource = Enum.GetNames<TextureNormalSource>();
+        private static readonly string[] s_specularSource = Enum.GetNames<TextureSpecularSource>();
+        private static readonly string[] s_alphaSource = Enum.GetNames<TextureAlphaSource>();
+        private static readonly string[] s_swizzleChannel = Enum.GetNames<Processors.TextureSwizzleChannel>();
 
-        internal record class TargetData(string FullPath);
+        internal record class TargetData(string LocalPath);
     }
 
     [TomlSerializedObject]

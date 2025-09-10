@@ -140,6 +140,8 @@ namespace Editor.DearImGui.Components
                             Memory = RHI.MemoryUsage.Immutable,
                             Usage = RHI.TextureUsage.ShaderResource,
                             CpuAccessFlags = RHI.CPUAccessFlags.None,
+
+                            Swizzle = RHI.TextureSwizzle.Default,
                         }, new Span<nint>(ref ptrV));
                     }
                 }

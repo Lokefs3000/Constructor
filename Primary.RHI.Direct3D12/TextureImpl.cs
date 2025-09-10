@@ -125,7 +125,7 @@ namespace Primary.RHI.Direct3D12
                 {
                     ViewDimension = ShaderResourceViewDimension.Texture2D,
                     Format = resDesc.Format,
-                    Shader4ComponentMapping = Terra.D3D12.D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+                    Shader4ComponentMapping = EncodeShader4ComponentMapping((uint)desc.Swizzle.R, (uint)desc.Swizzle.G, (uint)desc.Swizzle.B, (uint)desc.Swizzle.A),
                     Texture2D = new Texture2DShaderResourceView
                     {
                         MipLevels = desc.MipLevels,
@@ -144,6 +144,9 @@ namespace Primary.RHI.Direct3D12
 
             _currentState = usingState;
             _resourceName = _resource.Name;
+
+            device.InvokeObjectCreationTracking(this);
+            device.InvokeObjectRenamingTracking(this, _resourceName);
         }
 
         private void Dispose(bool disposing)
@@ -162,6 +165,7 @@ namespace Primary.RHI.Direct3D12
                     _resource?.Dispose();
                 });
 
+                _device.InvokeObjectDestructionTracking(this);
                 _disposedValue = true;
             }
         }
@@ -225,7 +229,14 @@ namespace Primary.RHI.Direct3D12
         #endregion
 
         public override ref readonly TextureDescription Description => ref _description;
-        public override string Name { set => _resource.Name = value; }
+        public override string Name
+        {
+            set
+            {
+                _resource.Name = value;
+                _device.InvokeObjectRenamingTracking(this, value);
+            }
+        }
         public override nint Handle => _handlePtr;
 
         public ulong TotalSizeInBytes => _totalSizeInBytes;
@@ -238,5 +249,22 @@ namespace Primary.RHI.Direct3D12
         public CpuDescriptorHandle CpuDescriptor => _descriptor.GetCpuHandle();
         public ResourceStates GenericState => ResourceStates.Common;
         public ResourceStates CurrentState => _currentState;
+
+        //https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_shader_component_mapping
+
+        private const int ShaderComponentMappingMask = 0x7;
+        private const int ShaderComponentMappingShift = 3;
+        private const int ShaderComponentMappingAlwaysSetBitAvoidingZeroMemMistakes = 1 << (ShaderComponentMappingShift * 4);
+
+        private static readonly uint DefaultShader4ComponentMapping = EncodeShader4ComponentMapping(0, 1, 2, 3);
+
+        private static uint EncodeShader4ComponentMapping(uint src0, uint src1, uint src2, uint src3)
+        {
+            return ((((src0) & ShaderComponentMappingMask) |
+                    (((src1) & ShaderComponentMappingMask) << ShaderComponentMappingShift) |
+                    (((src2) & ShaderComponentMappingMask) << (ShaderComponentMappingShift * 2)) |
+                    (((src3) & ShaderComponentMappingMask) << (ShaderComponentMappingShift * 3)) |
+                    ShaderComponentMappingAlwaysSetBitAvoidingZeroMemMistakes));
+        }
     }
 }

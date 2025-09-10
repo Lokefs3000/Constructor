@@ -37,12 +37,6 @@ namespace Editor.Processors
 
             string sourceSearchDir = Path.GetDirectoryName(args.AbsoluteFilepath)!;
 
-            string tomlFile = Path.ChangeExtension(args.AbsoluteFilepath, ".toml");
-            if (!File.Exists(tomlFile))
-            {
-                return false;
-            }
-
             string[] paths = ["", sourceSearchDir, args.ContentSearchDir];
             using IDxcCompiler3 compiler = Dxc.CreateDxcCompiler<IDxcCompiler3>();
 
@@ -55,7 +49,7 @@ namespace Editor.Processors
                 string errors = result.GetErrors();
                 if (errors.Length > 0)
                 {
-                    args.Logger.Error(errors + $" {Environment.StackTrace}");
+                    args.Logger?.Error(errors + $" {Environment.StackTrace}");
                     return false;
                 }
 
@@ -66,7 +60,6 @@ namespace Editor.Processors
             }
 
             ShaderParseResult parseResult = ShaderSourceParser.ParseSource(processedSource, sourceSearchDir, args.ContentSearchDir);
-            PipelineDesc pipelineDesc = Toml.ToModel<PipelineDesc>(File.ReadAllText(tomlFile), tomlFile);
 
             ShaderPath = parseResult.Path;
 
@@ -128,7 +121,7 @@ namespace Editor.Processors
 
                 bw.Write(parseResult.Path!);
 
-                WritePipelineDesc(bw, pipelineDesc, parseResult);
+                WritePipelineDesc(bw, ref args, parseResult);
                 WriteSupplementData(bw, parseResult, compiler, paths, args.Logger);
 
                 bw.Write(apiTarget);
@@ -195,8 +188,10 @@ namespace Editor.Processors
             }
         }
 
-        private static void WritePipelineDesc(BinaryWriter bw, PipelineDesc desc, ShaderParseResult result)
+        private static void WritePipelineDesc(BinaryWriter bw, ref ShaderProcessorArgs args, ShaderParseResult result)
         {
+            ref ShaderDescriptionArgs desc = ref args.Description;
+
             bw.Write((byte)desc.FillMode);
             bw.Write((byte)desc.CullMode);
             bw.Write(desc.FrontCounterClockwise);
@@ -206,40 +201,40 @@ namespace Editor.Processors
             bw.Write(desc.DepthClipEnable);
             bw.Write(desc.ConservativeRaster);
             bw.Write(desc.DepthEnable);
-            bw.Write(desc.DepthWriteMask);
-            bw.Write(desc.DepthFunc);
+            bw.Write((byte)desc.DepthWriteMask);
+            bw.Write((byte)desc.DepthFunc);
             bw.Write(desc.StencilEnable);
             bw.Write(desc.StencilReadMask);
             bw.Write(desc.StencilWriteMask);
-            bw.Write(desc.PrimitiveTopology);
-            WriteStencilFace(bw, desc.FrontFace);
-            WriteStencilFace(bw, desc.BackFace);
+            bw.Write((byte)desc.PrimitiveTopology);
+            WriteStencilFace(bw, ref desc.FrontFace);
+            WriteStencilFace(bw, ref desc.BackFace);
             bw.Write(desc.AlphaToCoverageEnable);
             bw.Write(desc.IndependentBlendEnable);
             bw.Write(desc.LogicOpEnable);
-            bw.Write(desc.LogicOp);
+            bw.Write((byte)desc.LogicOp);
             bw.Write((byte)(result.ConstantsSize / 4));
-            bw.Write((byte)desc.Blends.Count);
-            for (int i = 0; i < desc.Blends.Count; i++)
+            bw.Write((byte)args.Blends.Length);
+            for (int i = 0; i < args.Blends.Length; i++)
             {
-                BlendDescription blend = desc.Blends.ElementAt(i);
+                ref BlendDescriptionArgs blend = ref args.Blends[i];
                 bw.Write(blend.BlendEnable);
-                bw.Write(blend.SrcBlend);
-                bw.Write(blend.DstBlend);
-                bw.Write(blend.BlendOp);
-                bw.Write(blend.SrcBlendAlpha);
-                bw.Write(blend.DstBlendAlpha);
-                bw.Write(blend.BlendOpAlpha);
+                bw.Write((byte)blend.SourceBlend);
+                bw.Write((byte)blend.DestinationBlend);
+                bw.Write((byte)blend.BlendOp);
+                bw.Write((byte)blend.SourceBlendAlpha);
+                bw.Write((byte)blend.DestinationBlendAlpha);
+                bw.Write((byte)blend.BlendOpAlpha);
                 bw.Write(blend.RenderTargetWriteMask);
             }
         }
 
-        private static void WriteStencilFace(BinaryWriter bw, StencilFace face)
+        private static void WriteStencilFace(BinaryWriter bw, ref StencilFaceDescriptionArgs face)
         {
-            bw.Write(face.StencilFailOp);
-            bw.Write(face.StencilDepthFailOp);
-            bw.Write(face.StencilPassOp);
-            bw.Write(face.StencilFunc);
+            bw.Write((byte)face.FailOp);
+            bw.Write((byte)face.DepthFailOp);
+            bw.Write((byte)face.PassOp);
+            bw.Write((byte)face.Func);
         }
 
         private static bool WriteSupplementData(BinaryWriter bw, ShaderParseResult parseResult, IDxcCompiler3 compiler, string[] includePaths, ILogger logger)
@@ -401,6 +396,7 @@ namespace Editor.Processors
                                 {
                                     ShaderAttribProperty value = (ShaderAttribProperty)attrib.Value!;
                                     bw.Write(value.Name);
+                                    bw.Write((byte)value.Default);
 
                                     break;
                                 }
@@ -505,9 +501,57 @@ namespace Editor.Processors
 
         public string ContentSearchDir;
 
+        public ILogger? Logger;
+        
         public RHI.GraphicsAPI Target;
 
-        public ILogger Logger;
+        public ShaderDescriptionArgs Description;
+        public BlendDescriptionArgs[] Blends;
+    }
+
+    public struct ShaderDescriptionArgs
+    {
+        public RHI.FillMode FillMode;
+        public RHI.CullMode CullMode;
+        public bool FrontCounterClockwise;
+        public int DepthBias;
+        public float DepthBiasClamp;
+        public float SlopeScaledDepthBias;
+        public bool DepthClipEnable;
+        public bool ConservativeRaster;
+        public bool DepthEnable;
+        public RHI.DepthWriteMask DepthWriteMask;
+        public RHI.ComparisonFunc DepthFunc;
+        public bool StencilEnable;
+        public byte StencilReadMask;
+        public byte StencilWriteMask;
+        public RHI.PrimitiveTopologyType PrimitiveTopology;
+        public bool AlphaToCoverageEnable;
+        public bool IndependentBlendEnable;
+        public bool LogicOpEnable;
+        public RHI.LogicOp LogicOp;
+        public StencilFaceDescriptionArgs FrontFace;
+        public StencilFaceDescriptionArgs BackFace;
+    }
+
+    public struct StencilFaceDescriptionArgs
+    {
+        public RHI.StencilOp FailOp;
+        public RHI.StencilOp DepthFailOp;
+        public RHI.StencilOp PassOp;
+        public RHI.ComparisonFunc Func;
+    }
+
+    public struct BlendDescriptionArgs
+    {
+        public bool BlendEnable;
+        public RHI.Blend SourceBlend;
+        public RHI.Blend DestinationBlend;
+        public RHI.BlendOp BlendOp;
+        public RHI.Blend SourceBlendAlpha;
+        public RHI.Blend DestinationBlendAlpha;
+        public RHI.BlendOp BlendOpAlpha;
+        public byte RenderTargetWriteMask;
     }
 
     internal enum ShaderBytecodeTargets : byte

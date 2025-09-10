@@ -27,7 +27,7 @@ namespace Editor.Assets
 
             _fileRemappings = new ConcurrentDictionary<string, string>();
 
-            string mappingFile = Path.Combine(EditorFilepaths.LibraryPath, "FileRemappings.dat");
+            string mappingFile = Path.Combine(EditorFilepaths.LibraryIntermediatePath, "FileRemappings.dat");
             if (File.Exists(mappingFile))
             {
                 ReadFileMappings(mappingFile);
@@ -88,7 +88,7 @@ namespace Editor.Assets
 
         internal void FlushFileRemappings()
         {
-            string outputFile = Path.Combine(EditorFilepaths.LibraryPath, "FileRemappings.dat");
+            string outputFile = Path.Combine(EditorFilepaths.LibraryIntermediatePath, "FileRemappings.dat");
 
             StringBuilder sb = new StringBuilder();
             foreach (var kvp in _fileRemappings)

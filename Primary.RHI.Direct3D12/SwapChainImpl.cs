@@ -230,7 +230,6 @@ namespace Primary.RHI.Direct3D12
                 _handlePtr = nint.Zero;
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public override void Dispose() => throw new NotSupportedException("Cannot dispose swapchain backbuffer!");
 
             public void EnsureResourceStates(ResourceBarrierManager manager, ResourceStates requiredStates, bool toggle = false)
@@ -244,13 +243,11 @@ namespace Primary.RHI.Direct3D12
                 }
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void SetImplicitResourcePromotion(ResourceStates state)
             {
                 BackBufferResourceState = state;
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void TransitionImmediate(ID3D12GraphicsCommandList7 commandList, ResourceStates newState)
             {
                 if (BackBufferResourceState != newState)
@@ -258,14 +255,18 @@ namespace Primary.RHI.Direct3D12
                 BackBufferResourceState = newState;
             }
 
+            public void CopyTexture(ID3D12GraphicsCommandList7 commandList, ICommandBufferRTView view) => throw new NotSupportedException();
+
             public override nint Handle => _handlePtr;
 
             public override ref readonly RenderTargetDescription Description => throw new NotImplementedException("Cannot access description for swapchain back buffer!");
 
             public override RenderTextureView? ColorTexture => null;
             public override RenderTextureView? DepthTexture => null;
+            public override RenderTextureView? StencilTexture => null;
 
             public CpuDescriptorHandle ViewCpuDescriptor => CpuHandle;
+            ID3D12Resource ICommandBufferRTView.Resource => Resource;
 
             public bool IsShaderVisible => false;
             public ResourceType Type => ResourceType.Texture;

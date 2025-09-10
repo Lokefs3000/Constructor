@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.0" />
+    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.8.2" />
     <PackageReference Include="Silk.NET.Assimp" Version="2.22.0" />
     <PackageReference Include="System.Text.Json" Version="9.0.8" />
     <PackageReference Include="Tomlyn" Version="0.19.0" />
@@ -20,6 +21,7 @@
     <ProjectReference Include="..\Editor.Interop\Editor.Interop.csproj" />
     <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
     <ProjectReference Include="..\Primary.RHI\Primary.RHI.csproj" />
+    <ProjectReference Include="..\Primary\Primary.csproj" />
   </ItemGroup>
 
   <ItemGroup>

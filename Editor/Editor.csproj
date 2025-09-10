@@ -32,6 +32,15 @@
 	  <Folder Include="Rendering\Paths\" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <None Update="splash.bmp">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="splash.png">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
+
 	<Target Name="PatchExec" AfterTargets="PostBuildEvent">
 		<Exec Command="call &quot;..\..\..\..\Patcher\D3D12SDKVersionPatcher\PatchEditor.bat&quot; &quot;Editor&quot;" WorkingDirectory="$(OutDir)" />
 	</Target>

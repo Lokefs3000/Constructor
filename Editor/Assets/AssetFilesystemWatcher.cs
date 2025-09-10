@@ -58,84 +58,105 @@ namespace Editor.Assets
 
             _watcher.Created += (a, b) =>
             {
-                FileAttributes attributes = File.GetAttributes(b.FullPath);
-                if (FlagUtility.HasFlag(attributes, FileAttributes.Directory))
+                try
                 {
-                    string localDirectory = b.FullPath.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/');
-                    AddLocalDirectory(null, b.FullPath, localDirectory);
-                }
-                else
-                {
-                    string localFile = b.FullPath.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/');
-                    if (_rememberedFiles.Contains(localFile))
+                    FileAttributes attributes = File.GetAttributes(b.FullPath);
+                    if (FlagUtility.HasFlag(attributes, FileAttributes.Directory))
                     {
-                        return;
+                        string localDirectory = b.FullPath.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/');
+                        AddLocalDirectory(null, b.FullPath, localDirectory);
                     }
-
-                    PushFileAddedEvent(localFile);
-
-                    _rememberedFiles.Add(localFile);
-                    _activeFiles.TryAdd(localFile, new AssetFile(File.GetLastWriteTime(localFile)));
-
-                    string? directory = Path.GetDirectoryName(localFile);
-                    if (directory != null)
+                    else
                     {
-                        string localDirectory = (Path.IsPathFullyQualified(directory) ? directory.Substring(Editor.GlobalSingleton.ProjectPath.Length) : directory).Replace('\\', '/');
-                        AddLocalDirectory(localFile, directory, localDirectory);
-                    }
-                }
-            };
-
-            _watcher.Deleted += (a, b) =>
-            {
-                string localFile = b.FullPath.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/');
-
-                if (_directoryTree.ContainsKey(localFile))
-                {
-                    RemoveLocalDirectory(b.FullPath.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/'), true);
-                }
-                else if (_rememberedFiles.Contains(localFile))
-                {
-                    PushFileRemovedEvent(localFile);
-
-                    _rememberedFiles.Remove(localFile);
-                    _activeFiles.Remove(localFile, out _);
-
-                    string? directory = Path.GetDirectoryName(b.FullPath);
-                    if (directory != null)
-                    {
-                        RemoveFromLocalDirectory(localFile, directory.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/'));
-                    }
-                }
-            };
-
-            _watcher.Changed += (a, b) =>
-            {
-                FileAttributes attributes = File.GetAttributes(b.FullPath);
-                if (!FlagUtility.HasFlag(attributes, FileAttributes.Directory))
-                {
-                    string localFile = b.FullPath.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/');
-                    if (_activeFiles.TryGetValue(localFile, out AssetFile file))
-                    {
-                        DateTime lastModified = File.GetLastWriteTime(b.FullPath);
-                        if (file.LastModifiedDate == lastModified)
+                        string localFile = b.FullPath.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/');
+                        if (_rememberedFiles.Contains(localFile))
                         {
                             return;
                         }
 
-                        _activeFiles[localFile] = new AssetFile(lastModified);
-                    }
-                    else
-                    {
                         PushFileAddedEvent(localFile);
 
                         _rememberedFiles.Add(localFile);
                         _activeFiles.TryAdd(localFile, new AssetFile(File.GetLastWriteTime(localFile)));
 
-                        return;
+                        string? directory = Path.GetDirectoryName(localFile);
+                        if (directory != null)
+                        {
+                            string localDirectory = (Path.IsPathFullyQualified(directory) ? directory.Substring(Editor.GlobalSingleton.ProjectPath.Length) : directory).Replace('\\', '/');
+                            AddLocalDirectory(localFile, directory, localDirectory);
+                        }
                     }
+                }
+                catch (Exception ex)
+                {
+                    EdLog.Assets.Error(ex, "Failed to handle callback for file creation");
+                }
+            };
 
-                    PushFileChangedEvent(localFile);
+            _watcher.Deleted += (a, b) =>
+            {
+                try
+                {
+                    string localFile = b.FullPath.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/');
+
+                    if (_directoryTree.ContainsKey(localFile))
+                    {
+                        RemoveLocalDirectory(b.FullPath.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/'), true);
+                    }
+                    else if (_rememberedFiles.Contains(localFile))
+                    {
+                        PushFileRemovedEvent(localFile);
+
+                        _rememberedFiles.Remove(localFile);
+                        _activeFiles.Remove(localFile, out _);
+
+                        string? directory = Path.GetDirectoryName(b.FullPath);
+                        if (directory != null)
+                        {
+                            RemoveFromLocalDirectory(localFile, directory.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/'));
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    EdLog.Assets.Error(ex, "Failed to handle callback for file deletion");
+                }
+            };
+
+            _watcher.Changed += (a, b) =>
+            {
+                try
+                {
+                    FileAttributes attributes = File.GetAttributes(b.FullPath);
+                    if (!FlagUtility.HasFlag(attributes, FileAttributes.Directory))
+                    {
+                        string localFile = b.FullPath.Substring(Editor.GlobalSingleton.ProjectPath.Length).Replace('\\', '/');
+                        if (_activeFiles.TryGetValue(localFile, out AssetFile file))
+                        {
+                            DateTime lastModified = File.GetLastWriteTime(b.FullPath);
+                            if (file.LastModifiedDate == lastModified)
+                            {
+                                return;
+                            }
+
+                            _activeFiles[localFile] = new AssetFile(lastModified);
+                        }
+                        else
+                        {
+                            PushFileAddedEvent(localFile);
+
+                            _rememberedFiles.Add(localFile);
+                            _activeFiles.TryAdd(localFile, new AssetFile(File.GetLastWriteTime(localFile)));
+
+                            return;
+                        }
+
+                        PushFileChangedEvent(localFile);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    EdLog.Assets.Error(ex, "Failed to handle callback for file change");
                 }
             };
         }
@@ -444,7 +465,7 @@ namespace Editor.Assets
             }
         }
 
-        private string FilesystemDataFile => Path.Combine(EditorFilepaths.LibraryPath, $"{(uint)_directory.GetDjb2HashCode()}.fsdat");
+        private string FilesystemDataFile => Path.Combine(EditorFilepaths.LibraryIntermediatePath, $"{(uint)_directory.GetDjb2HashCode()}.fsdat");
 
         internal object LockableTree => _directoryTree;
     }

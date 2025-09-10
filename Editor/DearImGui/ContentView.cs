@@ -330,16 +330,34 @@ namespace Editor.DearImGui
                                 string ext = Path.GetExtension(fullLocalPath);
                                 if (ext == ".png" || ext == ".jpg" || ext == ".jpeg")
                                     Editor.GlobalSingleton.PropertiesView.SetInspected(new TextureProperties.TargetData(fullLocalPath));
+                                else if (ext == ".hlsl")
+                                    Editor.GlobalSingleton.PropertiesView.SetInspected(new ShaderProperties.TargetData(fullLocalPath));
                             }
                         }
 
                         if (ImGui.BeginPopupContextItem())
                         {
+
                             if (!isDirectory)
                             {
-                                if (ImGui.MenuItem("Edit"))
+                                bool hasId = Editor.GlobalSingleton.AssetPipeline.Identifier.HasIdForAsset(fullLocalPath);
+
+                                if (hasId)
                                 {
-                                    
+                                    if (ImGui.MenuItem("Edit"))
+                                    {
+
+                                    }
+                                }
+                                else
+                                {
+                                    if (Editor.GlobalSingleton.AssetPipeline.CanBeImported(fullLocalPath))
+                                    {
+                                        if (ImGui.MenuItem("Import"))
+                                        {
+
+                                        }
+                                    }
                                 }
                             }
 

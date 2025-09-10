@@ -12,7 +12,7 @@ namespace Primary.Rendering.Pooling
 
         private RHI.GraphicsDevice _device;
 
-        private ConcurrentStack<CommandBuffer> _commandBufferWrappers;
+        private ConcurrentStack<RasterCommandBuffer> _commandBufferWrappers;
         private ConcurrentStack<RHI.GraphicsCommandBuffer>[] _commandBuffers;
 
         private int _activeStack = 0;
@@ -23,7 +23,7 @@ namespace Primary.Rendering.Pooling
         {
             _device = device;
 
-            _commandBufferWrappers = new ConcurrentStack<CommandBuffer>();
+            _commandBufferWrappers = new ConcurrentStack<RasterCommandBuffer>();
             _commandBuffers = new ConcurrentStack<RHI.GraphicsCommandBuffer>[2];
 
             _commandBuffers[0] = new ConcurrentStack<RHI.GraphicsCommandBuffer>();
@@ -62,7 +62,7 @@ namespace Primary.Rendering.Pooling
             _activeStack = _activeStack == 1 ? 0 : 1;
         }
 
-        public static CommandBuffer Get(bool autoBegin = true)
+        public static RasterCommandBuffer Get(bool autoBegin = true)
         {
             CommandBufferPool pool = NullableUtility.ThrowIfNull(s_instance);
             if (!pool._commandBuffers[pool._activeStack].TryPop(out RHI.GraphicsCommandBuffer? commandBuffer))
@@ -73,16 +73,16 @@ namespace Primary.Rendering.Pooling
             if (autoBegin)
                 commandBuffer.Begin(); //TODO: error checking
 
-            if (!pool._commandBufferWrappers.TryPop(out CommandBuffer? wrapper))
+            if (!pool._commandBufferWrappers.TryPop(out RasterCommandBuffer? wrapper))
             {
-                wrapper = new CommandBuffer();
+                wrapper = new RasterCommandBuffer();
             }
 
             wrapper.BindForUsage(commandBuffer);
             return wrapper;
         }
 
-        public static void Return(CommandBuffer commandBuffer, bool autoEndAndSubmit = true)
+        public static void Return(RasterCommandBuffer commandBuffer, bool autoEndAndSubmit = true)
         {
             CommandBufferPool pool = NullableUtility.ThrowIfNull(s_instance);
 

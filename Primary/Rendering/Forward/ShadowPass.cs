@@ -17,7 +17,7 @@ using System.Threading.Tasks;
 
 namespace Primary.Rendering.Forward
 {
-    internal sealed class ShadowPass : IRenderPass
+    internal sealed class ShadowPass
     {
         private ShaderAsset _shadowPassShader;
         private ShaderBindGroup _shadowBindGroup;
@@ -47,20 +47,22 @@ namespace Primary.Rendering.Forward
             _shadowData.Dispose();
         }
 
-        public void CleanupFrame(IRenderPath path, RenderPassData passData)
+        public void ExecutePass(RenderPass renderPass)
         {
-            
+            using (RasterPassDescription pass = renderPass.CreateRasterPass())
+            {
+                pass.SetThreadingPolicy(RenderPassThreadingPolicy.None);
+                pass.SetFunction(PassFunction);
+            }
         }
 
-        public void ExecutePass(IRenderPath path, RenderPassData passData)
+        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
         {
             RenderingManager manager = Engine.GlobalSingleton.RenderingManager;
             RenderBatcher batcher = manager.RenderBatcher;
 
-            ForwardRenderPath forward = (ForwardRenderPath)path;
+            ForwardRenderPath forward = (ForwardRenderPath)manager.RenderPath;
             ShadowManager shadows = forward.Shadows;
-
-            CommandBuffer commandBuffer = CommandBufferPool.Get();
 
             using (new CommandBufferEventScope(commandBuffer, "ForwardRP - Shadows"))
             {
@@ -79,11 +81,9 @@ namespace Primary.Rendering.Forward
                     DrawCasterView(commandBuffer, forward, batcher, ref lightData);
                 }
             }
-
-            CommandBufferPool.Return(commandBuffer);
         }
 
-        private unsafe void DrawCasterView(CommandBuffer commandBuffer, ForwardRenderPath path, RenderBatcher batcher, ref ShadowManager.FrameCasterData lightData)
+        private unsafe void DrawCasterView(RasterCommandBuffer commandBuffer, ForwardRenderPath path, RenderBatcher batcher, ref ShadowManager.FrameCasterData lightData)
         {
             //TODO: improve this so it uses a range-based approach instead of clumping them here instead and allow for global indexing!
 
@@ -141,11 +141,6 @@ namespace Primary.Rendering.Forward
                     offsetInMatrixBuffer += (uint)data.BatchableFlags.Count;
                 }
             }
-        }
-
-        public void PrepareFrame(IRenderPath path, RenderPassData passData)
-        {
-            
         }
 
         private record struct ShadowData(Matrix4x4 LightProjection, Vector4 LightPos_FarPlane);

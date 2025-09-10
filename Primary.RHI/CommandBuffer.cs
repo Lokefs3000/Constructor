@@ -36,16 +36,7 @@ namespace Primary.RHI
         Copy
     }
 
-    public struct TextureLocation
-    {
-        public int X;
-        public int Y;
-        public int Z;
-
-        public uint Width;
-        public uint Height;
-        public uint Depth;
-    }
+    public record struct TextureLocation(int X, int Y, int Z, uint Width, uint Height, uint Depth);
 
     public struct MapRange
     {

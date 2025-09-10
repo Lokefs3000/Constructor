@@ -25,6 +25,28 @@ namespace Primary.RHI
         public MemoryUsage Memory;
         public TextureUsage Usage;
         public CPUAccessFlags CpuAccessFlags;
+
+        public TextureSwizzle Swizzle;
+    }
+
+    public record struct TextureSwizzle
+    {
+        public ushort Code;
+
+        public TextureSwizzle()
+            => this = Default;
+        public TextureSwizzle(TextureChannelSwizzle r, TextureChannelSwizzle g, TextureChannelSwizzle b, TextureChannelSwizzle a)
+            => Code = (ushort)(((int)r << 9) | ((int)g << 6) | ((int)b << 3) | (int)a);
+
+        public TextureSwizzle(ushort code)
+            => Code = code;
+
+        public TextureChannelSwizzle R { get => (TextureChannelSwizzle)((Code >> 9) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 9)) | ((int)value << 9)); }
+        public TextureChannelSwizzle G { get => (TextureChannelSwizzle)((Code >> 6) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 6)) | ((int)value << 6)); }
+        public TextureChannelSwizzle B { get => (TextureChannelSwizzle)((Code >> 3) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 3)) | ((int)value << 3)); }
+        public TextureChannelSwizzle A { get => (TextureChannelSwizzle)(Code & 0x7); set => Code = (ushort)((Code & ~0x7) | (int)value); }
+
+        public static readonly TextureSwizzle Default = new TextureSwizzle(TextureChannelSwizzle.R, TextureChannelSwizzle.G, TextureChannelSwizzle.B, TextureChannelSwizzle.A);
     }
 
     public enum TextureDimension : byte
@@ -163,5 +185,15 @@ namespace Primary.RHI
     {
         None = 0,
         ShaderResource = 1 << 0,
+    }
+
+    public enum TextureChannelSwizzle : byte
+    {
+        R = 0,
+        G,
+        B,
+        A,
+        Zero,
+        One
     }
 }

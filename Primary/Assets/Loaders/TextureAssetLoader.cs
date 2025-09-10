@@ -4,7 +4,6 @@ using Primary.Rendering;
 using Primary.Utility;
 using Serilog;
 using System.Collections.Frozen;
-using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -77,99 +76,54 @@ namespace Primary.Assets.Loaders
 
                 BinaryReader br = new BinaryReader(stream!, Encoding.UTF8, true);
 
-                ExceptionUtility.Assert(br.ReadUInt32() == DDSMagicNumber);
+                TextureHeader header = br.Read<TextureHeader>();
 
-                DDS_HEADER ddsHeader = br.Read<DDS_HEADER>();
-                bool hasDxtHeader = ddsHeader.ddspf.fourCC == DXT10HeaderCC;
-                DDS_HEADER_DXT10 ddsDxt10 = hasDxtHeader ? br.Read<DDS_HEADER_DXT10>() : default;
-
-                IntermediateTextureFormat textureFormat = IntermediateTextureFormat.Undefined;
-                RHI.TextureDimension dimension = RHI.TextureDimension.Texture2D;
-
-                if (hasDxtHeader)
-                {
-                    ExceptionUtility.Assert(ddsDxt10.resourceDimension == 3/*DDS_DIMENSION_TEXTURE2D*/, "Only Texture2Ds are supported yet!");
-                    ExceptionUtility.Assert(ddsDxt10.arraySize == 1, "Array textures are not supported yet!");
-
-                    if (ddsDxt10.resourceDimension == 3 && FlagUtility.HasFlag(ddsDxt10.miscFlag, 0x4u/*DDS_RESOURCE_MISC_TEXTURECUBE*/))
-                        dimension = RHI.TextureDimension.TextureCube;
-                    if (ddsDxt10.miscFlags2 != 0)
-                        Log.Warning("[t:{path}]: DDS DXT10 header {paramName} is not zero! This is ignored by the importer but could cause issues in others.", sourcePath, nameof(ddsDxt10.miscFlags2));
-
-                    switch (ddsDxt10.dxgiFormat)
-                    {
-                        case Vortice.DXGI.Format.BC7_UNorm: textureFormat = IntermediateTextureFormat.BC7; break;
-                        case Vortice.DXGI.Format.BC6H_Sf16: textureFormat = IntermediateTextureFormat.BC6s; break;
-                        case Vortice.DXGI.Format.BC6H_Uf16: textureFormat = IntermediateTextureFormat.BC6u; break;
-                        case Vortice.DXGI.Format.BC5_UNorm: textureFormat = IntermediateTextureFormat.BC5u; break;
-                        case Vortice.DXGI.Format.BC4_UNorm: textureFormat = IntermediateTextureFormat.BC4u; break;
-                        case Vortice.DXGI.Format.BC3_UNorm: textureFormat = IntermediateTextureFormat.BC3; break;
-                        case Vortice.DXGI.Format.BC3_Typeless: textureFormat = IntermediateTextureFormat.BC3n; break;
-                        case Vortice.DXGI.Format.BC2_UNorm: textureFormat = IntermediateTextureFormat.BC2; break;
-                        case Vortice.DXGI.Format.BC1_Typeless: textureFormat = IntermediateTextureFormat.BC1a; break;
-                        case Vortice.DXGI.Format.BC1_UNorm: textureFormat = IntermediateTextureFormat.BC1; break;
-                    }
-                }
-
-                if (textureFormat == IntermediateTextureFormat.Undefined)
-                {
-                    if (!FlagUtility.HasFlag(ddsHeader.ddspf.flags, 0x4u/*DDPF_FOURCC*/) || !PixelFormatConversionTable.TryGetValue(ddsHeader.ddspf.fourCC, out textureFormat))
-                    {
-                        bool hasAlpha = FlagUtility.HasFlag(ddsHeader.ddspf.flags, 0x1u/*DDPF_ALPHAPIXELS*/ | 0x2u/*DDPF_ALPHA*/);
-                        uint bitMaskCount = MakeBitmaskCount(
-                            ddsHeader.ddspf.RBitMask, ddsHeader.ddspf.GBitMask, ddsHeader.ddspf.BBitMask,
-                            hasAlpha ? ddsHeader.ddspf.ABitMask : 0xffffffff);
-
-                        if (!TextureFormatMaskDictionary.TryGetValue((bitMaskCount, ddsHeader.ddspf.RGBBitCount), out textureFormat))
-                        {
-                            throw new Exception();
-                        }
-                    }
-                }
+                if (header.FileHeader != TextureHeader.Header)
+                    throw new Exception("Invalid file header specified!");
+                if (header.FileVersion != TextureHeader.Version)
+                    throw new Exception("Incompatible file version specified!");
 
                 RHI.FormatInfo fi = default;
-                switch (textureFormat)
+                switch (header.Format)
                 {
-                    case IntermediateTextureFormat.BC7: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC7un); break;
-                    case IntermediateTextureFormat.BC6s: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC6Hsf16); break;
-                    case IntermediateTextureFormat.BC6u: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC6Huf16); break;
-                    case IntermediateTextureFormat.BC5u: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC5un); break;
-                    case IntermediateTextureFormat.BC4u: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC4un); break;
-                    case IntermediateTextureFormat.BC3: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC3un); break;
-                    case IntermediateTextureFormat.BC3n: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC3un); break;
-                    case IntermediateTextureFormat.BC2: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC2un); break;
-                    case IntermediateTextureFormat.BC1a: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC1un); break;
-                    case IntermediateTextureFormat.BC1: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC1un); break;
-                    case IntermediateTextureFormat.R8a: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R8un); break;
-                    case IntermediateTextureFormat.R8l: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R8un); break;
-                    case IntermediateTextureFormat.BGR8: fi = new RHI.FormatInfo(3, 3); break;
-                    case IntermediateTextureFormat.BGRA8: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BGRA8un); break;
-                    case IntermediateTextureFormat.BGRX8: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BGRX8un); break;
-                    case IntermediateTextureFormat.RGB8: fi = new RHI.FormatInfo(3, 3); break;
-                    case IntermediateTextureFormat.RGBA8: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RGBA8un); break;
-                    case IntermediateTextureFormat.R16: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R16sf); break;
-                    case IntermediateTextureFormat.RG16: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RG16sf); break;
-                    case IntermediateTextureFormat.RGBA16: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RGBA16sf); break;
-                    case IntermediateTextureFormat.R32: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R32sf); break;
-                    case IntermediateTextureFormat.RG32: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RG32sf); break;
-                    case IntermediateTextureFormat.RGBA32: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RGBA32sf); break;
+                    case TextureFormat.BC7: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC7un); break;
+                    case TextureFormat.BC6s: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC6Hsf16); break;
+                    case TextureFormat.BC6u: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC6Huf16); break;
+                    case TextureFormat.BC5u: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC5un); break;
+                    case TextureFormat.BC4u: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC4un); break;
+                    case TextureFormat.BC3: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC3un); break;
+                    case TextureFormat.BC3n: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC3un); break;
+                    case TextureFormat.BC2: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC2un); break;
+                    case TextureFormat.BC1a: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC1un); break;
+                    case TextureFormat.BC1: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC1un); break;
+                    case TextureFormat.R8a: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R8un); break;
+                    case TextureFormat.R8l: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R8un); break;
+                    case TextureFormat.BGR8: fi = new RHI.FormatInfo(3, 3); break;
+                    case TextureFormat.BGRA8: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BGRA8un); break;
+                    case TextureFormat.BGRX8: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BGRX8un); break;
+                    case TextureFormat.RGB8: fi = new RHI.FormatInfo(3, 3); break;
+                    case TextureFormat.RGBA8: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RGBA8un); break;
+                    case TextureFormat.R16: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R16sf); break;
+                    case TextureFormat.RG16: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RG16sf); break;
+                    case TextureFormat.RGBA16: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RGBA16sf); break;
+                    case TextureFormat.R32: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R32sf); break;
+                    case TextureFormat.RG32: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RG32sf); break;
+                    case TextureFormat.RGBA32: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RGBA32sf); break;
                 }
 
-                //bool hasMips = FlagUtility.HasFlag(ddsHeader.flags, 0x20000u/*DDSD_MIPMAPCOUNT*/);
-                if (ddsHeader.depth > 1 && ddsHeader.mipMapCount > 0)
-                    throw new Exception();
+                RHI.TextureDimension dimension = RHI.TextureDimension.Texture2D;
 
                 RHI.Texture? rhiTexture = null;
 
                 //TODO: use an ArrayPool instead to avoid memalloc
-                nint[] mipLevels = new nint[ddsHeader.mipMapCount];
+                nint[] mipLevels = new nint[header.MipLevels];
                 try
                 {
-                    for (int i = 0; i < ddsHeader.mipMapCount; i++)
+                    for (int i = 0; i < header.MipLevels; i++)
                     {
-                        uint width = ddsHeader.width >> i;
-                        uint height = ddsHeader.height >> i;
-                        uint depth = Math.Max(1, ddsHeader.depth);
+                        uint width = (uint)(header.Width >> i);
+                        uint height = (uint)(header.Height >> i);
+                        uint depth = Math.Max(1u, header.Depth);
 
                         //ulong dataPitch = (ulong)fi.CalculatePitch(width);
                         //ulong dataSize = (dataPitch * height) * depth;
@@ -180,7 +134,7 @@ namespace Primary.Assets.Loaders
                         nint mipData = (nint)NativeMemory.Alloc((nuint)dataSize);
                         stream!.ReadExactly(new Span<byte>(mipData.ToPointer(), (int)dataSize));
 
-                        if (textureFormat == IntermediateTextureFormat.BGR8 || textureFormat == IntermediateTextureFormat.RGB8)
+                        if (header.Format == TextureFormat.BGR8 || header.Format == TextureFormat.RGB8)
                         {
                             ExceptionUtility.Assert(depth > 1, "can depth actually have a 24bit format?");
                             nint newMipData = AddAlphaChannelToPixelData(mipData, width, height, (uint)fi.BytesPerPixel);
@@ -192,31 +146,31 @@ namespace Primary.Assets.Loaders
                         mipLevels[i] = mipData;
                     }
 
-                    RHI.TextureFormat rhiFormat = textureFormat switch
+                    RHI.TextureFormat rhiFormat = header.Format switch
                     {
-                        IntermediateTextureFormat.BC7 => RHI.TextureFormat.BC7un,
-                        IntermediateTextureFormat.BC6s => RHI.TextureFormat.BC6Hsf16,
-                        IntermediateTextureFormat.BC6u => RHI.TextureFormat.BC6Huf16,
-                        IntermediateTextureFormat.BC5u => RHI.TextureFormat.BC5un,
-                        IntermediateTextureFormat.BC4u => RHI.TextureFormat.BC4un,
-                        IntermediateTextureFormat.BC3 => RHI.TextureFormat.BC3un,
-                        IntermediateTextureFormat.BC3n => RHI.TextureFormat.BC3t,
-                        IntermediateTextureFormat.BC2 => RHI.TextureFormat.BC2un,
-                        IntermediateTextureFormat.BC1a => RHI.TextureFormat.BC1t,
-                        IntermediateTextureFormat.BC1 => RHI.TextureFormat.BC1un,
-                        IntermediateTextureFormat.R8a => RHI.TextureFormat.R8un,
-                        IntermediateTextureFormat.R8l => RHI.TextureFormat.R8un,
-                        IntermediateTextureFormat.BGR8 => RHI.TextureFormat.BGRA8un,
-                        IntermediateTextureFormat.BGRA8 => RHI.TextureFormat.BGRA8un,
-                        IntermediateTextureFormat.BGRX8 => RHI.TextureFormat.BGRX8un,
-                        IntermediateTextureFormat.RGB8 => RHI.TextureFormat.RGBA8un,
-                        IntermediateTextureFormat.RGBA8 => RHI.TextureFormat.RGBA8un,
-                        IntermediateTextureFormat.R16 => RHI.TextureFormat.R16sf,
-                        IntermediateTextureFormat.RG16 => RHI.TextureFormat.RG16sf,
-                        IntermediateTextureFormat.RGBA16 => RHI.TextureFormat.RGBA16sf,
-                        IntermediateTextureFormat.R32 => RHI.TextureFormat.R32sf,
-                        IntermediateTextureFormat.RG32 => RHI.TextureFormat.RG32sf,
-                        IntermediateTextureFormat.RGBA32 => RHI.TextureFormat.RGBA32sf,
+                        TextureFormat.BC7 => RHI.TextureFormat.BC7un,
+                        TextureFormat.BC6s => RHI.TextureFormat.BC6Hsf16,
+                        TextureFormat.BC6u => RHI.TextureFormat.BC6Huf16,
+                        TextureFormat.BC5u => RHI.TextureFormat.BC5un,
+                        TextureFormat.BC4u => RHI.TextureFormat.BC4un,
+                        TextureFormat.BC3 => RHI.TextureFormat.BC3un,
+                        TextureFormat.BC3n => RHI.TextureFormat.BC3un,
+                        TextureFormat.BC2 => RHI.TextureFormat.BC2un,
+                        TextureFormat.BC1a => RHI.TextureFormat.BC1t,
+                        TextureFormat.BC1 => RHI.TextureFormat.BC1un,
+                        TextureFormat.R8a => RHI.TextureFormat.R8un,
+                        TextureFormat.R8l => RHI.TextureFormat.R8un,
+                        TextureFormat.BGR8 => RHI.TextureFormat.BGRA8un,
+                        TextureFormat.BGRA8 => RHI.TextureFormat.BGRA8un,
+                        TextureFormat.BGRX8 => RHI.TextureFormat.BGRX8un,
+                        TextureFormat.RGB8 => RHI.TextureFormat.RGBA8un,
+                        TextureFormat.RGBA8 => RHI.TextureFormat.RGBA8un,
+                        TextureFormat.R16 => RHI.TextureFormat.R16sf,
+                        TextureFormat.RG16 => RHI.TextureFormat.RG16sf,
+                        TextureFormat.RGBA16 => RHI.TextureFormat.RGBA16sf,
+                        TextureFormat.R32 => RHI.TextureFormat.R32sf,
+                        TextureFormat.RG32 => RHI.TextureFormat.RG32sf,
+                        TextureFormat.RGBA32 => RHI.TextureFormat.RGBA32sf,
                         _ => RHI.TextureFormat.Undefined
                     };
 
@@ -224,18 +178,22 @@ namespace Primary.Assets.Loaders
 
                     rhiTexture = RenderingManager.Device.CreateTexture(new RHI.TextureDescription
                     {
-                        Width = ddsHeader.width,
-                        Height = Math.Max(ddsHeader.height, 1),
-                        Depth = Math.Max(ddsHeader.depth, 1),
+                        Width = header.Width,
+                        Height = Math.Max(header.Height, 1u),
+                        Depth = Math.Max(header.Depth, 1u),
 
-                        MipLevels = ddsHeader.mipMapCount,
+                        MipLevels = header.MipLevels,
 
-                        Dimension = RHI.TextureDimension.Texture2D,
+                        Dimension = dimension,
                         Format = rhiFormat,
                         Memory = RHI.MemoryUsage.Immutable,
                         Usage = RHI.TextureUsage.ShaderResource,
-                        CpuAccessFlags = RHI.CPUAccessFlags.None
+                        CpuAccessFlags = RHI.CPUAccessFlags.None,
+
+                        Swizzle = new RHI.TextureSwizzle(header.Swizzle.Code),
                     }, mipLevels.AsSpan());
+
+                    rhiTexture.Name = sourcePath;
                 }
                 finally
                 {
@@ -249,6 +207,182 @@ namespace Primary.Assets.Loaders
                 }
 
                 textureData.UpdateAssetData(texture, rhiTexture);
+#if false
+                    ExceptionUtility.Assert(br.ReadUInt32() == DDSMagicNumber);
+
+                    DDS_HEADER ddsHeader = br.Read<DDS_HEADER>();
+                    bool hasDxtHeader = ddsHeader.ddspf.fourCC == DXT10HeaderCC;
+                    DDS_HEADER_DXT10 ddsDxt10 = hasDxtHeader ? br.Read<DDS_HEADER_DXT10>() : default;
+
+                    IntermediateTextureFormat textureFormat = IntermediateTextureFormat.Undefined;
+                    RHI.TextureDimension dimension = RHI.TextureDimension.Texture2D;
+
+                    if (hasDxtHeader)
+                    {
+                        ExceptionUtility.Assert(ddsDxt10.resourceDimension == 3/*DDS_DIMENSION_TEXTURE2D*/, "Only Texture2Ds are supported yet!");
+                        ExceptionUtility.Assert(ddsDxt10.arraySize == 1, "Array textures are not supported yet!");
+
+                        if (ddsDxt10.resourceDimension == 3 && FlagUtility.HasFlag(ddsDxt10.miscFlag, 0x4u/*DDS_RESOURCE_MISC_TEXTURECUBE*/))
+                            dimension = RHI.TextureDimension.TextureCube;
+                        if (ddsDxt10.miscFlags2 != 0)
+                            Log.Warning("[t:{path}]: DDS DXT10 header {paramName} is not zero! This is ignored by the importer but could cause issues in others.", sourcePath, nameof(ddsDxt10.miscFlags2));
+
+                        switch (ddsDxt10.dxgiFormat)
+                        {
+                            case Vortice.DXGI.Format.BC7_UNorm: textureFormat = IntermediateTextureFormat.BC7; break;
+                            case Vortice.DXGI.Format.BC6H_Sf16: textureFormat = IntermediateTextureFormat.BC6s; break;
+                            case Vortice.DXGI.Format.BC6H_Uf16: textureFormat = IntermediateTextureFormat.BC6u; break;
+                            case Vortice.DXGI.Format.BC5_UNorm: textureFormat = IntermediateTextureFormat.BC5u; break;
+                            case Vortice.DXGI.Format.BC4_UNorm: textureFormat = IntermediateTextureFormat.BC4u; break;
+                            case Vortice.DXGI.Format.BC3_UNorm: textureFormat = IntermediateTextureFormat.BC3; break;
+                            case Vortice.DXGI.Format.BC3_Typeless: textureFormat = IntermediateTextureFormat.BC3n; break;
+                            case Vortice.DXGI.Format.BC2_UNorm: textureFormat = IntermediateTextureFormat.BC2; break;
+                            case Vortice.DXGI.Format.BC1_Typeless: textureFormat = IntermediateTextureFormat.BC1a; break;
+                            case Vortice.DXGI.Format.BC1_UNorm: textureFormat = IntermediateTextureFormat.BC1; break;
+                        }
+                    }
+
+                    if (textureFormat == IntermediateTextureFormat.Undefined)
+                    {
+                        if (!FlagUtility.HasFlag(ddsHeader.ddspf.flags, 0x4u/*DDPF_FOURCC*/) || !PixelFormatConversionTable.TryGetValue(ddsHeader.ddspf.fourCC, out textureFormat))
+                        {
+                            bool hasAlpha = FlagUtility.HasFlag(ddsHeader.ddspf.flags, 0x1u/*DDPF_ALPHAPIXELS*/ | 0x2u/*DDPF_ALPHA*/);
+                            uint bitMaskCount = MakeBitmaskCount(
+                                ddsHeader.ddspf.RBitMask, ddsHeader.ddspf.GBitMask, ddsHeader.ddspf.BBitMask,
+                                hasAlpha ? ddsHeader.ddspf.ABitMask : 0xffffffff);
+
+                            if (!TextureFormatMaskDictionary.TryGetValue((bitMaskCount, ddsHeader.ddspf.RGBBitCount), out textureFormat))
+                            {
+                                throw new Exception();
+                            }
+                        }
+                    }
+
+                    RHI.FormatInfo fi = default;
+                    switch (textureFormat)
+                    {
+                        case IntermediateTextureFormat.BC7: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC7un); break;
+                        case IntermediateTextureFormat.BC6s: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC6Hsf16); break;
+                        case IntermediateTextureFormat.BC6u: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC6Huf16); break;
+                        case IntermediateTextureFormat.BC5u: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC5un); break;
+                        case IntermediateTextureFormat.BC4u: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC4un); break;
+                        case IntermediateTextureFormat.BC3: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC3un); break;
+                        case IntermediateTextureFormat.BC3n: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC3un); break;
+                        case IntermediateTextureFormat.BC2: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC2un); break;
+                        case IntermediateTextureFormat.BC1a: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC1un); break;
+                        case IntermediateTextureFormat.BC1: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BC1un); break;
+                        case IntermediateTextureFormat.R8a: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R8un); break;
+                        case IntermediateTextureFormat.R8l: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R8un); break;
+                        case IntermediateTextureFormat.BGR8: fi = new RHI.FormatInfo(3, 3); break;
+                        case IntermediateTextureFormat.BGRA8: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BGRA8un); break;
+                        case IntermediateTextureFormat.BGRX8: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.BGRX8un); break;
+                        case IntermediateTextureFormat.RGB8: fi = new RHI.FormatInfo(3, 3); break;
+                        case IntermediateTextureFormat.RGBA8: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RGBA8un); break;
+                        case IntermediateTextureFormat.R16: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R16sf); break;
+                        case IntermediateTextureFormat.RG16: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RG16sf); break;
+                        case IntermediateTextureFormat.RGBA16: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RGBA16sf); break;
+                        case IntermediateTextureFormat.R32: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.R32sf); break;
+                        case IntermediateTextureFormat.RG32: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RG32sf); break;
+                        case IntermediateTextureFormat.RGBA32: fi = RHI.FormatStatistics.Query(RHI.TextureFormat.RGBA32sf); break;
+                    }
+
+                    //bool hasMips = FlagUtility.HasFlag(ddsHeader.flags, 0x20000u/*DDSD_MIPMAPCOUNT*/);
+                    if (ddsHeader.depth > 1 && ddsHeader.mipMapCount > 0)
+                        throw new Exception();
+
+                    RHI.Texture? rhiTexture = null;
+
+                    //TODO: use an ArrayPool instead to avoid memalloc
+                    nint[] mipLevels = new nint[ddsHeader.mipMapCount];
+                    try
+                    {
+                        for (int i = 0; i < ddsHeader.mipMapCount; i++)
+                        {
+                            uint width = ddsHeader.width >> i;
+                            uint height = ddsHeader.height >> i;
+                            uint depth = Math.Max(1, ddsHeader.depth);
+
+                            //ulong dataPitch = (ulong)fi.CalculatePitch(width);
+                            //ulong dataSize = (dataPitch * height) * depth;
+                            ulong dataSize = (ulong)fi.CalculateSize(width, height, depth);
+
+                            ExceptionUtility.Assert(dataSize <= uint.MaxValue);
+
+                            nint mipData = (nint)NativeMemory.Alloc((nuint)dataSize);
+                            stream!.ReadExactly(new Span<byte>(mipData.ToPointer(), (int)dataSize));
+
+                            if (textureFormat == IntermediateTextureFormat.BGR8 || textureFormat == IntermediateTextureFormat.RGB8)
+                            {
+                                ExceptionUtility.Assert(depth > 1, "can depth actually have a 24bit format?");
+                                nint newMipData = AddAlphaChannelToPixelData(mipData, width, height, (uint)fi.BytesPerPixel);
+
+                                NativeMemory.Free(mipData.ToPointer());
+                                mipData = newMipData;
+                            }
+
+                            mipLevels[i] = mipData;
+                        }
+
+                        RHI.TextureFormat rhiFormat = textureFormat switch
+                        {
+                            IntermediateTextureFormat.BC7 => RHI.TextureFormat.BC7un,
+                            IntermediateTextureFormat.BC6s => RHI.TextureFormat.BC6Hsf16,
+                            IntermediateTextureFormat.BC6u => RHI.TextureFormat.BC6Huf16,
+                            IntermediateTextureFormat.BC5u => RHI.TextureFormat.BC5un,
+                            IntermediateTextureFormat.BC4u => RHI.TextureFormat.BC4un,
+                            IntermediateTextureFormat.BC3 => RHI.TextureFormat.BC3un,
+                            IntermediateTextureFormat.BC3n => RHI.TextureFormat.BC3t,
+                            IntermediateTextureFormat.BC2 => RHI.TextureFormat.BC2un,
+                            IntermediateTextureFormat.BC1a => RHI.TextureFormat.BC1t,
+                            IntermediateTextureFormat.BC1 => RHI.TextureFormat.BC1un,
+                            IntermediateTextureFormat.R8a => RHI.TextureFormat.R8un,
+                            IntermediateTextureFormat.R8l => RHI.TextureFormat.R8un,
+                            IntermediateTextureFormat.BGR8 => RHI.TextureFormat.BGRA8un,
+                            IntermediateTextureFormat.BGRA8 => RHI.TextureFormat.BGRA8un,
+                            IntermediateTextureFormat.BGRX8 => RHI.TextureFormat.BGRX8un,
+                            IntermediateTextureFormat.RGB8 => RHI.TextureFormat.RGBA8un,
+                            IntermediateTextureFormat.RGBA8 => RHI.TextureFormat.RGBA8un,
+                            IntermediateTextureFormat.R16 => RHI.TextureFormat.R16sf,
+                            IntermediateTextureFormat.RG16 => RHI.TextureFormat.RG16sf,
+                            IntermediateTextureFormat.RGBA16 => RHI.TextureFormat.RGBA16sf,
+                            IntermediateTextureFormat.R32 => RHI.TextureFormat.R32sf,
+                            IntermediateTextureFormat.RG32 => RHI.TextureFormat.RG32sf,
+                            IntermediateTextureFormat.RGBA32 => RHI.TextureFormat.RGBA32sf,
+                            _ => RHI.TextureFormat.Undefined
+                        };
+
+                        ExceptionUtility.Assert(rhiFormat != RHI.TextureFormat.Undefined);
+
+                        rhiTexture = RenderingManager.Device.CreateTexture(new RHI.TextureDescription
+                        {
+                            Width = ddsHeader.width,
+                            Height = Math.Max(ddsHeader.height, 1),
+                            Depth = Math.Max(ddsHeader.depth, 1),
+
+                            MipLevels = ddsHeader.mipMapCount,
+
+                            Dimension = RHI.TextureDimension.Texture2D,
+                            Format = rhiFormat,
+                            Memory = RHI.MemoryUsage.Immutable,
+                            Usage = RHI.TextureUsage.ShaderResource,
+                            CpuAccessFlags = RHI.CPUAccessFlags.None
+
+                            Swizzle = RHI.TextureSwizzle.Default,
+                        }, mipLevels.AsSpan());
+                    }
+                    finally
+                    {
+                        for (int i = 0; i < mipLevels.Length; i++)
+                        {
+                            if (mipLevels[i] != nint.Zero)
+                            {
+                                NativeMemory.Free(mipLevels[i].ToPointer());
+                            }
+                        }
+                    }
+
+                    textureData.UpdateAssetData(texture, rhiTexture);
+#endif
             }
 #if DEBUG && false
             finally
@@ -421,5 +555,89 @@ namespace Primary.Assets.Loaders
             RGBA32
         }
         #endregion
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct TextureHeader
+    {
+        public uint FileHeader;
+        public uint FileVersion;
+
+        public ushort Width;
+        public ushort Height;
+        public ushort Depth;
+
+        public TextureFormat Format;
+        public TextureFlags Flags;
+
+        public ushort MipLevels;
+
+        public TextureSwizzle Swizzle;
+
+        public const uint Header = 0x44584554;
+        public const uint Version = 1;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public record struct TextureSwizzle
+    {
+        public ushort Code;
+
+        public TextureSwizzle()
+            => this = Default;
+        public TextureSwizzle(TextureSwizzleChannel r, TextureSwizzleChannel g, TextureSwizzleChannel b, TextureSwizzleChannel a)
+            => Code = (ushort)(((int)r << 9) | ((int)g << 6) | ((int)b << 3) | (int)a);
+
+        public TextureSwizzle(ushort code)
+            => Code = code;
+
+        public TextureSwizzleChannel R { get => (TextureSwizzleChannel)((Code >> 9) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 9)) | ((int)value << 9)); }
+        public TextureSwizzleChannel G { get => (TextureSwizzleChannel)((Code >> 6) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 6)) | ((int)value << 6)); }
+        public TextureSwizzleChannel B { get => (TextureSwizzleChannel)((Code >> 3) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 3)) | ((int)value << 3)); }
+        public TextureSwizzleChannel A { get => (TextureSwizzleChannel)(Code & 0x7); set => Code = (ushort)((Code & ~0x7) | (int)value); }
+
+        public static readonly TextureSwizzle Default = new TextureSwizzle(TextureSwizzleChannel.R, TextureSwizzleChannel.G, TextureSwizzleChannel.B, TextureSwizzleChannel.A);
+    }
+
+    public enum TextureFormat : byte
+    {
+        BC7 = 0,
+        BC6s,
+        BC6u,
+        BC5u,
+        BC4u,
+        BC3,
+        BC3n,
+        BC2,
+        BC1a,
+        BC1,
+        R8a,
+        R8l,
+        BGR8,
+        BGRA8,
+        BGRX8,
+        RGB8,
+        RGBA8,
+        R16,
+        RG16,
+        RGBA16,
+        R32,
+        RG32,
+        RGBA32
+    }
+
+    public enum TextureFlags : ushort
+    {
+        None = 0,
+    }
+
+    public enum TextureSwizzleChannel : byte
+    {
+        R = 0,
+        G,
+        B,
+        A,
+        Zero,
+        One
     }
 }

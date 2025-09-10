@@ -3,6 +3,8 @@ using Editor.Assets;
 using Editor.DearImGui;
 using Editor.Demos;
 using Editor.Gui;
+using Editor.Interaction;
+using Editor.Rendering;
 using Editor.Rendering.Gizmos;
 using Hexa.NET.ImGui;
 using Primary;
@@ -32,6 +34,9 @@ namespace Editor
         private AssetPipeline _assetPipeline;
         private DearImGuiStateManager _dearImGuiStateManager;
         //private EditorGuiManager _guiManager;
+        private ToolManager _toolManager;
+        private SelectionManager _selectionManager;
+        private EditorRenderManager _editorRenderManager;
 
         private DynamicAtlasManager _guiAtlasManager;
 
@@ -42,6 +47,8 @@ namespace Editor
         private EditorTaskViewer _editorTaskViewer;
         private ContentView _contentView;
         private SceneView _sceneView;
+        private ImportFileView _importFileView;
+        private RHIInspector _rhiInsector;
 
         internal Editor(string baseProjectPath) : base()
         {
@@ -62,6 +69,9 @@ namespace Editor
 
             _dearImGuiStateManager = new DearImGuiStateManager(this);
             //_guiManager = new EditorGuiManager();
+            _toolManager = new ToolManager();
+            _selectionManager = new SelectionManager();
+            _editorRenderManager = new EditorRenderManager();
 
             _guiAtlasManager = new DynamicAtlasManager();
 
@@ -72,6 +82,8 @@ namespace Editor
             _editorTaskViewer = new EditorTaskViewer();
             _contentView = new ContentView();
             _sceneView = new SceneView();
+            _importFileView = new ImportFileView();
+            _rhiInsector = new RHIInspector();
         }
 
         public override void Dispose()
@@ -80,6 +92,7 @@ namespace Editor
 
             _guiAtlasManager.Dispose();
 
+            _editorRenderManager.Dispose();
             _dearImGuiStateManager.Dispose();
             _assetPipeline.Dispose();
 
@@ -91,7 +104,7 @@ namespace Editor
             Window window = WindowManager.CreateWindow("Primary", new Vector2(1336, 726), CreateWindowFlags.None);
             RenderingManager.DefaultWindow = window;
 
-            RenderingManager.RenderPassManager.AddRenderPass<GizmoRenderPass>();
+            RenderingManager.PostRender += _editorRenderManager.SetupPasses;
 
             _dearImGuiStateManager.InitWindow(window);
             _guiAtlasManager.TriggerRebuild();
@@ -133,74 +146,78 @@ namespace Editor
 
         private void DrawDearImgui()
         {
-            _dearImGuiStateManager.BeginFrame();
-
-            if (ImGui.IsMouseDragging(ImGuiMouseButton.Right))
+            using (new ProfilingScope("EditorGui"))
             {
-                Vector2 drag = ImGui.GetIO().MouseDelta;
-                drag *= -0.2f;
-                _cameraRotation += drag;
-            }
+                _dearImGuiStateManager.BeginFrame();
 
-            Quaternion quat = Quaternion.CreateFromYawPitchRoll(float.DegreesToRadians(_cameraRotation.X), float.DegreesToRadians(-_cameraRotation.Y), 0.0f);
+                if (ImGui.IsMouseDragging(ImGuiMouseButton.Right))
+                {
+                    Vector2 drag = ImGui.GetIO().MouseDelta;
+                    drag *= -0.2f;
+                    _cameraRotation += drag;
+                }
 
-            if (ImGui.IsKeyDown(ImGuiKey.W))
-                _cameraPosition += Vector3.Transform(Vector3.UnitZ, quat) * 10.0f * Time.DeltaTime;
-            if (ImGui.IsKeyDown(ImGuiKey.S))
-                _cameraPosition += Vector3.Transform(-Vector3.UnitZ, quat) * 10.0f * Time.DeltaTime;
-            if (ImGui.IsKeyDown(ImGuiKey.A))
-                _cameraPosition += Vector3.Transform(Vector3.UnitX, quat) * 10.0f * Time.DeltaTime;
-            if (ImGui.IsKeyDown(ImGuiKey.D))
-                _cameraPosition += Vector3.Transform(-Vector3.UnitX, quat) * 10.0f * Time.DeltaTime;
-            if (ImGui.IsKeyDown(ImGuiKey.E))
-                _cameraPosition += Vector3.Transform(Vector3.UnitY, quat) * 10.0f * Time.DeltaTime;
-            if (ImGui.IsKeyDown(ImGuiKey.Q))
-                _cameraPosition += Vector3.Transform(-Vector3.UnitY, quat) * 10.0f * Time.DeltaTime;
+                Quaternion quat = Quaternion.CreateFromYawPitchRoll(float.DegreesToRadians(_cameraRotation.X), float.DegreesToRadians(-_cameraRotation.Y), 0.0f);
 
-            SceneManager.World.Query(new QueryDescription().WithAll<Camera, Transform>(), (ref Camera c, ref Transform t) =>
+                if (ImGui.IsKeyDown(ImGuiKey.W))
+                    _cameraPosition += Vector3.Transform(Vector3.UnitZ, quat) * 10.0f * Time.DeltaTime;
+                if (ImGui.IsKeyDown(ImGuiKey.S))
+                    _cameraPosition += Vector3.Transform(-Vector3.UnitZ, quat) * 10.0f * Time.DeltaTime;
+                if (ImGui.IsKeyDown(ImGuiKey.A))
+                    _cameraPosition += Vector3.Transform(Vector3.UnitX, quat) * 10.0f * Time.DeltaTime;
+                if (ImGui.IsKeyDown(ImGuiKey.D))
+                    _cameraPosition += Vector3.Transform(-Vector3.UnitX, quat) * 10.0f * Time.DeltaTime;
+                if (ImGui.IsKeyDown(ImGuiKey.E))
+                    _cameraPosition += Vector3.Transform(Vector3.UnitY, quat) * 10.0f * Time.DeltaTime;
+                if (ImGui.IsKeyDown(ImGuiKey.Q))
+                    _cameraPosition += Vector3.Transform(-Vector3.UnitY, quat) * 10.0f * Time.DeltaTime;
+
+                SceneManager.World.Query(new QueryDescription().WithAll<Camera, Transform>(), (ref Camera c, ref Transform t) =>
                 {
                     t.Rotation = quat;
                     t.Position = _cameraPosition;
                 });
 
-            /*if (ImGui.Begin("Profiler"))
-            {
-                ImDrawListPtr drawList = ImGui.GetWindowDrawList();
-
-                ImGui.Text($"Frametime: {Time.DeltaTimeDouble.ToString("F5")} ({(1.0 / Time.DeltaTimeDouble).ToString("F3")})");
-
-                Dictionary<int, ThreadProfilingTimestamps> threadTimestamps = ProfilingManager.Timestamps;
-                foreach (var kvp in threadTimestamps)
+                /*if (ImGui.Begin("Profiler"))
                 {
-                    DrawProfilerViewFor(drawList, kvp.Value, ProfilingManager.StartTimestamp);
+                    ImDrawListPtr drawList = ImGui.GetWindowDrawList();
+
+                    ImGui.Text($"Frametime: {Time.DeltaTimeDouble.ToString("F5")} ({(1.0 / Time.DeltaTimeDouble).ToString("F3")})");
+
+                    Dictionary<int, ThreadProfilingTimestamps> threadTimestamps = ProfilingManager.Timestamps;
+                    foreach (var kvp in threadTimestamps)
+                    {
+                        DrawProfilerViewFor(drawList, kvp.Value, ProfilingManager.StartTimestamp);
+                    }
                 }
-            }
-            ImGui.End();*/
+                ImGui.End();*/
 
-            _profilerView.Render();
-            _hierchyView.Render();
-            _propertiesView.Render();
-            _renderingView.Render();
-            _editorTaskViewer.Render();
-            _contentView.Render();
-            _sceneView.Render();
-            //_debugStatisticsView.Render();
+                _profilerView.Render();
+                _hierchyView.Render();
+                _propertiesView.Render();
+                //_renderingView.Render();
+                _editorTaskViewer.Render();
+                _contentView.Render();
+                _sceneView.Render();
+                _importFileView.Render();
+                _rhiInsector.Render();
 
-            GCMemoryInfo memoryInfo = GC.GetGCMemoryInfo();
+                //GCMemoryInfo memoryInfo = GC.GetGCMemoryInfo();
+                //
+                //ImDrawListPtr drawList = ImGui.GetForegroundDrawList();
+                //drawList.AddText(new Vector2(20.0f), 0xffffffff, $"Frametime: {Time.DeltaTimeDouble.ToString("F5", CultureInfo.InvariantCulture)} ({(1.0 / Time.DeltaTimeDouble).ToString("F1", CultureInfo.InvariantCulture)} fps)");
+                //drawList.AddText(new Vector2(20.0f, 32.0f), 0xffffffff, $"Working set: {(_process.WorkingSet64 / (1024.0 * 1024.0)).ToString("F6", CultureInfo.InvariantCulture)}mb");
+                //drawList.AddText(new Vector2(20.0f, 44.0f), 0xffffffff, $"Jit: il:{(JitInfo.GetCompiledILBytes() / 1024.0).ToString("F2", CultureInfo.InvariantCulture)}kb  mc:{JitInfo.GetCompiledMethodCount()}  ct:{JitInfo.GetCompilationTime()}");
+                //drawList.AddText(new Vector2(20.0f, 56.0f), 0xffffffff, $"GC: {(GC.GetTotalMemory(false) / (1024.0 * 1024.0)).ToString("F6")}mb");
 
-            ImDrawListPtr drawList = ImGui.GetForegroundDrawList();
-            drawList.AddText(new Vector2(20.0f), 0xffffffff, $"Frametime: {Time.DeltaTimeDouble.ToString("F5", CultureInfo.InvariantCulture)} ({(1.0 / Time.DeltaTimeDouble).ToString("F1", CultureInfo.InvariantCulture)} fps)");
-            drawList.AddText(new Vector2(20.0f, 32.0f), 0xffffffff, $"Working set: {(_process.WorkingSet64 / (1024.0 * 1024.0)).ToString("F6", CultureInfo.InvariantCulture)}mb");
-            drawList.AddText(new Vector2(20.0f, 44.0f), 0xffffffff, $"Jit: il:{(JitInfo.GetCompiledILBytes() / 1024.0).ToString("F2", CultureInfo.InvariantCulture)}kb  mc:{JitInfo.GetCompiledMethodCount()}  ct:{JitInfo.GetCompilationTime()}");
-            drawList.AddText(new Vector2(20.0f, 56.0f), 0xffffffff, $"GC: {(GC.GetTotalMemory(false) / (1024.0 * 1024.0)).ToString("F6")}mb");
+                _dearImGuiStateManager.EndFrame();
 
-            _dearImGuiStateManager.EndFrame();
-
-            _timer += Time.DeltaTime;
-            if (_timer > 2.0f)
-            {
-                _process.Refresh();
-                _timer = 0.0f;
+                _timer += Time.DeltaTime;
+                if (_timer > 2.0f)
+                {
+                    _process.Refresh();
+                    _timer = 0.0f;
+                }
             }
         }
 
@@ -220,8 +237,11 @@ namespace Editor
         internal ProjectSubFilesystem ProjectSubFilesystem => _projectSubFilesystem;
         internal ProjectShaderLibrary ProjectShaderLibrary => _projectShaderLibrary;
 
+        internal DearImGuiStateManager DearImGuiStateManager => _dearImGuiStateManager;
         public AssetPipeline AssetPipeline => _assetPipeline;
         public DynamicAtlasManager GuiAtlasManager => _guiAtlasManager;
+        public ToolManager ToolManager => _toolManager;
+        public SelectionManager SelectionManager => _selectionManager;
 
         internal PropertiesView PropertiesView => _propertiesView;
 

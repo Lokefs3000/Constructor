@@ -18,6 +18,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using TerraFX.Interop.Windows;
 using Vortice;
 using Vortice.Direct3D12;
 using Vortice.Mathematics;
@@ -423,9 +424,25 @@ namespace Primary.RHI.Direct3D12
             return true;
         }
 
+        //TODO: add validation and rest of types to function
         public override bool CopyTextureRegion(Resource src, TextureLocation srcLoc, uint srcSubRes, Resource dst, TextureLocation dstLoc, uint dstSubRes)
         {
-            throw new NotImplementedException();
+            if (src is ICommandBufferRTView srcRT && dst is ICommandBufferRTView dstRT)
+            {
+                if (srcRT.CurrentState != ResourceStates.Common && srcRT.CurrentState != ResourceStates.CopySource)
+                    srcRT.EnsureResourceStates(_barrierManager, ResourceStates.CopySource);
+                if (dstRT.CurrentState != ResourceStates.Common && dstRT.CurrentState != ResourceStates.CopyDest)
+                    dstRT.EnsureResourceStates(_barrierManager, ResourceStates.CopyDest);
+
+                _barrierManager.FlushPendingTransitions(_commandList);
+
+                srcRT.CopyTexture(_commandList, dstRT);
+
+                _referencedResources.Add(srcRT);
+                _referencedResources.Add(dstRT);
+            }
+
+            return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -599,14 +616,14 @@ namespace Primary.RHI.Direct3D12
             if (viewports.Length == 1)
             {
                 ref Viewport rect = ref viewports[0];
-                _viewports[0] = new Vortice.Mathematics.Viewport(rect.TopLeftX, rect.TopLeftY, rect.Width, rect.Width, rect.MinDepth, rect.MaxDepth);
+                _viewports[0] = new Vortice.Mathematics.Viewport(rect.TopLeftX, rect.TopLeftY, rect.Width, rect.Height, rect.MinDepth, rect.MaxDepth);
             }
             else
             {
                 for (int i = 0; i < limit; i++)
                 {
                     ref Viewport rect = ref viewports[i];
-                    _viewports[i] = new Vortice.Mathematics.Viewport(rect.TopLeftX, rect.TopLeftY, rect.Width, rect.Width, rect.MinDepth, rect.MaxDepth);
+                    _viewports[i] = new Vortice.Mathematics.Viewport(rect.TopLeftX, rect.TopLeftY, rect.Width, rect.Height, rect.MinDepth, rect.MaxDepth);
                 }
             }
 
@@ -1163,8 +1180,10 @@ namespace Primary.RHI.Direct3D12
                         CpuDescriptorHandle handle = allocation.GetCpuHandle(resource.DescriptorIndex);
                         _device.D3D12Device.CopyDescriptorsSimple(1, handle, resource.Resource.CpuDescriptor, DescriptorHeapType.ConstantBufferViewShaderResourceViewUnorderedAccessView);
 
-                        _activeDescriptors.Add(resource.DictionaryKey, offset);
-                        descriptors[resource.DescriptorIndex] = offset;
+                        if (_activeDescriptors.TryAdd(resource.DictionaryKey, offset))
+                            descriptors[resource.DescriptorIndex] = offset;
+                        else
+                            descriptors[resource.DescriptorIndex] = _activeDescriptors[resource.DictionaryKey];
                     }
 
                 }

@@ -23,7 +23,7 @@ namespace Editor.Assets
 
             _libraryMap = new ConcurrentDictionary<string, string>();
 
-            string mappingFile = Path.Combine(EditorFilepaths.LibraryPath, "ShaderMappings.dat");
+            string mappingFile = Path.Combine(EditorFilepaths.LibraryIntermediatePath, "ShaderMappings.dat");
             if (File.Exists(mappingFile))
             {
                 ReadFileMappings(mappingFile);
@@ -95,7 +95,7 @@ namespace Editor.Assets
 
         internal void FlushFileMappings()
         {
-            string outputFile = Path.Combine(EditorFilepaths.LibraryPath, "ShaderMappings.dat");
+            string outputFile = Path.Combine(EditorFilepaths.LibraryIntermediatePath, "ShaderMappings.dat");
 
             StringBuilder sb = new StringBuilder();
             foreach (var kvp in _libraryMap)
@@ -143,6 +143,15 @@ namespace Editor.Assets
                 {
                     //bad
                 }
+            }
+
+            using Stream? stream = AssetFilesystem.OpenStream(path);
+            if (stream != null)
+            {
+                byte[] data = new byte[stream.Length];
+                stream.ReadExactly(data);
+
+                return data;
             }
 
             return null;

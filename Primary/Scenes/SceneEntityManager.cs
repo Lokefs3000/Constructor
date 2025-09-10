@@ -413,6 +413,7 @@ namespace Primary.Scenes
 
         private event ComponentEnabledCallback _componentEnabled;
         private event TransformChangedCallback _transformChanged;
+        private event SceneEntityDeletedCallback _sceneEntityDeleted;
 
         public static event ComponentEnabledCallback ComponentEnabled
         {
@@ -424,6 +425,12 @@ namespace Primary.Scenes
         {
             add => NullableUtility.ThrowIfNull((SceneEntityManager?)s_instance.Target)._transformChanged += value;
             remove => NullableUtility.ThrowIfNull((SceneEntityManager?)s_instance.Target)._transformChanged -= value;
+        }
+
+        public static event SceneEntityDeletedCallback SceneEntityDeleted
+        {
+            add => NullableUtility.ThrowIfNull((SceneEntityManager?)s_instance.Target)._sceneEntityDeleted += value;
+            remove => NullableUtility.ThrowIfNull((SceneEntityManager?)s_instance.Target)._sceneEntityDeleted -= value;
         }
 
         private readonly record struct Component(
@@ -452,4 +459,5 @@ namespace Primary.Scenes
 
     public delegate void ComponentEnabledCallback(SceneEntity entity, bool enabled);
     public delegate void TransformChangedCallback(SceneEntity entity);
+    public delegate void SceneEntityDeletedCallback(SceneEntity entity);
 }

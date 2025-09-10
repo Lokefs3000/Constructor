@@ -81,6 +81,13 @@ namespace Editor.Processors.Shaders
     internal struct ShaderAttribProperty
     {
         public string Name;
+        public ShaderPropertyDefault Default;
+    }
+
+    internal enum ShaderPropertyDefault : byte
+    {
+        White = 0,
+        Normal
     }
 
     internal struct ShaderInputLayout
@@ -105,6 +112,7 @@ namespace Editor.Processors.Shaders
         public float MipLODBias;
         public float MinLOD;
         public float MaxLOD;
+        public RHI.SamplerBorder Border;
     }
 
     internal struct ShaderFunction

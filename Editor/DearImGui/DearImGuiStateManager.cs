@@ -31,6 +31,7 @@ namespace Editor.DearImGui
         private Editor _editor;
 
         private ImGuiContextPtr _context;
+        private DearImGuiRenderPass _renderPass;
 
         private bool _disposedValue;
 
@@ -52,16 +53,16 @@ namespace Editor.DearImGui
             ImGuiIOPtr io = ImGui.GetIO();
             io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
 
-            editor.RenderingManager.RenderPassManager.AddRenderPass<DearImGuiRenderPass>();
+            _renderPass = new DearImGuiRenderPass();
         }
 
         private void Dispose(bool disposing)
         {
             if (!_disposedValue)
             {
-                _editor.RenderingManager.RenderPassManager.RemoveRenderPass<DearImGuiRenderPass>();
-
                 _editor.EventManager.EventRecieved -= EventRecived;
+
+                _renderPass.Dispose();
 
                 ImGuiImplSDL3.Shutdown();
                 ImGui.DestroyContext();
@@ -90,7 +91,6 @@ namespace Editor.DearImGui
             _editor.EventManager.EventRecieved += EventRecived;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void BeginFrame()
         {
             ImGuiImplSDL3.NewFrame();
@@ -99,7 +99,6 @@ namespace Editor.DearImGui
             ImGui.DockSpaceOverViewport(ImGuiDockNodeFlags.PassthruCentralNode);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void EndFrame()
         {
             //ImGui.ShowStyleEditor();
@@ -108,11 +107,14 @@ namespace Editor.DearImGui
             ImGui.Render();
         }
 
+        internal void SetupPasses(RenderPass renderPass)
+        {
+            _renderPass.ExecutePass(renderPass);
+        }
+
         private static void EventRecived(SDL_Event @event) => ImGuiImplSDL3.ProcessEvent(ref Unsafe.As<SDL_Event, SDLEvent>(ref @event));
 
-        //[RenderPassPriority(true, typeof(FinalBlitPass))]
-        [RenderPassPriority(true, typeof(GizmoRenderPass))]
-        private class DearImGuiRenderPass : IRenderPass
+        private class DearImGuiRenderPass
         {
             private RHI.GraphicsDevice _device;
 
@@ -161,7 +163,8 @@ namespace Editor.DearImGui
                 ImGuiPlatformIOPtr platformIO = ImGui.GetPlatformIO();
                 for (int i = 0; i < platformIO.Textures.Size; i++)
                 {
-                    if (platformIO.Textures[i].RefCount == 1)
+                    if (platformIO.Textures[i].RefCount == 1 &&
+                        platformIO.Textures[i].BackendUserData != null)
                     {
                         RHI.Resource? resource = RHI.Resource.FromIntPtr((nint)platformIO.Textures[i].BackendUserData);
                         ExceptionUtility.Assert(resource != null);
@@ -177,13 +180,24 @@ namespace Editor.DearImGui
                 io.BackendFlags &= ~(ImGuiBackendFlags.RendererHasVtxOffset | ImGuiBackendFlags.RendererHasTextures);
             }
 
-            public void ExecutePass(IRenderPath path, RenderPassData passData)
+            public void ExecutePass(RenderPass renderPass)
             {
                 ImDrawDataPtr drawData = ImGui.GetDrawData();
                 if (drawData.IsNull || drawData.TotalVtxCount == 0 || drawData.TotalIdxCount == 0)
                     return;
 
-                CommandBuffer commandBuffer = CommandBufferPool.Get();
+                using (RasterPassDescription pass = renderPass.CreateRasterPass())
+                {
+                    pass.SetThreadingPolicy(RenderPassThreadingPolicy.None);
+                    pass.SetFunction(PassFunction);
+                }
+            }
+
+            private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
+            {
+                ImDrawDataPtr drawData = ImGui.GetDrawData();
+                if (drawData.IsNull || drawData.TotalVtxCount == 0 || drawData.TotalIdxCount == 0)
+                    return;
 
                 using (new CommandBufferEventScope(commandBuffer, "Dear ImGui"))
                 {
@@ -335,7 +349,9 @@ namespace Editor.DearImGui
                                         Format = RHI.TextureFormat.RGBA8un,
                                         Memory = RHI.MemoryUsage.Default,
                                         Usage = RHI.TextureUsage.ShaderResource,
-                                        CpuAccessFlags = RHI.CPUAccessFlags.None
+                                        CpuAccessFlags = RHI.CPUAccessFlags.None,
+
+                                        Swizzle = RHI.TextureSwizzle.Default,
                                     }, new Span<nint>(&pixels, 1));
                                     texture.Name = $"DearImGui - Texture [{textureData.UniqueID}]";
 
@@ -394,8 +410,6 @@ namespace Editor.DearImGui
                         }
                     }
                 }
-
-                CommandBufferPool.Return(commandBuffer);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

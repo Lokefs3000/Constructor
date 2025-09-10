@@ -29,8 +29,8 @@ namespace Primary.Assets
 
         internal ModelAssetData AssetData => _assetData;
 
-        internal RHI.Buffer? VertexBuffer => _assetData.VertexBuffer;
-        internal RHI.Buffer? IndexBuffer => _assetData.IndexBuffer;
+        public RHI.Buffer? VertexBuffer => _assetData.VertexBuffer;
+        public RHI.Buffer? IndexBuffer => _assetData.IndexBuffer;
 
         public ResourceStatus Status => _assetData.Status;
     }

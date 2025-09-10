@@ -83,7 +83,12 @@ namespace Primary.Assets.Loaders
                                 VariableName = variable.Name,
                             });
 
-                            defaultGroup.SetResource(variable.Name, AssetManager.Static.DefaultWhite);
+                            defaultGroup.SetResource(variable.Name, property.Default switch
+                            {
+                                ShaderPropertyDefault.White => AssetManager.Static.DefaultWhite,
+                                ShaderPropertyDefault.Normal => AssetManager.Static.DefaultNormal,
+                                _ => AssetManager.Static.DefaultWhite
+                            });
                         }
                     }
                 }

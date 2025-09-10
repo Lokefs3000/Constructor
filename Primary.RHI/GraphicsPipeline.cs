@@ -93,6 +93,7 @@
         public float MipLODBias;
         public float MinLOD;
         public float MaxLOD;
+        public SamplerBorder Border;
     }
 
     public enum FillMode : byte
@@ -259,5 +260,14 @@
         Mirror,
         ClampToEdge,
         ClampToBorder
+    }
+
+    public enum SamplerBorder : byte
+    {
+        TransparentBlack = 0,
+        OpaqueBlack,
+        OpaqueWhite,
+        OpaqueBlackUInt,
+        OpaqueWhiteUInt
     }
 }

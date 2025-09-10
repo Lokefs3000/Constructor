@@ -38,6 +38,7 @@ namespace Primary.RHI.Direct3D12
 
         private RenderTextureViewImpl? _rtView;
         private RenderTextureViewImpl? _dstView;
+        private RenderTextureViewStencilImpl? _stencilView;
 
         private ResourceStates _rtCurrentState;
         private ResourceStates _dstCurrentState;
@@ -93,7 +94,7 @@ namespace Primary.RHI.Direct3D12
                 _rtDescriptor = device.CpuRTVDescriptors.Rent(1);
                 device.D3D12Device.CreateRenderTargetView(_renderTexture, null, _rtDescriptor.GetCpuHandle());
 
-                _rtView = new RenderTextureViewImpl(device, _renderTexture, resDesc.Format, _rtDescriptor, ResourceStates.RenderTarget, FlagUtility.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Color), false);
+                _rtView = new RenderTextureViewImpl(device, _renderTexture, resDesc.Format, _rtDescriptor, ResourceStates.RenderTarget, FlagUtility.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Color), 0);
             }
 
             if (desc.DepthFormat != DepthStencilFormat.Undefined)
@@ -134,11 +135,15 @@ namespace Primary.RHI.Direct3D12
                 _dstDescriptor = device.CpuDSVDescriptors.Rent(1);
                 if (FormatHelper.IsTypeless(resDesc.Format))
                 {
+
                     device.D3D12Device.CreateDepthStencilView(_depthStencilTexture, new DepthStencilViewDescription
                     {
                         Format = desc.DepthFormat switch
                         {
+                            DepthStencilFormat.R32tX8X24ui => Format.D32_Float_S8X24_UInt,
                             DepthStencilFormat.R32t => Format.D32_Float,
+                            DepthStencilFormat.R24tX8ui => Format.D24_UNorm_S8_UInt,
+                            DepthStencilFormat.R16t => Format.D16_UNorm,
                             _ => throw new NotImplementedException(),
                         },
                         ViewDimension = DepthStencilViewDimension.Texture2D,
@@ -154,8 +159,23 @@ namespace Primary.RHI.Direct3D12
                     device.D3D12Device.CreateDepthStencilView(_depthStencilTexture, null, _dstDescriptor.GetCpuHandle());
                 }
 
-                _dstView = new RenderTextureViewImpl(device, _depthStencilTexture, resDesc.Format, _dstDescriptor, ResourceStates.DepthWrite, FlagUtility.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Depth), true);
+                _dstView = new RenderTextureViewImpl(device, _depthStencilTexture, resDesc.Format, _dstDescriptor, ResourceStates.DepthWrite, FlagUtility.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Depth), 1);
+                if (desc.DepthFormat switch
+                {
+                    DepthStencilFormat.D32sfS8X24ui => true,
+                    DepthStencilFormat.D24unS8ui => true,
+                    DepthStencilFormat.R32tX8X24ui => true,
+                    DepthStencilFormat.R24tX8ui => true,
+                    _ => false
+                })
+                    _stencilView = new RenderTextureViewStencilImpl(device, _dstView, _depthStencilTexture, resDesc.Format, ResourceStates.DepthWrite, FlagUtility.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Stencil));
             }
+
+            _device.DumpMessageQueue();
+
+            device.InvokeObjectCreationTracking(this);
+            if (_renderTexture != null || _depthStencilTexture != null)
+                device.InvokeObjectRenamingTracking(this, _renderTexture?.Name ?? _depthStencilTexture?.Name ?? throw new NullReferenceException());
         }
 
         private void Dispose(bool disposing)
@@ -184,6 +204,7 @@ namespace Primary.RHI.Direct3D12
                         _dstAllocation->Release();
                 });
 
+                _device.InvokeObjectDestructionTracking(this);
                 _disposedValue = true;
             }
         }
@@ -237,11 +258,14 @@ namespace Primary.RHI.Direct3D12
                     _renderTexture.Name = value + ".RT";
                 if (_depthStencilTexture != null)
                     _depthStencilTexture.Name = value + ".DST";
+
+                _device.InvokeObjectRenamingTracking(this, value);
             }
         }
 
         public override RenderTextureView? ColorTexture => _rtView;
         public override RenderTextureView? DepthTexture => _dstView;
+        public override RenderTextureView? StencilTexture => _stencilView;
 
         public override nint Handle => _handlePtr;
 
@@ -269,13 +293,13 @@ namespace Primary.RHI.Direct3D12
             private ResourceStates _currentState;
 
             private bool _isShaderVisible;
-            private bool _isDst;
+            private int _type;
 
             private string _resourceName;
 
             private bool _hasInitialClearCompleted;
 
-            internal RenderTextureViewImpl(GraphicsDeviceImpl device, ID3D12Resource resource, Format format, DescriptorHeapAllocation allocation, ResourceStates state, bool isShaderVisible, bool isDst)
+            internal RenderTextureViewImpl(GraphicsDeviceImpl device, ID3D12Resource resource, Format format, DescriptorHeapAllocation allocation, ResourceStates state, bool isShaderVisible, int type)
             {
                 _device = device;
 
@@ -289,7 +313,7 @@ namespace Primary.RHI.Direct3D12
                 _currentState = state;
 
                 _isShaderVisible = isShaderVisible;
-                _isDst = isDst;
+                _type = type;
 
                 _resourceName = _resource.Name;
 
@@ -304,7 +328,10 @@ namespace Primary.RHI.Direct3D12
                         {
                             Format = format switch
                             {
+                                Format.R32G8X24_Typeless => type == 2 ? Format.X32_Typeless_G8X24_UInt : Format.R32_Float_X8X24_Typeless,
                                 Format.R32_Typeless => Format.R32_Float,
+                                Format.R24G8_Typeless => type == 2 ? Format.X24_Typeless_G8_UInt : Format.R24_UNorm_X8_Typeless,
+                                Format.R16_Typeless => Format.R16_Float,
                                 _ => throw new NotImplementedException()
                             },
                             ViewDimension = ShaderResourceViewDimension.Texture2D,
@@ -313,7 +340,7 @@ namespace Primary.RHI.Direct3D12
                             {
                                 MostDetailedMip = 0,
                                 MipLevels = 1,
-                                PlaneSlice = 0,
+                                PlaneSlice = type == 2 ? 1u : 0,
                                 ResourceMinLODClamp = 0.0f
                             }
                         }, _srvAllocation.GetCpuHandle());
@@ -342,13 +369,11 @@ namespace Primary.RHI.Direct3D12
                 }
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void SetImplicitResourcePromotion(ResourceStates state)
             {
                 _currentState = state;
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void TransitionImmediate(ID3D12GraphicsCommandList7 commandList, ResourceStates newState)
             {
                 if (_currentState != newState)
@@ -356,17 +381,23 @@ namespace Primary.RHI.Direct3D12
                 _currentState = newState;
             }
 
+            public void CopyTexture(ID3D12GraphicsCommandList7 commandList, ICommandBufferRTView view)
+            {
+                commandList.CopyResource(view.Resource, _resource);
+            }
+
             public override nint Handle => _handlePtr;
 
             public override string Name { set => _resource.Name = value; }
 
             public CpuDescriptorHandle ViewCpuDescriptor => _allocation.GetCpuHandle();
+            public ID3D12Resource Resource => _resource;
 
             public override bool IsShaderVisible => _isShaderVisible;
             public ResourceType Type => ResourceType.Texture;
             public string ResourceName => _resourceName;
             public CpuDescriptorHandle CpuDescriptor => _srvAllocation.GetCpuHandle();
-            public ResourceStates GenericState => _isDst ? ResourceStates.DepthWrite : ResourceStates.RenderTarget;
+            public ResourceStates GenericState => _type == 1 ? ResourceStates.DepthWrite : ResourceStates.RenderTarget;
             public ResourceStates CurrentState => _currentState;
 
             //it is fine to leave with default thread safety as it only ever gets set to true
@@ -377,6 +408,103 @@ namespace Primary.RHI.Direct3D12
                 {
                     _hasInitialClearCompleted = value;
                 }
+            }
+        }
+
+        private class RenderTextureViewStencilImpl : RenderTextureView, ICommandBufferRTView
+        {
+            private readonly GraphicsDeviceImpl _device;
+            private readonly RenderTextureViewImpl _dsv;
+
+            private GCHandle _handle;
+            private nint _handlePtr;
+
+            private ID3D12Resource _resource;
+            private DescriptorHeapAllocation _srvAllocation;
+
+            private bool _isShaderVisible;
+
+            internal RenderTextureViewStencilImpl(GraphicsDeviceImpl device, RenderTextureViewImpl dsv, ID3D12Resource resource, Format format, ResourceStates state, bool isShaderVisible)
+            {
+                _device = device;
+                _dsv = dsv;
+
+                _handle = GCHandle.Alloc(this, GCHandleType.Weak);
+                _handlePtr = GCHandle.ToIntPtr(_handle);
+
+                _resource = resource;
+                _isShaderVisible = isShaderVisible;
+
+                if (isShaderVisible)
+                {
+                    _srvAllocation = device.CpuSRVCBVUAVDescriptors.Rent(1);
+                    if (FormatHelper.IsTypeless(format))
+                    {
+                        _device.D3D12Device.CreateShaderResourceView(resource, new ShaderResourceViewDescription
+                        {
+                            Format = format switch
+                            {
+                                Format.R32G8X24_Typeless => Format.X32_Typeless_G8X24_UInt,
+                                Format.R24G8_Typeless => Format.X24_Typeless_G8_UInt,
+                                _ => throw new NotImplementedException()
+                            },
+                            ViewDimension = ShaderResourceViewDimension.Texture2D,
+                            Shader4ComponentMapping = 0x1688,
+                            Texture2D = new Texture2DShaderResourceView
+                            {
+                                MostDetailedMip = 0,
+                                MipLevels = 1,
+                                PlaneSlice = 1,
+                                ResourceMinLODClamp = 0.0f
+                            }
+                        }, _srvAllocation.GetCpuHandle());
+                    }
+                    else
+                    {
+                        _device.D3D12Device.CreateShaderResourceView(resource, null, _srvAllocation.GetCpuHandle());
+                    }
+                }
+            }
+
+            internal void ReleaseInternal()
+            {
+                if (!_srvAllocation.IsNull)
+                    _device.CpuSRVCBVUAVDescriptors.Return(_srvAllocation);
+            }
+
+            public override void Dispose() => throw new NotSupportedException("Cannot dispose \"RenderTextureView\"!");
+
+            public void EnsureResourceStates(ResourceBarrierManager manager, ResourceStates requiredStates, bool toggle = false)
+                => _dsv.EnsureResourceStates(manager, requiredStates, toggle);
+
+            public void SetImplicitResourcePromotion(ResourceStates state)
+                => _dsv.SetImplicitResourcePromotion(state);
+
+            public void TransitionImmediate(ID3D12GraphicsCommandList7 commandList, ResourceStates newState)
+                => _dsv.TransitionImmediate(commandList, newState);
+
+            public void CopyTexture(ID3D12GraphicsCommandList7 commandList, ICommandBufferRTView view)
+                => _dsv.CopyTexture(commandList, view);
+
+            public override nint Handle => _handlePtr;
+
+            public override string Name { set => _resource.Name = value; }
+
+            public CpuDescriptorHandle ViewCpuDescriptor => _dsv.ViewCpuDescriptor;
+            public ID3D12Resource Resource => _dsv.Resource;
+
+            public override bool IsShaderVisible => _isShaderVisible;
+            public ResourceType Type => ResourceType.Texture;
+            public string ResourceName => _dsv.ResourceName;
+            public CpuDescriptorHandle CpuDescriptor => _srvAllocation.GetCpuHandle();
+            public ResourceStates GenericState => _dsv.GenericState;
+            public ResourceStates CurrentState => _dsv.CurrentState;
+
+            //it is fine to leave with default thread safety as it only ever gets set to true
+            public bool HasInitialClearCompleted
+            {
+                get => _dsv.HasInitialClearCompleted;
+                set => _dsv.HasInitialClearCompleted = value;
             }
         }
     }

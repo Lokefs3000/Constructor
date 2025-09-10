@@ -23,8 +23,7 @@ using RHI = Primary.RHI;
 
 namespace Editor.Rendering.Gizmos
 {
-    //[RenderPassPriority(true, typeof(FinalBlitPass))]
-    internal sealed class GizmoRenderPass : IRenderPass
+    internal sealed class GizmoRenderPass
     {
         private ObjectPool<PooledList<IconDrawArgs>> _iconPool;
         private Dictionary<TextureAsset, PooledList<IconDrawArgs>> _iconBatches;
@@ -88,10 +87,17 @@ namespace Editor.Rendering.Gizmos
             });
         }
 
-        public void ExecutePass(IRenderPath path, RenderPassData passData)
+        public void ExecutePass(RenderPass renderPass)
         {
-            CommandBuffer commandBuffer = CommandBufferPool.Get();
+            using (RasterPassDescription pass = renderPass.CreateRasterPass())
+            {
+                pass.SetThreadingPolicy(RenderPassThreadingPolicy.None);
+                pass.SetFunction(PassFunction);
+            }
+        }
 
+        public void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
+        {
             RenderPassViewportData viewportData = passData.Get<RenderPassViewportData>()!;
 
             using (new CommandBufferEventScope(commandBuffer, "Gizmos"))
@@ -99,11 +105,9 @@ namespace Editor.Rendering.Gizmos
                 UploadGizmoData(commandBuffer, viewportData);
                 RenderGizmos(commandBuffer, viewportData);
             }
-
-            CommandBufferPool.Return(commandBuffer);
         }
 
-        private unsafe void UploadGizmoData(CommandBuffer commandBuffer, RenderPassViewportData viewportData)
+        private unsafe void UploadGizmoData(RasterCommandBuffer commandBuffer, RenderPassViewportData viewportData)
         {
             {
                 FrameBufferData bufferData = new FrameBufferData
@@ -171,8 +175,11 @@ namespace Editor.Rendering.Gizmos
             }
         }
 
-        private void RenderGizmos(CommandBuffer commandBuffer, RenderPassViewportData viewportData)
+        private void RenderGizmos(RasterCommandBuffer commandBuffer, RenderPassViewportData viewportData)
         {
+            if (_floatingIcons.Status != ResourceStatus.Success)
+                return;
+
             commandBuffer.SetRenderTarget(viewportData.BackBufferRenderTarget);
             commandBuffer.SetDepthStencil(viewportData.CameraRenderTarget);
             commandBuffer.SetScissorRect(new RHI.ScissorRect(0, 0, 100000, 100000));

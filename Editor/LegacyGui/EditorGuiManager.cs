@@ -45,8 +45,6 @@ namespace Editor.LegacyGui
 
             _coreWindow = OpenWindow<CoreWindow>()!;
             _currentFocus = null;
-
-            editor.RenderingManager.RenderPassManager.AddRenderPass<GuiRenderer>();
         }
 
         public T? OpenWindow<T>() where T : EditorWindow, new() => OpenWindow(typeof(T)) as T;

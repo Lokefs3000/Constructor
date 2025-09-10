@@ -63,6 +63,8 @@ namespace Primary.RHI.Direct3D12
         private string _deviceName;
         private ulong _videoMemory;
 
+        private List<IObjectTracker> _trackers;
+
         private bool _disposedValue;
 
         internal GraphicsDeviceImpl(ILogger logger)
@@ -79,6 +81,8 @@ namespace Primary.RHI.Direct3D12
 
             _lastSubmittedCommandBuffer = new WeakReference(null);
             _waitForCompletionEvent = new ManualResetEventSlim(false);
+
+            _trackers = new List<IObjectTracker>();
 
             {
                 if (File.Exists("WinPixEventRuntime.dll") || File.Exists("runtimes/win-x64/native/WinPixEventRuntime.dll"))
@@ -579,6 +583,53 @@ namespace Primary.RHI.Direct3D12
                 TextureDimension.TextureCube => FormatSupport1.TextureCube,
                 _ => FormatSupport1.None
             });
+        }
+        #endregion
+
+        #region Tracking
+        public override void InstallTracker(IObjectTracker tracker)
+        {
+            if (_trackers.Contains(tracker))
+                return;
+            _trackers.Add(tracker);
+        }
+
+        public override void UninstallTracker(IObjectTracker tracker)
+        {
+            _trackers.Remove(tracker);
+        }
+
+        internal void InvokeObjectCreationTracking(Resource resource)
+        {
+            if (_trackers.Count > 0)
+            {
+                for (int i = 0; i < _trackers.Count; i++)
+                {
+                    _trackers[i].ObjectCreated(resource);
+                }
+            }
+        }
+
+        internal void InvokeObjectDestructionTracking(Resource resource)
+        {
+            if (_trackers.Count > 0)
+            {
+                for (int i = 0; i < _trackers.Count; i++)
+                {
+                    _trackers[i].ObjectDestroyed(resource);
+                }
+            }
+        }
+
+        internal void InvokeObjectRenamingTracking(Resource resource, string newName)
+        {
+            if (_trackers.Count > 0)
+            {
+                for (int i = 0; i < _trackers.Count; i++)
+                {
+                    _trackers[i].ObjectRenamed(resource, newName);
+                }
+            }
         }
         #endregion
 

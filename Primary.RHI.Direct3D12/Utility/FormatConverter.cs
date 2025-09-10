@@ -92,6 +92,9 @@ namespace Primary.RHI.Direct3D12.Utility
                 DepthStencilFormat.D32sf => Format.D32_Float,
                 DepthStencilFormat.D24unS8ui => Format.D24_UNorm_S8_UInt,
                 DepthStencilFormat.D16un => Format.D16_UNorm,
+                DepthStencilFormat.R32tX8X24ui => useAccurateTypes ? Format.R32G8X24_Typeless : Format.D32_Float_S8X24_UInt,
+                DepthStencilFormat.R24tX8ui => useAccurateTypes ? Format.R24G8_Typeless : Format.D24_UNorm_S8_UInt,
+                DepthStencilFormat.R16t => useAccurateTypes ? Format.R16_Typeless : Format.D16_UNorm,
                 DepthStencilFormat.R32t => useAccurateTypes ? Format.R32_Typeless : Format.D32_Float,
                 _ => Format.Unknown
             };

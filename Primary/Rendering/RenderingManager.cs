@@ -33,6 +33,8 @@ namespace Primary.Rendering
         private RenderTargetPool _renderTargetPool;
         private Blitter _blitter;
 
+        private RenderPass _renderPass;
+
         private MaterialAsset _missingMaterial;
 
         private IRenderPath _path;
@@ -58,6 +60,8 @@ namespace Primary.Rendering
             _renderPassData = new RenderPassData(new RenderPassViewportData(), new RenderPassLightingData());
             _renderTargetPool = new RenderTargetPool(_graphicsDevice);
             _blitter = new Blitter();
+
+            _renderPass = new RenderPass();
 
             _missingMaterial = AssetManager.LoadAsset<MaterialAsset>("Content/Missing.mat", true)!;
 
@@ -128,9 +132,16 @@ namespace Primary.Rendering
                         SetupRenderState(ref viewports[i]);
 
                         _path.PreparePasses(_renderPassData);
-                        _renderPassManager.ExecuteAllPasses(_path, _renderPassData);
-                        _path.CleanupPasses(_renderPassData);
+                        _path.ExecutePasses(_renderPass);
+
+                        DispatchRenderPasses();
                     }
+                }
+
+                PostRender?.Invoke(_renderPass);
+                if (!_renderPass.IsEmpty)
+                {
+                    DispatchRenderPasses();
                 }
 
                 //_frameUploadManager.SubmitBuffersForEndOfFrame();
@@ -173,10 +184,24 @@ namespace Primary.Rendering
                 if (!_config.OutputRenderTarget.IsNull)
                     rpViewportData.BackBufferRenderTarget = _config.OutputRenderTarget.RHIRenderTarget!;
             }
-
+           
             {
                 RenderPassLightingData rpLightingData = _renderPassData.Get<RenderPassLightingData>()!;
             }
+        }
+
+        private void DispatchRenderPasses()
+        {
+            IReadOnlyList<IPassDescription> descriptions = _renderPass.Descriptions;
+
+            //TODO: implement auto threading of passes once a task scheduler is actually implemented
+
+            foreach (IPassDescription desc in descriptions)
+            {
+                desc.ExecuteInternal(_renderPassData);
+            }
+
+            _renderPass.ClearForNextFrame();
         }
 
         public Window? DefaultWindow { get => _defaultWindow; set => _defaultWindow = value; }
@@ -192,6 +217,8 @@ namespace Primary.Rendering
         public IRenderPath RenderPath => _path;
 
         public ref RenderingConfig Configuration => ref _config;
+
+        public event Action<RenderPass>? PostRender;
 
         internal event Action<IDebugCallbacks>? EmitDebugData;
 

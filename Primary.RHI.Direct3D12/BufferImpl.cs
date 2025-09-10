@@ -167,6 +167,9 @@ namespace Primary.RHI.Direct3D12
                     _ => throw new ArgumentException(nameof(desc.Stride))
                 };
             }
+
+            device.InvokeObjectCreationTracking(this);
+            device.InvokeObjectRenamingTracking(this, _resourceName);
         }
 
         private void Dispose(bool disposing)
@@ -185,6 +188,7 @@ namespace Primary.RHI.Direct3D12
                     _resource?.Dispose();
                 });
 
+                _device.InvokeObjectDestructionTracking(this);
                 _disposedValue = true;
             }
         }
@@ -243,7 +247,14 @@ namespace Primary.RHI.Direct3D12
         #endregion
 
         public override ref readonly BufferDescription Description => ref _description;
-        public override string Name { set => _resource.Name = value; }
+        public override string Name
+        {
+            set
+            {
+                _resource.Name = value;
+                _device.InvokeObjectRenamingTracking(this, value);
+            }
+        }
         public override nint Handle => _handlePtr;
 
         public ulong TotalSizeInBytes => _description.ByteWidth;

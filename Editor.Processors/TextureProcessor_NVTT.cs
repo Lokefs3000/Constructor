@@ -1,7 +1,10 @@
 ﻿using Editor.Interop.NVTT;
+using Primary.Assets.Loaders;
 using Primary.Common;
+using Primary.Mathematics;
 using Serilog;
 using System.Diagnostics;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -60,8 +63,38 @@ namespace Editor.Processors
                     return false;
                 }
 
-                if (args.FlipVertical)
+                if (hasAlpha == NvttBoolean.True)
+                {
+                    switch (args.AlphaSource)
+                    {
+                        case TextureAlphaSource.None:
+                        case TextureAlphaSource.Opaque:
+                            {
+                                NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.None);
+                                hasAlpha = NvttBoolean.False;
+                                break;
+                            }
+                        case TextureAlphaSource.Red:
+                            {
+                                NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.Transparency);
+                                NVTT.nvttSurfaceCopyChannel(surface, surface, 0, 3, null);
+                                break;
+                            }
+                    }
+                }
+                else
+                {
+                    if (args.AlphaSource == TextureAlphaSource.Red)
+                    {
+                        NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.Transparency);
+                        NVTT.nvttSurfaceCopyChannel(surface, surface, 0, 3, null);
+                    }
+                }
+
+                if (!args.FlipVertical)
+                {
                     NVTT.nvttSurfaceFlipY(surface, null);
+                }
 
                 NvttCompressionOptions* compressionOptions = NVTT.nvttCreateCompressionOptions();
                 NVTT.nvttSetCompressionOptionsQuality(compressionOptions, NvttQuality.Normal);
@@ -70,12 +103,55 @@ namespace Editor.Processors
                 NVTT.nvttErrorHandlerDelegate @delegate = ErrorReporter;
                 NVTT.nvttSetOutputOptionsErrorHandler(outputOptions, ErrorReporter);
 
-                switch (args.ImageFormat)
+                TextureImageFormat imageFormat = args.ImageFormat;
+                if (imageFormat == TextureImageFormat.Undefined)
+                {
+                    switch (args.ImageType)
+                    {
+                        case TextureImageType.Color:
+                            {
+                                switch (args.AlphaSource)
+                                {
+                                    case TextureAlphaSource.None:
+                                    case TextureAlphaSource.Opaque: imageFormat = TextureImageFormat.BC1; break;
+                                    case TextureAlphaSource.Source:
+                                    case TextureAlphaSource.Red: imageFormat = TextureImageFormat.BC3; break;
+                                }
+                                break;
+                            }
+                        case TextureImageType.Grayscale:
+                            {
+                                switch (args.AlphaSource)
+                                {
+                                    case TextureAlphaSource.None:
+                                    case TextureAlphaSource.Opaque: imageFormat = TextureImageFormat.BC4u; break;
+                                    case TextureAlphaSource.Source:
+                                    case TextureAlphaSource.Red: imageFormat = TextureImageFormat.BC3; break;
+                                }
+                                break;
+                            }
+                        case TextureImageType.Normal: imageFormat = TextureImageFormat.BC3n; break;
+                        case TextureImageType.Specular:
+                            {
+                                TextureProcessorSpecularArgs specularArgs = args.ImageMetadata.SpecularArgs;
+                                switch (specularArgs.Source)
+                                {
+                                    case TextureSpecularSource.Colored: imageFormat = TextureImageFormat.BC3; break;
+                                    case TextureSpecularSource.Grayscale: imageFormat = TextureImageFormat.BC4u; break;
+                                    case TextureSpecularSource.Roughness: imageFormat = TextureImageFormat.BC4u; break;
+                                }
+
+                                break;
+                            }
+                    }
+                }
+
+                switch (imageFormat)
                 {
                     case TextureImageFormat.BC7: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC7); break;
                     case TextureImageFormat.BC6s: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC6S); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); break;
                     case TextureImageFormat.BC6u: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC6U); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedFloat); break;
-                    case TextureImageFormat.ASTC: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.ASTC_LDR_4x4); break;
+                    //case TextureImageFormat.ASTC: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.ASTC_LDR_4x4); break;
                     case TextureImageFormat.BC5u: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC5); break;
                     case TextureImageFormat.BC4u: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC4); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); break;
                     case TextureImageFormat.BC3: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.BC3); break;
@@ -101,12 +177,12 @@ namespace Editor.Processors
                     case TextureImageFormat.BGRX8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 8); break;
                     case TextureImageFormat.RGB8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGB); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 0); break;
                     case TextureImageFormat.RGBA8: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.UnsignedNorm); /*NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, 8);*/ break;
-                    case TextureImageFormat.R16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 0, 0, 0); break;
-                    case TextureImageFormat.RG16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 16, 0, 0); break;
-                    case TextureImageFormat.RGBA16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 16, 16, 16); break;
-                    case TextureImageFormat.R32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 0, 0, 0); break;
-                    case TextureImageFormat.RG32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 32, 0, 0); break;
-                    case TextureImageFormat.RGBA32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 32, 32, 32); break;
+                    //case TextureImageFormat.R16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 0, 0, 0); break;
+                    //case TextureImageFormat.RG16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 16, 0, 0); break;
+                    //case TextureImageFormat.RGBA16f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 16, 16, 16, 16); break;
+                    //case TextureImageFormat.R32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 0, 0, 0); break;
+                    //case TextureImageFormat.RG32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 32, 0, 0); break;
+                    //case TextureImageFormat.RGBA32f: NVTT.nvttSetCompressionOptionsFormat(compressionOptions, NvttFormat.RGBA); NVTT.nvttSetCompressionOptionsPixelType(compressionOptions, NvttPixelType.Float); NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 32, 32, 32, 32); break;
                     default: break;
                 }
 
@@ -114,7 +190,7 @@ namespace Editor.Processors
 
                 if (args.CutoutDither && hasAlpha == NvttBoolean.True && args.ImageFormat != TextureImageFormat.BC2 && args.ImageFormat != TextureImageFormat.BC1a)
                 {
-                    NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 0, 8, 8, 8, alphaBits);
+                    //NVTT.nvttSetCompressionOptionsPixelFormat(compressionOptions, 8, 8, 8, 8, alphaBits);
                     NVTT.nvttSetCompressionOptionsQuantization(compressionOptions, NvttBoolean.False, NvttBoolean.True, NvttBoolean.False, args.CutoutThreshold);
                 }
 
@@ -123,7 +199,7 @@ namespace Editor.Processors
 
                 NvttAlphaMode alphaMode = NVTT.nvttSurfaceAlphaMode(surface);
 
-                alphaMode = args.PremultipliedAlpha ? NvttAlphaMode.Premultiplied : alphaMode;
+                alphaMode = (args.PremultipliedAlpha && args.AlphaSource > TextureAlphaSource.Opaque) ? NvttAlphaMode.Premultiplied : alphaMode;
                 if (args.ImageFormat == TextureImageFormat.BC6u || args.ImageFormat == TextureImageFormat.BC6s)
                     alphaMode = NvttAlphaMode.None;
 
@@ -166,25 +242,149 @@ namespace Editor.Processors
 
                 mipmapCount = Math.Max(1, mipmapCount);
 
-                OutputHandler outputHandler = new OutputHandler(args.AbsoluteOutputPath);
+                OutputHandler outputHandler = new OutputHandler(args.AbsoluteOutputPath, new TextureHeader
+                {
+                    FileHeader = TextureHeader.Header,
+                    FileVersion = TextureHeader.Version,
+
+                    Width = (ushort)mip0Width,
+                    Height = (ushort)mip0Height,
+                    Depth = (ushort)mip0Depth,
+
+                    Format = (TextureFormat)(imageFormat - 1),
+                    Flags = TextureFlags.None,
+
+                    MipLevels = (ushort)mipmapCount,
+
+                    Swizzle = new TextureSwizzle(args.TextureSwizzle.Code),
+                });
+
                 NVTT.nvttSetOutputOptionsOutputHandler(outputOptions, outputHandler.nvttBeginImage, outputHandler.nvttWriteData, outputHandler.nvttEndImage);
 
                 switch (args.ImageType)
                 {
-                    case TextureImageType.Colormap: break;
-                    case TextureImageType.Grayscale: NVTT.nvttSurfaceToGreyScale(surface, 1.0f, 1.0f, 1.0f, 1.0f, null); break;
-                    case TextureImageType.NormalMap_TangentSpace: NVTT.nvttSetSurfaceNormalMap(surface, NvttBoolean.True); break;
-                    case TextureImageType.NormalMap_ObjectSpace: NVTT.nvttSetSurfaceNormalMap(surface, NvttBoolean.True); break;
+                    case TextureImageType.Color: break;
+                    case TextureImageType.Grayscale: NVTT.nvttSurfaceToGreyScale(surface, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, null); break;
+                    case TextureImageType.Normal: NVTT.nvttSetSurfaceNormalMap(surface, NvttBoolean.True); break;
+                    case TextureImageType.Specular:
+                        {
+                            TextureProcessorSpecularArgs specularArgs = args.ImageMetadata.SpecularArgs;
+                            switch (specularArgs.Source)
+                            {
+                                case TextureSpecularSource.Grayscale: NVTT.nvttSurfaceToGreyScale(surface, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, null); break;
+                                case TextureSpecularSource.Roughness:
+                                    {
+                                        int channelCount = (alphaMode > NvttAlphaMode.None && hasAlpha == NvttBoolean.True) ? 4 : 3;
+                                        int totalPixels = mip0Width * mip0Height;
+
+                                        for (int i = 0; i < channelCount; i++)
+                                        {
+                                            float* channel = NVTT.nvttSurfaceChannel(surface, i);
+                                            for (int j = 0; j < totalPixels; j++)
+                                            {
+                                                channel[j] = 1.0f - channel[j];
+                                            }
+                                        }
+
+                                        break;
+                                    }
+                            }
+
+                            break;
+                        }
                 }
 
                 NvttBatchList* batchList = NVTT.nvttCreateBatchList();
 
                 if (NVTT.nvttSurfaceIsNormalMap(surface) == NvttBoolean.True)
                 {
-                    if (args.ImageType == TextureImageType.NormalMap_ObjectSpace)
+                    TextureProcessorNormalArgs normalArgs = args.ImageMetadata.NormalArgs;
+                    if (normalArgs.Source == TextureNormalSource.Object)
                     {
                         NVTT.nvttSurfaceToGreyScale(surface, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, 0.0f, null);
                         NVTT.nvttSurfaceToNormalMap(surface, 1.0f / 1.875f, 0.5f / 1.875f, 0.25f / 1.875f, 0.125f / 1.875f, null);
+                    }
+                    else if (normalArgs.Source == TextureNormalSource.Bump)
+                    {
+                        //NVTT.nvttSurfaceToGreyScale(surface, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, 0.0f, null);
+                        //NVTT.nvttSurfaceToNormalMap(surface, 1.0f / 1.875f, 0.5f / 1.875f, 0.25f / 1.875f, 0.125f / 1.875f, null);
+                  
+                        NvttSurface* referenceCopy = NVTT.nvttSurfaceClone(surface);
+                        
+                        float* srcData = NVTT.nvttSurfaceChannel(referenceCopy, 0);
+
+                        float* dstData0 = NVTT.nvttSurfaceChannel(surface, 0);
+                        float* dstData1 = NVTT.nvttSurfaceChannel(surface, 1);
+                        float* dstData2 = NVTT.nvttSurfaceChannel(surface, 2);
+
+                        Int2 oneLessSize = new Int2(mip0Width, mip0Height) - Int2.One;
+                        Vector2 step = Vector2.One / new Vector2(mip0Width, mip0Height);
+
+                        float maxHeight = 0.0f;
+
+                        for (int y = 0; y < mip0Height; y++)
+                        {
+                            int ySlice = y * mip0Width;
+                            for (int x = 0; x < mip0Width; x++)
+                            {
+                                Int2 posPu = new Int2(x + 1, y);
+                                Int2 posMu = new Int2(x - 1, y);
+                                Int2 posPv = new Int2(x, y + 1);
+                                Int2 posMv = new Int2(x, y - 1);
+
+                                posPu.X = (posPu.X < 0) ? oneLessSize.X : ((posPu.X > oneLessSize.X) ? 0 : posPu.X);
+                                posMu.X = (posMu.X < 0) ? oneLessSize.X : ((posMu.X > oneLessSize.X) ? 0 : posMu.X);
+
+                                posPv.Y = (posPv.Y < 0) ? oneLessSize.Y : ((posPv.Y > oneLessSize.Y) ? 0 : posPv.Y);
+                                posMv.Y = (posMv.Y < 0) ? oneLessSize.Y : ((posMv.Y > oneLessSize.Y) ? 0 : posMv.Y);
+
+                                float height = srcData[x + ySlice];
+
+                                Vector2 dxy = new Vector2(height) - new Vector2(
+                                    srcData[posPu.X + ySlice],
+                                    srcData[posPv.X + posPv.Y * mip0Width]);
+
+                                Vector2 n = dxy;
+                                if (dxy.X != 0.0f && dxy.Y != 0.0f)
+                                {
+                                    Vector3 tempNorm = Vector3.Normalize(new Vector3(dxy, 1.0f));
+                                    n = new Vector2(tempNorm.X, tempNorm.Y);
+
+                                    Vector2 absN = Vector2.Abs(n);
+                                    maxHeight = MathF.Max(MathF.Max(absN.X, absN.Y), maxHeight);
+                                }
+
+                                dstData0[x + ySlice] = n.X;
+                                dstData1[x + ySlice] = n.Y;
+                                dstData2[x + ySlice] = 1.0f;
+
+                                //float samplePu = srcData[posPu.X + ySlice];
+                                //float sampleMu = srcData[posMu.X + ySlice];
+                                //float samplePv = srcData[posPv.X + posPv.Y * mip0Width];
+                                //float sampleMv = srcData[posMv.X + posMv.Y * mip0Width];
+                                //
+                                //float du = sampleMu - samplePu;
+                                //float dv = sampleMv - samplePv;
+                                //
+                                //Vector3 n = Vector3.Normalize(new Vector3(du, dv, 1.0f));
+                                //
+                                //dstVec3[x + ySlice] = n * 0.5f + new Vector3(0.5f);
+                            }
+                        }
+
+                        int total = mip0Width * mip0Height;
+                        for (int i = 0; i < total; i++)
+                        {
+                            ref float nx = ref dstData0[i];
+                            ref float ny = ref dstData1[i];
+
+                            Vector2 n = new Vector2(nx, ny) * 0.5f + new Vector2(0.5f);
+
+                            nx = n.X;
+                            ny = n.Y;
+                        }
+
+                        NVTT.nvttDestroySurface(referenceCopy);
                     }
                 }
                 else
@@ -273,6 +473,7 @@ namespace Editor.Processors
                     outputHandler.Dispose();
                 };
 
+                outputHandler.Skip = true;
                 if (NVTT.nvttContextOutputHeaderData(context, NvttTextureType._2D, mip0Width, mip0Height, mip0Depth, mipmapCount, NVTT.nvttSurfaceIsNormalMap(surface), compressionOptions, outputOptions) != NvttBoolean.True)
                 {
                     cleanup();
@@ -280,6 +481,7 @@ namespace Editor.Processors
                     return false;
                 }
 
+                outputHandler.Skip = false;
                 if (NVTT.nvttContextCompressBatch(context, batchList, compressionOptions) != NvttBoolean.True)
                 {
                     cleanup();
@@ -292,7 +494,7 @@ namespace Editor.Processors
             }
             finally
             {
-                
+
             }
         }
 
@@ -335,17 +537,23 @@ namespace Editor.Processors
         public class OutputHandler : IDisposable
         {
             private Stream? _stream;
+            private bool _skip;
 
-            public OutputHandler(string path)
+            private TextureHeader _header;
+
+            public OutputHandler(string path, TextureHeader header)
             {
                 try
                 {
-                    _stream = File.OpenWrite(path);
+                    _stream = FileUtility.TryWaitOpen(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
                 }
                 catch (Exception ex)
                 {
                     //bad
                 }
+
+                _header = header;
+                _stream?.Write(MemoryMarshal.Cast<TextureHeader, byte>(new ReadOnlySpan<TextureHeader>(ref header)));
             }
 
             public void Dispose()
@@ -355,11 +563,14 @@ namespace Editor.Processors
 
             public void nvttBeginImage(int size, int width, int height, int depth, int face, int miplevel)
             {
-
+                
             }
 
             public unsafe NvttBoolean nvttWriteData(void* data, int size)
             {
+                if (_skip)
+                    return NvttBoolean.True;
+
                 if (_stream != null)
                 {
                     _stream.Write(new ReadOnlySpan<byte>(data, size));
@@ -373,36 +584,88 @@ namespace Editor.Processors
             {
 
             }
+
+            public bool Skip { get => _skip; set => _skip = value; }
         }
     }
 
-    public struct TextureProcessorArgs
+    public record struct TextureProcessorArgs
     {
         public string AbsoluteFilepath;
         public string AbsoluteOutputPath;
 
         public ILogger? Logger;
 
-        public bool FlipVertical;
+        public TextureImageType ImageType;
+        public Metadata ImageMetadata;
+
+        public Swizzle TextureSwizzle;
+
         public TextureImageFormat ImageFormat;
-        public bool CutoutDither;
-        public byte CutoutThreshold;
+        public TextureAlphaSource AlphaSource;
+
         public bool GammaCorrect;
         public bool PremultipliedAlpha;
-        public TextureMipmapFilter MipmapFilter;
+
+        public bool CutoutDither;
+        public byte CutoutThreshold;
+
+        public bool GenerateMipmaps;
+        public bool ScaleAlphaForMipmaps;
         public int MaxMipmapCount;
         public int MinMipmapSize;
-        public bool GenerateMipmaps;
-        public TextureImageType ImageType;
-        public bool ScaleAlphaForMipmaps;
+        public TextureMipmapFilter MipmapFilter;
+
+        public bool FlipVertical;
+
+        [StructLayout(LayoutKind.Explicit, Pack = 0)]
+        public record struct Metadata
+        {
+            [FieldOffset(0)]
+            public TextureProcessorNormalArgs NormalArgs;
+
+            [FieldOffset(0)]
+            public TextureProcessorSpecularArgs SpecularArgs;
+        }
+
+        public record struct Swizzle
+        {
+            public ushort Code;
+
+            public Swizzle()
+                => this = Default;
+            public Swizzle(TextureSwizzleChannel r, TextureSwizzleChannel g, TextureSwizzleChannel b, TextureSwizzleChannel a)
+                => Code = (ushort)(((int)r << 9) | ((int)g << 6) | ((int)b << 3) | (int)a);
+
+            public Swizzle(ushort code)
+                => Code = code;
+
+            public TextureSwizzleChannel R { get => (TextureSwizzleChannel)((Code >> 9) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 9)) | ((int)value << 9)); }
+            public TextureSwizzleChannel G { get => (TextureSwizzleChannel)((Code >> 6) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 6)) | ((int)value << 6)); }
+            public TextureSwizzleChannel B { get => (TextureSwizzleChannel)((Code >> 3) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 3)) | ((int)value << 3)); }
+            public TextureSwizzleChannel A { get => (TextureSwizzleChannel)(Code & 0x7); set => Code = (ushort)((Code & ~0x7) | (int)value); }
+
+            public static readonly Swizzle Default = new Swizzle(TextureSwizzleChannel.R, TextureSwizzleChannel.G, TextureSwizzleChannel.B, TextureSwizzleChannel.A);
+        }
+    }
+
+    public record struct TextureProcessorNormalArgs
+    {
+        public TextureNormalSource Source;
+    }
+
+    public record struct TextureProcessorSpecularArgs
+    {
+        public TextureSpecularSource Source;
     }
 
     public enum TextureImageFormat : byte
     {
-        BC7 = 0,
+        Undefined = 0,
+
+        BC7,
         BC6s,
         BC6u,
-        ASTC,
         BC5u,
         BC4u,
         BC3,
@@ -417,17 +680,25 @@ namespace Editor.Processors
         BGRX8,
         RGB8,
         RGBA8,
-        R16f,
-        RG16f,
-        RGBA16f,
-        R32f,
-        RG32f,
-        RGBA32f
+        R16,
+        RG16,
+        RGBA16,
+        R32,
+        RG32,
+        RGBA32
+    }
+
+    public enum TextureAlphaSource : byte
+    {
+        None = 0,
+        Opaque,
+        Source,
+        Red
     }
 
     public enum TextureMipmapFilter : byte
     {
-        Box,
+        Box = 0,
         Kaiser,
         Triangle,
         Mitchell,
@@ -437,9 +708,33 @@ namespace Editor.Processors
 
     public enum TextureImageType : byte
     {
-        Colormap,
+        Color = 0,
         Grayscale,
-        NormalMap_TangentSpace,
-        NormalMap_ObjectSpace
+        Normal,
+        Specular,
+    }
+
+    public enum TextureSwizzleChannel : byte
+    {
+        R = 0,
+        G,
+        B,
+        A,
+        Zero,
+        One
+    }
+
+    public enum TextureNormalSource : byte
+    {
+        Tangent = 0,
+        Object,
+        Bump
+    }
+
+    public enum TextureSpecularSource : byte
+    {
+        Colored = 0,
+        Grayscale,
+        Roughness
     }
 }

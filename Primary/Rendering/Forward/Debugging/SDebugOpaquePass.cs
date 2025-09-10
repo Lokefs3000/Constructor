@@ -6,13 +6,14 @@ using Primary.Rendering.Raw;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace Primary.Rendering.Forward.Debugging
 {
-    internal class SDebugOpaquePass : IRenderPass
+    internal class SDebugOpaquePass
     {
         private ShaderAsset? _unlitShader;
         private ShaderAsset? _lightingOnlyShader;
@@ -33,16 +34,23 @@ namespace Primary.Rendering.Forward.Debugging
 
         public void Dispose() { }
 
-        public unsafe void ExecutePass(IRenderPath path, RenderPassData passData)
+        public void ExecutePass(RenderPass renderPass)
         {
-            CommandBuffer commandBuffer = CommandBufferPool.Get();
+            using (RasterPassDescription pass = renderPass.CreateRasterPass())
+            {
+                pass.SetThreadingPolicy(RenderPassThreadingPolicy.None);
+                pass.SetFunction(PassFunction);
+            }
+        }
 
+        public unsafe void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
+        {
             using (new CommandBufferEventScope(commandBuffer, "ForwardRP - DebugVM"))
             {
-                ForwardRenderPath renderPath = (ForwardRenderPath)path;
-
                 RenderingManager manager = Engine.GlobalSingleton.RenderingManager;
                 RenderBatcher batcher = manager.RenderBatcher;
+
+                ForwardRenderPath renderPath = (ForwardRenderPath)manager.RenderPath;
 
                 RenderPassViewportData viewportData = passData.Get<RenderPassViewportData>()!;
 
@@ -61,11 +69,9 @@ namespace Primary.Rendering.Forward.Debugging
                     HandleRenderBatch(commandBuffer, manager, batcher, renderPath, renderBatch, ref offsetInMatrixBuffer);
                 }
             }
-
-            CommandBufferPool.Return(commandBuffer);
         }
 
-        private unsafe void HandleRenderBatch(CommandBuffer commandBuffer, RenderingManager manager, RenderBatcher batcher, ForwardRenderPath path, FlagRenderBatch renderBatch, ref uint offsetInMatrixBuffer)
+        private unsafe void HandleRenderBatch(RasterCommandBuffer commandBuffer, RenderingManager manager, RenderBatcher batcher, ForwardRenderPath path, FlagRenderBatch renderBatch, ref uint offsetInMatrixBuffer)
         {
             Span<RenderMeshBatchData> batchDatas = renderBatch.RenderMeshBatches;
 

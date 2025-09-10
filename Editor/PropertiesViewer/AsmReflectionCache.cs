@@ -66,8 +66,9 @@ namespace Editor.PropertiesViewer
             }
 
             CachedReflection reflection = new CachedReflection(true, refl.AsSpan(0, i).ToArray());
-            _cache[type] = reflection;
+            Array.Sort(reflection.Fields, (x, y) => x.Name.CompareTo(y.Name));
 
+            _cache[type] = reflection;
             return reflection;
         }
     }

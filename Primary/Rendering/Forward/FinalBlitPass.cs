@@ -5,6 +5,7 @@ using Primary.Rendering.Raw;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -13,28 +14,26 @@ using TerraFX.Interop.Windows;
 
 namespace Primary.Rendering.Forward
 {
-    [RenderPassPriority(true, typeof(ForwardOpaquePass))]
-    public sealed class FinalBlitPass : IRenderPass
+    public sealed class FinalBlitPass
     {
-        private ShaderAsset _shadowBlit;
-        private ShaderBindGroup _shadowBG;
-
-        public FinalBlitPass()
+        internal FinalBlitPass()
         {
-            _shadowBlit = AssetManager.LoadAsset<ShaderAsset>("Hidden/ShadowBlit")!;
-            _shadowBG = _shadowBlit.CreateDefaultBindGroup();
+
         }
 
-        public void CleanupFrame(IRenderPath path, RenderPassData passData) { }
-        public void Dispose() { }
-        public void PrepareFrame(IRenderPath path, RenderPassData passData) { }
+        public void ExecutePass(RenderPass renderPass)
+        {
+            using (RasterPassDescription pass = renderPass.CreateRasterPass())
+            {
+                pass.SetThreadingPolicy(RenderPassThreadingPolicy.None);
+                pass.SetFunction(PassFunction);
+            }
+        }
 
-        public void ExecutePass(IRenderPath path, RenderPassData passData)
+        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
         {
             RenderPassViewportData viewportData = passData.Get<RenderPassViewportData>()!;
-            ForwardRenderPath forward = (ForwardRenderPath)path;
-
-            CommandBuffer commandBuffer = CommandBufferPool.Get();
+            ForwardRenderPath forward = (ForwardRenderPath)Engine.GlobalSingleton.RenderingManager.RenderPath;
 
             using (new CommandBufferEventScope(commandBuffer, "ForwardRP - Final blit"))
             {
@@ -43,10 +42,7 @@ namespace Primary.Rendering.Forward
 
                 Blitter.Blit(commandBuffer, viewportData.CameraRenderTarget.ColorTexture!);
             }
-
-            CommandBufferPool.Return(commandBuffer);
         }
-
 
         private record struct ShadowBlitData(Vector2 Offset, Vector2 Scale, float Near, float Far);
     }

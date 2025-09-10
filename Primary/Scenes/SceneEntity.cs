@@ -193,17 +193,9 @@ namespace Primary.Scenes
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override string ToString()
-        {
-            return IsNull ? "null" : Name;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override int GetHashCode()
-        {
-            return _entity.GetHashCode();
-        }
+        public override string ToString() => IsNull ? "null" : Name;
+        public override int GetHashCode() => _entity.GetHashCode();
+        public bool Equals(SceneEntity entity) => entity._entity == _entity;
 
         public Entity WrappedEntity => _entity;
 

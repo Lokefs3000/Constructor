@@ -34,6 +34,7 @@ namespace Primary.RHI.Direct3D12.Utility
                 catch (RHIException ex)
                 {
                     GraphicsDeviceImpl.Logger.Error(ex, GetErrorString(result));
+                    device?.DumpMessageQueue();
                 }
             }
         }

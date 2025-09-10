@@ -68,7 +68,7 @@ namespace Primary.RHI.Direct3D12
                     MipLODBias = 0.0f,
                     MaxAnisotropy = Math.Max(samplerDescription.MaxAnistropy, 1u),
                     ComparisonFunction = ComparisonFunction.Never,
-                    BorderColor = StaticBorderColor.OpaqueWhite,
+                    BorderColor = SwitchBorder(samplerDescription.Border),
                     MinLOD = samplerDescription.MinLOD,
                     MaxLOD = samplerDescription.MaxLOD,
                     ShaderRegister = sampler.Key,
@@ -336,6 +336,18 @@ namespace Primary.RHI.Direct3D12
                     TextureAddressMode.Mirror => Vortice.Direct3D12.TextureAddressMode.Mirror,
                     TextureAddressMode.ClampToEdge => Vortice.Direct3D12.TextureAddressMode.Clamp,
                     TextureAddressMode.ClampToBorder => Vortice.Direct3D12.TextureAddressMode.Border,
+                    _ => throw new NotImplementedException()
+                };
+            }
+            static StaticBorderColor SwitchBorder(SamplerBorder border)
+            {
+                return border switch
+                {
+                    SamplerBorder.TransparentBlack => StaticBorderColor.TransparentBlack,
+                    SamplerBorder.OpaqueBlack => StaticBorderColor.OpaqueBlack,
+                    SamplerBorder.OpaqueWhite => StaticBorderColor.OpaqueWhite,
+                    SamplerBorder.OpaqueBlackUInt => StaticBorderColor.OpaqueBlackUInt,
+                    SamplerBorder.OpaqueWhiteUInt => StaticBorderColor.OpaqueWhiteUInt,
                     _ => throw new NotImplementedException()
                 };
             }
