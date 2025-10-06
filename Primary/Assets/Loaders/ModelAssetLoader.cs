@@ -285,7 +285,7 @@ namespace Primary.Assets.Loaders
         public ushort MeshCount;
         public ushort NodeCount;
 
-        public const uint ConstHeader = 0x20504d46;
+        public const uint ConstHeader = 0x4d502046;
         public const uint ConstVersion = 1;
     }
 
