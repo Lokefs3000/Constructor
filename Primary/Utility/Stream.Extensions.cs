@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
 
 namespace Primary.Utility
 {
@@ -17,5 +11,10 @@ namespace Primary.Utility
 
             return v;
         }
-	}
+
+        public static void Write<T>(this Stream stream, in T value) where T : unmanaged
+        {
+            stream.Write(MemoryMarshal.Cast<T, byte>(new ReadOnlySpan<T>(in value)));
+        }
+    }
 }

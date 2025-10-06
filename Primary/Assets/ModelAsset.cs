@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.HighPerformance;
+﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -33,6 +33,9 @@ namespace Primary.Assets
         public RHI.Buffer? IndexBuffer => _assetData.IndexBuffer;
 
         public ResourceStatus Status => _assetData.Status;
+
+        public string Name => _assetData.Name;
+        public AssetId Id => _assetData.Id;
     }
 
     internal sealed class ModelAssetData : IInternalAssetData
@@ -41,17 +44,23 @@ namespace Primary.Assets
 
         private ResourceStatus _status;
 
+        private readonly AssetId _id;
+        private string _name;
+
         private RenderMesh[] _meshes;
         private ModelNode? _node;
 
         private RHI.Buffer? _vertexBuffer;
         private RHI.Buffer? _indexBuffer;
 
-        internal ModelAssetData()
+        internal ModelAssetData(AssetId id)
         {
             _asset = new WeakReference(null);
 
             _status = ResourceStatus.Pending;
+
+            _id = id;
+            _name = string.Empty;
 
             _meshes = Array.Empty<RenderMesh>();
             _node = null;
@@ -79,17 +88,14 @@ namespace Primary.Assets
             _indexBuffer = null;
         }
 
-        public void ResetInternalState()
+        public void SetAssetInternalStatus(ResourceStatus status)
         {
-            Dispose();
-
-            _status = ResourceStatus.Pending;
+            _status = status;
         }
 
-        public void PromoteStateToRunning()
+        public void SetAssetInternalName(string name)
         {
-            if (_status == ResourceStatus.Pending)
-                _status = ResourceStatus.Running;
+            _name = name;
         }
 
         internal void UpdateAssetData(ModelAsset asset, RenderMesh[] meshes, ModelNode node, RHI.Buffer vertexBuffer, RHI.Buffer indexBuffer)
@@ -131,7 +137,11 @@ namespace Primary.Assets
 
         internal ResourceStatus Status => _status;
 
+        internal AssetId Id => _id;
+        internal string Name => _name;
+
         public Type AssetType => typeof(ModelAsset);
+        public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
     }
 
     public class RenderMesh
@@ -173,29 +183,36 @@ namespace Primary.Assets
         public uint IndexCount => _indexCount;
     }
 
-    public sealed class ModelNode
+    public sealed record class ModelNode
     {
         private readonly ModelAsset _model;
         private readonly ModelNode? _parent;
         private readonly ModelNode[] _children;
 
-        private readonly string _name;
-        private readonly string[] _meshes;
+        private readonly ModelTransform _transform;
 
-        internal ModelNode(ModelAsset model, ModelNode? parent, ModelNode[] children, string name, string[] meshes)
+        private readonly string _name;
+        private readonly string? _meshId;
+
+        internal ModelNode(ModelAsset model, ModelNode? parent, ModelNode[] children, ModelTransform transform, string name, string? meshId)
         {
             _model = model;
             _parent = parent;
             _children = children;
+            _transform = transform;
             _name = name;
-            _meshes = meshes;
+            _meshId = meshId;
         }
 
         public ModelAsset Model => _model;
         public ModelNode? Parent => _parent;
-        public ModelNode[] Children => _children;
+        public IReadOnlyCollection<ModelNode> Children => _children;
+
+        public ModelTransform Transform => _transform;
 
         public string Name => _name;
-        public string[] Meshes => _meshes;
+        public string? MeshId => _meshId;
     }
+
+    public readonly record struct ModelTransform(Vector3 Position, Quaternion Quaternion, Vector3 Scale);
 }

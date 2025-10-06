@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Editor.Assets
+﻿namespace Editor.Assets
 {
     public interface IAssetImporter : IDisposable
     {
-        public void Import(AssetPipeline pipeline, string fullFilePath, string outputFilePath);
+        public bool Import(AssetPipeline pipeline, ProjectSubFilesystem filesystem, string fullFilePath, string outputFilePath, string localOutputFile);
+        public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline);
+        public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline);
 
         public string? CustomFileIcon { get; }
     }

@@ -2,8 +2,8 @@
 using Primary.Assets.Loaders;
 using Primary.Common;
 using Primary.Mathematics;
+using Primary.Utility;
 using Serilog;
-using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -63,6 +63,10 @@ namespace Editor.Processors
                     return false;
                 }
 
+                int mip0Width = NVTT.nvttSurfaceWidth(surface);
+                int mip0Height = NVTT.nvttSurfaceHeight(surface);
+                int mip0Depth = NVTT.nvttSurfaceDepth(surface);
+
                 if (hasAlpha == NvttBoolean.True)
                 {
                     switch (args.AlphaSource)
@@ -77,7 +81,11 @@ namespace Editor.Processors
                         case TextureAlphaSource.Red:
                             {
                                 NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.Transparency);
-                                NVTT.nvttSurfaceCopyChannel(surface, surface, 0, 3, null);
+
+                                float* red = NVTT.nvttSurfaceChannel(surface, 0);
+                                float* alpha = NVTT.nvttSurfaceChannel(surface, 3);
+
+                                NativeMemory.Copy(red, alpha, (nuint)(mip0Width * mip0Height * mip0Depth * sizeof(float)));
                                 break;
                             }
                     }
@@ -87,7 +95,11 @@ namespace Editor.Processors
                     if (args.AlphaSource == TextureAlphaSource.Red)
                     {
                         NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.Transparency);
-                        NVTT.nvttSurfaceCopyChannel(surface, surface, 0, 3, null);
+
+                        float* red = NVTT.nvttSurfaceChannel(surface, 0);
+                        float* alpha = NVTT.nvttSurfaceChannel(surface, 3);
+
+                        NativeMemory.Copy(red, alpha, (nuint)(mip0Width * mip0Height * mip0Depth * sizeof(float)));
                     }
                 }
 
@@ -205,6 +217,21 @@ namespace Editor.Processors
 
                 NVTT.nvttSetSurfaceAlphaMode(surface, alphaMode);
 
+                if (imageFormat == TextureImageFormat.R8a && alphaMode != NvttAlphaMode.None)
+                {
+                    switch (args.AlphaSource)
+                    {
+                        case TextureAlphaSource.Source:
+                            {
+                                float* red = NVTT.nvttSurfaceChannel(surface, 0);
+                                float* alpha = NVTT.nvttSurfaceChannel(surface, 3);
+
+                                NativeMemory.Copy(alpha, red, (nuint)(mip0Width * mip0Height * mip0Depth * sizeof(float)));
+                                break;
+                            }
+                    }
+                }
+
                 NvttMipmapFilter filter = NvttMipmapFilter.Box;
                 switch (args.MipmapFilter)
                 {
@@ -215,10 +242,6 @@ namespace Editor.Processors
                     case TextureMipmapFilter.Min: filter = NvttMipmapFilter.Min; break;
                     case TextureMipmapFilter.Max: filter = NvttMipmapFilter.Max; break;
                 }
-
-                int mip0Width = NVTT.nvttSurfaceWidth(surface);
-                int mip0Height = NVTT.nvttSurfaceHeight(surface);
-                int mip0Depth = NVTT.nvttSurfaceDepth(surface);
 
                 List<(int width, int height)> sizes = new List<(int, int)>();
 
@@ -259,7 +282,11 @@ namespace Editor.Processors
                     Swizzle = new TextureSwizzle(args.TextureSwizzle.Code),
                 });
 
-                NVTT.nvttSetOutputOptionsOutputHandler(outputOptions, outputHandler.nvttBeginImage, outputHandler.nvttWriteData, outputHandler.nvttEndImage);
+                NVTT.nvttBeginImageDelegate beginImageDelegate = outputHandler.nvttBeginImage;
+                NVTT.nvttWriteDataWriteData writeDataWriteData = outputHandler.nvttWriteData;
+                NVTT.nvttEndImageDelegate endImageDelegate = outputHandler.nvttEndImage;
+
+                NVTT.nvttSetOutputOptionsOutputHandler(outputOptions, beginImageDelegate, writeDataWriteData, endImageDelegate);
 
                 switch (args.ImageType)
                 {
@@ -308,9 +335,9 @@ namespace Editor.Processors
                     {
                         //NVTT.nvttSurfaceToGreyScale(surface, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, 0.0f, null);
                         //NVTT.nvttSurfaceToNormalMap(surface, 1.0f / 1.875f, 0.5f / 1.875f, 0.25f / 1.875f, 0.125f / 1.875f, null);
-                  
+
                         NvttSurface* referenceCopy = NVTT.nvttSurfaceClone(surface);
-                        
+
                         float* srcData = NVTT.nvttSurfaceChannel(referenceCopy, 0);
 
                         float* dstData0 = NVTT.nvttSurfaceChannel(surface, 0);
@@ -490,6 +517,10 @@ namespace Editor.Processors
                 }
 
                 cleanup();
+
+                GC.KeepAlive(beginImageDelegate);
+                GC.KeepAlive(writeDataWriteData);
+                GC.KeepAlive(endImageDelegate);
                 return true;
             }
             finally
@@ -545,7 +576,7 @@ namespace Editor.Processors
             {
                 try
                 {
-                    _stream = FileUtility.TryWaitOpen(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
+                    _stream = FileUtility.TryWaitOpen(path, FileMode.Create, FileAccess.Write, FileShare.None);
                 }
                 catch (Exception ex)
                 {
@@ -553,7 +584,7 @@ namespace Editor.Processors
                 }
 
                 _header = header;
-                _stream?.Write(MemoryMarshal.Cast<TextureHeader, byte>(new ReadOnlySpan<TextureHeader>(ref header)));
+                _stream?.Write(header);
             }
 
             public void Dispose()
@@ -563,7 +594,7 @@ namespace Editor.Processors
 
             public void nvttBeginImage(int size, int width, int height, int depth, int face, int miplevel)
             {
-                
+
             }
 
             public unsafe NvttBoolean nvttWriteData(void* data, int size)

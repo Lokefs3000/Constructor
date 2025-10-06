@@ -1,27 +1,24 @@
 ﻿using CommunityToolkit.HighPerformance;
 using CommunityToolkit.HighPerformance.Enumerables;
-using System;
+using Primary.Assets;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Assets
 {
-    public sealed class AssetIdentifier
+    public sealed class AssetIdentifier : IAssetIdProvider
     {
         //Key = LocalPath
         private ConcurrentDictionary<string, AssetId> _assets;
+        private ConcurrentDictionary<AssetId, string> _assetPaths;
 
         private HashSet<ulong> _idHashSet;
 
         internal AssetIdentifier()
         {
             _assets = new ConcurrentDictionary<string, AssetId>();
+            _assetPaths = new ConcurrentDictionary<AssetId, string>();
 
             _idHashSet = new HashSet<ulong>();
 
@@ -47,6 +44,7 @@ namespace Editor.Assets
                 ulong localId = ulong.Parse(tokenizer.Current.ToString());
 
                 _assets.TryAdd(localFilePath, new AssetId(localId));
+                _assetPaths.TryAdd(new AssetId(localId), localFilePath);
                 _idHashSet.Add(localId);
             }
         }
@@ -54,13 +52,16 @@ namespace Editor.Assets
         /// <summary>Thread-safe</summary>
         internal string TrySerializeAssetIds()
         {
+            if (_assets.IsEmpty)
+                return string.Empty;
+
             StringBuilder sb = new StringBuilder();
 
             foreach (var kvp in _assets)
             {
                 sb.Append(kvp.Key);
                 sb.Append(':');
-                sb.AppendLine(kvp.Value.Id.ToString());
+                sb.AppendLine(kvp.Value.ToString());
             }
 
             sb.Length--;
@@ -75,11 +76,22 @@ namespace Editor.Assets
             {
                 lock (_idHashSet)
                 {
-                    return new AssetId(GenerateId());
+                    AssetId id = new AssetId(GenerateId());
+                    _assetPaths.TryAdd(id, localPath);
+                    return id;
                 }
             });
 
             return id;
+        }
+
+        /// <summary>Thread-safe</summary>
+        internal void ChangeIdPath(AssetId id, string localPath, string newLocalPath)
+        {
+            if (_assetPaths.ContainsKey(id))
+            {
+                _assetPaths.TryUpdate(id, newLocalPath, localPath);
+            }
         }
 
         /// <summary>Thread-safe</summary>
@@ -88,11 +100,14 @@ namespace Editor.Assets
         /// <summary>Thread-safe</summary>
         public bool HasIdForAsset(string localPath) => _assets.ContainsKey(localPath);
 
+        /// <summary>Thread-safe</summary>
+        public bool IsIdValid(AssetId id) => !id.IsInvalid && _assetPaths.ContainsKey(id);
+
         /// <summary>Not thread-safe</summary>
         private ulong GenerateId()
         {
             ulong id = (ulong)Stopwatch.GetTimestamp();
-            while (_idHashSet.Contains(id))
+            while (id == Invalid || _idHashSet.Contains(id))
             {
                 id++;
             }
@@ -101,8 +116,24 @@ namespace Editor.Assets
             return id;
         }
 
-        public static string DataFilePath = Path.Combine(EditorFilepaths.LibraryPath, "assets.ids");
-    }
+        #region Provider
+        public string? RetrievePathForId(AssetId assetId)
+        {
+            if (_assetPaths.TryGetValue(assetId, out string? path))
+                return path;
+            return null;
+        }
 
-    public readonly record struct AssetId(ulong Id);
+        public AssetId RetriveIdForPath(ReadOnlySpan<char> path)
+        {
+            if (_assets.TryGetValue(path.ToString(), out AssetId assetId))
+                return assetId;
+            return AssetId.Invalid;
+        }
+        #endregion
+
+        public static string DataFilePath = Path.Combine(EditorFilepaths.LibraryPath, "assets.ids");
+
+        public const ulong Invalid = ulong.MaxValue;
+    }
 }

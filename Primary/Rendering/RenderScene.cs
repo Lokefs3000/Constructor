@@ -1,13 +1,6 @@
 ﻿using Arch.Core;
 using CommunityToolkit.HighPerformance;
-using Primary.Components;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Rendering
 {
@@ -25,8 +18,7 @@ namespace Primary.Rendering
             _outputViewports.Clear();
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void AddOutputViewport(RSOutputViewport viewport) => _outputViewports.Add(viewport);
+        public void AddOutputViewport(RSOutputViewport viewport) => _outputViewports.Add(viewport);
 
         internal Span<RSOutputViewport> Viewports => _outputViewports.AsSpan();
     }

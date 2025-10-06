@@ -1,10 +1,6 @@
 ﻿using Primary.Common;
 using Primary.RHI.Direct3D12.Utility;
-using System;
-using System.Buffers;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Vortice.Direct3D;

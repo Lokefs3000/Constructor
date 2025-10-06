@@ -1,7 +1,6 @@
 ﻿using Arch.Core;
-using CommunityToolkit.HighPerformance;
+using Primary.Assets;
 using Primary.Components;
-using System.Diagnostics;
 
 namespace Primary.Scenes
 {
@@ -11,6 +10,7 @@ namespace Primary.Scenes
         private List<Scene> _scenes;
 
         private SceneEntityManager _entityManager;
+        private SceneDeserializer _deserializer;
 
         private bool _disposedValue;
 
@@ -20,27 +20,77 @@ namespace Primary.Scenes
             _scenes = new List<Scene>();
 
             _entityManager = new SceneEntityManager(_world);
+            _deserializer = new SceneDeserializer();
 
-            SerializerTypes.RegisterDefault();
             RegisterComponentsDefault.RegisterDefault();
         }
 
+        /// <summary>Not thread-safe</summary>
         private int CreateSceneId()
         {
             while (true)
             {
                 int num = Random.Shared.Next();
-                if (!_scenes.Exists((x) => x.Id == num))
+                if (num != int.MinValue && !_scenes.Exists((x) => x.Id == num))
                     return num;
             }
         }
 
-        public Scene CreateScene(string name)
+        /// <summary>Not thread-safe</summary>
+        public Scene CreateScene(string name, LoadSceneMode mode)
         {
+            if (mode == LoadSceneMode.Single)
+            {
+                for (int i = 0; i < _scenes.Count; i++)
+                {
+                    SceneUnloaded?.Invoke(_scenes[i]);
+                    _scenes[i].Dispose();
+                }
+
+                _scenes.Clear();
+            }
+
             Scene scene = new Scene(CreateSceneId(), name, _world, _entityManager);
 
             _scenes.Add(scene);
+
+            SceneLoaded?.Invoke(scene);
             return scene;
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public Scene LoadScene(string path, LoadSceneMode mode)
+        {
+            if (mode == LoadSceneMode.Single)
+            {
+                for (int i = 0; i < _scenes.Count; i++)
+                {
+                    SceneUnloaded?.Invoke(_scenes[i]);
+                    _scenes[i].Dispose();
+                }
+
+                _scenes.Clear();
+            }
+
+            Scene scene = new Scene(CreateSceneId(), Path.GetFileNameWithoutExtension(path), _world, _entityManager);
+
+            string? source = AssetFilesystem.ReadString(path);
+            if (source != null)
+                _deserializer.Deserialize(source, scene);
+            else
+                EngLog.Scene.Error("Failed to read scene file string: {p}", path);
+
+            _scenes.Add(scene);
+
+            SceneLoaded?.Invoke(scene);
+            return scene;
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public Scene? FindScene(int id)
+        {
+            int idx = _scenes.FindIndex((x) => x.Id == id);
+            return idx == -1 ? null : _scenes[idx];
         }
 
         private void Dispose(bool disposing)
@@ -65,8 +115,19 @@ namespace Primary.Scenes
         }
 
         public World World => _world;
+
         internal SceneEntityManager EntityManager => _entityManager;
+        public SceneDeserializer Deserializer => _deserializer;
 
         public IReadOnlyList<Scene> Scenes => _scenes;
+
+        public event Action<Scene>? SceneLoaded;
+        public event Action<Scene>? SceneUnloaded;
+    }
+
+    public enum LoadSceneMode : byte
+    {
+        Single = 0,
+        Additive
     }
 }

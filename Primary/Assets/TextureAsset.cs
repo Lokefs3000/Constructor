@@ -1,5 +1,4 @@
-﻿using System.Numerics;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.CompilerServices;
 
 namespace Primary.Assets
 {
@@ -13,10 +12,12 @@ namespace Primary.Assets
         }
 
         internal TextureAssetData AssetData => _assetData;
-
         internal RHI.Texture? Texture => _assetData.Texture;
 
         public ResourceStatus Status => _assetData.Status;
+
+        public string Name => _assetData.Name;
+        public AssetId Id => _assetData.Id;
 
         public int Width => _assetData.Width;
         public int Height => _assetData.Height;
@@ -31,17 +32,23 @@ namespace Primary.Assets
 
         private ResourceStatus _status;
 
+        private readonly AssetId _id;
+        private string _name;
+
         private RHI.Texture? _texture;
 
         private int _width;
         private int _height;
         private RHI.TextureFormat _format;
 
-        internal TextureAssetData()
+        internal TextureAssetData(AssetId id)
         {
             _asset = new WeakReference(null);
 
             _status = ResourceStatus.Pending;
+
+            _id = id;
+            _name = string.Empty;
 
             _texture = null;
 
@@ -64,17 +71,14 @@ namespace Primary.Assets
             _format = RHI.TextureFormat.Undefined;
         }
 
-        public void ResetInternalState()
+        public void SetAssetInternalStatus(ResourceStatus status)
         {
-            Dispose();
-
-            _status = ResourceStatus.Pending;
+            _status = status;
         }
 
-        public void PromoteStateToRunning()
+        public void SetAssetInternalName(string name)
         {
-            if (_status == ResourceStatus.Pending)
-                _status = ResourceStatus.Running;
+            _name = name;
         }
 
         internal void UpdateAssetData(TextureAsset asset, RHI.Texture texture)
@@ -99,6 +103,9 @@ namespace Primary.Assets
 
         internal ResourceStatus Status => _status;
 
+        internal AssetId Id => _id;
+        internal string Name => _name;
+
         internal RHI.Texture? Texture => _texture;
 
         internal int Width => _width;
@@ -106,5 +113,6 @@ namespace Primary.Assets
         internal RHI.TextureFormat Format => _format;
 
         public Type AssetType => typeof(TextureAsset);
+        public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
     }
 }

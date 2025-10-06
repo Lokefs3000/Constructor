@@ -1,5 +1,5 @@
-﻿using Arch.Core;
-using Primary.Assets;
+﻿using Primary.Assets;
+using Primary.Common;
 using Primary.Components;
 using Primary.Scenes;
 using System.Numerics;
@@ -233,7 +233,7 @@ namespace Editor.Demos
                         ref Light light = ref entity.AddComponent<Light>();
                         light.Type = LightType.PointLight;
                         light.Brightness = 8.0f;
-                        light.Diffuse = new Vector3(1.0f, 0.5f, 0.2f);
+                        light.Diffuse = new Color(1.0f, 0.5f, 0.2f);
                         light.Specular = light.Diffuse;
 
                         light.ShadowImportance = ShadowImportance.Low;

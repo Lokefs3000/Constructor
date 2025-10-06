@@ -1,0 +1,20 @@
+{
+    "Id": "Editor_Tools",
+    "Bindings": [
+        {
+            "Id": "Tool_ButtonPress",
+            "Type": "Digital",
+            "Value": "Boolean",
+            "Triggers": [
+                {
+                    "$type": "ButtonTrigger",
+                    "Id": "MouseLeft",
+                    "Active": true,
+                    "Behavior": "OneShot",
+                    "Button": "LeftMouseButton",
+                    "Modifiers": []
+                }
+            ]
+        }
+    ]
+}

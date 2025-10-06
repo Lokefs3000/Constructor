@@ -6,14 +6,12 @@ using Primary.Editor;
 using Primary.Profiling;
 using Primary.Rendering.Batching;
 using Primary.Rendering.Data;
-using Primary.Rendering.Forward;
 using Primary.Rendering.Pooling;
 using Primary.Rendering.Raw;
 using Primary.RenderLayer;
 using Primary.RHI;
 using Serilog;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 
 namespace Primary.Rendering
 {
@@ -63,7 +61,7 @@ namespace Primary.Rendering
 
             _renderPass = new RenderPass();
 
-            _missingMaterial = AssetManager.LoadAsset<MaterialAsset>("Content/Missing.mat", true)!;
+            _missingMaterial = AssetManager.LoadAsset<MaterialAsset>("Engine/Materials/Missing.mat", true)!;
 
             _path = new ForwardRenderPath(this);
 
@@ -108,10 +106,10 @@ namespace Primary.Rendering
             if (_defaultWindow == null)
                 return;
 
+            SwapChain swapChain = _swapChainCache.GetOrAddDefault(_defaultWindow);
+
             using (new ProfilingScope("ExecuteRender"))
             {
-                SwapChain swapChain = _swapChainCache.GetOrAddDefault(_defaultWindow);
-
                 //_graphicsDevice.SynchronizeDevice(SynchronizeDeviceTargets.All);
 
                 _graphicsDevice.BeginFrame();
@@ -124,17 +122,22 @@ namespace Primary.Rendering
                 //_frameUploadManager.UploadPending();
                 //_frameUploadManager.OpenBuffersForFrame();
 
+                PreRender?.Invoke();
+
                 Span<RSOutputViewport> viewports = _renderScene.Viewports;
-                for (int i = 0; i < viewports.Length; i++)
+                if (viewports.Length > 0)
                 {
-                    using (new ProfilingScope("RTViewport"))
+                    for (int i = 0; i < viewports.Length; i++)
                     {
-                        SetupRenderState(ref viewports[i]);
+                        using (new ProfilingScope("RTViewport"))
+                        {
+                            SetupRenderState(ref viewports[i]);
 
-                        _path.PreparePasses(_renderPassData);
-                        _path.ExecutePasses(_renderPass);
+                            _path.PreparePasses(_renderPassData);
+                            _path.ExecutePasses(_renderPass);
 
-                        DispatchRenderPasses();
+                            DispatchRenderPasses();
+                        }
                     }
                 }
 
@@ -148,9 +151,9 @@ namespace Primary.Rendering
 
                 _renderBatcher.ClearBatchData();
                 _renderScene.ClearInternalData();
-
-                swapChain.Present(PresentParameters.None);
             }
+
+            swapChain.Present(PresentParameters.None);
 
             using (new ProfilingScope("FinishFrame"))
             {
@@ -184,7 +187,7 @@ namespace Primary.Rendering
                 if (!_config.OutputRenderTarget.IsNull)
                     rpViewportData.BackBufferRenderTarget = _config.OutputRenderTarget.RHIRenderTarget!;
             }
-           
+
             {
                 RenderPassLightingData rpLightingData = _renderPassData.Get<RenderPassLightingData>()!;
             }
@@ -212,19 +215,20 @@ namespace Primary.Rendering
         public RenderPassManager RenderPassManager => _renderPassManager;
         public FrameCollector FrameCollector => _frameCollector;
 
-        internal RenderScene RenderScene => _renderScene;
+        public RenderScene RenderScene => _renderScene;
 
         public IRenderPath RenderPath => _path;
 
         public ref RenderingConfig Configuration => ref _config;
 
+        public event Action? PreRender;
         public event Action<RenderPass>? PostRender;
 
         internal event Action<IDebugCallbacks>? EmitDebugData;
 
         public static GraphicsDevice Device => NullableUtility.ThrowIfNull((GraphicsDevice?)s_gd.Target);
     }
-    
+
     public struct RenderingConfig
     {
         public GfxRenderTarget OutputRenderTarget;

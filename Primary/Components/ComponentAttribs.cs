@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Primary.Components
+﻿namespace Primary.Components
 {
     [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
     public sealed class ComponentRequirementsAttribute : Attribute
@@ -51,6 +45,6 @@ namespace Primary.Components
     [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
     public sealed class DontSerializeComponentAttribute : Attribute
     {
-        
+
     }
 }

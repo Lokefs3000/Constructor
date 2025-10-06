@@ -2,7 +2,6 @@
 using Arch.Core.Extensions;
 using Primary.Components;
 using Primary.Editor;
-using Serilog;
 
 namespace Primary.Scenes
 {
@@ -26,7 +25,7 @@ namespace Primary.Scenes
             _world = world;
             _entityManager = entityManager;
 
-            _root = _entityManager.CreateReadyEntity();
+            _root = _entityManager.CreateReadyEntity(this);
             _root.WrappedEntity.Add(new SceneTagComponent(_id));
 
             _root.Name = id.ToString();
@@ -35,9 +34,8 @@ namespace Primary.Scenes
 
         public SceneEntity CreateEntity(SceneEntity parent)
         {
-            SceneEntity newEntity = _entityManager.CreateReadyEntity();
-            newEntity.WrappedEntity.Add(new SceneTagComponent(_id));
-            newEntity.Parent = _root;
+            SceneEntity newEntity = _entityManager.CreateReadyEntity(this);
+            newEntity.Parent = parent.IsNull ? _root : parent;
 
             return newEntity;
         }
@@ -64,7 +62,7 @@ namespace Primary.Scenes
         [InspectorHidden]
         internal readonly record struct SceneTagComponent(int SceneId) : IComponent;
 
-        internal int Id => _id;
+        public int Id => _id;
         public SceneEntity Root => _root;
 
         public string Name => _name;

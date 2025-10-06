@@ -1,5 +1,4 @@
-﻿using TerraFX.Interop.Windows;
-using Vortice.DXGI;
+﻿using Vortice.DXGI;
 
 namespace Primary.RHI.Direct3D12.Utility
 {

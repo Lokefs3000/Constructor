@@ -1,9 +1,4 @@
 ﻿using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor
 {
@@ -11,6 +6,8 @@ namespace Editor
     {
         public static readonly ILogger Assets = Create("Assets");
         public static readonly ILogger Gui = Create("Gui");
+        public static readonly ILogger Reflection = Create("Refl");
+        public static readonly ILogger Serialization = Create("Serialize");
 
         private static ILogger Create(string prefix)
         {

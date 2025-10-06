@@ -5,17 +5,10 @@ using Primary.Common;
 using Primary.Components;
 using Primary.Profiling;
 using Primary.Rendering.Data;
-using Primary.Scenes;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Rendering.Forward.Managers
 {

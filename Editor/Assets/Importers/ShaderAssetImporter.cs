@@ -1,5 +1,6 @@
 ﻿using Editor.Processors;
-using Primary.Common;
+using Editor.Storage;
+using Primary.Assets;
 using Tomlyn;
 using Tomlyn.Model;
 using RHI = Primary.RHI;
@@ -20,17 +21,18 @@ namespace Editor.Assets.Importers
 
         }
 
-        public void Import(AssetPipeline pipeline, string fullFilePath, string outputFilePath)
+        public bool Import(AssetPipeline pipeline, ProjectSubFilesystem filesystem, string fullFilePath, string outputFilePath, string localOutputFile)
         {
-            string localInputFile = fullFilePath.Substring(Editor.GlobalSingleton.ProjectPath.Length);
-            string localOutputFile = outputFilePath.Substring(Editor.GlobalSingleton.ProjectPath.Length);
+            string localInputFile = fullFilePath.Substring(filesystem.AbsolutePath.Length);
 
+            bool hasLocalConfigFile = false;
             string tomlFile = pipeline.Configuration.GetFilePath(localInputFile, "Shader");
             if (!File.Exists(tomlFile))
             {
                 tomlFile = Path.ChangeExtension(fullFilePath, ".toml");
+                hasLocalConfigFile = true;
                 if (!File.Exists(tomlFile))
-                    return;
+                    return false;
             }
 
             TomlTable root = Toml.ToModel<TomlTable>(File.ReadAllText(tomlFile));
@@ -56,18 +58,54 @@ namespace Editor.Assets.Importers
             if (!r)
             {
                 EdLog.Assets.Error("Failed to import shader: {local}", fullFilePath.Substring(Editor.GlobalSingleton.ProjectPath.Length));
-                return;
+                return false;
             }
 
-            Editor.GlobalSingleton.ProjectShaderLibrary.AddFileToMapping(NullableUtility.AlwaysThrowIfNull(processor.ShaderPath), localOutputFile);
-            Editor.GlobalSingleton.ProjectSubFilesystem.RemapFile(localInputFile, localOutputFile);
+            Editor.GlobalSingleton.ProjectShaderLibrary.AddFileToMapping(localInputFile, localOutputFile);
+            filesystem.RemapFile(localInputFile, localOutputFile);
 
-            pipeline.MakeFileAssociations(fullFilePath, processor.ReadFiles);
+            if (hasLocalConfigFile)
+                pipeline.MakeFileAssociations(localInputFile, [tomlFile, .. processor.ReadFiles]);
+            else
+                pipeline.MakeFileAssociations(localInputFile, processor.ReadFiles);
             if (processor.ShaderPath != null)
-                pipeline.ReloadAsset(processor.ShaderPath);
+                pipeline.ReloadAsset(pipeline.Identifier.GetOrRegisterAsset(localInputFile));
+
+            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localInputFile), localInputFile));
+            return true;
         }
 
-        public string CustomFileIcon => "Content/Icons/FileShader.png";
+        public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
+        {
+            using Stream? stream = filesystem.OpenStream(localFilePath);
+
+            if (stream == null)
+            {
+                return pipeline.Configuration.DoesFileHaveConfig(localFilePath, "Shader") || filesystem.Exists(Path.ChangeExtension(localFilePath, ".toml"));
+            }
+            if (stream.Length < 8)
+                return false;
+
+            using BinaryReader br = new BinaryReader(stream);
+
+
+            if (br.ReadUInt32() != ShaderProcessor.HeaderId)
+                return false;
+            if (br.ReadUInt32() != ShaderProcessor.HeaderVersion)
+                return false;
+
+            return true;
+        }
+
+        public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
+        {
+            if (!ValidateFile(localFilePath, filesystem, pipeline))
+                return;
+
+            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath));
+        }
+
+        public string CustomFileIcon => "Editor/Textures/Icons/FileShader.png";
 
         private static ShaderDescriptionArgs DecodeDescription(TomlTable document)
         {

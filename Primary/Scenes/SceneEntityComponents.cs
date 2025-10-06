@@ -1,22 +1,15 @@
 ﻿using Arch.Core;
 using CommunityToolkit.HighPerformance;
-using CommunityToolkit.HighPerformance.Helpers;
 using Primary.Common;
 using Primary.Components;
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Scenes
 {
     //TODO: stop enumeration when EntityData is modified!
-    public ref struct SceneEntityComponents : IEnumerable
+    public struct SceneEntityComponents : IEnumerable
     {
         private EntityData _entityData;
 

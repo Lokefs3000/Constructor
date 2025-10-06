@@ -5,14 +5,7 @@ using Primary.RHI.Direct3D12.Interfaces;
 using Primary.RHI.Direct3D12.Memory;
 using Primary.RHI.Direct3D12.Utility;
 using SharpGen.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
 using Vortice.Direct3D12;
 
 namespace Primary.RHI.Direct3D12

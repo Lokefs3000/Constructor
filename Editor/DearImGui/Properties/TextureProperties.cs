@@ -1,18 +1,18 @@
 ﻿using CsToml;
+using Editor.Assets;
 using Editor.Assets.Importers;
 using Editor.Processors;
 using Hexa.NET.ImGui;
 using Primary.Assets;
 using Primary.Assets.Loaders;
 using Primary.Common;
+using Primary.Utility;
 using System.Diagnostics;
+using System.Globalization;
 using System.Numerics;
 using System.Text;
 using Tomlyn;
 using Tomlyn.Model;
-using Primary.Common.Streams;
-using Primary.Utility;
-using System.Globalization;
 
 namespace Editor.DearImGui.Properties
 {
@@ -22,6 +22,7 @@ namespace Editor.DearImGui.Properties
 
         private TextureAsset? _texture;
         private string? _configFile;
+        private bool _hasLocalConfigFile;
 
         private TextureProcessorArgs _args;
 
@@ -222,8 +223,25 @@ namespace Editor.DearImGui.Properties
             TargetData? td = target as TargetData;
             if (td != null)
             {
+                AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
+
+                _hasLocalConfigFile = false;
+
                 string localPath = td.LocalPath;
-                string altToml = Editor.GlobalSingleton.AssetPipeline.Configuration.GetFilePath(localPath, "Texture");
+                string altToml = pipeline.Configuration.GetFilePath(localPath, "Texture");
+                if (!File.Exists(altToml))
+                {
+                    ProjectSubFilesystem? subFilesystem = AssetPipeline.SelectAppropriateFilesystem(AssetPipeline.GetFileNamespace(localPath));
+                    if (subFilesystem != null)
+                    {
+                        string newToml = Path.ChangeExtension(subFilesystem.GetFullPath(td.LocalPath), ".toml");
+                        if (File.Exists(newToml))
+                        {
+                            altToml = newToml;
+                            _hasLocalConfigFile = true;
+                        }
+                    }
+                }
 
                 _localPath = localPath;
 
@@ -313,6 +331,7 @@ namespace Editor.DearImGui.Properties
                 _configFile = null;
                 _query = null;
                 _textureMemorySize = 0;
+                _hasLocalConfigFile = false;
             }
         }
 
@@ -331,7 +350,7 @@ namespace Editor.DearImGui.Properties
 
                 TomlTable root = new TomlTable();
                 root["image_type"] = _args.ImageType.ToString();
-                
+
                 root["swizzle"] = new TomlArray() { _args.TextureSwizzle.R.ToString(), _args.TextureSwizzle.G.ToString(), _args.TextureSwizzle.B.ToString(), _args.TextureSwizzle.A.ToString() };
 
                 root["image_format"] = _args.ImageFormat.ToString();

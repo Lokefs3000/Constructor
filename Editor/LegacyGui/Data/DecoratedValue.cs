@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.LegacyGui.Data
 {
@@ -60,7 +55,7 @@ namespace Editor.LegacyGui.Data
         public static implicit operator DecoratedValue<T>(T value) => new DecoratedValue<T>(value);
         public static explicit operator T(DecoratedValue<T> value) => value.Value;
     }
-    
+
     public interface DecoratedValue_ImplAdd<T>
     {
         public T Value { set; }

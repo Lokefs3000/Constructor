@@ -1,22 +1,19 @@
 ﻿using CsToml;
-using CsToml.Values;
 using Primary.Common;
 using Primary.Common.Streams;
 using Primary.Rendering;
-using Serilog;
 using System.Collections.Frozen;
-using System.Diagnostics;
 
 namespace Primary.Assets.Loaders
 {
-    internal static unsafe class MaterialAssetLoader
+    internal unsafe class MaterialAssetLoader : IAssetLoader
     {
-        internal static IInternalAssetData FactoryCreateNull()
+        public IInternalAssetData FactoryCreateNull(AssetId id)
         {
-            return new MaterialAssetData();
+            return new MaterialAssetData(id);
         }
 
-        internal static IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
+        public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
         {
             if (assetData is not MaterialAssetData materialData)
                 throw new ArgumentException(nameof(assetData));
@@ -24,7 +21,7 @@ namespace Primary.Assets.Loaders
             return new MaterialAsset(materialData);
         }
 
-        internal static void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
+        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
         {
             if (asset is not MaterialAsset material)
                 throw new ArgumentException(nameof(asset));
@@ -44,7 +41,7 @@ namespace Primary.Assets.Loaders
 
                 TomlDocument document = CsTomlSerializer.Deserialize<TomlDocument>(stream!);
                 TomlDocumentNode root = document.RootNode;
-            
+
                 string shader = string.Empty;
                 ExceptionUtility.Assert(root["shader"u8].TryGetString(out shader));
 
@@ -105,13 +102,18 @@ namespace Primary.Assets.Loaders
                             {
                                 case MaterialVariableType.Texture:
                                     {
-                                        if (!child.TryGetString(out string value))
+                                        TextureAsset? textureAsset = null;
+                                        if (child.TryGetInt64(out long id))
                                         {
-                                            //bad
-                                            continue;
+                                            textureAsset = AssetManager.LoadAsset<TextureAsset>(new AssetId((ulong)id));
+                                        }
+                                        else if (!child.TryGetString(out string value))
+                                        {
+                                            textureAsset = AssetManager.LoadAsset<TextureAsset>(value);
                                         }
 
-                                        defaultGroup.SetResource(kvp.Value.VariableName, AssetManager.LoadAsset<TextureAsset>(value));
+                                        if (textureAsset != null)
+                                            defaultGroup.SetResource(kvp.Value.VariableName, textureAsset);
                                         break;
                                     }
                             }
@@ -131,7 +133,7 @@ namespace Primary.Assets.Loaders
             catch (Exception ex)
             {
                 materialData.UpdateAssetFailed(material);
-                Log.Error(ex, "Failed to load shader: {name}", sourcePath);
+                EngLog.Assets.Error(ex, "Failed to load shader: {name}", sourcePath);
             }
 #endif
         }

@@ -18,7 +18,8 @@ namespace Primary.RHI
         Immutable = 0,
         Default,
         Dynamic,
-        Staging
+        Staging,
+        Readback
     }
 
     [Flags]

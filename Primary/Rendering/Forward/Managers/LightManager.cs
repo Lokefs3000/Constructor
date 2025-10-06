@@ -1,22 +1,12 @@
 ﻿using Arch.Core;
-using Arch.Core.Extensions;
-using Primary.Common;
 using Primary.Components;
-using Primary.GUI.ImGui;
 using Primary.Profiling;
 using Primary.Rendering.Collections;
 using Primary.Scenes;
 using Primary.Timing;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
 
 namespace Primary.Rendering.Forward.Managers
 {
@@ -173,8 +163,8 @@ namespace Primary.Rendering.Forward.Managers
                                 SpotInnerCone = light.InnerCutOff,
                                 SpotOuterCone = light.OuterCutOff,
 
-                                Diffuse = light.Diffuse * light.Brightness,
-                                Specular = light.Specular * MathF.Min(light.Brightness, 1.0f),
+                                Diffuse = light.Diffuse.AsVector3() * light.Brightness,
+                                Specular = light.Specular.AsVector3() * light.Brightness,
                             };
 
                             Shadows.UpdateCaster(e, light.Type, light.ShadowImportance);

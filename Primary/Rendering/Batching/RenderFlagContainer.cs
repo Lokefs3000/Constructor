@@ -1,19 +1,11 @@
-﻿using Arch.LowLevel;
-using CommunityToolkit.HighPerformance;
-using Primary.Assets;
+﻿using Primary.Assets;
 using Primary.Common;
 using Primary.Components;
 using Primary.Memory;
 using Primary.Scenes;
 using Primary.Utility.Scopes;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Rendering.Batching
 {
@@ -34,7 +26,7 @@ namespace Primary.Rendering.Batching
         {
             s_instance.Target = this;
 
-            _missingMaterial = NullableUtility.AlwaysThrowIfNull(AssetManager.LoadAsset<MaterialAsset>("Content/Missing.mat", true));
+            _missingMaterial = NullableUtility.AlwaysThrowIfNull(AssetManager.LoadAsset<MaterialAsset>("Engine/Materials/Missing.mat", true));
 
             _rmFlagPool = new ConcurrentStack<RenderMeshFlagContainer>();
             _usedShaders = new ConcurrentDictionary<int, ShaderFlagContainer>();

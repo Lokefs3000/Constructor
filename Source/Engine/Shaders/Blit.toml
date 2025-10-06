@@ -1,0 +1,41 @@
+fill_mode = "Solid"
+cull_mode = "None"
+front_counter_clockwise = false
+depth_bias = 0
+depth_bias_clamp = 0.0
+slope_scaled_depth_bias = 0.0
+depth_clip_enable = false
+conservative_raster = false
+depth_enable = false
+depth_write_mask = "All"
+depth_func = "LessEqual"
+stencil_enable = false
+stencil_read_mask = 0xff
+stencil_write_mask = 0xff
+primitive_topology = "Triangle"
+alpha_to_coverage_enable = false
+independent_blend_enable = false
+logic_op_enable = false
+logic_op = "NoOp"
+
+[front_face]
+stencil_fail_op = "Keep"
+stencil_depth_fail_op = "Keep"
+stencil_pass_op = "Keep"
+stencil_func = "Always"
+
+[back_face]
+stencil_fail_op = "Keep"
+stencil_depth_fail_op = "Keep"
+stencil_pass_op = "Keep"
+stencil_func = "Always"
+
+[[blends]]
+blend_enable = true
+src_blend = "SourceAlpha"
+dst_blend = "InverseSourceAlpha"
+blend_op = "Add"
+src_blend_alpha = "One"
+dst_blend_alpha = "InverseSourceAlpha"
+blend_op_alpha = "Add"
+render_target_write_mask = 0xf

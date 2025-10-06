@@ -1,7 +1,6 @@
 ﻿using Primary.Assets;
 using Primary.Common;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
@@ -163,7 +162,7 @@ namespace Editor.Assets
             {
                 using FileStream? stream = File.Open(path, FileMode.Open, FileAccess.Read);
                 using BinaryReader br = new BinaryReader(stream);
-                
+
                 ExceptionUtility.Assert(br.ReadUInt32() == ShaderLibrary.HeaderId, "Id mismatch!");
                 ExceptionUtility.Assert(br.ReadUInt32() == ShaderLibrary.HeaderVersion, "Version mismatch!");
 

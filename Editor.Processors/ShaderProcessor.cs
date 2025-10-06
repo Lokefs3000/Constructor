@@ -4,12 +4,10 @@ using Editor.Processors.Shaders;
 using Primary.Common;
 using Serilog;
 using System.Buffers;
-using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-using Tomlyn;
 using Vortice.Direct3D12.Shader;
 using Vortice.Dxc;
 
@@ -59,7 +57,7 @@ namespace Editor.Processors
                 ReadFiles = includeHandler.ReadFiles;
             }
 
-            ShaderParseResult parseResult = ShaderSourceParser.ParseSource(processedSource, sourceSearchDir, args.ContentSearchDir);
+            ShaderParseResult parseResult = new ShaderSourceParser().ParseSource(processedSource, sourceSearchDir, args.ContentSearchDir);
 
             ShaderPath = parseResult.Path;
 
@@ -109,7 +107,7 @@ namespace Editor.Processors
 
             Memory<byte> vs = CompileSource(compiler, parseResult, paths, parseResult.EntryPointVertex!, "vs_6_6", templateArgs, args.Logger);
             if (vs.IsEmpty) return false;
-            
+
             Memory<byte> ps = CompileSource(compiler, parseResult, paths, parseResult.EntryPointPixel!, "ps_6_6", templateArgs, args.Logger);
             if (ps.IsEmpty) return false;
 
@@ -437,8 +435,8 @@ namespace Editor.Processors
         [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
         private static void* SpirvAlloc(ulong size) => NativeMemory.Alloc((nuint)size);
 
-        private const uint HeaderId = 0x204c4243;
-        private const uint HeaderVersion = 0;
+        public const uint HeaderId = 0x204c4243;
+        public const uint HeaderVersion = 0;
 
         private class PipelineDesc
         {
@@ -502,7 +500,7 @@ namespace Editor.Processors
         public string ContentSearchDir;
 
         public ILogger? Logger;
-        
+
         public RHI.GraphicsAPI Target;
 
         public ShaderDescriptionArgs Description;

@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Primary.RHI
+﻿namespace Primary.RHI
 {
     public abstract class Texture : Resource
     {
+        public abstract Descriptor AllocateDescriptor(TextureSRDescriptorDescription description);
+
         public abstract ref readonly TextureDescription Description { get; }
         public abstract string Name { set; }
     }
@@ -163,7 +159,7 @@ namespace Primary.RHI
         B5G6R5un,
 
         BGR5A1un,
-        
+
         BGRA8un,
         BGRX8un,
         BGRA8t,

@@ -1,15 +1,8 @@
 ﻿using Primary.Assets;
 using Primary.Rendering.Batching;
 using Primary.Rendering.Data;
-using Primary.Rendering.Pooling;
 using Primary.Rendering.Raw;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Rendering.Forward.Debugging
 {
@@ -24,12 +17,12 @@ namespace Primary.Rendering.Forward.Debugging
 
         internal SDebugOpaquePass()
         {
-            _unlitShader = AssetManager.LoadAsset<ShaderAsset>("Hidden/Debug/Unlit");
-            _lightingOnlyShader = AssetManager.LoadAsset<ShaderAsset>("Hidden/Debug/LightingOnly");
-            _detailLightingShader = AssetManager.LoadAsset<ShaderAsset>("Hidden/Debug/DetailLighting");
-            _wireframeShader = AssetManager.LoadAsset<ShaderAsset>("Hidden/Debug/Wireframe");
-            _normalsShader = AssetManager.LoadAsset<ShaderAsset>("Hidden/Debug/Normals");
-            _overdrawShader = AssetManager.LoadAsset<ShaderAsset>("Hidden/Debug/Overdraw");
+            _unlitShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Debug/Unlit.hlsl");
+            _lightingOnlyShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Debug/LightingOnly.hlsl");
+            _detailLightingShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Debug/DetailLighting.hlsl");
+            _wireframeShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Debug/Wireframe.hlsl");
+            _normalsShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Debug/Normals.hlsl");
+            _overdrawShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Debug/Overdraw.hlsl");
         }
 
         public void Dispose() { }

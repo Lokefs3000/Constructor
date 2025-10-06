@@ -1,27 +1,25 @@
-﻿using Arch.LowLevel;
-using CommunityToolkit.HighPerformance;
+﻿using CommunityToolkit.HighPerformance;
+using K4os.Compression.LZ4.Streams;
 using Primary.Common;
 using Primary.Common.Streams;
+using Primary.Rendering;
 using Primary.RHI;
 using Primary.Utility;
-using Serilog;
-using System.Diagnostics;
+using System.Buffers;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-
-using Array = System.Array;
+using System.Text;
 
 namespace Primary.Assets.Loaders
 {
-    internal static unsafe class ModelAssetLoader
+    internal unsafe class ModelAssetLoader : IAssetLoader
     {
-        internal static IInternalAssetData FactoryCreateNull()
+        public IInternalAssetData FactoryCreateNull(AssetId id)
         {
-            return new ModelAssetData();
+            return new ModelAssetData(id);
         }
 
-        internal static IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
+        public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
         {
             if (assetData is not ModelAssetData modelData)
                 throw new ArgumentException(nameof(assetData));
@@ -29,155 +27,317 @@ namespace Primary.Assets.Loaders
             return new ModelAsset(modelData);
         }
 
-        internal static void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
+        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
         {
             if (asset is not ModelAsset model)
                 throw new ArgumentException(nameof(asset));
             if (assetData is not ModelAssetData modelData)
                 throw new ArgumentException(nameof(assetData));
 
+            RHI.Buffer? vertexBuffer = null;
+            RHI.Buffer? indexBuffer = null;
+
             try
             {
                 using Stream stream = AssetFilesystem.OpenStream(sourcePath, bundleToReadFrom)!;
-                using BinaryReader br = new BinaryReader(stream);
 
-                ExceptionUtility.Assert(br.ReadUInt32() == HeaderId, "Invalid header id");
-                ExceptionUtility.Assert(br.ReadUInt32() == HeaderVersion, "Invalid header version");
+                PMFHeader header = CommunityToolkit.HighPerformance.StreamExtensions.Read<PMFHeader>(stream);
 
-                uint vertexCount = br.ReadUInt32();
-                uint indexCount = br.ReadUInt32();
+                if (header.Header != PMFHeader.ConstHeader)
+                    ThrowException("Invalid header present in file: {header} ({utf8})", header.Header, Encoding.UTF8.GetString(MemoryMarshal.Cast<uint, byte>(new ReadOnlySpan<uint>(in header.Header))));
+                if (header.Version != PMFHeader.ConstVersion)
+                    ThrowException("Invalid version present in file: {version}", header.Version);
 
-                using UnsafeArray<Vertex> vertices = new UnsafeArray<Vertex>((int)vertexCount);
-                using UnsafeArray<ushort> indices = new UnsafeArray<ushort>((int)indexCount);
+                Stream dataReadStream = stream;
+                if (FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.IsCompressed))
+                    dataReadStream = LZ4Stream.Decode(stream);
 
-                RenderMesh[] meshes = System.Array.Empty<RenderMesh>();
+                using BinaryReader br = new BinaryReader(dataReadStream);
 
+                RenderMesh[] meshes = new RenderMesh[header.MeshCount];
+
+                int vertexDataOffset = 0;
+                int indexDataOffset = 0;
+
+                uint indexOffsetTotal = 0;
+
+                byte[] vertexData = new byte[header.VertexTotalSize];
+                byte[] indexData = new byte[header.IndexCount * (FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? sizeof(uint) : sizeof(ushort))];
+
+                for (int i = 0; i < meshes.Length; i++)
                 {
-
-                    Vertex* verticesStart = (Vertex*)Unsafe.AsPointer(ref vertices[0]);
-                    ushort* indicesStart = (ushort*)Unsafe.AsPointer(ref indices[0]);
-
-                    Vertex* verticesBaseRef = verticesStart;
-                    ushort* indicesBaseRef = indicesStart;
-
-                    uint vtxOffset = 0;
-                    uint idxOffset = 0;
-
-                    ushort count = br.ReadUInt16();
-                    meshes = new RenderMesh[count];
-
-                    for (int i = 0; i < count; i++)
+                    PMFMesh mesh = new PMFMesh
                     {
-                        string meshName = br.ReadString();
+                        Name = br.ReadString(),
 
-                        uint meshVertexCount = br.ReadUInt32();
-                        uint meshIndexCount = br.ReadUInt32();
-                        byte numUVs = br.ReadByte();
+                        VertexCount = br.ReadUInt32(),
+                        IndexCount = br.ReadUInt32(),
 
-                        ExceptionUtility.Assert((numUVs & 0b00000001) == 1, "UV style not implemented yet");
+                        VertexStride = br.ReadUInt16(),
+                        UVChannelMask = br.ReadByte()
+                    };
 
-                        uint material = br.ReadUInt32();
+                    int uvChannelCount = 8 - byte.LeadingZeroCount(mesh.UVChannelMask);
+                    if (uvChannelCount > 1)
+                        throw new NotImplementedException();
 
-                        meshes[i] = new RenderMesh(model, meshName, vtxOffset, idxOffset, meshIndexCount);
+                    Span<float> vertices = MemoryMarshal.Cast<byte, float>(new Span<byte>(vertexData, vertexDataOffset, (int)mesh.VertexCount * (12 + (uvChannelCount * 2)) * sizeof(float)));
 
-                        br.Read(verticesStart, (int)meshVertexCount);
-                        br.Read(indicesStart, (int)meshIndexCount);
+                    if (FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.HalfVertexValues))
+                    {
+                        using PoolArray<Half> pool = ArrayPool<Half>.Shared.Rent(vertices.Length);
+                        br.Read(pool.AsSpan(0, vertices.Length));
 
-                        verticesStart += meshVertexCount;
-                        indicesStart += meshIndexCount;
+                        for (int j = 0; j < pool.Array.Length; j++)
+                        {
+                            vertices[j] = (float)pool[j];
+                        }
+                    }
+                    else
+                    {
+                        br.Read(vertices);
+                    }
 
-                        vtxOffset += meshVertexCount;
-                        idxOffset += meshIndexCount;
+                    vertexDataOffset += vertices.Length * sizeof(float);
+
+                    if (FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices))
+                    {
+                        int indexDataSize = (int)(mesh.IndexCount * sizeof(uint));
+                        Span<uint> indices = MemoryMarshal.Cast<byte, uint>(new Span<byte>(indexData, indexDataOffset, indexDataSize));
+
+                        br.Read(indices);
+
+                        indexDataOffset += indexDataSize;
+                    }
+                    else
+                    {
+                        int indexDataSize = (int)(mesh.IndexCount * sizeof(ushort));
+                        Span<ushort> indices = MemoryMarshal.Cast<byte, ushort>(new Span<byte>(indexData, indexDataOffset, indexDataSize));
+
+                        br.Read(indices);
+
+                        indexDataOffset += indexDataSize;
+                    }
+
+                    meshes[i] = new RenderMesh(model, mesh.Name, 0, indexOffsetTotal, mesh.IndexCount);
+                    indexOffsetTotal += mesh.IndexCount;
+                }
+
+                List<ModelNode> rootNodeChildren = new List<ModelNode>();
+                for (int i = 0; i < header.NodeCount;)
+                {
+                    rootNodeChildren.Add(RecursiveReadNodes(ref i));
+                }
+
+                //ModelNode rootNode = new ModelNode(model, null, rootNodeChildren.ToArray(), new ModelTransform(Vector3.Zero, Quaternion.Identity, Vector3.One), string.Empty, null);
+
+                ModelNode RecursiveReadNodes(ref int i, ModelNode? parent = null)
+                {
+                    i++;
+                    PMFNode node = new PMFNode
+                    {
+                        Name = br.ReadString(),
+                        Transform = ReadTransform(br, FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.HalfNodeTransforms)),
+
+                        ChildCount = br.ReadUInt16(),
+
+                        MeshIndex = br.ReadUInt16()
+                    };
+
+                    if (node.ChildCount == 0)
+                    {
+                        return new ModelNode(
+                            model,
+                            parent,
+                            Array.Empty<ModelNode>(),
+                            new ModelTransform(node.Transform.Position, node.Transform.Rotation, node.Transform.Scale),
+                            node.Name,
+                            node.MeshIndex == ushort.MaxValue ? null : meshes[node.MeshIndex].Id);
+                    }
+
+                    ModelNode[] nodes = new ModelNode[node.ChildCount];
+                    for (int j = 0; j < node.ChildCount; j++, i++)
+                    {
+                        nodes[j] = RecursiveReadNodes(ref i);
+                    }
+
+                    return new ModelNode(
+                            model,
+                            parent,
+                            nodes,
+                            new ModelTransform(node.Transform.Position, node.Transform.Rotation, node.Transform.Scale),
+                            node.Name,
+                            node.MeshIndex == ushort.MaxValue ? null : meshes[node.MeshIndex].Id);
+                }
+
+                unsafe
+                {
+                    //vertex buffer
+                    fixed (byte* ptr = vertexData)
+                    {
+                        vertexBuffer = RenderingManager.Device.CreateBuffer(new BufferDescription
+                        {
+                            ByteWidth = (uint)vertexData.Length,
+                            Stride = 12 * sizeof(float) + 2 * sizeof(float),
+
+                            Memory = MemoryUsage.Immutable,
+                            Usage = BufferUsage.VertexBuffer,
+                            Mode = BufferMode.None,
+                            CpuAccessFlags = CPUAccessFlags.None
+                        }, (nint)ptr);
+                    }
+
+                    //index buffer
+                    fixed (byte* ptr = indexData)
+                    {
+                        indexBuffer = RenderingManager.Device.CreateBuffer(new BufferDescription
+                        {
+                            ByteWidth = (uint)indexData.Length,
+                            Stride = FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? 4u : 2u,
+
+                            Memory = MemoryUsage.Immutable,
+                            Usage = BufferUsage.IndexBuffer,
+                            Mode = BufferMode.None,
+                            CpuAccessFlags = CPUAccessFlags.None
+                        }, (nint)ptr);
                     }
                 }
 
-                br.Skip(4);
+                modelData.UpdateAssetData(model, meshes, rootNodeChildren[0], vertexBuffer, indexBuffer);
 
-                ModelNode rootNode = new ModelNode(model, null, Array.Empty<ModelNode>(), string.Empty, Array.Empty<string>()); //DeserializeNodeAndChildren(br, meshes, model, null);
+                vertexBuffer = null;
+                indexBuffer = null;
 
-                GraphicsDevice device = Engine.GlobalSingleton.RenderingManager.GraphicsDevice;
-
-                RHI.Buffer vertexBuffer = device.CreateBuffer(new BufferDescription
+                static PMFTransform ReadTransform(BinaryReader br, bool halfPrecision)
                 {
-                    ByteWidth = (uint)(vertices.Count * sizeof(Vertex)),
-                    Stride = (uint)sizeof(Vertex),
-                    Memory = MemoryUsage.Immutable,
-                    Usage = BufferUsage.VertexBuffer,
-                    Mode = BufferMode.None,
-                    CpuAccessFlags = CPUAccessFlags.None
-                }, (nint)Unsafe.AsPointer(ref vertices.AsSpan().DangerousGetReference()));
+                    PMFTransform transform = new PMFTransform
+                    {
+                        Features = br.Read<PMFTransformFeatures>(),
 
-                RHI.Buffer indexBuffer = device.CreateBuffer(new BufferDescription
+                        Position = Vector3.Zero,
+                        Rotation = Quaternion.Identity,
+                        Scale = Vector3.One
+                    };
+
+                    if (FlagUtility.HasFlag(transform.Features, PMFTransformFeatures.Position))
+                    {
+                        transform.Position = halfPrecision ?
+                            new Vector3((float)br.ReadHalf(), (float)br.ReadHalf(), (float)br.ReadHalf()) :
+                            new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                    }
+
+                    if (FlagUtility.HasFlag(transform.Features, PMFTransformFeatures.Rotation))
+                    {
+                        transform.Rotation = halfPrecision ?
+                            new Quaternion((float)br.ReadHalf(), (float)br.ReadHalf(), (float)br.ReadHalf(), (float)br.ReadHalf()) :
+                            new Quaternion(br.ReadSingle(), br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                    }
+
+                    if (FlagUtility.HasFlag(transform.Features, PMFTransformFeatures.UniformScale))
+                    {
+                        transform.Scale = new Vector3(halfPrecision ?
+                            (float)br.ReadHalf() :
+                            br.ReadSingle());
+                    }
+
+                    if (FlagUtility.HasFlag(transform.Features, PMFTransformFeatures.Scale))
+                    {
+                        transform.Scale = halfPrecision ?
+                            new Vector3((float)br.ReadHalf(), (float)br.ReadHalf(), (float)br.ReadHalf()) :
+                            new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                    }
+
+                    return transform;
+                }
+
+                void ThrowException(string message, params object?[] args)
                 {
-                    ByteWidth = (uint)(indices.Count * sizeof(ushort)),
-                    Stride = (uint)sizeof(ushort),
-                    Memory = MemoryUsage.Immutable,
-                    Usage = BufferUsage.IndexBuffer,
-                    Mode = BufferMode.None,
-                    CpuAccessFlags = CPUAccessFlags.None
-                }, (nint)Unsafe.AsPointer(ref indices.AsSpan().DangerousGetReference()));
-
-                vertexBuffer.Name = sourcePath + " - Vertex buffer";
-                indexBuffer.Name = sourcePath + " - Index buffer";
-
-                modelData.UpdateAssetData(model, meshes, rootNode, vertexBuffer, indexBuffer);
+                    EngLog.Assets.Error("[a:{path}]: " + message, [sourcePath, .. args]);
+                    throw new Exception("Unexpected error");
+                }
             }
-#if DEBUG
             finally
             {
-
+                vertexBuffer?.Dispose();
+                indexBuffer?.Dispose();
             }
-#else
+#if !DEBUG
             catch (Exception ex)
             {
                 modelData.UpdateAssetFailed(model);
-                Log.Error(ex, "Failed to load model: {name}", sourcePath);
+                EngLog.Assets.Error(ex, "Failed to load model: {name}", sourcePath);
             }
 #endif
         }
-
-        private static ModelNode DeserializeNodeAndChildren(BinaryReader br, RenderMesh[] renderMeshes, ModelAsset asset, ModelNode? parent)
-        {
-            string name = br.ReadString();
-            Matrix4x4 transform = br.Read<Matrix4x4>();
-
-            ushort meshCount = br.ReadUInt16();
-            string[] meshes = meshCount > 0 ? new string[meshCount] : Array.Empty<string>();
-            if (meshCount > 0)
-            {
-                for (int i = 0; i < meshCount; i++)
-                {
-                    meshes[i] = renderMeshes[br.ReadUInt32()].Id;
-                }
-            }
-
-            ushort nodeCount = br.ReadUInt16();
-            ModelNode[] children = nodeCount > 0 ? new ModelNode[nodeCount] : Array.Empty<ModelNode>();
-
-            ModelNode newNode = new ModelNode(asset, parent, children, name, meshes);
-
-            if (nodeCount > 0)
-            {
-                for (int i = 0; i < nodeCount; i++)
-                {
-                    children[i] = DeserializeNodeAndChildren(br, renderMeshes, asset, newNode);
-                }
-            }
-
-            return newNode;
-        }
-
-        private static uint HeaderId = 0x46444d45;
-        private static uint HeaderVersion = 0;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct Vertex
+    public record struct PMFHeader
     {
+        public uint Header;
+        public uint Version;
+
+        public PMFHeaderFlags Flags;
+
+        public uint VertexTotalSize;
+        public uint IndexCount;
+
+        public ushort MeshCount;
+        public ushort NodeCount;
+
+        public const uint ConstHeader = 0x20504d46;
+        public const uint ConstVersion = 1;
+    }
+
+    public enum PMFHeaderFlags : byte
+    {
+        None = 0,
+
+        IsCompressed = 1 << 0,
+
+        LargeIndices = 1 << 1,
+
+        HalfNodeTransforms = 1 << 2,
+        HalfVertexValues = 1 << 3,
+    }
+
+    public record struct PMFMesh
+    {
+        public string Name;
+
+        public uint VertexCount;
+        public uint IndexCount;
+
+        public ushort VertexStride;
+        public byte UVChannelMask;
+    }
+
+    public record struct PMFNode
+    {
+        public string Name;
+        public PMFTransform Transform;
+
+        public ushort ChildCount;
+
+        public ushort MeshIndex;
+    }
+
+    public record struct PMFTransform
+    {
+        public PMFTransformFeatures Features;
+
         public Vector3 Position;
-        public Vector3 Normal;
-        public Vector3 Tangent;
-        public Vector3 Bitangent;
-        public Vector2 UV;
+        public Quaternion Rotation;
+        public Vector3 Scale;
+    }
+
+    public enum PMFTransformFeatures : byte
+    {
+        None = 0,
+
+        Position = 1 << 0,
+        Rotation = 1 << 1,
+        UniformScale = 1 << 2,
+        Scale = 1 << 3,
     }
 }

@@ -1,338 +1,442 @@
-﻿using Primary.Scenes;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using CommunityToolkit.HighPerformance;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.Serialization;
 
 namespace Primary.Serialization
 {
-    public sealed class SDFReader
+    public ref struct SDFReader
     {
-        private char[] _inputBuffer;
+        private ReadOnlySpan<char> _source;
+        private SDFTokenType _lastReadToken;
 
-        private int _revertIndex;
-        private int _currentIndex;
+        private ReadOnlySpan<char> _slice;
 
-        private Stack<CurrentContext> _recContext;
-        private Stack<CurrentContext> _context;
+        private int _line;
+        private int _lineIndex;
 
-        internal SDFReader(char[] inputStream)
+        private int _index;
+
+        private Stack<TokenContext> _context;
+
+        public SDFReader(ReadOnlySpan<char> source)
         {
-            _inputBuffer = inputStream;
+            _source = source;
+            _lastReadToken = SDFTokenType.Unknown;
 
-            _revertIndex = 0;
-            _currentIndex = 0;
+            _slice = ReadOnlySpan<char>.Empty;
 
-            _recContext = new Stack<CurrentContext>();
-            _context = new Stack<CurrentContext>();
+            _line = 0;
+            _lineIndex = 0;
+
+            _index = 0;
+
+            _context = new Stack<TokenContext>();
         }
 
-        #region Manipulation
-        private void SkipWhitespace()
+        #region Basic
+        private char Peek() => IsEOF ? '\0' : _source.DangerousGetReferenceAt(_index);
+        private char PeekPrev()
         {
-            while (IsEOF || char.IsWhiteSpace(Peek()))
-            {
-                Advance();
-            }
+            uint prev = (uint)_index - 1;
+            if (prev < _index)
+                return _source.DangerousGetReferenceAt((int)prev);
+            return '\0';
         }
-
-        private ReadOnlySpan<char> ReadIdentifier()
-        {
-            SkipWhitespace();
-
-            if (!char.IsLetter(Peek()))
-                return ReadOnlySpan<char>.Empty;
-
-            int start = _currentIndex;
-            do
-            {
-                Advance();
-                ThrowIfEOF();
-            } while (char.IsLetterOrDigit(Peek()));
-
-            return _inputBuffer.AsSpan(start, _currentIndex - start);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private char Peek() => IsEOF ? '\0' : _inputBuffer[_currentIndex];
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private char Advance() => IsEOF ? '\0' : _inputBuffer[_currentIndex++];
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool AdvanceIfMatch(char match)
-        {
-            if (Peek() == match)
-            {
-                Advance();
-                return true;
-            }
-
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ThrowIfEOF()
+        private char Advance()
         {
             if (IsEOF)
-                throw new ArgumentOutOfRangeException("EOF");
-        }
-
-        public bool IsEOF => _currentIndex >= _inputBuffer.Length;
-        #endregion
-
-        public void Commit()
-        {
-            _revertIndex = _currentIndex;
-
-            _recContext.Clear();
-            foreach (CurrentContext context in _context)
-                _recContext.Push(context);
-        }
-
-        public void Restore()
-        {
-            _currentIndex = _revertIndex;
-
-            _context.Clear();
-            foreach (CurrentContext context in _recContext)
-                _context.Push(context);
-        }
-
-        public bool TryPeekObject(out string? name)
-        {
-            name = null;
-
-            int start = _currentIndex;
-
-            ReadOnlySpan<char> identifier = ReadIdentifier();
-            if (identifier.IsEmpty)
+                return '\0';
+            char c = _source.DangerousGetReferenceAt(_index++);
+            if (c == '\n')
             {
-                _currentIndex = start;
-                return false;
+                _line++;
+                _lineIndex = _index;
             }
-
-            SkipWhitespace();
-            if (!AdvanceIfMatch('{'))
-            {
-                _currentIndex = start;
-                return false;
-            }
-
-            name = identifier.ToString();
-
-            _currentIndex = start;
-            return true;
+            return c;
         }
 
-        public bool BeginObject(out string? name)
+        private bool CheckContext(TokenContext expectedContext)
         {
-            name = null;
-
-            ReadOnlySpan<char> identifier = ReadIdentifier();
-            if (identifier.IsEmpty)
-                return false;
-
-            SkipWhitespace();
-            if (!AdvanceIfMatch('{'))
-                return false;
-
-            name = identifier.ToString();
-
-            _context.Push(CurrentContext.Object);
-            return true;
+            if (_context.TryPeek(out TokenContext currentContext) && currentContext == expectedContext)
+                return true;
+            return false;
         }
 
-        public bool EndObject()
+        private bool IsValueTypeValid()
         {
-            if (!_context.TryPeek(out CurrentContext context) || context != CurrentContext.Object)
+            if (!_context.TryPeek(out TokenContext context))
                 return false;
 
-            _context.Pop();
-            if (_context.TryPeek(out context) && context == CurrentContext.Property)
-                _context.Pop();
-
-            SkipWhitespace();
-            return AdvanceIfMatch('}');
-        }
-
-        public bool BeginArray()
-        {
-            if (!_context.TryPeek(out CurrentContext context) || (context != CurrentContext.Property && context != CurrentContext.Array))
-                return false;
-
-            SkipWhitespace();
-            if (!AdvanceIfMatch('['))
-                return false;
-
-            _context.Push(CurrentContext.Array);
-            return true;
-        }
-
-        public bool EndArray()
-        {
-            if (!_context.TryPeek(out CurrentContext context) || context != CurrentContext.Array)
-                return false;
-
-            _context.Pop();
-            if (_context.TryPeek(out context) && context == CurrentContext.Property)
-                _context.Pop();
-
-            SkipWhitespace();
-            if (!AdvanceIfMatch(']'))
-                return false;
+            if (context != TokenContext.WithinArray)
+                return _lastReadToken == SDFTokenType.Property;
 
             return true;
         }
 
-        public bool ReadProperty(out string? name)
+        private bool IsPropertyNameValid()
         {
-            name = null;
-
-            if (!_context.TryPeek(out CurrentContext context) || context != CurrentContext.Object)
+            if (CheckContext(TokenContext.WithinArray))
                 return false;
 
-            ReadOnlySpan<char> identifier = ReadIdentifier();
-            if (identifier.IsEmpty)
-                return false;
-
-            SkipWhitespace();
-            if (!AdvanceIfMatch('='))
-                return false;
-
-            name = identifier.ToString();
-
-            _context.Push(CurrentContext.Property);
-            return true;
-        }
-
-        private bool ReadGeneric(out ReadOnlySpan<char> value, Func<char, bool> isValidCharacter)
-        {
-            value = ReadOnlySpan<char>.Empty;
-
-            if (!_context.TryPeek(out CurrentContext context) || (context != CurrentContext.Property && context != CurrentContext.Array))
-                return false;
-
-            SkipWhitespace();
-
-            int start = 0;
-            do
+            if (IsCharSkippable(Peek()))
             {
                 Advance();
-                ThrowIfEOF();
-            } while (isValidCharacter(Peek()));
 
-            value = _inputBuffer.AsSpan(start, _currentIndex - start);
-
-            if (_context.TryPeek(out context))
-            {
-                if (context == CurrentContext.Property)
-                    _context.Pop();
-                else if (context == CurrentContext.Array)
-                {
-                    SkipWhitespace();
-                    if (Peek() == ',')
-                        Advance();
-                }
+                while (!IsEOF && IsCharSkippable(Peek())) Advance();
             }
 
-            return !value.IsEmpty;
-        }
-
-        private bool ReadTemplated<T>(out T value, Func<char, bool> validCharFunc, TemplatedConvert<T> converter) where T : struct
-        {
-            value = default;
-            if (ReadGeneric(out ReadOnlySpan<char> span, validCharFunc))
-            {
-                return converter(span, out value);
-            }
-
-            return false;
-        }
-
-        private delegate bool TemplatedConvert<T>(ReadOnlySpan<char> span, out T value);
-
-        public bool Read(out string? value)
-        {
-            value = null;
-            if (ReadGeneric(out ReadOnlySpan<char> span, static (c) => char.IsLetterOrDigit(c) || c == '"' || c == '\''))
-            {
-                if (!span.StartsWith('"') || !span.EndsWith('"'))
-                    return false;
-
-                value = span.Slice(1, span.Length - 2).ToString();
-                return true;
-            }
-
-            return false;
-        }
-
-        public bool Read<T>(out T? value)
-        {
-            value = default;
-            if (ReadGeneric(out ReadOnlySpan<char> span, (x) => char.IsLetterOrDigit(x)))
-            {
-                if (SerializerTypes.TryDeserializeDataType<T>(this, out value))
-                    return true;
-            }
-
-            return false;
-        }
-
-        public bool Read(out float value)
-            => ReadTemplated(out value, static (c) => char.IsDigit(c) || char.IsPunctuation(c), static (ReadOnlySpan<char> span, out float v) => float.TryParse(span, out v));
-        public bool Read(out double value)
-         => ReadTemplated(out value, static (c) => char.IsDigit(c) || char.IsPunctuation(c), static (ReadOnlySpan<char> span, out double v) => double.TryParse(span, out v));
-        public bool Read(out sbyte value)
-            => ReadTemplated(out value, static (c) => char.IsDigit(c), static (ReadOnlySpan<char> span, out sbyte v) => sbyte.TryParse(span, out v));
-        public bool Read(out short value)
-            => ReadTemplated(out value, static (c) => char.IsDigit(c), static (ReadOnlySpan<char> span, out short v) => short.TryParse(span, out v));
-        public bool Read(out int value)
-            => ReadTemplated(out value, static (c) => char.IsDigit(c), static (ReadOnlySpan<char> span, out int v) => int.TryParse(span, out v));
-        public bool Read(out long value)
-            => ReadTemplated(out value, static (c) => char.IsDigit(c), static (ReadOnlySpan<char> span, out long v) => long.TryParse(span, out v));
-        public bool Read(out byte value)
-            => ReadTemplated(out value, static (c) => char.IsDigit(c), static (ReadOnlySpan<char> span, out byte v) => byte.TryParse(span, out v));
-        public bool Read(out ushort value)
-            => ReadTemplated(out value, static (c) => char.IsDigit(c), static (ReadOnlySpan<char> span, out ushort v) => ushort.TryParse(span, out v));
-        public bool Read(out uint value)
-            => ReadTemplated(out value, static (c) => char.IsDigit(c), static (ReadOnlySpan<char> span, out uint v) => uint.TryParse(span, out v));
-        public bool Read(out ulong value)
-            => ReadTemplated(out value, static (c) => char.IsDigit(c), static (ReadOnlySpan<char> span, out ulong v) => ulong.TryParse(span, out v));
-
-        public T? Read<T>(string propertyName)
-        {
-            if (!ReadProperty(out string? property) || property != propertyName)
-                return default;
-
-            Read(out T? value);
-            return value;
-        }
-
-        public bool IsObjectActive
-        {
-            get
-            {
-                int start = _currentIndex;
-
-                SkipWhitespace();
-                if (Peek() == '}')
-                {
-                    _currentIndex = start;
-                    return true;
-                }
-
-                _currentIndex = start;
+            if (Peek() != '=')
                 return false;
+
+            Advance();
+            return true;
+        }
+
+        private bool IsSignedObjectValid()
+        {
+            if (CheckContext(TokenContext.WithinArray))
+                return false;
+
+            if (_lastReadToken == SDFTokenType.Property)
+                return false;
+
+            return true;
+        }
+
+        private void CheckForArrayDeliminter()
+        {
+            if (Peek() == ']')
+                return;
+
+            if (IsCharSkippable(Peek()))
+            {
+                Advance();
+
+                while (!IsEOF && IsCharSkippable(Peek())) Advance();
+            }
+
+            if (Peek() != ']')
+            {
+                if (Peek() != ',')
+                    ThrowParseException("Values inside of array must be split with a ',' delimiter");
+
+                Advance();
             }
         }
 
-        private enum CurrentContext : byte
+        [DoesNotReturn, StackTraceHidden]
+        private void ThrowParseException(string message) => throw new SDFParseException($"[{_line}:{_index - _lineIndex}]: {message}");
+
+        public bool IsEOF => _index >= _source.Length;
+
+        private static bool IsDeliminationCapable(char c) => char.IsWhiteSpace(c) || char.IsControl(c);
+        private static bool IsIdentifierCapable(char c) => char.IsLetterOrDigit(c) || c == '.' || c == '_';
+        #endregion
+
+        #region Parsing
+        private bool TryParseNextToken()
         {
-            Object,
-            Property,
-            Array
+            char token = Advance();
+            switch (token)
+            {
+                //in-line
+
+                case '{': //value type object begin
+                    {
+                        if (!IsValueTypeValid())
+                            ThrowParseException($"A value type object is not valid in this context");
+
+                        _context.Push(TokenContext.WithinObject);
+                        _lastReadToken = SDFTokenType.ObjectBegin;
+                        _slice = ReadOnlySpan<char>.Empty;
+
+                        return true;
+                    }
+                case '}': //(value type) object end
+                    {
+                        if (!CheckContext(TokenContext.WithinObject))
+                            ThrowParseException($"Unexpected object end token outside of object context");
+
+                        _context.Pop();
+                        _lastReadToken = SDFTokenType.ObjectEnd;
+                        _slice = ReadOnlySpan<char>.Empty;
+
+                        return true;
+                    }
+                case '[': //array begin
+                    {
+                        if (!IsValueTypeValid())
+                            ThrowParseException($"An array is not valid in this context");
+
+                        _context.Push(TokenContext.WithinArray);
+                        _lastReadToken = SDFTokenType.ArrayBegin;
+
+                        return true;
+                    }
+                case ']':
+                    {
+                        if (!CheckContext(TokenContext.WithinArray))
+                            ThrowParseException($"Unexpected array end token outside of array context");
+
+                        _context.Pop();
+                        _lastReadToken = SDFTokenType.ArrayEnd;
+
+                        return true;
+                    }
+                case '\n':
+                    {
+                        _line++;
+                        _lineIndex = _index;
+                        return true;
+                    }
+                case '\0': return false;
+
+                //proxy
+
+                case '-':
+                    {
+                        if (char.IsDigit(Peek()))
+                        {
+                            if (!IsValueTypeValid())
+                                ThrowParseException($"A number value is not valid in this context");
+                            return ParseNumberValue(true);
+                        }
+                        break;
+                    }
+                case '+':
+                    {
+                        if (char.IsDigit(Peek()))
+                        {
+                            if (!IsValueTypeValid())
+                                ThrowParseException($"A number value is not valid in this context");
+                            return ParseNumberValue(true);
+                        }
+                        break;
+                    }
+
+                case '"':
+                case '\'':
+                    {
+                        if (!IsValueTypeValid())
+                            ThrowParseException($"A string value is not valid in this context");
+                        return ParseStringValue(token);
+                    }
+
+                default:
+                    {
+                        if (char.IsDigit(token))
+                        {
+                            if (!IsValueTypeValid())
+                                ThrowParseException($"A number value is not valid in this context");
+                            return ParseNumberValue(false);
+                        }
+                        else if (char.IsLetter(token) || token == '_' || token == '@')
+                        {
+                            ReadOnlySpan<char> identifier = ReadIdentifier(true);
+                            if (Peek() == '{')
+                            {
+                                Advance();
+                                if (!IsSignedObjectValid())
+                                    ThrowParseException("A signed object is not valid in this context");
+
+                                _context.Push(TokenContext.WithinObject);
+                                _lastReadToken = SDFTokenType.ObjectBegin;
+                                _slice = identifier;
+                                return true;
+                            }
+                            else if (identifier.Equals("true", StringComparison.OrdinalIgnoreCase) || identifier.Equals("false", StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (!IsValueTypeValid())
+                                    ThrowParseException($"A boolean value is not valid in this context");
+
+                                _lastReadToken = SDFTokenType.Boolean;
+                                _slice = identifier;
+                                return true;
+                            }
+                            else if (!identifier.Contains('@'))
+                            {
+                                if (!IsPropertyNameValid())
+                                    ThrowParseException("A property name is not valid in this context");
+
+                                _lastReadToken = SDFTokenType.Property;
+                                _slice = identifier;
+                                return true;
+                            }
+                        }
+
+                        break;
+                    }
+            }
+
+            ThrowParseException($"Unexpected token encountered: {token}");
+            return false;
+        }
+
+        private bool ParseNumberValue(bool hasSignInPreviousToken)
+        {
+            bool isValueNegative = false;
+            if (hasSignInPreviousToken)
+            {
+                char prev = _source[_index - 1];
+                isValueNegative = prev == '-';
+            }
+
+            bool hasDecimalInNumber = false;
+
+            int previous = hasSignInPreviousToken ? _index : _index - 1;
+            while (true)
+            {
+                char c = Peek();
+                if (c == '.')
+                {
+                    if (hasDecimalInNumber)
+                        ThrowParseException("Number must not have more then 1 decimal in place");
+                    hasDecimalInNumber = true;
+                }
+                else if (!char.IsDigit(c))
+                    break;
+
+                Advance();
+            }
+
+            int sliceIndex = _index;
+
+            if (CheckContext(TokenContext.WithinArray))
+                CheckForArrayDeliminter();
+            else if (!IsDeliminationCapable(Peek()))
+                ThrowParseException("Expected empty character or EOF after number");
+
+            _lastReadToken = SDFTokenType.Number;
+            _slice = _source.Slice(previous, sliceIndex - previous);
+
+            return true;
+        }
+
+        private bool ParseStringValue(char delimiter)
+        {
+            int previous = _index;
+            while (true)
+            {
+                char c = Peek();
+                if (c == delimiter)
+                {
+                    if (PeekPrev() != '\\')
+                        break;
+                }
+
+                Advance();
+            }
+
+            int sliceIndex = _index;
+
+            Advance();
+
+            if (CheckContext(TokenContext.WithinArray))
+                CheckForArrayDeliminter();
+            else if (!IsDeliminationCapable(Peek()))
+                ThrowParseException("Expected empty character or EOF after string");
+
+            _lastReadToken = SDFTokenType.String;
+            _slice = _source.Slice(previous, sliceIndex - previous);
+
+            return true;
+        }
+
+        private ReadOnlySpan<char> ReadIdentifier(bool includePreviousToken = false)
+        {
+            int previous = includePreviousToken ? _index - 1 : _index;
+            if (previous < 0)
+                ThrowParseException("Identifier previous index is less than 0");
+
+            while (true)
+            {
+                char c = Peek();
+                if (!IsIdentifierCapable(c))
+                    break;
+
+                Advance();
+            }
+
+            return _source.Slice(previous, _index - previous);
+        }
+        #endregion
+
+        public void Reset()
+        {
+            _lastReadToken = SDFTokenType.Unknown;
+
+            _line = 0;
+            _index = 0;
+
+            _context.Clear();
+        }
+
+        public bool Read()
+        {
+            if (IsCharSkippable(Peek()))
+            {
+                Advance();
+
+                while (!IsEOF && IsCharSkippable(Peek())) Advance();
+            }
+
+            return TryParseNextToken();
+        }
+
+        public bool Skip() => throw new NotImplementedException();
+
+        public SDFTokenType TokenType => _lastReadToken;
+
+        public int Index { get => _index; set => _index = value; }
+        public int Line { get => _line; set => _line = value; }
+
+        public ReadOnlySpan<char> Slice => _slice;
+
+        private static bool IsCharSkippable(char c) => char.IsControl(c) || char.IsWhiteSpace(c);
+
+        private enum TokenContext : byte
+        {
+            None = 0,
+
+            WithinObject,
+            WithinArray
+        }
+    }
+
+    public enum SDFTokenType : byte
+    {
+        Unknown = 0,
+
+        Property,
+
+        ObjectBegin,
+        ObjectEnd,
+
+        ArrayBegin,
+        ArrayEnd,
+
+        Number,
+        String,
+        Boolean
+    }
+
+    public class SDFParseException : Exception
+    {
+        public SDFParseException()
+        {
+        }
+
+        public SDFParseException(string? message) : base(message)
+        {
+        }
+
+        public SDFParseException(string? message, Exception? innerException) : base(message, innerException)
+        {
+        }
+
+        protected SDFParseException(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
         }
     }
 }

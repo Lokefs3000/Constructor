@@ -1,21 +1,4 @@
-﻿using Editor.LegacyGui;
-using Editor.LegacyGui.Data;
-using Editor.LegacyGui.Elements;
-using Editor.Memory;
-using Primary.Assets;
-using Primary.Profiling;
-using Primary.Rendering;
-using Primary.Rendering.Data;
-using Primary.Rendering.Forward;
-using Primary.Rendering.Pooling;
-using Primary.Rendering.Raw;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using TerraFX.Interop.Windows;
-using RHI = Primary.RHI;
-
-namespace Editor.Rendering.Gui
+﻿namespace Editor.Rendering.Gui
 {
     //[RenderPassPriority(true, typeof(FinalBlitPass))]
     //internal sealed class GuiRenderer : IRenderPass

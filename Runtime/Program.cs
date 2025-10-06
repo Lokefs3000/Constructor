@@ -1,15 +1,13 @@
-﻿using Primary;
-
-namespace Runtime
+﻿namespace Runtime
 {
     internal class Program
     {
         static void Main(string[] args)
         {
-            using (Engine engine = new Engine())
-            {
-                engine.Run();
-            }
+            //using (Engine engine = new Engine())
+            //{
+            //    engine.Run();
+            //}
         }
     }
 }

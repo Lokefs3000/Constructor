@@ -1,18 +1,13 @@
 ﻿using Editor.LegacyGui.Elements;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.LegacyGui
 {
     public class EditorWindow : IDisposable
     {
         protected readonly UIWindow _window;
-  
+
         private bool _disposedValue;
 
         public EditorWindow(Vector2 position, Vector2 size)

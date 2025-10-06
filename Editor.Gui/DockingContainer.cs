@@ -4,14 +4,8 @@ using Editor.Gui.Events;
 using Editor.Gui.Graphics;
 using Primary.Common;
 using Primary.Rendering;
-using Serilog;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 using RHI = Primary.RHI;
 
@@ -207,7 +201,7 @@ namespace Editor.Gui
                                     case DockSpace.Left:
                                         {
                                             _size.X = MathF.Max(startSize.X + x.MouseOffset.X, 50.0f);
-                                            
+
                                             _containgDock!.RecomputeDockingSpace();
                                             RecomputeDockingSpace();
                                             break;

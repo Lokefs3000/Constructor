@@ -6,11 +6,9 @@ using Primary.RHI.Direct3D12.Utility;
 using Serilog;
 using SharpGen.Runtime;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using TerraFX.Interop.Windows;
 using Vortice.Direct3D;
 using Vortice.Direct3D12;
 using Vortice.Direct3D12.Debug;
@@ -34,7 +32,7 @@ namespace Primary.RHI.Direct3D12
         private ID3D12DeviceFactory _deviceFactory;
         private ID3D12Debug6? _debug;
         private ID3D12InfoQueue? _infoQueue;
-        private ID3D12DeviceRemovedExtendedDataSettings2? _dredSettings;
+        private ID3D12DeviceRemovedExtendedDataSettings1? _dredSettings;
         private ID3D12Device14 _device;
         private ID3D12DeviceConfiguration _deviceConfig;
         private Terra.D3D12MA_Allocator* _allocator;
@@ -116,7 +114,7 @@ namespace Primary.RHI.Direct3D12
                         _debug.EnableDebugLayer();
                         _debug.SetEnableSynchronizedCommandQueueValidation(true);
                         _debug.SetEnableAutoName(true);
-                     
+
 #if false
                         _debug.SetEnableGPUBasedValidation(true);
                         _debug.SetGPUBasedValidationFlags(GpuBasedValidationFlags.None);
@@ -315,6 +313,7 @@ namespace Primary.RHI.Direct3D12
 
             if (_pendingResizes.Count > 0)
             {
+                SynchronizeDevice(SynchronizeDeviceTargets.Graphics);
                 foreach (var kvp in _pendingResizes)
                 {
                     kvp.Key.ResizeInternal(kvp.Value);

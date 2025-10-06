@@ -2,6 +2,9 @@
 {
     public abstract class Buffer : Resource
     {
+        public abstract Descriptor AllocateDescriptor(BufferCBDescriptorDescription description);
+        public abstract Descriptor AllocateDescriptor(BufferSRDescriptorDescription description);
+
         public abstract ref readonly BufferDescription Description { get; }
         public abstract string Name { set; }
     }

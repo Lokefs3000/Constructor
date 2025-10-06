@@ -1,15 +1,10 @@
 ﻿using Primary.Assets;
 using Primary.Common;
-using System;
 using System.Collections.Frozen;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json.Nodes;
-using System.Threading.Tasks;
 
 namespace Editor.LegacyGui.Data
 {
@@ -34,7 +29,7 @@ namespace Editor.LegacyGui.Data
             JsonObject atlasNode = NullableUtility.ThrowIfNull(rootNode["atlas"]?.AsObject());
 
             Vector2 atlasSize = new Vector2(atlasNode["width"]!.GetValue<int>(), atlasNode["height"]!.GetValue<int>());
-      
+
             Dictionary<char, GuiFontGlyph> dict = new Dictionary<char, GuiFontGlyph>();
 
             foreach (JsonObject? @object in NullableUtility.ThrowIfNull(rootNode["glyphs"]).AsArray())

@@ -1,10 +1,4 @@
-﻿using Editor.Rendering.Gizmos;
-using Primary.Rendering;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Primary.Rendering;
 
 namespace Editor.Rendering
 {
@@ -15,6 +9,9 @@ namespace Editor.Rendering
         private GizmoRenderPass _gizmoPass;
         private ToolsRenderPass _toolsPass;
         private SelectionRenderPass _selectionRenderPass;
+        private GeoToolRenderPass _geoToolRenderPass;
+
+        private Gizmos _gizmos;
 
         private bool _disposedValue;
 
@@ -25,6 +22,9 @@ namespace Editor.Rendering
             _gizmoPass = new GizmoRenderPass();
             _toolsPass = new ToolsRenderPass();
             _selectionRenderPass = new SelectionRenderPass();
+            _geoToolRenderPass = new GeoToolRenderPass();
+
+            _gizmos = new Gizmos();
         }
 
         private void Dispose(bool disposing)
@@ -33,6 +33,9 @@ namespace Editor.Rendering
             {
                 if (disposing)
                 {
+                    _gizmos.Dispose();
+
+                    _geoToolRenderPass.Dispose();
                     _selectionRenderPass.Dispose();
                     _toolsPass.Dispose();
                     _gizmoPass.Dispose();
@@ -48,10 +51,18 @@ namespace Editor.Rendering
             GC.SuppressFinalize(this);
         }
 
+        internal void PrepareFrame()
+        {
+            _gizmos.ResetForNewFrame();
+        }
+
         internal void SetupPasses(RenderPass renderPass)
         {
+            _gizmos.FinalizeBuffers();
+
+            _gizmoPass.SetupRenderState(renderPass);
             _selectionRenderPass.SetupRenderState(renderPass);
-            _gizmoPass.ExecutePass(renderPass);
+            _geoToolRenderPass.SetupRenderState(renderPass);
             _toolsPass.SetupRenderState(renderPass);
             _editor.DearImGuiStateManager.SetupPasses(renderPass);
         }

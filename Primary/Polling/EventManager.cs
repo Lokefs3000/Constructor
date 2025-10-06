@@ -1,8 +1,5 @@
 ﻿using Primary.Common;
-using Primary.Rendering;
 using SDL;
-using Serilog;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using static SDL.SDL3;
@@ -23,7 +20,7 @@ namespace Primary.Polling
 
             _handlers = new List<IEventHandler>();
 
-            ExceptionUtility.Assert(SDL_AddEventWatch(&EventWatchCallback, nint.Zero));
+            //ExceptionUtility.Assert(SDL_AddEventWatch(&EventWatchCallback, nint.Zero));
         }
 
         [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -84,7 +81,7 @@ namespace Primary.Polling
                     s_instance = null;
                 }
 
-                SDL_RemoveEventWatch(&EventWatchCallback, nint.Zero);
+                //SDL_RemoveEventWatch(&EventWatchCallback, nint.Zero);
 
                 _disposedValue = true;
             }

@@ -1,14 +1,8 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Serilog;
-using System;
 using System.Buffers;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Processors.Shaders
 {

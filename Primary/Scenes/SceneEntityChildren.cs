@@ -1,13 +1,7 @@
-﻿using Arch.LowLevel;
-using Primary.Components;
-using System;
+﻿using Primary.Components;
 using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Scenes
 {
@@ -15,7 +9,7 @@ namespace Primary.Scenes
     public readonly record struct SceneEntityChildren : IEnumerable<SceneEntity>, IReadOnlyList<SceneEntity>
     {
         private readonly EntityRelationships _relationships;
-        
+
         internal SceneEntityChildren(EntityRelationships relationships)
         {
             _relationships = relationships;

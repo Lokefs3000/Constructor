@@ -1,11 +1,14 @@
 ﻿namespace Primary.Assets
 {
-    internal interface IInternalAssetData : IDisposable
+    public interface IInternalAssetData : IDisposable
     {
         public Type AssetType { get; }
+        public IAssetDefinition? Definition { get; }
 
-        public void PromoteStateToRunning();
-        public void ResetInternalState();
+        /// <summary>Thread-safe</summary>
+        public void SetAssetInternalStatus(ResourceStatus status);
+        /// <summary>Thread-safe</summary>
+        public void SetAssetInternalName(string name);
     }
 
     public enum ResourceStatus : byte

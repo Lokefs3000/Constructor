@@ -1,10 +1,5 @@
-﻿using Primary.Scenes;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Primary.Common;
+using System.Runtime.Serialization;
 
 namespace Primary.Components
 {
@@ -14,8 +9,8 @@ namespace Primary.Components
     {
         private LightType _type;
 
-        private Vector3 _diffuse;
-        private Vector3 _specular;
+        private Color _diffuse;
+        private Color _specular;
 
         private float _brightness;
 
@@ -30,8 +25,8 @@ namespace Primary.Components
         {
             _type = LightType.DirectionalLight;
 
-            _diffuse = new Vector3(1.0f);
-            _specular = new Vector3(1.0f);
+            _diffuse = new Color(1.0f);
+            _specular = new Color(1.0f);
 
             _brightness = 10.0f;
 
@@ -45,8 +40,8 @@ namespace Primary.Components
 
         public LightType Type { get => _type; set { _type = value; _dirty = true; } }
 
-        public Vector3 Diffuse { get => _diffuse; set { _diffuse = value; _dirty = true; } }
-        public Vector3 Specular { get => _specular; set { _specular = value; _dirty = true; } }
+        public Color Diffuse { get => _diffuse; set { _diffuse = value; _dirty = true; } }
+        public Color Specular { get => _specular; set { _specular = value; _dirty = true; } }
 
         public float Brightness { get => _brightness; set { _brightness = value; _dirty = true; } }
 
@@ -54,7 +49,8 @@ namespace Primary.Components
         public float InnerCutOff { get => _innerCutOff; set { _innerCutOff = value; _dirty = true; } }
 
         public ShadowImportance ShadowImportance { get => _shadowImportance; set { _shadowImportance = value; _dirty = true; } }
-    
+
+        [IgnoreDataMember]
         internal bool Dirty { get => _dirty; set => _dirty = value; }
     }
 

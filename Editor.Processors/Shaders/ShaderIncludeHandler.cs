@@ -66,7 +66,7 @@ public class ShaderIncludeHandler : CallbackBase, IDxcIncludeHandler
                 return buffer;
             }
         }
-        catch(Exception)
+        catch (Exception)
         {
             Log.Information("failed to open shader include: \"{ff}\"", includeFile);
             throw;

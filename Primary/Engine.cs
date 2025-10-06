@@ -1,4 +1,6 @@
 ﻿using Primary.Assets;
+using Primary.Console;
+using Primary.Input;
 using Primary.Polling;
 using Primary.Profiling;
 using Primary.Rendering;
@@ -18,6 +20,7 @@ namespace Primary
     {
         private static Engine? s_instance = null;
 
+        private ConsoleManager _consoleManager;
         private Time _time;
         private ProfilingManager _profilingManager;
         private AssetFilesystem _assetFilesystem;
@@ -28,13 +31,14 @@ namespace Primary
         private RenderingManager _renderingManager;
         private SystemManager _systemManager;
         private ThreadHelper _threadHelper;
+        private InputSystem _inputSystem;
 
         public Engine()
         {
             s_instance = this;
         }
 
-        protected void Initialize()
+        protected void Initialize(IAssetIdProvider assetIdProvider)
         {
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.Console()
@@ -49,16 +53,18 @@ namespace Primary
 
             SDL.SDL3.SDL_Init(SDL.SDL_InitFlags.SDL_INIT_VIDEO | SDL.SDL_InitFlags.SDL_INIT_EVENTS);
 
+            _consoleManager = new ConsoleManager();
             _time = new Time();
             _profilingManager = new ProfilingManager();
             _assetFilesystem = new AssetFilesystem(); SetupAssetFilesystem();
-            _assetManager = new AssetManager();
+            _assetManager = new AssetManager(); _assetManager.LockInIdProvider(assetIdProvider);
             _eventManager = new EventManager();
             _windowManager = new WindowManager();
             _sceneManager = new SceneManager();
             _renderingManager = new RenderingManager();
             _systemManager = new SystemManager();
             _threadHelper = new ThreadHelper();
+            _inputSystem = new InputSystem();
         }
 
         public virtual void Dispose()
@@ -89,6 +95,7 @@ namespace Primary
         public RenderingManager RenderingManager => _renderingManager;
         public SystemManager SystemManager => _systemManager;
         public ThreadHelper ThreadHelper => _threadHelper;
+        public InputSystem InputSystem => _inputSystem;
 
         public static Engine GlobalSingleton => s_instance!;
     }

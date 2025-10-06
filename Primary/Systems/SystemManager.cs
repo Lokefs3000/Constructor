@@ -1,7 +1,6 @@
 ﻿using Arch.Core;
 using Primary.Assets;
 using Primary.Profiling;
-using Serilog;
 using System.Text.Json;
 
 namespace Primary.Systems
@@ -37,14 +36,14 @@ namespace Primary.Systems
 
                     if (type == null)
                     {
-                        Log.Error("Failed to find type for system: {sys}", typeName);
+                        EngLog.Systems.Error("Failed to find type for system: {sys}", typeName);
                     }
                     else
                     {
                         ISystem? system = (ISystem?)Activator.CreateInstance(type, false);
                         if (system == null)
                         {
-                            Log.Error("Failed to create instance for system: {sys}", typeName);
+                            EngLog.Systems.Error("Failed to create instance for system: {sys}", typeName);
                             continue;
                         }
 

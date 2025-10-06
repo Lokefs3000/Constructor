@@ -5,15 +5,9 @@ using Primary.Rendering;
 using Primary.Rendering.Data;
 using Primary.Rendering.Raw;
 using Primary.Scenes;
-using Serilog;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 using RHI = Primary.RHI;
 
 namespace Editor.Rendering
@@ -36,8 +30,8 @@ namespace Editor.Rendering
 
         internal SelectionRenderPass()
         {
-            _writeDepth = AssetManager.LoadAsset<ShaderAsset>("Hidden/Editor/OutlineWriteDepth");
-            _sampleDepth = AssetManager.LoadAsset<ShaderAsset>("Hidden/Editor/OutlineSampleDepth");
+            _writeDepth = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/OutlineWriteDepth.hlsl");
+            _sampleDepth = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/OutlineSampleDepth.hlsl");
 
             _renderableEntities = new List<SceneEntity>();
             _meshes = new List<RenderObject>();

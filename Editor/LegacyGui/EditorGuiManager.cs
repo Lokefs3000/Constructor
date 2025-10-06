@@ -2,17 +2,9 @@
 using Editor.LegacyGui.Data;
 using Editor.LegacyGui.Elements;
 using Editor.LegacyGui.Managers;
-using Editor.Rendering.Gui;
 using Primary.Common;
-using Primary.Polling;
 using Primary.Profiling;
-using SDL;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.LegacyGui
 {
@@ -146,7 +138,7 @@ namespace Editor.LegacyGui
         {
             public CoreWindow() : base(new Vector2(0.0f), new Vector2(1336.0f, 726.0f))
             {
-                
+
             }
         }
     }

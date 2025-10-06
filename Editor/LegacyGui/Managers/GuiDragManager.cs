@@ -1,16 +1,7 @@
 ﻿using Editor.LegacyGui.Elements;
-using Hexa.NET.ImGui;
-using Primary.Common;
 using Primary.Rendering;
-using SDL;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
 
 namespace Editor.LegacyGui.Managers
 {
@@ -68,7 +59,7 @@ namespace Editor.LegacyGui.Managers
 
                         if (!SDL.SDL3.SDL_CaptureMouse(true))
                             Log.Error("SDL error: {err}", SDL.SDL3.SDL_GetError());
-                        
+
                         EditorGuiManager.Instance.EventManager.SetExclusiveViewer(EventViewer, kvp.Value.Window);
                     }
                 }

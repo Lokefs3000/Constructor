@@ -1,20 +1,10 @@
 ﻿using Hexa.NET.ImGui;
-using Primary;
 using Primary.Common;
 using Primary.Rendering;
 using Primary.Rendering.Forward.Managers;
-using Primary.Scenes;
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Numerics;
-using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
 
 namespace Editor.DearImGui
 {

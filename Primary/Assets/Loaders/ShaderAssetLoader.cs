@@ -1,19 +1,17 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Common.Streams;
 using Primary.Rendering;
-using Serilog;
-using System.Diagnostics;
 
 namespace Primary.Assets.Loaders
 {
-    internal static unsafe class ShaderAssetLoader
+    internal unsafe class ShaderAssetLoader : IAssetLoader
     {
-        internal static IInternalAssetData FactoryCreateNull()
+        public IInternalAssetData FactoryCreateNull(AssetId id)
         {
-            return new ShaderAssetData();
+            return new ShaderAssetData(id);
         }
 
-        internal static IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
+        public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
         {
             if (assetData is not ShaderAssetData modelData)
                 throw new ArgumentException(nameof(assetData));
@@ -21,7 +19,7 @@ namespace Primary.Assets.Loaders
             return new ShaderAsset(modelData);
         }
 
-        internal static void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
+        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
         {
             if (asset is not ShaderAsset shader)
                 throw new ArgumentException(nameof(asset));
@@ -56,7 +54,7 @@ namespace Primary.Assets.Loaders
             catch (Exception ex)
             {
                 shaderData.UpdateAssetFailed(shader);
-                Log.Error(ex, "Failed to load shader: {name}", sourcePath);
+                EngLog.Assets.Error(ex, "Failed to load shader: {name}", sourcePath);
             }
 #endif
         }

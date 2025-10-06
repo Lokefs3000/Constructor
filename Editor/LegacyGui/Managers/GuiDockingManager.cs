@@ -1,7 +1,6 @@
 ﻿using Editor.LegacyGui.Data;
 using Editor.LegacyGui.Elements;
 using Microsoft.Extensions.ObjectPool;
-using Primary.Rendering;
 using System.Numerics;
 
 namespace Editor.LegacyGui.Managers
@@ -109,7 +108,7 @@ namespace Editor.LegacyGui.Managers
                         DockPosition dockPosition = CalculateDockPosition(dock, position);
                         if (dockPosition == DockPosition.Tabbed && dockSpace.Tabs.Length > 1)
                             continue;
-                        
+
                         dock.UpdateDockingData(dockSpace, dockPosition);
 
                         newDockSpace = dock;

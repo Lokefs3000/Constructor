@@ -1,20 +1,14 @@
 ﻿using Arch.Core;
 using Arch.Core.Extensions;
+using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Primary.Components;
 using Serilog;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
 
 namespace Primary.Scenes
 {
@@ -30,6 +24,7 @@ namespace Primary.Scenes
 
         private SemaphoreSlim _eventSemaphore;
         private Dictionary<Type, ComponentCallbacks> _callbacks;
+
         internal SceneEntityManager(World world)
         {
             _world = world;
@@ -43,11 +38,14 @@ namespace Primary.Scenes
             s_instance.Target = this;
         }
 
-        internal SceneEntity CreateReadyEntity()
+        internal SceneEntity CreateReadyEntity(Scene? scene)
         {
             Entity entity = _world.Create();
 
-            entity.Add(new EntityEnabled { Enabled = true }, new EntityName { Name = "New SceneEntity" });
+            entity.Add(
+                new EntityEnabled { Enabled = true },
+                new EntityName { Name = "New SceneEntity" },
+                new EntityScene { SceneId = scene?.Id ?? int.MinValue });
 
             EntityRelationships relationships = new EntityRelationships();
             entity.Add(relationships);
@@ -56,7 +54,9 @@ namespace Primary.Scenes
             AddComponent<Transform>(ref se);
 
             _relationships[entity] = relationships;
-            return new SceneEntity(entity);
+
+            _sceneEntityCreated?.Invoke(se);
+            return se;
         }
 
         public static void BuildRequirementHierchies()
@@ -213,8 +213,7 @@ namespace Primary.Scenes
 
         public static IComponent? GetComponent(ref SceneEntity sceneEntity, Type type)
         {
-            sceneEntity.WrappedEntity.TryGet(type, out object? component);
-            return component as IComponent;
+            return sceneEntity.WrappedEntity.Get(type) as IComponent;
         }
 
         public static bool RemoveComponent<T>(ref SceneEntity sceneEntity) where T : struct, IComponent
@@ -327,13 +326,13 @@ namespace Primary.Scenes
 
             metadata.TryGetRef(entity, out bool exists);
             if (!exists)
-                return null;
+                return AddComponent(type, ref sceneEntity);
 
             metadata.Set(entity, newComponent);
             return metadata.TryGetRef(entity, out bool _);
         }
 
-        internal static void ChangeParent(ref SceneEntity sceneEntity, SceneEntity parentEntity)
+        private void ChangeParentImpl(ref SceneEntity sceneEntity, SceneEntity parentEntity)
         {
             Entity child = sceneEntity.WrappedEntity;
             Entity parent = parentEntity.WrappedEntity;
@@ -341,6 +340,10 @@ namespace Primary.Scenes
             EntityRelationships childRelationships = child.Get<EntityRelationships>();
             EntityRelationships parentRelationships = parent.Get<EntityRelationships>();
 
+            if (childRelationships.Parent == parent)
+                return;
+
+            Entity oldParent = childRelationships.Parent;
             if (childRelationships.Parent != Entity.Null)
             {
                 EntityRelationships oldParentRelationships = childRelationships.Parent.Get<EntityRelationships>();
@@ -349,7 +352,12 @@ namespace Primary.Scenes
 
             childRelationships.Parent = parent;
             parentRelationships.Children.Add(child);
+
+            _sceneEntityParentChanged?.Invoke(sceneEntity, oldParent);
         }
+
+        internal static void ChangeParent(ref SceneEntity sceneEntity, SceneEntity parentEntity)
+            => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target)).ChangeParentImpl(ref sceneEntity, parentEntity);
 
         public static void AddComponentAddedCallback<T>(Action<SceneEntity> callback) where T : IComponent
         {
@@ -411,26 +419,56 @@ namespace Primary.Scenes
             @this._eventSemaphore.Release();
         }
 
-        private event ComponentEnabledCallback _componentEnabled;
-        private event TransformChangedCallback _transformChanged;
-        private event SceneEntityDeletedCallback _sceneEntityDeleted;
+        public static Type? FindComponentFromFullName(string fullName)
+        {
+            SceneEntityManager @this = NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target));
+            foreach (Type key in @this._components.Keys)
+            {
+                if (key.FullName == fullName)
+                    return key;
+            }
+
+            return null;
+        }
+
+        public static SceneEntity CreateEntity(Scene? scene) => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target)).CreateReadyEntity(scene);
+
+        public static IEnumerable<Type> RegisteredComponents => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._components.Keys;
+
+        private event ComponentEnabledCallback? _componentEnabled;
+        private event TransformChangedCallback? _transformChanged;
+        private event SceneEntityCreatedCallback? _sceneEntityCreated;
+        private event SceneEntityDeletedCallback? _sceneEntityDeleted;
+        private event SceneEntityParentChangedCallback? _sceneEntityParentChanged;
 
         public static event ComponentEnabledCallback ComponentEnabled
         {
-            add => NullableUtility.ThrowIfNull((SceneEntityManager?)s_instance.Target)._componentEnabled += value;
-            remove => NullableUtility.ThrowIfNull((SceneEntityManager?)s_instance.Target)._componentEnabled -= value;
+            add => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._componentEnabled += value;
+            remove => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._componentEnabled -= value;
         }
 
         public static event TransformChangedCallback TransformChanged
         {
-            add => NullableUtility.ThrowIfNull((SceneEntityManager?)s_instance.Target)._transformChanged += value;
-            remove => NullableUtility.ThrowIfNull((SceneEntityManager?)s_instance.Target)._transformChanged -= value;
+            add => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._transformChanged += value;
+            remove => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._transformChanged -= value;
+        }
+
+        public static event SceneEntityCreatedCallback SceneEntityCreated
+        {
+            add => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._sceneEntityCreated += value;
+            remove => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._sceneEntityCreated -= value;
         }
 
         public static event SceneEntityDeletedCallback SceneEntityDeleted
         {
-            add => NullableUtility.ThrowIfNull((SceneEntityManager?)s_instance.Target)._sceneEntityDeleted += value;
-            remove => NullableUtility.ThrowIfNull((SceneEntityManager?)s_instance.Target)._sceneEntityDeleted -= value;
+            add => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._sceneEntityDeleted += value;
+            remove => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._sceneEntityDeleted -= value;
+        }
+
+        public static event SceneEntityParentChangedCallback SceneEntityParentChanged
+        {
+            add => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._sceneEntityParentChanged += value;
+            remove => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._sceneEntityParentChanged -= value;
         }
 
         private readonly record struct Component(
@@ -459,5 +497,7 @@ namespace Primary.Scenes
 
     public delegate void ComponentEnabledCallback(SceneEntity entity, bool enabled);
     public delegate void TransformChangedCallback(SceneEntity entity);
+    public delegate void SceneEntityCreatedCallback(SceneEntity entity);
     public delegate void SceneEntityDeletedCallback(SceneEntity entity);
+    public delegate void SceneEntityParentChangedCallback(SceneEntity entity, SceneEntity oldParent);
 }

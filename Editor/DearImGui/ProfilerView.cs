@@ -5,16 +5,9 @@ using Microsoft.Extensions.ObjectPool;
 using Primary.Common;
 using Primary.Profiling;
 using Primary.Timing;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.Linq;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
 
 namespace Editor.DearImGui
 {

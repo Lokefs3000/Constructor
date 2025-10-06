@@ -1,16 +1,6 @@
-﻿using Primary.Assets;
-using Primary.Rendering.Data;
-using Primary.Rendering.Pooling;
+﻿using Primary.Rendering.Data;
 using Primary.Rendering.Raw;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
 
 namespace Primary.Rendering.Forward
 {

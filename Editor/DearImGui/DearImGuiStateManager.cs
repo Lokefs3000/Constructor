@@ -1,26 +1,15 @@
-﻿using Editor.Rendering.Gizmos;
-using Editor.Rendering.Gui;
-using Hexa.NET.ImGui;
+﻿using Hexa.NET.ImGui;
 using Hexa.NET.ImGui.Backends.SDL3;
 using Primary.Assets;
 using Primary.Common;
 using Primary.Rendering;
 using Primary.Rendering.Data;
-using Primary.Rendering.Forward;
-using Primary.Rendering.Pooling;
 using Primary.Rendering.Raw;
 using SDL;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
-using System.Text;
-using System.Threading.Tasks;
 
 using RHI = Primary.RHI;
 
@@ -137,7 +126,7 @@ namespace Editor.DearImGui
 
                 _device = manager.GraphicsDevice;
 
-                _imguiShader = AssetManager.LoadAsset<ShaderAsset>("Hidden/Editor/DearImGui", true)!;
+                _imguiShader = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/DearImGui.hlsl", true)!;
                 _bindGroup = _imguiShader.CreateDefaultBindGroup();
 
                 _cb = _device.CreateBuffer(new RHI.BufferDescription

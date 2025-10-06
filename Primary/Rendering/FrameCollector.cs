@@ -3,7 +3,6 @@ using Primary.Assets;
 using Primary.Components;
 using Primary.Profiling;
 using Primary.Rendering.Batching;
-using System.Diagnostics;
 using System.Numerics;
 
 namespace Primary.Rendering
@@ -26,7 +25,7 @@ namespace Primary.Rendering
                 //TODO: fix shit naming scheme
                 CollectCameras job = new CollectCameras { Scene = renderScene };
 
-                world.InlineEntityQuery<CollectCameras, WorldTransform, CameraProjectionData>(CollectCameras.Description, ref job);
+                world.InlineEntityQuery<CollectCameras, EntityEnabled, WorldTransform, CameraProjectionData>(CollectCameras.Description, ref job);
             }
         }
 
@@ -64,7 +63,7 @@ namespace Primary.Rendering
                     MaterialAsset? material = renderer.Material;
                     if (material?.Shader == null)
                         material = MissingMat;
-                    
+
                     FlagRenderBatch flagBatcher = Batcher.GetFlagBatch(material.Shader!);
 
                     uint materialIdx = Batcher.GetMaterialIndex(material);
@@ -73,15 +72,18 @@ namespace Primary.Rendering
             }
         }
 
-        private record struct CollectCameras : IForEachWithEntity<WorldTransform, CameraProjectionData>
+        private record struct CollectCameras : IForEachWithEntity<EntityEnabled, WorldTransform, CameraProjectionData>
         {
             public static QueryDescription Description =
-                new QueryDescription().WithAll<WorldTransform, CameraProjectionData>();
+                new QueryDescription().WithAll<EntityEnabled, WorldTransform, CameraProjectionData>();
 
             public RenderScene Scene;
 
-            public void Update(Entity entity, ref WorldTransform transform, ref CameraProjectionData projectionData)
+            public void Update(Entity entity, ref EntityEnabled enabled, ref WorldTransform transform, ref CameraProjectionData projectionData)
             {
+                if (!enabled.Enabled)
+                    return;
+
                 Scene.AddOutputViewport(new RSOutputViewport
                 {
                     Id = (long)entity.Id | ((long)entity.WorldId << 32),

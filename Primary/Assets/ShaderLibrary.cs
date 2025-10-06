@@ -10,7 +10,7 @@ namespace Primary.Assets
     public sealed class ShaderLibrary : IDisposable
     {
         private List<IShaderSubLibrary> _packages;
-        private bool disposedValue;
+        private bool _disposedValue;
 
         internal ShaderLibrary()
         {
@@ -19,7 +19,7 @@ namespace Primary.Assets
 
         private void Dispose(bool disposing)
         {
-            if (!disposedValue)
+            if (!_disposedValue)
             {
                 if (disposing)
                 {
@@ -29,7 +29,7 @@ namespace Primary.Assets
                     }
                 }
 
-                disposedValue = true;
+                _disposedValue = true;
             }
         }
 
@@ -87,11 +87,11 @@ namespace Primary.Assets
                 }
 
                 string internalFilePath = br.ReadString();
-                if (internalFilePath != path)
-                {
-                    Log.Error("[g:{path}]: Different shader paths present!", path);
-                    return false;
-                }
+                //if (internalFilePath != path)
+                //{
+                //    Log.Error("[g:{path}]: Different shader paths present!", path);
+                //    return false;
+                //}
 
                 {
                     desc = new RHI.GraphicsPipelineDescription
@@ -254,14 +254,14 @@ namespace Primary.Assets
                 {
                     case RHI.GraphicsAPI.None:
                         {
-                            Log.Error("[g:{path}]: Graphics API does not support graphics shaders: {api}", path, RenderingManager.Device.API);
+                            EngLog.Assets.Error("[g:{path}]: Graphics API does not support graphics shaders: {api}", path, RenderingManager.Device.API);
                             return false;
                         }
                     case RHI.GraphicsAPI.Vulkan:
                         {
                             if (!apiTargets.HasFlag(ShaderAPITargets.Vulkan))
                             {
-                                Log.Error("[g:{path}]: Shader does not have target for API: {api}", path, RenderingManager.Device.API);
+                                EngLog.Assets.Error("[g:{path}]: Shader does not have target for API: {api}", path, RenderingManager.Device.API);
                                 return false;
                             }
 
@@ -272,7 +272,7 @@ namespace Primary.Assets
                         {
                             if (!apiTargets.HasFlag(ShaderAPITargets.Direct3D12))
                             {
-                                Log.Error("[g:{path}]: Shader does not have target for API: {api}", path, RenderingManager.Device.API);
+                                EngLog.Assets.Error("[g:{path}]: Shader does not have target for API: {api}", path, RenderingManager.Device.API);
                                 return false;
                             }
 
@@ -281,7 +281,7 @@ namespace Primary.Assets
                         }
                     default:
                         {
-                            Log.Error("[g:{path}]: Unknown graphics API: {api}", path, RenderingManager.Device.API);
+                            EngLog.Assets.Error("[g:{path}]: Unknown graphics API: {api}", path, RenderingManager.Device.API);
                             return false;
                         }
                 }
@@ -307,7 +307,7 @@ namespace Primary.Assets
                 }
             }
 
-            Log.Error("[g:{path}]: Failed to find shader bytecode chunk for API: {api}", path, Engine.GlobalSingleton.RenderingManager.GraphicsDevice.API);
+            EngLog.Assets.Error("[g:{path}]: Failed to find shader bytecode chunk for API: {api}", path, Engine.GlobalSingleton.RenderingManager.GraphicsDevice.API);
             return false;
         }
 

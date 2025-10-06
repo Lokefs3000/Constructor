@@ -1,7 +1,7 @@
 ﻿using Primary.Assets;
 using Primary.Editor;
-using Primary.Rendering.Batching;
 using Primary.Scenes;
+using System.Runtime.Serialization;
 
 namespace Primary.Components
 {
@@ -9,6 +9,7 @@ namespace Primary.Components
     [ComponentUsage(HasSelfReference: true)]
     public record struct MeshRenderer : IComponent
     {
+        [IgnoreDataMember]
         private SceneEntity _self;
 
         private RenderMesh? _mesh;

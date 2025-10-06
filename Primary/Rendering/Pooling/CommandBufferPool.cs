@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.ObjectPool;
-using Primary.Common;
+﻿using Primary.Common;
 using Primary.Rendering.Raw;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
@@ -59,7 +58,7 @@ namespace Primary.Rendering.Pooling
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void PrepareNewFrame()
         {
-            _activeStack = _activeStack == 1 ? 0 : 1;
+            //_activeStack = _activeStack == 1 ? 0 : 1;
         }
 
         public static RasterCommandBuffer Get(bool autoBegin = true)
@@ -94,7 +93,7 @@ namespace Primary.Rendering.Pooling
                     pool._device.Submit(commandBuffer.Wrapped);
             }
 
-            pool._commandBuffers[1 - pool._activeStack].Push(commandBuffer.Wrapped);
+            pool._commandBuffers[pool._activeStack].Push(commandBuffer.Wrapped);
 
             commandBuffer.UnbindUsage();
             pool._commandBufferWrappers.Push(commandBuffer);

@@ -1,12 +1,8 @@
 ﻿using Primary.Assets;
-using Primary.Common;
 using Primary.Rendering.Batching;
 using Primary.Rendering.Data;
-using Primary.Rendering.Pooling;
 using Primary.Rendering.Raw;
 using System.Diagnostics;
-using System.Numerics;
-using System.Runtime.InteropServices;
 
 namespace Primary.Rendering.Forward
 {
@@ -126,13 +122,13 @@ namespace Primary.Rendering.Forward
 
                 commandBuffer.CommitShaderResources();
                 commandBuffer.DrawIndexedInstanced(new RHI.DrawIndexedInstancedArgs
-                    {
-                        IndexCountPerInstance = mesh.IndexCount,
-                        InstanceCount = (uint)(batchData.BatchableFlags.Count),
-                        StartIndexLocation = mesh.IndexOffset,
-                        BaseVertexLocation = (int)mesh.VertexOffset,
-                        StartInstanceLocation = 0
-                    });
+                {
+                    IndexCountPerInstance = mesh.IndexCount,
+                    InstanceCount = (uint)(batchData.BatchableFlags.Count),
+                    StartIndexLocation = mesh.IndexOffset,
+                    BaseVertexLocation = (int)mesh.VertexOffset,
+                    StartInstanceLocation = 0
+                });
 
                 offsetInMatrixBuffer += (uint)batchData.BatchableFlags.Count;
             }

@@ -5,13 +5,10 @@ using Primary.RHI.Direct3D12.Interfaces;
 using Primary.RHI.Direct3D12.Utility;
 using SharpGen.Runtime;
 using System.Numerics;
-using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using TerraFX.Interop.Windows;
 using Vortice.Direct3D12;
 using Vortice.DXGI;
-using Vortice.Mathematics;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -77,7 +74,7 @@ namespace Primary.RHI.Direct3D12
 
                 _backBuffers[i].Name = $"SwapChain - BackBuffer[{i}]";
             }
-        
+
             _currentBackBufferState = ResourceStates.Present;
 
             _internalRt = new InternalRT(_backBuffers[_activeBackBuffer])
@@ -140,7 +137,7 @@ namespace Primary.RHI.Direct3D12
                     _backBuffers[i].Dispose();
                 }
 
-                Result r = _swapChain.ResizeBuffers(2u, (uint)newClientSize.X, (uint)newClientSize.Y, Format.R8G8B8A8_UNorm, SwapChainFlags.AllowTearing);
+                Result r = _swapChain.ResizeBuffers1(2u, (uint)newClientSize.X, (uint)newClientSize.Y, Format.R8G8B8A8_UNorm, SwapChainFlags.AllowTearing, [0, 0], [_device.DirectCommandQueue, _device.DirectCommandQueue]);
                 if (r.Failure)
                     HandleSwapChainIssue(r);
 

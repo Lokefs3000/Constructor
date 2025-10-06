@@ -1,14 +1,11 @@
 ﻿using Arch.Core;
 using Arch.Core.Extensions;
 using CommunityToolkit.HighPerformance;
+using Primary.Common;
 using Primary.Components;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
+using System.Runtime.Serialization;
 
 namespace Primary.Scenes
 {
@@ -100,6 +97,7 @@ namespace Primary.Scenes
             return SceneEntityManager.SetComponent(ref this, value, type);
         }
 
+        [IgnoreDataMember]
         public SceneEntity Parent
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -182,6 +180,43 @@ namespace Primary.Scenes
             }
         }
 
+        [IgnoreDataMember]
+        public int SceneId
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                if (IsNull)
+                    throw new NullReferenceException();
+#if DEBUG
+                if (!_entity.Has<EntityScene>())
+                    throw new NullReferenceException();
+#endif
+                return _entity.Get<EntityScene>().SceneId;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            set
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        public Scene Scene
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                if (IsNull)
+                    throw new NullReferenceException();
+#if DEBUG
+                if (!_entity.Has<EntityScene>())
+                    throw new NullReferenceException();
+#endif
+                return NullableUtility.ThrowIfNull(Engine.GlobalSingleton.SceneManager.FindScene(_entity.Get<EntityScene>().SceneId));
+            }
+            set => SceneId = value.Id;
+        }
+
         public SceneEntityComponents Components
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -193,13 +228,26 @@ namespace Primary.Scenes
             }
         }
 
+        [IgnoreDataMember]
+        public bool IsSceneRoot
+        {
+            get
+            {
+                if (IsNull)
+                    throw new NullReferenceException();
+                return _entity.Has<Scene.SceneTagComponent>();
+            }
+        }
+
         public override string ToString() => IsNull ? "null" : Name;
         public override int GetHashCode() => _entity.GetHashCode();
         public bool Equals(SceneEntity entity) => entity._entity == _entity;
 
+        [IgnoreDataMember]
         public Entity WrappedEntity => _entity;
 
-        public bool IsNull => _entity == Entity.Null && _entity.IsAlive();
+        [IgnoreDataMember]
+        public bool IsNull => _entity == Entity.Null || !_entity.IsAlive();
 
         public static readonly SceneEntity Null = new SceneEntity(Entity.Null);
 

@@ -1,19 +1,14 @@
 ﻿using Primary.Common;
 using Primary.Editor;
-using Primary.Rendering;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Components
 {
     [ComponentRequirements(typeof(Transform)), ComponentConnections(typeof(CameraProjectionData))]
     public record struct Camera : IComponent
     {
+        [IgnoreDataMember]
         private bool _isDirty;
 
         private CameraClear _clear;

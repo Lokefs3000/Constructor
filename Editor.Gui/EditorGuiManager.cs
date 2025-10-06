@@ -1,17 +1,10 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Editor.Gui.Elements;
-using Editor.Gui.Graphics;
 using Editor.Gui.Resources;
-using Primary;
 using Primary.Common;
 using Primary.Profiling;
 using Primary.Rendering;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Gui
 {
@@ -81,7 +74,7 @@ namespace Editor.Gui
                     {
                         _recalculateQueue.Clear();
                         _recalculateQueue.Enqueue(container.FocusedEditorWindow.RootElement);
-                        
+
                         while (_recalculateQueue.TryDequeue(out Element? element))
                         {
                             if (element.RecalculateLayoutInternal())

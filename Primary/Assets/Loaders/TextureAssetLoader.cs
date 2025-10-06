@@ -11,14 +11,14 @@ using System.Text;
 
 namespace Primary.Assets.Loaders
 {
-    internal static unsafe class TextureAssetLoader
+    internal unsafe class TextureAssetLoader : IAssetLoader
     {
-        internal static IInternalAssetData FactoryCreateNull()
+        public IInternalAssetData FactoryCreateNull(AssetId id)
         {
-            return new TextureAssetData();
+            return new TextureAssetData(id);
         }
 
-        internal static IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
+        public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
         {
             if (assetData is not TextureAssetData textureData)
                 throw new ArgumentException(nameof(assetData));
@@ -26,7 +26,7 @@ namespace Primary.Assets.Loaders
             return new TextureAsset(textureData);
         }
 
-        internal static void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
+        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
         {
             if (asset is not TextureAsset texture)
                 throw new ArgumentException(nameof(asset));
@@ -35,42 +35,6 @@ namespace Primary.Assets.Loaders
 
             try
             {
-                /*
-                Format support (from "TextureProcessor.cs" within "Editor.Processors")
-                    BC7     - Yes
-                    BC6s    - Yes
-                    BC6u    - Yes
-                    ASTC    - No
-                    BC5u    - Yes
-                    BC4u    - Yes
-                    BC3     - Yes
-                    BC3n    - Unknown?
-                    BC2     - Yes
-                    BC1a    - Unknown?
-                    BC1     - Yes
-                    R8a     - Needs testing
-                    R8l     - Needs testing
-                    BGR8    - Yes
-                    BGRA8   - Yes
-                    BGRX8   - Yes
-                    RGB8    - Yes
-                    RGBA8   - Yes
-                    R16     - Yes
-                    RG16    - Yes
-                    RGBA16  - Yes
-                    R32     - Yes
-                    RG32    - Yes
-                    RGBA32  - Yes
-
-                Feature support:
-                    DDPF_ALPHAPIXELS - Yes
-                    DDPF_ALPHA - Yes
-                    DDPF_FOURCC - Yes
-                    DDPF_RGB - Ignored
-                    DDPF_YUV - No
-                    DDPF_LUMINANCE - No
-                */
-
                 using Stream? stream = AssetFilesystem.OpenStream(sourcePath, bundleToReadFrom);
                 ExceptionUtility.Assert(stream != null);
 

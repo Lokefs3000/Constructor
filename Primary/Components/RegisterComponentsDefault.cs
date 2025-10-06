@@ -1,10 +1,4 @@
 ﻿using Primary.Scenes;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Components
 {
@@ -24,6 +18,7 @@ namespace Primary.Components
             SceneEntityManager.Register<DirectionalLight>();
             SceneEntityManager.Register<Light>();
             SceneEntityManager.Register<LightRenderingData>();
+            SceneEntityManager.Register<EntityScene>();
 
             SceneEntityManager.BuildRequirementHierchies();
         }

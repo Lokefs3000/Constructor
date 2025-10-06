@@ -1,13 +1,6 @@
 ﻿using Editor.DearImGui.Properties;
 using Hexa.NET.ImGui;
-using Primary.Scenes;
-using System;
 using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.DearImGui
 {
@@ -27,7 +20,9 @@ namespace Editor.DearImGui
             {
                 { typeof(TextureProperties.TargetData), new TextureProperties() },
                 { typeof(ShaderProperties.TargetData), new ShaderProperties() },
-                { typeof(EntityProperties.TargetData), new EntityProperties() }
+                { typeof(ModelProperties.TargetData), new ModelProperties() },
+                { typeof(EntityProperties.TargetData), new EntityProperties() },
+                { typeof(GeoEditProperties.TargetData), new GeoEditProperties() },
             }.ToFrozenDictionary();
         }
 
@@ -61,6 +56,13 @@ namespace Editor.DearImGui
         {
             _targetChanged = _targetChanged || _target != data;
             _target = data;
+        }
+
+        internal T? GetPropertiesViewer<T>(Type targetData) where T : class, IObjectPropertiesViewer
+        {
+            if (_viewers.TryGetValue(targetData, out IObjectPropertiesViewer? value))
+                return value as T;
+            return null;
         }
     }
 

@@ -1,6 +1,5 @@
 ﻿using Arch.Core;
 using Arch.Core.Extensions;
-using Primary.Common;
 using Primary.Components;
 using Primary.Profiling;
 using Primary.Scenes;

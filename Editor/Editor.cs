@@ -1,25 +1,23 @@
-﻿using Arch.Core;
-using Editor.Assets;
+﻿using Editor.Assets;
+using Editor.Assets.Loaders;
+using Editor.Assets.Types;
 using Editor.DearImGui;
-using Editor.Demos;
 using Editor.Gui;
 using Editor.Interaction;
 using Editor.Rendering;
-using Editor.Rendering.Gizmos;
+using Editor.Storage;
 using Hexa.NET.ImGui;
 using Primary;
 using Primary.Assets;
-using Primary.Common;
 using Primary.Components;
+using Primary.Mathematics;
 using Primary.Polling;
 using Primary.Profiling;
 using Primary.Rendering;
 using Primary.Scenes;
 using Primary.Timing;
 using System.Diagnostics;
-using System.Globalization;
 using System.Numerics;
-using System.Runtime;
 using System.Runtime.CompilerServices;
 
 namespace Editor
@@ -31,11 +29,15 @@ namespace Editor
         private ProjectSubFilesystem _projectSubFilesystem;
         private ProjectShaderLibrary _projectShaderLibrary;
 
+        private ProjectSubFilesystem _engineFilesystem;
+        private ProjectSubFilesystem _editorFilesystem;
+
+        private AssetDatabase _assetDatabase;
         private AssetPipeline _assetPipeline;
         private DearImGuiStateManager _dearImGuiStateManager;
         //private EditorGuiManager _guiManager;
-        private ToolManager _toolManager;
         private SelectionManager _selectionManager;
+        private ToolManager _toolManager;
         private EditorRenderManager _editorRenderManager;
 
         private DynamicAtlasManager _guiAtlasManager;
@@ -49,6 +51,10 @@ namespace Editor
         private SceneView _sceneView;
         private ImportFileView _importFileView;
         private RHIInspector _rhiInsector;
+        private PopupManager _popupManager;
+        private InputDebugger _inputDebugger;
+        private DebugView _debugView;
+        private GeoEditorView _geoEditorView;
 
         internal Editor(string baseProjectPath) : base()
         {
@@ -63,14 +69,20 @@ namespace Editor
             _projectSubFilesystem = new ProjectSubFilesystem(EditorFilepaths.ContentPath);
             _projectShaderLibrary = new ProjectShaderLibrary(EditorFilepaths.ContentPath);
 
+            _engineFilesystem = new ProjectSubFilesystem(@"D:/source/repos/Constructor/Source/Engine");
+            _editorFilesystem = new ProjectSubFilesystem(@"D:/source/repos/Constructor/Source/Editor");
+
+            _assetDatabase = new AssetDatabase();
             _assetPipeline = new AssetPipeline();
 
-            base.Initialize();
+            base.Initialize(_assetPipeline.Identifier);
+
+            RegisterComponentsDefault.RegisterDefault();
 
             _dearImGuiStateManager = new DearImGuiStateManager(this);
             //_guiManager = new EditorGuiManager();
-            _toolManager = new ToolManager();
             _selectionManager = new SelectionManager();
+            _toolManager = new ToolManager();
             _editorRenderManager = new EditorRenderManager();
 
             _guiAtlasManager = new DynamicAtlasManager();
@@ -81,9 +93,13 @@ namespace Editor
             _renderingView = new RenderingView();
             _editorTaskViewer = new EditorTaskViewer();
             _contentView = new ContentView();
-            _sceneView = new SceneView();
+            _sceneView = new SceneView(_guiAtlasManager);
             _importFileView = new ImportFileView();
             _rhiInsector = new RHIInspector();
+            _popupManager = new PopupManager();
+            _inputDebugger = new InputDebugger();
+            _debugView = new DebugView();
+            _geoEditorView = new GeoEditorView();
         }
 
         public override void Dispose()
@@ -101,7 +117,7 @@ namespace Editor
 
         public void Run()
         {
-            Window window = WindowManager.CreateWindow("Primary", new Vector2(1336, 726), CreateWindowFlags.None);
+            Window window = WindowManager.CreateWindow("Primary", new Vector2(1336, 726), CreateWindowFlags.Resizable);
             RenderingManager.DefaultWindow = window;
 
             RenderingManager.PostRender += _editorRenderManager.SetupPasses;
@@ -109,9 +125,12 @@ namespace Editor
             _dearImGuiStateManager.InitWindow(window);
             _guiAtlasManager.TriggerRebuild();
 
-            Scene scene = SceneManager.CreateScene("Demo");
+            AssetManager.RegisterCustomAsset<GeoSceneAsset>(new GeoSceneAssetLoader());
 
-            StaticDemoScene2.Load(this);
+            SceneManager.CreateScene("Default", LoadSceneMode.Single);
+            //Scene scene = SceneManager.CreateScene("Demo");
+
+            //StaticDemoScene2.Load(this);
 
             EventManager.PumpDefaultPause += PumpEditorLoop;
 
@@ -126,57 +145,32 @@ namespace Editor
 
         private void PumpEditorLoop()
         {
-            DrawDearImgui();
 
             Time.BeginNewFrame();
             ProfilingManager.StartProfilingForFrame();
 
+            _editorRenderManager.PrepareFrame();
+
+            _assetDatabase.HandlePendingUpdates();
             _assetPipeline.PollRemainingEvents();
             //_guiManager.Update();
+            _toolManager.Update();
 
             ThreadHelper.ExecutePendingTasks();
 
+            DrawDearImgui();
+
+            InputSystem.UpdatePending();
             EventManager.PollEvents();
             SystemManager.RunSystems();
             RenderingManager.ExecuteRender();
         }
-
-        private static Vector3 _cameraPosition;
-        private static Vector2 _cameraRotation;
 
         private void DrawDearImgui()
         {
             using (new ProfilingScope("EditorGui"))
             {
                 _dearImGuiStateManager.BeginFrame();
-
-                if (ImGui.IsMouseDragging(ImGuiMouseButton.Right))
-                {
-                    Vector2 drag = ImGui.GetIO().MouseDelta;
-                    drag *= -0.2f;
-                    _cameraRotation += drag;
-                }
-
-                Quaternion quat = Quaternion.CreateFromYawPitchRoll(float.DegreesToRadians(_cameraRotation.X), float.DegreesToRadians(-_cameraRotation.Y), 0.0f);
-
-                if (ImGui.IsKeyDown(ImGuiKey.W))
-                    _cameraPosition += Vector3.Transform(Vector3.UnitZ, quat) * 10.0f * Time.DeltaTime;
-                if (ImGui.IsKeyDown(ImGuiKey.S))
-                    _cameraPosition += Vector3.Transform(-Vector3.UnitZ, quat) * 10.0f * Time.DeltaTime;
-                if (ImGui.IsKeyDown(ImGuiKey.A))
-                    _cameraPosition += Vector3.Transform(Vector3.UnitX, quat) * 10.0f * Time.DeltaTime;
-                if (ImGui.IsKeyDown(ImGuiKey.D))
-                    _cameraPosition += Vector3.Transform(-Vector3.UnitX, quat) * 10.0f * Time.DeltaTime;
-                if (ImGui.IsKeyDown(ImGuiKey.E))
-                    _cameraPosition += Vector3.Transform(Vector3.UnitY, quat) * 10.0f * Time.DeltaTime;
-                if (ImGui.IsKeyDown(ImGuiKey.Q))
-                    _cameraPosition += Vector3.Transform(-Vector3.UnitY, quat) * 10.0f * Time.DeltaTime;
-
-                SceneManager.World.Query(new QueryDescription().WithAll<Camera, Transform>(), (ref Camera c, ref Transform t) =>
-                {
-                    t.Rotation = quat;
-                    t.Position = _cameraPosition;
-                });
 
                 /*if (ImGui.Begin("Profiler"))
                 {
@@ -192,6 +186,13 @@ namespace Editor
                 }
                 ImGui.End();*/
 
+                if (ImGui.BeginMainMenuBar())
+                {
+                    _debugView.MenuBar();
+
+                    ImGui.EndMainMenuBar();
+                }
+
                 _profilerView.Render();
                 _hierchyView.Render();
                 _propertiesView.Render();
@@ -201,6 +202,10 @@ namespace Editor
                 _sceneView.Render();
                 _importFileView.Render();
                 _rhiInsector.Render();
+                _popupManager.Render();
+                _inputDebugger.Render();
+                _debugView.Render();
+                _geoEditorView.Render();
 
                 //GCMemoryInfo memoryInfo = GC.GetGCMemoryInfo();
                 //
@@ -227,6 +232,9 @@ namespace Editor
         protected override void SetupAssetFilesystem()
         {
             AssetFilesystem.AddFilesystem(_projectSubFilesystem);
+            AssetFilesystem.AddFilesystem(_engineFilesystem);
+            AssetFilesystem.AddFilesystem(_editorFilesystem);
+
             AssetFilesystem.ShaderLibrary.AddSubLibrary(_projectShaderLibrary);
 
             _assetPipeline.PollRemainingEvents();
@@ -237,13 +245,20 @@ namespace Editor
         internal ProjectSubFilesystem ProjectSubFilesystem => _projectSubFilesystem;
         internal ProjectShaderLibrary ProjectShaderLibrary => _projectShaderLibrary;
 
+        internal ProjectSubFilesystem EngineFilesystem => _engineFilesystem;
+        internal ProjectSubFilesystem EditorFilesystem => _editorFilesystem;
+
         internal DearImGuiStateManager DearImGuiStateManager => _dearImGuiStateManager;
+        public AssetDatabase AssetDatabase => _assetDatabase;
         public AssetPipeline AssetPipeline => _assetPipeline;
         public DynamicAtlasManager GuiAtlasManager => _guiAtlasManager;
-        public ToolManager ToolManager => _toolManager;
         public SelectionManager SelectionManager => _selectionManager;
+        public ToolManager ToolManager => _toolManager;
 
         internal PropertiesView PropertiesView => _propertiesView;
+        internal SceneView SceneView => _sceneView;
+        internal PopupManager PopupManager => _popupManager;
+        internal GeoEditorView GeoEditorView => _geoEditorView;
 
         private static void VerifyProjectPath(string path)
         {

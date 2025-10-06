@@ -1,13 +1,13 @@
-﻿using Primary.Assets;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets;
 using Primary.Common;
-using Primary.Common.Streams;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Editor.Assets
 {
-    internal class ProjectSubFilesystem : ISubFilesystem
+    public sealed class ProjectSubFilesystem : ISubFilesystem
     {
         private string _namespace;
         private string _absolutePath;
@@ -23,11 +23,14 @@ namespace Editor.Assets
             _namespace = Path.GetFileNameWithoutExtension(absolute)!;
             _absolutePath = Path.GetDirectoryName(absolute)!;
 
+            if (!_absolutePath.EndsWith(Path.PathSeparator))
+                _absolutePath += Path.DirectorySeparatorChar;
+
             _mappingsModified = false;
 
             _fileRemappings = new ConcurrentDictionary<string, string>();
 
-            string mappingFile = Path.Combine(EditorFilepaths.LibraryIntermediatePath, "FileRemappings.dat");
+            string mappingFile = FileRemappingsFile;
             if (File.Exists(mappingFile))
             {
                 ReadFileMappings(mappingFile);
@@ -62,7 +65,7 @@ namespace Editor.Assets
 
                 string realFile = source.Substring(find + 1, j - 1 - find);
 
-                string fullRemapPath = Path.Combine(Editor.GlobalSingleton.ProjectPath, remapFile);
+                string fullRemapPath = Path.Combine(_absolutePath, remapFile);
                 string fullRealPath = Path.Combine(Editor.GlobalSingleton.ProjectPath, realFile);
 
                 if (File.Exists(fullRemapPath) && File.Exists(fullRealPath))
@@ -88,7 +91,7 @@ namespace Editor.Assets
 
         internal void FlushFileRemappings()
         {
-            string outputFile = Path.Combine(EditorFilepaths.LibraryIntermediatePath, "FileRemappings.dat");
+            string outputFile = FileRemappingsFile;
 
             StringBuilder sb = new StringBuilder();
             foreach (var kvp in _fileRemappings)
@@ -101,7 +104,14 @@ namespace Editor.Assets
             File.WriteAllText(outputFile, sb.ToString());
         }
 
-        public string ReadString(ReadOnlySpan<char> path)
+        /// <summary>Thread-safe</summary>
+        public string GetFullPath(string path)
+        {
+            return Path.Combine(_absolutePath, path);
+        }
+
+        /// <summary>Thread-safe</summary>
+        public string? ReadString(ReadOnlySpan<char> path)
         {
             if (!path.StartsWith(_namespace))
             {
@@ -116,15 +126,28 @@ namespace Editor.Assets
             else
                 absolutePath = Path.Combine(_absolutePath, localPath);
 
-            return File.ReadAllText(absolutePath);
+            try
+            {
+                return File.ReadAllText(absolutePath);
+            }
+            catch (Exception)
+            {
+
+            }
+
+            return null;
         }
 
-        public Stream OpenStream(ReadOnlySpan<char> path)
+        /// <summary>Thread-safe</summary>
+        public Stream? OpenStream(ReadOnlySpan<char> path)
         {
             if (!path.StartsWith(_namespace))
             {
-                throw new ArgumentException("Incorrect file namespace!");
+                return null;
             }
+
+            //temporary (yeah this will prob stay a while cause its temporary lmao)
+            const bool waitIfImportPending = true;
 
             string absolutePath = string.Empty;
             string localPath = path.ToString();
@@ -132,28 +155,29 @@ namespace Editor.Assets
             AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
             if (_fileRemappings.TryGetValue(localPath, out string? remap))
             {
-                if (pipeline.IsImportingAsset(path))
+                if (pipeline != null && pipeline.IsImportingAsset(path))
                 {
-                    EdLog.Assets.Information("Waiting on file import: {lc}", path.ToString());
-                    pipeline.ImportChangesOrGetRunning(path)?.Wait();
+                    if (waitIfImportPending)
+                    {
+                        EdLog.Assets.Information("Waiting on file import: {lc}", path.ToString());
+                        pipeline.ImportChangesOrGetRunning(path)?.Wait();
+                    }
                 }
 
-                absolutePath = Path.Combine(_absolutePath, remap);
+                absolutePath = Path.Combine(Editor.GlobalSingleton.ProjectPath, remap);
             }
-            else
+            else if (pipeline != null)
             {
                 bool hasNewRemap = false;
                 if (!pipeline.IsAssetUpToDate(localPath))
                 {
                     if (pipeline.CanBeImported(path))
                     {
-                        EdLog.Assets.Information("Waiting on new file import: {lc}", path.ToString());
-                        Task? task = pipeline.ImportChangesOrGetRunning(path);
-                        task?.Wait();
-
+                        if (waitIfImportPending)
+                            pipeline.ImportChangesOrGetRunning(path)?.Wait();
                         if (_fileRemappings.TryGetValue(localPath, out remap))
                         {
-                            absolutePath = Path.Combine(_absolutePath, remap);
+                            absolutePath = Path.Combine(Editor.GlobalSingleton.ProjectPath, remap);
                             hasNewRemap = true;
                         }
                     }
@@ -162,10 +186,13 @@ namespace Editor.Assets
                 if (!hasNewRemap)
                     absolutePath = Path.Combine(_absolutePath, localPath);
             }
+            else
+                absolutePath = Path.Combine(_absolutePath, localPath);
 
-            return FileUtility.TryWaitOpen(absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            return FileUtility.TryWaitOpenNoThrow(absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         }
 
+        /// <summary>Thread-safe</summary>
         public bool Exists(ReadOnlySpan<char> path)
         {
             if (path.StartsWith(_namespace))
@@ -173,6 +200,11 @@ namespace Editor.Assets
 
             return false;
         }
+
+        public string FileRemappingsFile => Path.Combine(EditorFilepaths.LibraryIntermediatePath, $"FileRemappings_{(uint)Path.Combine(_absolutePath, _namespace).GetDjb2HashCode()}.dat");
+
+        public ref readonly string Namespace => ref _namespace;
+        public ref readonly string AbsolutePath => ref _absolutePath;
 
         private class ProjectFileStream : Stream
         {

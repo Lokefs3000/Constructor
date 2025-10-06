@@ -6,6 +6,7 @@
 
         public SemaphoreScope(SemaphoreSlim semaphore)
         {
+            semaphore.Wait();
             _semaphore = semaphore;
         }
 
@@ -13,7 +14,5 @@
         {
             _semaphore.Release();
         }
-
-        public SemaphoreScope() => throw new NotSupportedException("use other constructor!");
     }
 }

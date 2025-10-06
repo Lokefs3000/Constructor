@@ -1,13 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Primary.RHI;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.RenderLayer
 {
@@ -48,7 +42,7 @@ namespace Primary.RenderLayer
 
         public void SetStencilReference(uint stencilRef) => NullableUtility.ThrowIfNull(_internal).SetStencilReference(stencilRef);
 
-        public unsafe void SetVertexBuffers(int startSlot, Span<GfxBuffer> vertexBuffers) => NullableUtility.ThrowIfNull(_internal).SetVertexBuffers(startSlot, new Span<RHI.Buffer>(Unsafe.AsPointer(ref vertexBuffers.DangerousGetReference()), vertexBuffers.Length));
+        public unsafe void SetVertexBuffers(int startSlot, Span<GfxBuffer> vertexBuffers) => NullableUtility.ThrowIfNull(_internal).SetVertexBuffers(startSlot, new Span<RHI.Buffer>(Unsafe.AsPointer(ref vertexBuffers.DangerousGetReference()), vertexBuffers.Length), Span<uint>.Empty);
         public void SetIndexBuffer(GfxBuffer indexBuffer) => NullableUtility.ThrowIfNull(_internal).SetIndexBuffer(indexBuffer.RHIBuffer);
 
         public void SetPipeline(GfxGraphicsPipeline pipeline) => NullableUtility.ThrowIfNull(_internal).SetPipeline(NullableUtility.ThrowIfNull(pipeline.RHIGraphicsPipeline));
@@ -76,7 +70,7 @@ namespace Primary.RenderLayer
 
         public static explicit operator RHI.GraphicsCommandBuffer?(GfxGraphicsCommandBuffer commandBuffer) => commandBuffer._internal;
         public static implicit operator GfxGraphicsCommandBuffer(RHI.GraphicsCommandBuffer? commandBuffer) => new GfxGraphicsCommandBuffer(commandBuffer);
-        
+
         public static explicit operator GfxCommandBuffer(GfxGraphicsCommandBuffer commandBuffer) => new GfxCommandBuffer(commandBuffer._internal);
     }
 }

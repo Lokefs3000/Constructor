@@ -1,20 +1,12 @@
 ﻿using CommunityToolkit.HighPerformance;
-using Primary;
 using Primary.Common;
 using Primary.Mathematics;
 using Primary.RenderLayer;
 using Primary.Threading;
-using Serilog;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Gui
 {
@@ -71,10 +63,10 @@ namespace Editor.Gui
 
         internal unsafe void BuildAtlasTexture()
         {
-            uint* pixels = null;
+            SafePtrArray<uint> pixels = SafePtrArray<uint>.Null;
             try
             {
-                pixels = (uint*)NativeMemory.Alloc((nuint)(_atlasSize * _atlasSize * 4));
+                pixels = SafePtrArray<uint>.Allocate(_atlasSize * _atlasSize * 4);
 
                 int atlasRowPitch = _atlasSize;
 
@@ -83,25 +75,25 @@ namespace Editor.Gui
                 {
                     ref FittedTile tile = ref tiles[i];
 
-                    int tileRowPitch = tile.Size * 4;
+                    int tileRowPitch = tile.Size;
                     int currentIndex = tile.Offset.X + tile.Offset.Y * atlasRowPitch;
 
                     fixed (byte* ptr = tile.Pixels)
                     {
-                        uint* source = (uint*)ptr;
+                        SafePtrArray<uint> source = new SafePtrArray<uint>((uint*)ptr, tile.Pixels.Length);
                         for (int y = 0; y < tile.Size; y++)
                         {
-                            uint* start = (uint*)(&pixels[currentIndex]);
-                            NativeMemory.Copy(&source[y * tile.Size], start, (nuint)tileRowPitch);
+                            SafePtrArray<uint>.Copy(source, y * tile.Size, pixels, currentIndex, tileRowPitch);
 
                             currentIndex += atlasRowPitch;
                         }
                     }
                 }
 
+                //TODO: replace this when the RHI can handle multithreaded resource creation
                 ThreadHelper.ExecuteOnMainThread(() =>
                 {
-                    nint basePixelsPtr = (nint)pixels;
+                    nint basePixelsPtr = pixels.OpaquePointer;
 
                     _texture.Dispose();
                     _texture = GfxDevice.Current.CreateTexture(new Primary.RHI.TextureDescription
@@ -130,8 +122,7 @@ namespace Editor.Gui
             }
             finally
             {
-                if (pixels != null)
-                    NativeMemory.Free(pixels);
+                pixels.Dispose();
             }
         }
 
@@ -220,7 +211,7 @@ namespace Editor.Gui
             {
                 for (int x = 0; x < tileCount; x++)
                 {
-                    AtlasTile tile = new AtlasTile(new Int2(x, y), DynAtlasInitialTileSize);
+                    AtlasTile tile = new AtlasTile(new Int2(x, y) * DynAtlasInitialTileSize, DynAtlasInitialTileSize);
                     _tileSizes[lastIndex].Enqueue(tile);
                 }
             }

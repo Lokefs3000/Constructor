@@ -2,7 +2,7 @@
   "profiles": {
     "Editor": {
       "commandName": "Project",
-      "commandLineArgs": "D:\\source\\repos\\Constructor\\Project",
+      "commandLineArgs": "D:\\source\\repos\\Constructor\\Source\\DemoGame1",
       "nativeDebugging": false,
       "hotReloadEnabled": true
     }

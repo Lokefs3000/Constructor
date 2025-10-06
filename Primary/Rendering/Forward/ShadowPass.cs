@@ -1,19 +1,11 @@
 ﻿using Primary.Assets;
-using Primary.Components;
 using Primary.Rendering.Batching;
 using Primary.Rendering.Data;
 using Primary.Rendering.Forward.Managers;
-using Primary.Rendering.Pooling;
 using Primary.Rendering.Raw;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Rendering.Forward
 {
@@ -26,7 +18,7 @@ namespace Primary.Rendering.Forward
 
         public ShadowPass()
         {
-            _shadowPassShader = AssetManager.LoadAsset<ShaderAsset>("Hidden/ShadowPass")!;
+            _shadowPassShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/ShadowPass.hlsl")!;
             _shadowBindGroup = _shadowPassShader.CreateDefaultBindGroup();
 
             _shadowData = RenderingManager.Device.CreateBuffer(new RHI.BufferDescription

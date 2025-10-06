@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Globalization;
+using System.Numerics;
 
 namespace Primary.Common
 {
@@ -55,7 +52,35 @@ namespace Primary.Common
             }
         }
 
+        public Color32(Vector3 rgb, float a = 1.0f)
+        {
+            Vector4 clamped = Vector4.Clamp(Vector4.Round(new Vector4(rgb, a) * 255.0f), Vector4.Zero, new Vector4(255.0f));
+
+            R = (byte)clamped.X;
+            G = (byte)clamped.Y;
+            B = (byte)clamped.Z;
+            A = (byte)clamped.W;
+        }
+
+        public Color32(Vector4 rgba)
+        {
+            Vector4 clamped = Vector4.Clamp(Vector4.Round(rgba * 255.0f), Vector4.Zero, new Vector4(255.0f));
+
+            R = (byte)clamped.X;
+            G = (byte)clamped.Y;
+            B = (byte)clamped.Z;
+            A = (byte)clamped.W;
+        }
+
         public uint RGBA => ((uint)R << 24) | ((uint)G << 16) | ((uint)B << 8) | ((uint)A);
+        public uint BGRA => ((uint)B << 24) | ((uint)G << 16) | ((uint)R << 8) | ((uint)A);
         public uint ARGB => ((uint)A << 24) | ((uint)R << 16) | ((uint)G << 8) | ((uint)B);
+        public uint ABGR => ((uint)A << 24) | ((uint)B << 16) | ((uint)G << 8) | ((uint)R);
+
+        public static Color32 FromHex(ReadOnlySpan<char> hex)
+        {
+            uint rgba = uint.Parse(hex, NumberStyles.HexNumber);
+            return new Color32(rgba);
+        }
     }
 }

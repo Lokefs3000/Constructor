@@ -6,19 +6,10 @@ using Primary.RHI.Direct3D12.Helpers;
 using Primary.RHI.Direct3D12.Interfaces;
 using Primary.RHI.Direct3D12.Memory;
 using Primary.RHI.Direct3D12.Utility;
-using Serilog.Core;
 using SharpGen.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
-using TerraFX.Interop.Windows;
 using Vortice;
 using Vortice.Direct3D12;
 using Vortice.Mathematics;
@@ -56,13 +47,13 @@ namespace Primary.RHI.Direct3D12
         private DirtyStaticCollection<Vortice.Mathematics.Viewport> _viewports;
         private DirtyStaticCollection<RawRect> _scissorRects;
         private DirtyValue<uint> _stencilRef;
-        private DirtyCollection<BufferImpl?> _vertexBuffers;
+        private DirtyCollection<VertexBuffer> _vertexBuffers;
         private DirtyValue<BufferImpl?> _indexBuffer;
         private DirtyValue<GraphicsPipelineImpl?> _pipelineState;
         private DirtyStaticCollection<ResourceLocation> _activeResources;
         private DirtyStaticCollection<uint> _activeConstants;
 
-        private Dictionary<int, uint> _activeDescriptors;
+        private Dictionary<ActiveDescriptorKey, uint> _activeDescriptors;
 
         private bool _disposedValue;
 
@@ -97,13 +88,13 @@ namespace Primary.RHI.Direct3D12
             _viewports = new DirtyStaticCollection<Vortice.Mathematics.Viewport>(8);
             _scissorRects = new DirtyStaticCollection<RawRect>(8, RectI.Empty);
             _stencilRef = new DirtyValue<uint>();
-            _vertexBuffers = new DirtyCollection<BufferImpl?>(8);
+            _vertexBuffers = new DirtyCollection<VertexBuffer>(8);
             _indexBuffer = new DirtyValue<BufferImpl?>(null);
             _pipelineState = new DirtyValue<GraphicsPipelineImpl?>(null);
             _activeResources = new DirtyStaticCollection<ResourceLocation>(64);
             _activeConstants = new DirtyStaticCollection<uint>(128 / sizeof(uint));
 
-            _activeDescriptors = new Dictionary<int, uint>();
+            _activeDescriptors = new Dictionary<ActiveDescriptorKey, uint>();
 
             _isOpen = false;
             _isReady = true;
@@ -677,7 +668,7 @@ namespace Primary.RHI.Direct3D12
             _stencilRef.Value = stencilRef;
         }
 
-        public override void SetVertexBuffers(int startSlot, Span<Buffer> buffers)
+        public override void SetVertexBuffers(int startSlot, Span<Buffer> buffers, Span<uint> strides)
         {
             PerformSanityCheck();
 
@@ -699,6 +690,11 @@ namespace Primary.RHI.Direct3D12
                     {
                         GraphicsDeviceImpl.Logger.Warning("SetVertexBuffers: {arg1}[{idx}] does not have BufferUsage.{usage} usage flag set.", nameof(buffers), i, BufferUsage.VertexBuffer);
                     }
+
+                    if (strides.Length < i && strides[i] > buffers[i].Description.ByteWidth)
+                    {
+                        GraphicsDeviceImpl.Logger.Warning("SetVertexBuffers: {arg1}[{idx}] is larger then buffer total width (stride: {st}, width: {wd}).", nameof(strides), i, strides[i], buffers[i].Description.ByteWidth);
+                    }
                 }
             }
 
@@ -706,14 +702,16 @@ namespace Primary.RHI.Direct3D12
             {
                 if (startSlot < _vertexBuffers.Length)
                 {
-                    _vertexBuffers[startSlot] = (BufferImpl)buffers[startSlot];
+                    BufferImpl impl = (BufferImpl)buffers[0];
+                    _vertexBuffers[startSlot] = new VertexBuffer(impl, strides.IsEmpty ? impl.Description.Stride : (strides[0] == 0 ? impl.Description.Stride : strides[0]));
                 }
             }
             else
             {
-                for (int i = startSlot; i < limit; i++)
+                for (int i = startSlot, j = 0; i < limit; i++, j++)
                 {
-                    _vertexBuffers[i] = (BufferImpl)buffers[i];
+                    BufferImpl impl = (BufferImpl)buffers[j];
+                    _vertexBuffers[i] = new VertexBuffer(impl, strides.Length < j ? impl.Description.Stride : (strides[j] == 0 ? impl.Description.Stride : strides[j]));
                 }
             }
         }
@@ -775,6 +773,15 @@ namespace Primary.RHI.Direct3D12
                     {
                         GraphicsDeviceImpl.Logger.Warning("SetResources: {arg1}[{idx}] is not a shader visible resource (type: {type}, name: {name}).", nameof(resources), i, location.Resource.GetType(), resource.ResourceName);
                     }
+
+                    if (location.Descriptor != null)
+                    {
+                        if (location.Descriptor.Owner != location.Resource)
+                        {
+                            GraphicsDeviceImpl.Logger.Warning("SetResources: {arg1}[{idx}] descriptor owner does not match set resource.", nameof(resources), i);
+                            continue;
+                        }
+                    }
                 }
             }
 
@@ -823,6 +830,7 @@ namespace Primary.RHI.Direct3D12
                 _commandList.DrawInstanced(args.VertexCountPerInstance, args.InstanceCount, args.StartVertexLocation, args.StartInstanceLocation);
         }
         #endregion
+
         #region Draw preperation
         private HashSet<int> _tempValIntHashSet = new HashSet<int>();
         private int[] _tempValResPresentArray = [0, 0, 0];
@@ -857,7 +865,7 @@ namespace Primary.RHI.Direct3D12
             for (int i = 0; i < desc.InputElements.Length; i++)
             {
                 ref InputElementDescription elem = ref desc.InputElements[i];
-                if (_vertexBuffers[elem.InputSlot] == null && !_tempValIntHashSet.Contains(elem.InputSlot))
+                if (_vertexBuffers[elem.InputSlot].Buffer == null && !_tempValIntHashSet.Contains(elem.InputSlot))
                 {
                     GraphicsDeviceImpl.Logger.Warning("ValidateDrawState: Input element(s) specifies slot: {slot} but no vertex buffer is present.", elem.InputSlot);
                     _tempValIntHashSet.Add(elem.InputSlot);
@@ -892,9 +900,24 @@ namespace Primary.RHI.Direct3D12
 
                     ICommandBufferResource impl = (ICommandBufferResource)resource.Resource;
 
-                    if (impl.Type != bound.Type)
+                    if (resource.Descriptor != null)
                     {
-                        GraphicsDeviceImpl.Logger.Error("ValidateDrawState: Incorrect resource specified at index: {idx} (expected: {exp}, got: {got}).", bound.Index, bound.Type, bound.Index);
+                        ICommandDescriptor descriptor = Unsafe.As<ICommandDescriptor>(resource.Descriptor);
+                        if (descriptor.BindType != bound.Type)
+                        {
+                            GraphicsDeviceImpl.Logger.Error("ValidateDrawState: Incorrect descriptor type specified at index: {idx} (expected: {exp}, got: {got}).", bound.Index, bound.Type, descriptor.BindType);
+                        }
+                        else if (resource.Descriptor.Owner != resource.Resource)
+                        {
+                            GraphicsDeviceImpl.Logger.Error("ValidateDrawState: Descriptor specified at index: {idx} has a diffent owner than specified resource (owner: {own}, got: {got}).", bound.Index, resource.Descriptor.Owner, resource.Resource);
+                        }
+                    }
+                    else
+                    {
+                        if (impl.Type != bound.Type)
+                        {
+                            GraphicsDeviceImpl.Logger.Error("ValidateDrawState: Incorrect resource specified at index: {idx} (expected: {exp}, got: {got}).", bound.Index, bound.Type, bound.Index);
+                        }
                     }
                 }
                 else
@@ -1039,17 +1062,17 @@ namespace Primary.RHI.Direct3D12
 
             if (_vertexBuffers.IsDirty)
             {
-                Span<BufferImpl?> buffers = _vertexBuffers.AsSpanWithinDirty();
+                Span<VertexBuffer> buffers = _vertexBuffers.AsSpanWithinDirty();
                 if (!buffers.IsEmpty)
                 {
-                    bool isSettingWithDirty = buffers[0] == null;
+                    bool isSettingWithDirty = buffers[0].Buffer == null;
                     int lastIndex = 0;
                     int lastCount = 0;
 
                     for (int i = 0; i < buffers.Length; i++)
                     {
-                        BufferImpl? buffer = buffers[i];
-                        bool isNull = buffer == null;
+                        VertexBuffer buffer = buffers[i];
+                        bool isNull = buffer.Buffer == null;
 
                         if (isSettingWithDirty != isNull)
                         {
@@ -1069,16 +1092,16 @@ namespace Primary.RHI.Direct3D12
 
                         if (!isNull)
                         {
-                            buffer!.EnsureResourceStates(_barrierManager, ResourceStates.VertexAndConstantBuffer);
+                            buffer.Buffer!.EnsureResourceStates(_barrierManager, ResourceStates.VertexAndConstantBuffer);
 
                             _tempVBVs[lastCount] = new VertexBufferView
                             {
-                                BufferLocation = buffer!.GPUVirtualAddress,
-                                SizeInBytes = buffer!.Description.ByteWidth,
-                                StrideInBytes = buffer!.Description.Stride,
+                                BufferLocation = buffer.Buffer!.GPUVirtualAddress,
+                                SizeInBytes = buffer.Buffer!.Description.ByteWidth,
+                                StrideInBytes = buffer.Stride,
                             };
 
-                            _referencedResources.Add(buffer);
+                            _referencedResources.Add(buffer.Buffer);
                         }
 
                         lastCount++;
@@ -1144,53 +1167,76 @@ namespace Primary.RHI.Direct3D12
                 needsToSetNewConstants = true;
 
                 Span<ResourceLocation> locations = _activeResources.AsSpanProxy();
-                Span<uint> descriptors = _resourceCpuDescriptors.AsSpan((int)pipelineDesc.ExpectedConstantsSize, locations.Length);
-
-                for (int i = 0; i < locations.Length; i++)
+                if (!locations.IsEmpty)
                 {
-                    ref ResourceLocation location = ref locations[i];
-                    if (location.Resource == null)
-                        continue;
+                    Span<uint> descriptors = _resourceCpuDescriptors.AsSpan((int)pipelineDesc.ExpectedConstantsSize, locations.Length);
 
-                    ICommandBufferResource impl = (ICommandBufferResource)location.Resource;
-                    int hashKey = location.Resource.Handle.GetHashCode();
+                    _unresolvedResources.Clear();
 
-                    impl.EnsureResourceStates(_barrierManager, ResourceStates.Common, true);
-
-                    if (_activeDescriptors.TryGetValue(hashKey, out uint handle))
+                    for (int i = 0; i < locations.Length; i++)
                     {
-                        descriptors[i] = handle;
-                    }
-                    else
-                    {
-                        _unresolvedResources.Push(new UnresolvedResource(impl, location.ConstantsOffset, hashKey));
-                    }
+                        ref ResourceLocation location = ref locations[i];
+                        if (location.Resource == null)
+                            return false;
 
-                    _referencedResources.Add(impl);
-                }
+                        ICommandBufferResource impl = (ICommandBufferResource)location.Resource;
+                        if (!impl.IsShaderVisible)
+                            return false;
 
-                if (_unresolvedResources.Count > 0)
-                {
-                    DescriptorHeapAllocation allocation = _descriptorAllocator.Allocate(_unresolvedResources.Count);
+                        ICommandDescriptor? descriptor = Unsafe.As<ICommandDescriptor>(location.Descriptor);
 
-                    while (_unresolvedResources.TryPop(out UnresolvedResource resource))
-                    {
-                        uint offset = (uint)(resource.DescriptorIndex + allocation.HeapOffset);
+                        ActiveDescriptorKey key = new ActiveDescriptorKey(location.Resource.Handle, descriptor);
 
-                        CpuDescriptorHandle handle = allocation.GetCpuHandle(resource.DescriptorIndex);
-                        _device.D3D12Device.CopyDescriptorsSimple(1, handle, resource.Resource.CpuDescriptor, DescriptorHeapType.ConstantBufferViewShaderResourceViewUnorderedAccessView);
+                        impl.EnsureResourceStates(_barrierManager, ResourceStates.Common, true);
 
-                        if (_activeDescriptors.TryAdd(resource.DictionaryKey, offset))
-                            descriptors[resource.DescriptorIndex] = offset;
+                        if (!(descriptor?.IsDynamic ?? true) && _activeDescriptors.TryGetValue(key, out uint handle))
+                        {
+                            descriptors[i] = handle;
+                        }
                         else
-                            descriptors[resource.DescriptorIndex] = _activeDescriptors[resource.DictionaryKey];
+                        {
+                            _unresolvedResources.Push(new UnresolvedResource(impl, location.ConstantsOffset, key, location.DescriptorOffset));
+                        }
+
+                        _referencedResources.Add(impl);
                     }
 
-                }
+                    if (_unresolvedResources.Count > 0)
+                    {
+                        DescriptorHeapAllocation allocation = _descriptorAllocator.Allocate(_unresolvedResources.Count);
 
-                if (_pipelineState.Value.IsUsingConstantBuffer)
-                {
-                    throw new NotImplementedException();
+                        while (_unresolvedResources.TryPop(out UnresolvedResource resource))
+                        {
+                            uint offset = (uint)(resource.DescriptorIndex + allocation.HeapOffset);
+
+                            CpuDescriptorHandle handle = allocation.GetCpuHandle(resource.DescriptorIndex);
+
+                            CpuDescriptorHandle src = CpuDescriptorHandle.Default;
+                            if (resource.DictionaryKey.Descriptor == null)
+                                src = resource.Resource.CpuDescriptor;
+                            else if (resource.DictionaryKey.Descriptor.IsDynamic)
+                            {
+                                resource.DictionaryKey.Descriptor.AllocateDynamic(resource.DescriptorOffset, handle);
+                                descriptors[resource.DescriptorIndex] = offset;
+                                continue;
+                            }
+                            else
+                                src = resource.DictionaryKey.Descriptor.CpuDescriptor;
+
+                            _device.D3D12Device.CopyDescriptorsSimple(1, handle, src, DescriptorHeapType.ConstantBufferViewShaderResourceViewUnorderedAccessView);
+
+                            if (_activeDescriptors.TryAdd(resource.DictionaryKey, offset))
+                                descriptors[resource.DescriptorIndex] = offset;
+                            else
+                                descriptors[resource.DescriptorIndex] = _activeDescriptors[resource.DictionaryKey];
+                        }
+
+                    }
+
+                    if (_pipelineState.Value.IsUsingConstantBuffer)
+                    {
+                        throw new NotImplementedException();
+                    }
                 }
             }
 
@@ -1232,7 +1278,13 @@ namespace Primary.RHI.Direct3D12
         public ID3D12Fence ExecutionCompleteFence => _fence;
         public ulong FenceValue => _fenceValue;
 
-        private readonly record struct UnresolvedResource(ICommandBufferResource Resource, int DescriptorIndex, int DictionaryKey);
+        private readonly record struct UnresolvedResource(ICommandBufferResource Resource, int DescriptorIndex, ActiveDescriptorKey DictionaryKey, uint DescriptorOffset);
+        private readonly record struct VertexBuffer(BufferImpl? Buffer, uint Stride);
+
+        private readonly record struct ActiveDescriptorKey(nint Handle, ICommandDescriptor? Descriptor)
+        {
+            public override int GetHashCode() => Descriptor == null ? Handle.GetHashCode() : HashCode.Combine(Handle, Descriptor);
+        }
     }
 
     internal record struct DirtyValue<T> : GetWithoutRef<T>
@@ -1248,7 +1300,6 @@ namespace Primary.RHI.Direct3D12
             _value = initialValue;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void Reset()
         {
             _isDirty = false;
@@ -1349,9 +1400,7 @@ namespace Primary.RHI.Direct3D12
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Span<T> AsSpan() => _collection.AsSpan();
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Span<T> AsSpanProxy() => _collection.AsSpan(_proxyStart, _proxyLength);
 
         internal int Length => _collection.Length;
@@ -1436,7 +1485,7 @@ namespace Primary.RHI.Direct3D12
                 ExceptionUtility.Assert(index >= 0 && index < _collection.Length);
 #endif
                 ref T valueRef = ref _collection.DangerousGetReferenceAt(index);
-                if (Unsafe.IsNullRef(ref valueRef) ? value != null : !(valueRef?.Equals(value) ?? false))
+                if (/*Unsafe.IsNullRef(ref valueRef) ? value != null : !(valueRef?.Equals(value) ?? false)*/true)
                 {
                     SetDirtyRange(index);
                     _collection[index] = value; //TODO: do this without the internal check.
@@ -1445,9 +1494,7 @@ namespace Primary.RHI.Direct3D12
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Span<T> AsSpan() => _collection.AsSpan();
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Span<T> AsSpanWithinDirty() => _collection.AsSpan(_dirtyStart, _dirtyEnd - _dirtyStart);
 
         internal int Length => _collection.Length;

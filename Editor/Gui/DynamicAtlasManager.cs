@@ -1,19 +1,11 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
 using Primary.Common;
-using Primary.Mathematics;
 using Primary.RenderLayer;
-using Serilog;
 using StbImageSharp;
-using System;
-using System.Buffers;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Gui
 {
@@ -139,6 +131,12 @@ namespace Editor.Gui
                         try
                         {
                             using Stream? stream = AssetFilesystem.OpenStream(icon);
+                            if (stream == null)
+                            {
+                                EdLog.Gui.Error("Icon stream [{ic}, {set}] is null and might not exist", icon, iconSet.UniqueHash);
+                                continue;
+                            }
+
                             using ImageResult result = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
 
                             ExceptionUtility.Assert(result.Width == result.Height, "Icon width and height must match");
@@ -151,7 +149,7 @@ namespace Editor.Gui
                         }
                         catch (Exception ex)
                         {
-                            Log.Error(ex, "Failed to load icon: \"{ic}\" from set: {uh}", icon, iconSet.UniqueHash);
+                            EdLog.Gui.Error(ex, "Failed to load icon: \"{ic}\" from set: {uh}", icon, iconSet.UniqueHash);
                         }
                     }
 
@@ -218,6 +216,9 @@ namespace Editor.Gui
 
             EdLog.Gui.Information("Finished rebuilding dynamic atlas took: {secs}s (Icon sets: {is}, Total icons: {ti})", (DateTime.UtcNow - startTime).TotalSeconds, _iconSets.Count, totalIcons);
         }
+
+        internal IReadOnlyList<DynamicIconSet> IconSets => _iconSets;
+        internal IReadOnlyList<DynamicSubAtlas> SubAtlasses => _subAtlasses;
     }
 
     internal record struct CachedDynamicIconSetData(DynamicIconSet IconSet, int[] Ids, int[] Sizes, byte[][] ImageData);
@@ -254,6 +255,14 @@ namespace Editor.Gui
         {
             _subAtlas = subAtlas;
             _isModified = false;
+        }
+
+        /// <remarks>Not thread-safe</remarks>
+        public void Clear()
+        {
+            _iconSet.Clear();
+            RecalculateUniqueHash();
+            _isModified = true;
         }
 
         /// <remarks>Not thread-safe</remarks>

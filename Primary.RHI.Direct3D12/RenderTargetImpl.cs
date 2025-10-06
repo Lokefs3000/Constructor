@@ -2,17 +2,8 @@
 using Primary.RHI.Direct3D12.Descriptors;
 using Primary.RHI.Direct3D12.Helpers;
 using Primary.RHI.Direct3D12.Interfaces;
-using Primary.RHI.Direct3D12.Memory;
 using Primary.RHI.Direct3D12.Utility;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
 using Vortice.Direct3D12;
 using Vortice.DXGI;
 using Vortice.Mathematics;

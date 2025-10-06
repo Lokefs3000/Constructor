@@ -1,25 +1,4 @@
-﻿using Editor.Gui.Elements;
-using Primary;
-using Primary.Assets;
-using Primary.Common;
-using Primary.Profiling;
-using Primary.Rendering;
-using Primary.Rendering.Data;
-using Primary.Rendering.Forward;
-using Primary.Rendering.Pooling;
-using Primary.Rendering.Raw;
-using SharpGen.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
-using RHI = Primary.RHI;
-
-namespace Editor.Gui.Graphics
+﻿namespace Editor.Gui.Graphics
 {
     //[RenderPassPriority(true, typeof(FinalBlitPass))]
     //internal sealed class GuiRenderPass : IRenderPass

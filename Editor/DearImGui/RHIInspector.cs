@@ -1,7 +1,10 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Hexa.NET.ImGui;
+using Primary.Assets;
 using Primary.Common;
 using Primary.Rendering;
+using Primary.Timing;
+using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -11,6 +14,8 @@ namespace Editor.DearImGui
 {
     internal sealed class RHIInspector : RHI.IObjectTracker
     {
+        private TextureAsset _noPreview;
+
         private ObjectType _showTypes;
 
         private int _objectImageSize;
@@ -20,6 +25,8 @@ namespace Editor.DearImGui
 
         internal RHIInspector()
         {
+            _noPreview = AssetManager.LoadAsset<TextureAsset>("Editor/Textures/NoPreview.png")!;
+
             _showTypes = ObjectType.All;
 
             _objectImageSize = 128;
@@ -32,6 +39,9 @@ namespace Editor.DearImGui
 
         internal void Render()
         {
+            long timestampLimit = Stopwatch.Frequency * 4;
+            long currentTimestamp = Stopwatch.GetTimestamp();
+
             if (ImGui.Begin("RHI inspector", ImGuiWindowFlags.MenuBar))
             {
                 if (ImGui.BeginMenuBar())
@@ -74,6 +84,7 @@ namespace Editor.DearImGui
 
                     if (_objectImageSize > 0)
                     {
+
                         Span<TrackedObject> objects = _objects.AsSpan();
                         for (int i = 0; i < objects.Length; i++)
                         {
@@ -108,7 +119,7 @@ namespace Editor.DearImGui
 
                             if (colorToggle)
                                 drawList.AddRectFilled(cursor, cursor + new Vector2(contentAvail.X, indvSize), 0x10ffffff);
-                            
+
                             drawList.AddText(cursor + context.Style.FramePadding, 0xffffffff, @object.Name);
 
                             switch (@object.Type)
@@ -146,7 +157,7 @@ namespace Editor.DearImGui
             }
             ImGui.End();
 
-            static unsafe void DrawIcon(ImGuiContextPtr context, ImDrawListPtr drawList, ref Vector2 cursor, float size, float paddedSize, ref TrackedObject @object)
+            unsafe void DrawIcon(ImGuiContextPtr context, ImDrawListPtr drawList, ref Vector2 cursor, float size, float paddedSize, ref TrackedObject @object)
             {
                 uint id = ImGui.GetID(@object.Resource.Handle.GetHashCode());
 
@@ -165,34 +176,171 @@ namespace Editor.DearImGui
 
                 if (ImGui.BeginItemTooltip())
                 {
+                    ImDrawListPtr tooltipDrawList = ImGui.GetWindowDrawList();
+                    ImGuiStylePtr style = ImGui.GetStyle();
+
+                    Vector2 screenCursor = ImGui.GetCursorScreenPos();
+
                     switch (@object.Type)
                     {
                         case ObjectType.Buffer:
                             {
                                 RHI.Buffer buffer = Unsafe.As<RHI.Buffer>(@object.Resource);
 
-                                ImGui.TextUnformatted(@object.Name);
-                                ImGui.TextUnformatted(FileUtility.FormatSize(buffer.Description.Stride, "F4", CultureInfo.InvariantCulture));
-                                ImGui.TextUnformatted(FileUtility.FormatSize(buffer.Description.ByteWidth, "F4", CultureInfo.InvariantCulture));
+                                Vector2 sidePosition = screenCursor;
+                                float height = context.FontSize + style.FramePadding.Y;
+
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Name:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Byte width:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Stride:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Memory:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Usage:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Mode:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "CPU:"u8); sidePosition.Y += height;
+
+                                sidePosition = screenCursor + new Vector2(style.FramePadding.X + ImGui.CalcTextSize("Byte width:"u8).X, 0.0f);
+
+                                string byteWidthFormatted = FileUtility.FormatSize(buffer.Description.ByteWidth, "G", CultureInfo.InvariantCulture);
+                                string strideFormatted = FileUtility.FormatSize(buffer.Description.Stride, "G", CultureInfo.InvariantCulture);
+
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, @object.Name); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, byteWidthFormatted); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, strideFormatted); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, buffer.Description.Memory.ToString()); sidePosition.Y += height;
+
+                                RHI.BufferUsage usage = buffer.Description.Usage;
+                                if (usage == RHI.BufferUsage.None)
+                                {
+                                    tooltipDrawList.AddText(sidePosition, 0xffffffff, "None"u8);
+                                    sidePosition.Y += height;
+                                }
+                                else
+                                {
+                                    for (int i = 0; i < 4; i++)
+                                    {
+                                        RHI.BufferUsage val = (RHI.BufferUsage)(1 << i);
+                                        if (FlagUtility.HasFlag(usage, val))
+                                        {
+                                            tooltipDrawList.AddText(sidePosition, 0xffffffff, val.ToString());
+                                            sidePosition.Y += height;
+                                        }
+                                    }
+                                }
+
+                                RHI.BufferMode mode = buffer.Description.Mode;
+                                if (mode == RHI.BufferMode.None)
+                                {
+                                    tooltipDrawList.AddText(sidePosition, 0xffffffff, "None"u8);
+                                    sidePosition.Y += height;
+                                }
+                                else
+                                {
+                                    for (int i = 0; i < 2; i++)
+                                    {
+                                        RHI.BufferMode val = (RHI.BufferMode)(1 << i);
+                                        if (FlagUtility.HasFlag(mode, val))
+                                        {
+                                            tooltipDrawList.AddText(sidePosition, 0xffffffff, val.ToString());
+                                            sidePosition.Y += height;
+                                        }
+                                    }
+                                }
+
+                                switch (buffer.Description.CpuAccessFlags)
+                                {
+                                    case RHI.CPUAccessFlags.None: tooltipDrawList.AddText(sidePosition, 0xffffffff, "None"u8); sidePosition.Y += height; break;
+                                    case RHI.CPUAccessFlags.Write: tooltipDrawList.AddText(sidePosition, 0xffffffff, "Write"u8); sidePosition.Y += height; break;
+                                    case RHI.CPUAccessFlags.Read: tooltipDrawList.AddText(sidePosition, 0xffffffff, "Read"u8); sidePosition.Y += height; break;
+                                    case (RHI.CPUAccessFlags)3: tooltipDrawList.AddText(sidePosition, 0xffffffff, "Read/Write"u8); sidePosition.Y += height; break;
+                                }
+
+                                Vector2 dummySize = new Vector2(sidePosition.X - screenCursor.X + ImGui.CalcTextSize(@object.Name).X, sidePosition.Y - screenCursor.Y);
+                                ImGui.Dummy(dummySize);
+
                                 break;
                             }
                         case ObjectType.Texture:
                             {
                                 RHI.Texture texture = Unsafe.As<RHI.Texture>(@object.Resource);
-                                if (FlagUtility.HasFlag(texture.Description.Usage, RHI.TextureUsage.ShaderResource))
+                                bool shaderVisible = FlagUtility.HasFlag(texture.Description.Usage, RHI.TextureUsage.ShaderResource);
+
+                                Vector2 imageSize = new Vector2(256.0f);
+
+                                if (shaderVisible)
                                 {
                                     uint maxSize = Math.Max(texture.Description.Width, texture.Description.Height);
                                     float downscale = MathF.Min(256.0f / maxSize, 1.0f);
 
-                                    ImGui.Image(ImGuiUtility.GetTextureRef(texture.Handle), new Vector2(texture.Description.Width, texture.Description.Height) * downscale);
+                                    imageSize = new Vector2(texture.Description.Width, texture.Description.Height) * downscale;
                                 }
 
-                                ImGui.TextUnformatted(@object.Name);
-                                ImGui.TextUnformatted($"{texture.Description.Width}x{texture.Description.Height}x{texture.Description.Depth}");
-                                ImGui.TextUnformatted($"{texture.Description.Format}");
-                                ImGui.TextUnformatted($"{texture.Description.MipLevels}");
-                                ImGui.TextUnformatted(FileUtility.FormatSize(RHI.FormatStatistics.Query(texture.Description.Format).CalculateSize(texture.Description.Width, texture.Description.Height, texture.Description.Depth) * (long)texture.Description.MipLevels, "F4", CultureInfo.InvariantCulture));
+                                tooltipDrawList.AddRect(screenCursor, screenCursor + imageSize + new Vector2(2.0f), new Color32(style.Colors[(int)ImGuiCol.Border]).ARGB);
 
+                                if (shaderVisible)
+                                    tooltipDrawList.AddImage(ImGuiUtility.GetTextureRef(texture.Handle), screenCursor + Vector2.One, screenCursor + imageSize + Vector2.Zero);
+                                else if (_noPreview.Status == ResourceStatus.Success)
+                                    tooltipDrawList.AddImage(ImGuiUtility.GetTextureRef(_noPreview.Handle), screenCursor + Vector2.One, screenCursor + imageSize + Vector2.Zero);
+
+                                Vector2 sidePosition = screenCursor + new Vector2(imageSize.X + 2.0f + style.FramePadding.X, 0.0f);
+                                float height = context.FontSize + style.FramePadding.Y;
+
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Name:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Size:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Mip levels:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Dimension:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Format:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Memory:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Usage:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "CPU:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Swizzle:"u8); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, "Total memory:"u8); sidePosition.Y += height;
+
+                                sidePosition = screenCursor + new Vector2(imageSize.X + 2.0f + style.FramePadding.X * 2.0f + ImGui.CalcTextSize("Total memory:"u8).X, 0.0f);
+
+                                RHI.FormatInfo fi = RHI.FormatStatistics.Query(texture.Description.Format);
+                                string formattedSize = FileUtility.FormatSize(fi.CalculateSize(texture.Description.Width, texture.Description.Height, texture.Description.Depth) * (long)texture.Description.MipLevels, "G", CultureInfo.InvariantCulture);
+
+                                string formatText = $"{texture.Description.Format} (bc:{fi.IsBlockCompressed}, ch:{fi.ChannelCount}, width:{(fi.IsBlockCompressed ? fi.BlockWidth : fi.BytesPerPixel)})";
+
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, @object.Name); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, $"{texture.Description.Width}x{texture.Description.Height}x{texture.Description.Depth}"); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, texture.Description.MipLevels.ToString()); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, texture.Description.Dimension.ToString()); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, formatText); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, texture.Description.Memory.ToString()); sidePosition.Y += height;
+
+                                RHI.TextureUsage usage = texture.Description.Usage;
+                                if (usage == RHI.TextureUsage.None)
+                                {
+                                    tooltipDrawList.AddText(sidePosition, 0xffffffff, "None"u8);
+                                    sidePosition.Y += height;
+                                }
+                                else
+                                {
+                                    for (int i = 0; i < 4; i++)
+                                    {
+                                        RHI.TextureUsage val = (RHI.TextureUsage)(1 << i);
+                                        if (FlagUtility.HasFlag(usage, val))
+                                        {
+                                            tooltipDrawList.AddText(sidePosition, 0xffffffff, val.ToString());
+                                            sidePosition.Y += height;
+                                        }
+                                    }
+                                }
+
+                                switch (texture.Description.CpuAccessFlags)
+                                {
+                                    case RHI.CPUAccessFlags.None: tooltipDrawList.AddText(sidePosition, 0xffffffff, "None"u8); sidePosition.Y += height; break;
+                                    case RHI.CPUAccessFlags.Write: tooltipDrawList.AddText(sidePosition, 0xffffffff, "Write"u8); sidePosition.Y += height; break;
+                                    case RHI.CPUAccessFlags.Read: tooltipDrawList.AddText(sidePosition, 0xffffffff, "Read"u8); sidePosition.Y += height; break;
+                                    case (RHI.CPUAccessFlags)3: tooltipDrawList.AddText(sidePosition, 0xffffffff, "Read/Write"u8); sidePosition.Y += height; break;
+                                }
+
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, $"{texture.Description.Swizzle.R.ToString()},{texture.Description.Swizzle.G.ToString()},{texture.Description.Swizzle.B.ToString()},{texture.Description.Swizzle.A.ToString()}"); sidePosition.Y += height;
+                                tooltipDrawList.AddText(sidePosition, 0xffffffff, formattedSize); sidePosition.Y += height;
+
+                                Vector2 dummySize = new Vector2(sidePosition.X - screenCursor.X + ImGui.CalcTextSize(formatText).X, MathF.Max(imageSize.Y + 2.0f, sidePosition.Y - screenCursor.Y));
+                                ImGui.Dummy(dummySize);
                                 break;
                             }
                         case ObjectType.RenderTarget:
@@ -210,6 +358,14 @@ namespace Editor.DearImGui
 
                 drawList.AddRectFilled(bb.Min, bb.Max, 0x10ffffff);
                 drawList.AddText(cursor + new Vector2((size - textSize.X) * 0.5f, size - textSize.Y - context.Style.FramePadding.Y), 0xffffffff, @object.Name);
+
+                Vector2 centerIcon = new Vector2(bb.Max.X - 12.0f, bb.Min.Y + 12.0f);
+                long dist = Time.TimestampForActiveFrame - @object.CreationTimestamp;
+                if (dist < timestampLimit)
+                {
+                    float timer = 1.0f - (float)(dist / (double)timestampLimit);
+                    drawList.AddQuadFilled(centerIcon - new Vector2(4.0f, 0.0f), centerIcon - new Vector2(0.0f, 4.0f), centerIcon + new Vector2(4.0f, 0.0f), centerIcon + new Vector2(0.0f, 4.0f), new Color32(1.0f, 1.0f, 0.0f, timer).ABGR);
+                }
 
                 switch (@object.Type)
                 {
@@ -275,7 +431,7 @@ namespace Editor.DearImGui
                 return;
             }
 
-            _objects.Add(new TrackedObject(type, resource, "null"));
+            _objects.Add(new TrackedObject(type, resource, "null", Time.TimestampForActiveFrame));
             _objectCounters[(int)type - 1]++;
         }
 
@@ -311,6 +467,6 @@ namespace Editor.DearImGui
             All = Buffer | Texture | RenderTarget | GraphicsPipeline,
         }
 
-        private record struct TrackedObject(ObjectType Type, RHI.Resource Resource, string Name);
+        private record struct TrackedObject(ObjectType Type, RHI.Resource Resource, string Name, long CreationTimestamp);
     }
 }

@@ -3,14 +3,8 @@ using CommunityToolkit.HighPerformance;
 using Editor.Gui.Resources;
 using Primary.Assets;
 using Primary.Common;
-using Primary.Common.Native;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Gui.Graphics
 {

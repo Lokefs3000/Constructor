@@ -1,13 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
-using System;
 using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace Primary.Rendering
 {
@@ -44,7 +38,7 @@ namespace Primary.Rendering
 
         public ShaderBindGroup(ShaderAsset asset, string? name) : this(asset.GetVariablesForBindGroup(name ?? "__Default"), name)
         {
-            
+
         }
 
         public ShaderBindGroup(string? name, params ShaderBindGroupVariable[] variables)

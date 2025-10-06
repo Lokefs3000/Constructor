@@ -1,13 +1,8 @@
 ﻿using CommunityToolkit.HighPerformance;
 using CommunityToolkit.HighPerformance.Buffers;
-using System;
 using System.Buffers;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Serialization
 {
@@ -188,23 +183,23 @@ namespace Primary.Serialization
         public void Write(ulong value) => WriteGeneric(value.ToString(CultureInfo.InvariantCulture));
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(string property, float value)     { WriteProperty(property); WriteGeneric($@"""{value}"""); }
+        public void Write(string property, float value) { WriteProperty(property); WriteGeneric($@"""{value}"""); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(string property, double value)    { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
+        public void Write(string property, double value) { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(string property, sbyte value)     { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
+        public void Write(string property, sbyte value) { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(string property, short value)     { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
+        public void Write(string property, short value) { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(string property, int value)       { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
+        public void Write(string property, int value) { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(string property, long value)      { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
+        public void Write(string property, long value) { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(string property, byte value)      { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
+        public void Write(string property, byte value) { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(string property, ushort value)    { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
+        public void Write(string property, ushort value) { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(string property, uint value)      { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
+        public void Write(string property, uint value) { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Write(string property, ulong value) { WriteProperty(property); WriteGeneric(value.ToString(CultureInfo.InvariantCulture)); }
 

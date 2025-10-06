@@ -1,13 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Common;
-using System;
 using System.Buffers;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 using Vortice.Direct3D12;
 
 namespace Primary.RHI.Direct3D12.Helpers

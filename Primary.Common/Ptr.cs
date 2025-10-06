@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.CompilerServices;
 
 namespace Primary.Common
 {
@@ -11,13 +6,11 @@ namespace Primary.Common
     {
         private T* _pointer;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Ptr()
         {
             _pointer = null;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Ptr(T* @ref)
         {
             _pointer = @ref;

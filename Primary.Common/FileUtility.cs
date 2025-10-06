@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Primary.Common
+﻿namespace Primary.Common
 {
     public static class FileUtility
     {
@@ -27,6 +20,45 @@ namespace Primary.Common
             }
 
             return File.Open(fullPath, mode, access, share);
+        }
+
+        public static FileStream? TryWaitOpenNoThrow(string fullPath, FileMode mode, FileAccess access, FileShare share, int maxTries = 10, int timeoutMs = 250)
+        {
+            for (int i = 0; i < maxTries; i++)
+            {
+                FileStream? fs = null;
+                try
+                {
+                    fs = File.Open(fullPath, mode, access, share);
+                    return fs;
+                }
+                catch (Exception)
+                {
+                    fs?.Dispose();
+                    Thread.Sleep(timeoutMs);
+                }
+            }
+
+            return null;
+        }
+
+        public static string? TryReadAllText(string fullPath, int maxTries = 10, int timeoutMs = 250)
+        {
+            for (int i = 0; i < maxTries; i++)
+            {
+                FileStream? fs = null;
+                try
+                {
+                    return File.ReadAllText(fullPath);
+                }
+                catch (Exception)
+                {
+                    fs?.Dispose();
+                    Thread.Sleep(timeoutMs);
+                }
+            }
+
+            return null;
         }
 
         public static string FormatSize(long size, string? format = "G", IFormatProvider? provider = null)

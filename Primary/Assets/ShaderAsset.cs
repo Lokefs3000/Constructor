@@ -1,11 +1,7 @@
-﻿using CommunityToolkit.HighPerformance;
-using Primary.Common;
-using Primary.Rendering;
+﻿using Primary.Rendering;
 using System.Collections.Frozen;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Primary.Assets
 {
@@ -34,6 +30,9 @@ namespace Primary.Assets
         internal FrozenDictionary<string, ShaderVariable> Variables => _assetData.Variables;
 
         public ResourceStatus Status => _assetData.Status;
+
+        public string Name => _assetData.Name;
+        public AssetId Id => _assetData.Id;
     }
 
     internal sealed class ShaderAssetData : IInternalAssetData
@@ -42,17 +41,23 @@ namespace Primary.Assets
 
         private ResourceStatus _status;
 
+        private readonly AssetId _id;
+        private string _name;
+
         private RHI.GraphicsPipeline? _graphicsPipeline;
         private int _hashCode;
 
         private FrozenDictionary<string, ShaderVariable> _variables;
         private FrozenDictionary<string, int> _bindGroupIndices;
 
-        internal ShaderAssetData()
+        internal ShaderAssetData(AssetId id)
         {
             _asset = new WeakReference(null);
 
             _status = ResourceStatus.Pending;
+
+            _id = id;
+            _name = string.Empty;
 
             _graphicsPipeline = null;
             _hashCode = 0;
@@ -74,17 +79,14 @@ namespace Primary.Assets
             _asset.Target = null;
         }
 
-        public void ResetInternalState()
+        public void SetAssetInternalStatus(ResourceStatus status)
         {
-            Dispose();
-
-            _status = ResourceStatus.Pending;
+            _status = status;
         }
 
-        public void PromoteStateToRunning()
+        public void SetAssetInternalName(string name)
         {
-            if (_status == ResourceStatus.Pending)
-                _status = ResourceStatus.Running;
+            _name = name;
         }
 
         internal void UpdateAssetData(ShaderAsset asset, RHI.GraphicsPipeline graphicsPipeline, int hashCode, Dictionary<string, ShaderVariable> variables)
@@ -172,9 +174,13 @@ namespace Primary.Assets
 
         internal ResourceStatus Status => _status;
 
+        internal AssetId Id => _id;
+        internal string Name => _name;
+
         internal FrozenDictionary<string, ShaderVariable> Variables => _variables;
 
         public Type AssetType => typeof(ShaderAsset);
+        public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
 
         private struct CompareStringsInvariant : IComparer<string>
         {

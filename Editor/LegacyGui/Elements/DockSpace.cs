@@ -5,16 +5,8 @@ using Editor.Rendering.Gui;
 using Primary.Common;
 using Primary.Rendering;
 using Serilog;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
-using static Primary.Rendering.Window;
 using Boundaries = Editor.LegacyGui.Data.Boundaries;
 using RHI = Primary.RHI;
 

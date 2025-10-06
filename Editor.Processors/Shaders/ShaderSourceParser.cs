@@ -1,7 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using System.Buffers;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -10,9 +9,9 @@ using RHI = Primary.RHI;
 
 namespace Editor.Processors.Shaders
 {
-    internal static class ShaderSourceParser
+    internal class ShaderSourceParser
     {
-        public static ShaderParseResult ParseSource(ReadOnlySpan<char> source, string sourceSearchDir, string contentSearchDir)
+        public ShaderParseResult ParseSource(ReadOnlySpan<char> source, string sourceSearchDir, string contentSearchDir)
         {
             ShaderParseResult result = new ShaderParseResult();
 
@@ -31,7 +30,7 @@ namespace Editor.Processors.Shaders
             return result;
         }
 
-        private static void ParseIndividualSource(ShaderParseResult result, string sourceSearchDir, string contentSearchDir, Span<char> source, HashSet<string> defines, bool isSourceFile)
+        private void ParseIndividualSource(ShaderParseResult result, string sourceSearchDir, string contentSearchDir, Span<char> source, HashSet<string> defines, bool isSourceFile)
         {
             int current = 0;
 
@@ -624,7 +623,7 @@ namespace Editor.Processors.Shaders
                         } while (current < source.Length && source[current] != '}');
 
                         int idx = current;
-                        SkipUntil(ref idx, source, ' ', false);
+                        SkipUntilWhitespace(ref idx, source, false);
 
                         result.Structs.Add(structName, new ShaderStruct
                         {
@@ -643,7 +642,7 @@ namespace Editor.Processors.Shaders
                 throw new ArgumentException("unresolved attribs");
         }
 
-        private static void ConvertBindlessFunctions(ShaderParseResult result, int offset)
+        private void ConvertBindlessFunctions(ShaderParseResult result, int offset)
         {
             StringBuilder sb = new StringBuilder();
 
@@ -681,7 +680,7 @@ namespace Editor.Processors.Shaders
             }
         }
 
-        private static void ScanFunctionForVariables(Dictionary<string, ShaderVariable> existing, HashSet<string> found, ReadOnlySpan<char> source, int start, int end)
+        private void ScanFunctionForVariables(Dictionary<string, ShaderVariable> existing, HashSet<string> found, ReadOnlySpan<char> source, int start, int end)
         {
             found.Clear();
 
@@ -710,7 +709,7 @@ namespace Editor.Processors.Shaders
             }
         }
 
-        private static void GenerateBindlessSource(ShaderParseResult result, out int offset)
+        private void GenerateBindlessSource(ShaderParseResult result, out int offset)
         {
             if (result.Variables.Count == 0)
             {
@@ -809,6 +808,7 @@ namespace Editor.Processors.Shaders
             sb.AppendLine("{");
 
             SortShaderBindGroups(result);
+            variables = result.Variables.AsSpan();
 
             if (hasSizeForVkPush && hasUserConstants)
             {
@@ -893,12 +893,12 @@ namespace Editor.Processors.Shaders
             result.OutputSource = sb.ToString() + pooledString.AsSpan(0, result.OutputSource.Length).ToString();
         }
 
-        private static void SortShaderBindGroups(ShaderParseResult result)
+        private void SortShaderBindGroups(ShaderParseResult result)
         {
             using PoolArray<ShaderVariable> variables = ArrayPool<ShaderVariable>.Shared.Rent(result.Variables.Count);
             result.Variables.CopyTo(variables.Array);
 
-            Span<ShaderVariable> span = variables.AsSpan();
+            Span<ShaderVariable> span = variables.AsSpan(0, result.Variables.Count);
 
             result.Variables.Clear();
             foreach (string bindGroup in result.BindGroups)
@@ -930,7 +930,7 @@ namespace Editor.Processors.Shaders
             }
         }
 
-        private static int CalculateStructSize(ref ShaderStruct @struct)
+        private int CalculateStructSize(ref ShaderStruct @struct)
         {
             int size = 0;
             for (int i = 0; i < @struct.Variables.Length; i++)
@@ -942,7 +942,7 @@ namespace Editor.Processors.Shaders
             return size;
         }
 
-        private static bool CheckIsFunction(string name, int current, Span<char> source)
+        private bool CheckIsFunction(string name, int current, Span<char> source)
         {
             if (source[current] == '(' && FindCharacter(current, source, ')', false))
             {
@@ -973,7 +973,7 @@ namespace Editor.Processors.Shaders
             return false;
         }
 
-        private static Span<char> ReadIdentifier(ref int current, Span<char> identifier, bool throwAtEOF = true, bool includeSymbols = false)
+        private Span<char> ReadIdentifier(ref int current, Span<char> identifier, bool throwAtEOF = true, bool includeSymbols = false)
         {
             if (includeSymbols)
                 throw new NotSupportedException();
@@ -992,7 +992,7 @@ namespace Editor.Processors.Shaders
             return identifier.Slice(start, current - start);
         }
 
-        private static Span<char> ReadLetters(ref int current, Span<char> identifier, bool throwAtEOF = true)
+        private Span<char> ReadLetters(ref int current, Span<char> identifier, bool throwAtEOF = true)
         {
             int start = current;
             while (current < identifier.Length)
@@ -1008,7 +1008,7 @@ namespace Editor.Processors.Shaders
             return identifier.Slice(start, current - start);
         }
 
-        private static Span<char> ReadString(ref int current, Span<char> identifier, bool throwAtEOF = true)
+        private Span<char> ReadString(ref int current, Span<char> identifier, bool throwAtEOF = true)
         {
             int start = current;
             while (current < identifier.Length)
@@ -1024,7 +1024,7 @@ namespace Editor.Processors.Shaders
             return identifier.Slice(start, current - start);
         }
 
-        private static void SkipUntil(ref int index, Span<char> source, char ch, bool throwAtNewLine)
+        private void SkipUntil(ref int index, Span<char> source, char ch, bool throwAtNewLine)
         {
             while (index < source.Length)
             {
@@ -1040,7 +1040,23 @@ namespace Editor.Processors.Shaders
             throw new IndexOutOfRangeException("EOF");
         }
 
-        private static Span<char> ReadString(ref int index, Span<char> source)
+        private void SkipUntilWhitespace(ref int index, Span<char> source, bool throwAtNewLine)
+        {
+            while (index < source.Length)
+            {
+                if (source[index] == '\n' && throwAtNewLine)
+                    throw new ArgumentException();
+
+                if (char.IsWhiteSpace(source[index]))
+                    return;
+
+                index++;
+            }
+
+            throw new IndexOutOfRangeException("EOF");
+        }
+
+        private Span<char> ReadString(ref int index, Span<char> source)
         {
             int start = index;
 
@@ -1061,7 +1077,7 @@ namespace Editor.Processors.Shaders
             return source.Slice(start + 1, index - start - 2);
         }
 
-        private static void SkipWhitespace(ref int current, Span<char> source, bool skipNewLine)
+        private void SkipWhitespace(ref int current, Span<char> source, bool skipNewLine)
         {
             if (!char.IsWhiteSpace(source[current]))
                 return;
@@ -1072,7 +1088,7 @@ namespace Editor.Processors.Shaders
             } while (current < source.Length && (char.IsWhiteSpace(source[current]) || (skipNewLine ? source[current] == '\n' : false)));
         }
 
-        private static void SkipUntilNumber(ref int current, Span<char> source)
+        private void SkipUntilNumber(ref int current, Span<char> source)
         {
             if (char.IsNumber(source[current]))
                 return;
@@ -1086,7 +1102,7 @@ namespace Editor.Processors.Shaders
                 throw new ArgumentException("EOF");
         }
 
-        private static string ReadShaderSourceFile(string sourceFileName, params string[] searchDirs)
+        private string ReadShaderSourceFile(string sourceFileName, params string[] searchDirs)
         {
             for (int i = 0; i < searchDirs.Length; i++)
             {
@@ -1102,7 +1118,7 @@ namespace Editor.Processors.Shaders
             throw new FileNotFoundException(sourceFileName);
         }
 
-        private static void EnsureNoArguments(ref int current, Span<char> source)
+        private void EnsureNoArguments(ref int current, Span<char> source)
         {
             if (source[current] == '(')
             {
@@ -1117,7 +1133,7 @@ namespace Editor.Processors.Shaders
             }
         }
 
-        private static void SearchForArguments(ref int current, Span<char> source, Dictionary<string, string> arguments)
+        private void SearchForArguments(ref int current, Span<char> source, Dictionary<string, string> arguments)
         {
             if (source[current] != '(')
                 throw new ArgumentException("no args");
@@ -1176,7 +1192,7 @@ namespace Editor.Processors.Shaders
             current++;
         }
 
-        private static void RemoveRestOfLine(ref int current, Span<char> source)
+        private void RemoveRestOfLine(ref int current, Span<char> source)
         {
             while (current < source.Length && source[current] != '\n')
             {
@@ -1184,7 +1200,7 @@ namespace Editor.Processors.Shaders
             }
         }
 
-        private static void RemoveSectionOfLine(int start, int length, Span<char> source)
+        private void RemoveSectionOfLine(int start, int length, Span<char> source)
         {
             int current = start;
             int maximum = Math.Min(source.Length, length + start);
@@ -1195,7 +1211,7 @@ namespace Editor.Processors.Shaders
             }
         }
 
-        private static void RemoveSectionOfSource(int start, int length, Span<char> source)
+        private void RemoveSectionOfSource(int start, int length, Span<char> source)
         {
             int current = start;
             int maximum = Math.Min(source.Length, length + start);
@@ -1208,7 +1224,7 @@ namespace Editor.Processors.Shaders
             }
         }
 
-        private static char PeekNext(int current, Span<char> source)
+        private char PeekNext(int current, Span<char> source)
         {
             int next = current + 1;
 
@@ -1217,7 +1233,7 @@ namespace Editor.Processors.Shaders
             return source[next];
         }
 
-        private static bool FindCharacter(int current, Span<char> source, char searchFor, bool keepReadingNextLine)
+        private bool FindCharacter(int current, Span<char> source, char searchFor, bool keepReadingNextLine)
         {
             while (current < source.Length)
             {
@@ -1229,7 +1245,7 @@ namespace Editor.Processors.Shaders
             return false;
         }
 
-        private static bool IsAttributeValidOnVariable(AttribType type, ReadOnlySpan<char> signature)
+        private bool IsAttributeValidOnVariable(AttribType type, ReadOnlySpan<char> signature)
         {
             switch (type)
             {
@@ -1244,7 +1260,7 @@ namespace Editor.Processors.Shaders
             return false;
         }
 
-        private static bool IsAttributeValidOnFunction(AttribType type, ShaderParseResult result, ReadOnlySpan<char> functionName)
+        private bool IsAttributeValidOnFunction(AttribType type, ShaderParseResult result, ReadOnlySpan<char> functionName)
         {
             switch (type)
             {
@@ -1259,7 +1275,7 @@ namespace Editor.Processors.Shaders
             return false;
         }
 
-        private static ShaderAttribute ConvertAttribute(ref Attrib attrib)
+        private ShaderAttribute ConvertAttribute(ref Attrib attrib)
         {
             switch (attrib.Type)
             {
@@ -1270,7 +1286,7 @@ namespace Editor.Processors.Shaders
             throw new NotImplementedException(attrib.Type.ToString());
         }
 
-        private static HashSet<string> ResourceTypes = new HashSet<string>
+        private static readonly HashSet<string> ResourceTypes = new HashSet<string>
         {
             "ConstantBuffer",
             "StructuredBuffer",
@@ -1284,7 +1300,7 @@ namespace Editor.Processors.Shaders
             "TextureCubeArray",
         };
 
-        private static Dictionary<string, ImmutableSampler> PresetSamplerTypes = new Dictionary<string, ImmutableSampler>
+        private static readonly Dictionary<string, ImmutableSampler> PresetSamplerTypes = new Dictionary<string, ImmutableSampler>
         {
             { "default", new ImmutableSampler
             {
@@ -1321,7 +1337,7 @@ namespace Editor.Processors.Shaders
             } }
         };
 
-        private static int[] StructVariableSizes = [
+        private static readonly int[] StructVariableSizes = [
             0, //Struct
             4, //Bool
             4, //Int

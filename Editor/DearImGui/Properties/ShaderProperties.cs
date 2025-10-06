@@ -1,18 +1,14 @@
-﻿using Editor.Assets.Importers;
-using Editor.Processors;
+﻿using CommunityToolkit.HighPerformance;
+using Editor.Assets;
 using Hexa.NET.ImGui;
 using Primary.Assets;
-using Primary.Assets.Loaders;
 using Primary.Common;
 using System.Diagnostics;
 using System.Numerics;
 using System.Text;
 using Tomlyn;
 using Tomlyn.Model;
-using Primary.Utility;
-using System.Globalization;
 using RHI = Primary.RHI;
-using CommunityToolkit.HighPerformance;
 
 namespace Editor.DearImGui.Properties
 {
@@ -22,6 +18,7 @@ namespace Editor.DearImGui.Properties
 
         private ShaderAsset? _shader;
         private string? _configFile;
+        private bool _hasLocalConfigFile;
 
         private ShaderArgs _args;
         private List<BlendArgs> _blends;
@@ -357,14 +354,14 @@ namespace Editor.DearImGui.Properties
 
             if (_isImported)
             {
-                if (ImGui.Button("Revert"))
+                if (ImGui.Button("Revert"u8))
                 {
 
                 }
 
                 ImGui.SameLine();
 
-                if (ImGui.Button("Apply"))
+                if (ImGui.Button("Apply"u8))
                 {
                     try
                     {
@@ -378,7 +375,7 @@ namespace Editor.DearImGui.Properties
             }
             else
             {
-                if (ImGui.Button("Import"))
+                if (ImGui.Button(_hasLocalConfigFile ? "Import (L)"u8 : "Import (P)"u8))
                 {
                     try
                     {
@@ -389,6 +386,35 @@ namespace Editor.DearImGui.Properties
                         EdLog.Gui.Error(ex, "Writing importing texture data to disk failed: {f}", td.LocalPath);
                     }
                 }
+
+                if (ImGui.BeginPopupContextItem())
+                {
+                    if (ImGui.MenuItem("Project"u8, !_hasLocalConfigFile))
+                    {
+                        if (_hasLocalConfigFile)
+                        {
+                            AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
+
+                            _configFile = pipeline.Configuration.GetFilePath(td.LocalPath, "Shader");
+                            _hasLocalConfigFile = false;
+                        }
+                    }
+
+                    if (ImGui.MenuItem("Local"u8, _hasLocalConfigFile))
+                    {
+                        if (!_hasLocalConfigFile)
+                        {
+                            ProjectSubFilesystem? subFilesystem = AssetPipeline.SelectAppropriateFilesystem(AssetPipeline.GetFileNamespace(td.LocalPath));
+                            if (subFilesystem != null)
+                            {
+                                _configFile = Path.ChangeExtension(subFilesystem.GetFullPath(td.LocalPath), ".toml");
+                                _hasLocalConfigFile = true;
+                            }
+                        }
+                    }
+
+                    ImGui.EndPopup();
+                }
             }
         }
 
@@ -397,8 +423,25 @@ namespace Editor.DearImGui.Properties
             TargetData? td = target as TargetData;
             if (td != null)
             {
+                AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
+
+                _hasLocalConfigFile = false;
+
                 string localPath = td.LocalPath;
-                string altToml = Editor.GlobalSingleton.AssetPipeline.Configuration.GetFilePath(localPath, "Shader");
+                string altToml = pipeline.Configuration.GetFilePath(localPath, "Shader");
+                if (!File.Exists(altToml))
+                {
+                    ProjectSubFilesystem? subFilesystem = AssetPipeline.SelectAppropriateFilesystem(AssetPipeline.GetFileNamespace(localPath));
+                    if (subFilesystem != null)
+                    {
+                        string newToml = Path.ChangeExtension(subFilesystem.GetFullPath(td.LocalPath), ".toml");
+                        if (File.Exists(newToml))
+                        {
+                            altToml = newToml;
+                            _hasLocalConfigFile = true;
+                        }
+                    }
+                }
 
                 _localPath = localPath;
 
@@ -484,6 +527,7 @@ namespace Editor.DearImGui.Properties
                 _localPath = null;
                 _shader = null;
                 _configFile = null;
+                _hasLocalConfigFile = false;
             }
         }
 

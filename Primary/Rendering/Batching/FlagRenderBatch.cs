@@ -1,8 +1,6 @@
 ﻿using Arch.LowLevel;
 using CommunityToolkit.HighPerformance;
-using Microsoft.Extensions.ObjectPool;
 using Primary.Assets;
-using Schedulers;
 using SharpGen.Runtime;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -89,7 +87,7 @@ namespace Primary.Rendering.Batching
             {
                 if (disposing)
                 {
-                    
+
                 }
 
                 ClearData();

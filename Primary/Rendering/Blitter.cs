@@ -1,13 +1,8 @@
 ﻿using Primary.Assets;
 using Primary.Common;
 using Primary.Rendering.Raw;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Rendering
 {
@@ -23,7 +18,7 @@ namespace Primary.Rendering
         {
             s_instance = this;
 
-            _blitShader = NullableUtility.ThrowIfNull(AssetManager.LoadAsset<ShaderAsset>("Hidden/Blit", true));
+            _blitShader = NullableUtility.ThrowIfNull(AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Blit.hlsl", true));
             _bindGroup = _blitShader.CreateDefaultBindGroup();
         }
 

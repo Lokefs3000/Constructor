@@ -1,11 +1,6 @@
 ﻿using Primary.RHI.Direct3D12.Allocators;
 using Primary.RHI.Direct3D12.Utility;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 using Vortice.Direct3D12;
 
 namespace Primary.RHI.Direct3D12.Descriptors

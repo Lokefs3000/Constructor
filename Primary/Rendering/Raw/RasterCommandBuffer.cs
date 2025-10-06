@@ -1,14 +1,8 @@
 ﻿using Primary.Assets;
-using Primary.RenderLayer;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Rendering.Raw
 {
@@ -36,7 +30,7 @@ namespace Primary.Rendering.Raw
             _activeShader = null;
 
             Array.Fill(_bindGroups, null);
-            Array.Fill(_locations, new RHI.ResourceLocation(0, null));
+            Array.Fill(_locations, new RHI.ResourceLocation(0, null, null, 0));
         }
 
         internal void UnbindUsage()
@@ -45,50 +39,31 @@ namespace Primary.Rendering.Raw
             _activeShader = null;
 
             Array.Fill(_bindGroups, null);
-            Array.Fill(_locations, new RHI.ResourceLocation(0, null));
+            Array.Fill(_locations, new RHI.ResourceLocation(0, null, null, 0));
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public nint Map(RHI.Buffer buffer, RHI.MapIntent intent, ulong writeSize = 0, ulong writeOffset = 0) => _commandBuffer!.Map(buffer, intent, writeSize, writeOffset);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public nint Map(RHI.Texture texture, RHI.MapIntent intent, RHI.TextureLocation location, uint subresource = 0, uint rowPitch = 0) => _commandBuffer!.Map(texture, intent, location, subresource, rowPitch);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Unmap(RHI.Resource resource) => _commandBuffer!.Unmap(resource);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool CopyBufferRegion(RHI.Buffer src, uint srcOffset, RHI.Buffer dst, uint dstOffset, uint size) => _commandBuffer!.CopyBufferRegion(src, srcOffset, dst, dstOffset, size);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool CopyTextureRegion(RHI.Resource src, RHI.TextureLocation srcLoc, uint srcSubRes, RHI.Resource dst, RHI.TextureLocation dstLoc, uint dstSubRes) => _commandBuffer!.CopyTextureRegion(src, srcLoc, srcSubRes, dst, dstLoc, dstSubRes);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ClearRenderTarget(RHI.RenderTarget rt, Vector4 color) => _commandBuffer!.ClearRenderTarget(rt, color);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ClearDepthStencil(RHI.RenderTarget rt, RHI.ClearFlags clear, float depth = 1.0f, byte stencil = 0xff) => _commandBuffer!.ClearDepthStencil(rt, clear, depth, stencil);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetRenderTarget(RHI.RenderTarget rt, bool alsoBindDepthStencil = false) => _commandBuffer!.SetRenderTargets(new Span<RHI.RenderTarget>(ref rt), alsoBindDepthStencil);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetRenderTargets(Span<RHI.RenderTarget> rts, bool setFirstAsDepthStencil = false) => _commandBuffer!.SetRenderTargets(rts, setFirstAsDepthStencil);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetDepthStencil(RHI.RenderTarget rt) => _commandBuffer!.SetDepthStencil(rt);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetViewport(RHI.Viewport viewport) => _commandBuffer!.SetViewports(new Span<RHI.Viewport>(ref viewport));
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetViewports(Span<RHI.Viewport> viewports) => _commandBuffer!.SetViewports(viewports);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetScissorRect(RHI.ScissorRect scissor) => _commandBuffer!.SetScissorRects(new Span<RHI.ScissorRect>(ref scissor));
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetScissorRects(Span<RHI.ScissorRect> scissors) => _commandBuffer!.SetScissorRects(scissors);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetStencilReference(uint stencilRef) => _commandBuffer!.SetStencilReference(stencilRef);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetVertexBuffer(int slot, RHI.Buffer buffer) => _commandBuffer!.SetVertexBuffers(slot, new Span<RHI.Buffer>(ref buffer));
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetVertexBuffers(int startSlot, Span<RHI.Buffer> buffers) => _commandBuffer!.SetVertexBuffers(startSlot, buffers);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetVertexBuffer(int slot, RHI.Buffer buffer, uint stride = 0) => _commandBuffer!.SetVertexBuffers(slot, new Span<RHI.Buffer>(ref buffer), stride == 0 ? Span<uint>.Empty : new Span<uint>(ref stride));
+        public void SetVertexBuffers(int startSlot, Span<RHI.Buffer> buffers) => _commandBuffer!.SetVertexBuffers(startSlot, buffers, Span<uint>.Empty);
+        public void SetVertexBuffers(int startSlot, Span<RHI.Buffer> buffers, Span<uint> strides) => _commandBuffer!.SetVertexBuffers(startSlot, buffers, strides);
         public void SetIndexBuffer(RHI.Buffer? buffer) => _commandBuffer!.SetIndexBuffer(buffer);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -215,27 +190,27 @@ namespace Primary.Rendering.Raw
                                 {
                                     TextureAsset? asset = Unsafe.As<TextureAsset>(staticRes.Resource);
                                     if (asset == null || asset.Status != ResourceStatus.Success)
-                                        resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), AssetManager.Static.DefaultWhite.Texture);
+                                        resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), AssetManager.Static.DefaultWhite.Texture, null, 0);
                                     else
-                                        resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), asset.Texture);
+                                        resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), asset.Texture, null, 0);
                                     break;
                                 }
                             case BindGroupResourceType.RHITexture:
                                 {
                                     RHI.Texture? resource = Unsafe.As<RHI.Texture>(staticRes.Resource);
-                                    resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), resource);
+                                    resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), resource, null, 0);
                                     break;
                                 }
                             case BindGroupResourceType.RHIBuffer:
                                 {
                                     RHI.Buffer? resource = Unsafe.As<RHI.Buffer>(staticRes.Resource);
-                                    resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), resource);
+                                    resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), resource, null, 0);
                                     break;
                                 }
                             case BindGroupResourceType.RHIRenderTextureView:
                                 {
                                     RHI.RenderTextureView? resource = Unsafe.As<RHI.RenderTextureView>(staticRes.Resource);
-                                    resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), resource);
+                                    resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), resource, null, 0);
                                     break;
                                 }
                             default: break;

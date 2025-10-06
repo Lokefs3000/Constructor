@@ -1,9 +1,5 @@
-﻿using Editor.LegacyGui.Data;
-using Editor.LegacyGui.Managers;
-using Editor.Rendering.Gui;
-using Primary.Rendering;
+﻿using Editor.Rendering.Gui;
 using System.Numerics;
-using RHI = Primary.RHI;
 
 namespace Editor.LegacyGui.Elements
 {

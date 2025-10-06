@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Primary
+﻿namespace Primary
 {
     public static class Constants
     {
@@ -26,5 +20,10 @@ namespace Primary
         public const float rShadowCubemapBufferShrinkPercentage = 3.0f;
 
         public const int rFlagListStartSize = 32;
+
+        public const int rRPBufferManagerHistorySize = 12;
+        public const float rRPBufferManagerHistoryTime = 0.2f;
+        public const int rRPBufferManagerMinimumSize = 64; //bytes
+        public const int rRPBufferManagerMaximumSize = 1024; //bytes
     }
 }

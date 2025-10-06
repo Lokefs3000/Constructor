@@ -3,7 +3,6 @@ using Editor.LegacyGui.Data;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using TerraFX.Interop.Windows;
 
 namespace Editor.Rendering.Gui
 {

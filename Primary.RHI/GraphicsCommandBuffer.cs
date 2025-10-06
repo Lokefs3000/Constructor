@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Numerics;
 
 namespace Primary.RHI
 {
@@ -21,7 +15,7 @@ namespace Primary.RHI
 
         public abstract void SetStencilReference(uint stencilRef);
 
-        public abstract void SetVertexBuffers(int startSlot, Span<Buffer> buffers);
+        public abstract void SetVertexBuffers(int startSlot, Span<Buffer> buffers, Span<uint> strides);
         public abstract void SetIndexBuffer(Buffer? buffer);
 
         public abstract void SetPipeline(GraphicsPipeline pipeline);
@@ -78,7 +72,7 @@ namespace Primary.RHI
         }
     }
 
-    public record struct ResourceLocation(ushort ConstantsOffset, Resource? Resource);
+    public record struct ResourceLocation(ushort ConstantsOffset, Resource? Resource, Descriptor? Descriptor, uint DescriptorOffset);
     public record struct ScissorRect(int Left, int Top, int Right, int Bottom);
     public record struct Viewport(float TopLeftX, float TopLeftY, float Width, float Height, float MinDepth = 0.0f, float MaxDepth = 1.0f);
 }

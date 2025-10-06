@@ -50,6 +50,7 @@ namespace Primary.RHI.Direct3D12.Descriptors
 
         internal DescriptorHeapAllocation Rent(int size)
         {
+            //TODO: consider reversing if its performance critical as there is a higher change of a free space at last place then first
             for (int i = 0; i < _heaps.Count; i++)
             {
                 DescriptorHeapAllocation alloc = _heaps[i].Allocate(size);

@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Primary.Rendering.Data
+﻿namespace Primary.Rendering.Data
 {
     public interface IRenderPassDataObject
     {

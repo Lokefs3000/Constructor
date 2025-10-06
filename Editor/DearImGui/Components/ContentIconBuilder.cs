@@ -121,30 +121,35 @@ namespace Editor.DearImGui.Components
 
                 _iconUVPositions = boundaries.ToFrozenDictionary();
 
-                unsafe
+                if (bounds.Width > 0 && bounds.Height > 0)
                 {
-                    fixed (byte* ptr = atlasPixels)
+                    unsafe
                     {
-                        nint ptrV = (nint)ptr;
-
-                        _iconTexture = RenderingManager.Device.CreateTexture(new RHI.TextureDescription
+                        fixed (byte* ptr = atlasPixels)
                         {
-                            Width = bounds.Width,
-                            Height = bounds.Height,
-                            Depth = 1,
+                            nint ptrV = (nint)ptr;
 
-                            MipLevels = 1,
+                            _iconTexture = RenderingManager.Device.CreateTexture(new RHI.TextureDescription
+                            {
+                                Width = bounds.Width,
+                                Height = bounds.Height,
+                                Depth = 1,
 
-                            Dimension = RHI.TextureDimension.Texture2D,
-                            Format = RHI.TextureFormat.RGBA8un,
-                            Memory = RHI.MemoryUsage.Immutable,
-                            Usage = RHI.TextureUsage.ShaderResource,
-                            CpuAccessFlags = RHI.CPUAccessFlags.None,
+                                MipLevels = 1,
 
-                            Swizzle = RHI.TextureSwizzle.Default,
-                        }, new Span<nint>(ref ptrV));
+                                Dimension = RHI.TextureDimension.Texture2D,
+                                Format = RHI.TextureFormat.RGBA8un,
+                                Memory = RHI.MemoryUsage.Immutable,
+                                Usage = RHI.TextureUsage.ShaderResource,
+                                CpuAccessFlags = RHI.CPUAccessFlags.None,
+
+                                Swizzle = RHI.TextureSwizzle.Default,
+                            }, new Span<nint>(ref ptrV));
+                        }
                     }
                 }
+
+                EdLog.Gui.Information("Built content view icons..");
             }
             finally
             {

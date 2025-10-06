@@ -1,13 +1,13 @@
-﻿using SDL;
+﻿using Primary.Common.Streams;
+using SDL;
 using StbImageSharp;
-using System.Diagnostics;
 using System.Globalization;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using TerraFX.Interop.Windows;
+using System.Text.Json.Nodes;
 
 using static SDL.SDL3;
-using Win32 = TerraFX.Interop.Windows.Windows;
 
 namespace Editor.Platform.Windows
 {
@@ -16,7 +16,10 @@ namespace Editor.Platform.Windows
         private SDL_Window* _window;
         private SDL_Renderer* _renderer;
 
-        private SDL_Texture* _texture;
+        private SDL_Texture* _splashTexture;
+        private SDL_Texture* _glyphTexture;
+
+        private GlyphData[] _glyphs;
 
         private float _progress;
         private int _completed;
@@ -33,41 +36,72 @@ namespace Editor.Platform.Windows
 
             SDL_SetWindowHitTest(_window, &HitTest, nint.Zero);
 
+            using BundleReader reader = new BundleReader(File.OpenRead("SplashData.bundle")!, true);
+
             //Splash icon
             {
-                using ImageResult result = ImageResult.FromMemory(File.ReadAllBytes("splash.png"), ColorComponents.RedGreenBlueAlpha);
+                using ImageResult result = ImageResult.FromMemory(reader.ReadBytes("Splash")!, ColorComponents.RedGreenBlueAlpha);
 
-                SDL_Surface* surface = SDL_CreateSurfaceFrom(result.Width, result.Height, SDL_PixelFormat.SDL_PIXELFORMAT_ARGB8888, (nint)result.DataPtr, result.Width * 4);
-                _texture = SDL_CreateTextureFromSurface(_renderer, surface);
+                SDL_Surface* surface = SDL_CreateSurfaceFrom(result.Width, result.Height, SDL_PixelFormat.SDL_PIXELFORMAT_ABGR8888, (nint)result.DataPtr, result.Width * 4);
+                _splashTexture = SDL_CreateTextureFromSurface(_renderer, surface);
 
                 SDL_DestroySurface(surface);
             }
 
+            //Glyph texture
+            {
+                using ImageResult result = ImageResult.FromMemory(reader.ReadBytes("Font")!, ColorComponents.RedGreenBlueAlpha);
+
+                SDL_Surface* surface = SDL_CreateSurfaceFrom(result.Width, result.Height, SDL_PixelFormat.SDL_PIXELFORMAT_ABGR8888, (nint)result.DataPtr, result.Width * 4);
+
+                int length = result.Width * result.Height * 4;
+                for (int i = 0; i < length; i += 4)
+                {
+                    ((byte*)surface->pixels)[i + 3] = (byte)Math.Clamp((int)MathF.Pow(((byte*)surface->pixels)[i], 2.0f), 0, 255);
+                }
+
+                _glyphTexture = SDL_CreateTextureFromSurface(_renderer, surface);
+
+                SDL_DestroySurface(surface);
+            }
+
+            //Glyph data
+            {
+                _glyphs = new GlyphData[96];
+
+                JsonNode node = JsonNode.Parse(reader.ReadString("Data")!)!;
+
+                foreach (JsonObject glyph in node["glyphs"]!.AsArray()!)
+                {
+                    int unicode = glyph["unicode"]!.GetValue<int>();
+
+                    JsonNode? planeBounds = glyph["planeBounds"];
+                    JsonNode? atlasBounds = glyph["atlasBounds"];
+
+                    _glyphs[unicode - 32] = new GlyphData
+                    {
+                        IsDrawable = planeBounds != null && atlasBounds != null,
+                        Boundaries = planeBounds != null ? new Vector4(planeBounds["left"]!.GetValue<float>(), planeBounds["top"]!.GetValue<float>(), planeBounds["right"]!.GetValue<float>(), planeBounds["bottom"]!.GetValue<float>()) : default,
+                        Source = atlasBounds != null ? Constructor(atlasBounds["left"]!.GetValue<float>(), atlasBounds["top"]!.GetValue<float>(), atlasBounds["right"]!.GetValue<float>(), atlasBounds["bottom"]!.GetValue<float>()) : default,
+                        Advance = glyph["advance"]!.GetValue<float>()
+                    };
+                }
+
+                static SDL_FRect Constructor(float left, float top, float right, float bottom)
+                {
+                    return new SDL_FRect
+                    {
+                        x = left,
+                        y = top,
+                        w = right - left,
+                        h = bottom - top,
+                    };
+                }
+            }
+
             _startTime = DateTime.UtcNow;
 
-            //Draw initial
-            {
-                SDL_FRect dstRect = new SDL_FRect { w = 500, h = 250 };
-
-                SDL_SetRenderDrawColor(_renderer, 59, 59, 59, 255);
-                SDL_RenderClear(_renderer);
-
-                SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
-                SDL_RenderTexture(_renderer, _texture, null, &dstRect);
-
-                SDL_FRect lineRect = new SDL_FRect { x = 3, y = 253, w = 494, h = 44 };
-                SDL_FRect barRect = new SDL_FRect { x = 4, y = 254, w = 492, h = 42 };
-
-                SDL_SetRenderDrawColor(_renderer, 98, 98, 98, 255);
-                SDL_RenderRect(_renderer, &lineRect);
-
-                SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
-                SDL_RenderFillRect(_renderer, &barRect);
-
-                SDL_RenderPresent(_renderer);
-
-                SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
-            }
+            DrawInitial();
         }
 
         private void Dispose(bool disposing)
@@ -79,7 +113,7 @@ namespace Editor.Platform.Windows
 
                 }
 
-                SDL_DestroyTexture(_texture);
+                SDL_DestroyTexture(_splashTexture);
                 SDL_DestroyRenderer(_renderer);
                 SDL_DestroyWindow(_window);
 
@@ -108,20 +142,77 @@ namespace Editor.Platform.Windows
 
         internal void Draw()
         {
-            string statsText = $"{_completed}/{_total} - {(DateTime.UtcNow - _startTime).ToString(null, CultureInfo.InvariantCulture)}s";
-
-            SDL_FRect barRect = new SDL_FRect { x = 4, y = 254, w = 492 * _progress, h = 42 };
-            SDL_FRect statsRect = new SDL_FRect { x = 16, y = 16, w = 8 * statsText.Length, h = 7 };
-
-            SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
-            SDL_RenderFillRect(_renderer, &statsRect);
+            SDL_FRect srcRect = new SDL_FRect { x = 11, y = 254, w = 200 - 11, h = 14 };
+            SDL_RenderTexture(_renderer, _splashTexture, &srcRect, &srcRect);
 
             SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
+            DrawText(new Vector2(10.0f, 266.0f), 14.0f, $"{_completed}/{_total} - {(DateTime.UtcNow - _startTime).ToString(@"hh\.mm\:ss\:ff", CultureInfo.InvariantCulture)}");
+
+            SDL_FRect barRect = new SDL_FRect { x = 11, y = 273, w = 348 * MathF.Min((float)(_completed / (double)_total), 1.0f), h = 16 };
+
+            SDL_SetRenderDrawColor(_renderer, 184, 118, 51, 255);
             SDL_RenderFillRect(_renderer, &barRect);
 
-            SDL_RenderDebugText(_renderer, 16.0f, 16.0f, statsText);
+            SDL_RenderPresent(_renderer);
+        }
+
+        private void DrawInitial()
+        {
+            SDL_FRect dstRect = new SDL_FRect { w = 500, h = 300 };
+
+            SDL_SetRenderDrawColor(_renderer, 59, 59, 59, 255);
+            SDL_RenderClear(_renderer);
+
+            SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
+            SDL_RenderTexture(_renderer, _splashTexture, null, &dstRect);
+
+            SDL_SetRenderDrawBlendMode(_renderer, SDL_BlendMode.SDL_BLENDMODE_BLEND);
+
+            DrawText(new Vector2(10.0f, 248.0f), 24.0f, "Importing assets..");
+            DrawText(new Vector2(10.0f, 266.0f), 14.0f, $"{_completed}/{_total} - {(DateTime.UtcNow - _startTime).ToString(@"hh\.mm\:ss\:ff", CultureInfo.InvariantCulture)}");
+
+            SDL_SetRenderDrawBlendMode(_renderer, SDL_BlendMode.SDL_BLENDMODE_NONE);
+
+            SDL_FRect bgRect = new SDL_FRect { x = 10, y = 272, w = 350, h = 18 };
+
+            SDL_SetRenderDrawColor(_renderer, 40, 40, 40, 255);
+            SDL_RenderFillRect(_renderer, &bgRect);
+
+            //SDL_FRect lineRect = new SDL_FRect { x = 3, y = 253, w = 494, h = 44 };
+            //SDL_FRect barRect = new SDL_FRect { x = 4, y = 254, w = 492, h = 42 };
+
+            //SDL_SetRenderDrawColor(_renderer, 98, 98, 98, 255);
+            //SDL_RenderRect(_renderer, &lineRect);
+
+            //SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
+            //SDL_RenderFillRect(_renderer, &barRect);
 
             SDL_RenderPresent(_renderer);
+
+            SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
+        }
+
+        private void DrawText(Vector2 pos, float scale, in string text)
+        {
+            for (int i = 0; i < text.Length; i++)
+            {
+                int c = text[i] - 32;
+                if (c < 96)
+                {
+                    ref GlyphData data = ref _glyphs[c];
+                    if (data.IsDrawable)
+                    {
+                        Vector4 offset = data.Boundaries * scale + new Vector4(pos.X, pos.Y, pos.X, pos.Y);
+
+                        SDL_FRect src = data.Source;
+                        SDL_FRect dst = new SDL_FRect { x = offset.X, y = offset.Y, w = offset.Z - offset.X, h = offset.W - offset.Y };
+
+                        SDL_RenderTexture(_renderer, _glyphTexture, &src, &dst);
+                    }
+
+                    pos.X += data.Advance * scale;
+                }
+            }
         }
 
         internal float Progress { get => _progress; set => _progress = MathF.Min(MathF.Max(value, 0.0f), 1.0f); }
@@ -134,5 +225,7 @@ namespace Editor.Platform.Windows
         {
             return SDL_HitTestResult.SDL_HITTEST_DRAGGABLE;
         }
+
+        private readonly record struct GlyphData(bool IsDrawable, Vector4 Boundaries, SDL_FRect Source, float Advance);
     }
 }

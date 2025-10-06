@@ -147,7 +147,7 @@ namespace Editor.Gui
                     }
 
                     Vector2 localPosition = _globalMousePosition - container.Window.Position;
-                
+
                     if (eventData.MouseButtons != buttons)
                     {
                         UIMouseButton button = UIMouseButton.Left;

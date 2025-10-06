@@ -4,14 +4,16 @@ using Editor.DearImGui.Components;
 using Editor.DearImGui.Properties;
 using Editor.Gui;
 using Hexa.NET.ImGui;
+using Primary.Assets;
 using Primary.Common;
 using Primary.RenderLayer;
+using Primary.Scenes;
+using SDL;
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using TerraFX.Interop.Windows;
 
 namespace Editor.DearImGui
 {
@@ -33,6 +35,7 @@ namespace Editor.DearImGui
 
         private string? _activeTooltipPath = null;
         private long _fileLength;
+        private AssetId _fileId;
 
         internal ContentView()
         {
@@ -49,10 +52,11 @@ namespace Editor.DearImGui
             _folderFileIconId = -1;
 
             _iconSet = Editor.GlobalSingleton.GuiAtlasManager.CreateIconSet(
-                "Content/Icons/HierchyArrow.png");
+                "Editor/Textures/Icons/HierchyArrow.png");
 
             _activeTooltipPath = null;
             _fileLength = -1;
+            _fileId = AssetId.Invalid;
         }
 
         private List<DeferredIcon> _deferredIconStack = new List<DeferredIcon>();
@@ -70,7 +74,7 @@ namespace Editor.DearImGui
                     float height = ImGui.GetFrameHeight();
 
                     GfxTexture atlas = _iconSet.AtlasTexture;
-                    _iconSet.TryGetAtlasIcon("Content/Icons/HierchyArrow.png", out DynAtlasIcon icon);
+                    _iconSet.TryGetAtlasIcon("Editor/Textures/Icons/HierchyArrow.png", out DynAtlasIcon icon);
 
                     ImDrawListPtr drawList = ImGui.GetWindowDrawList();
                     ImGuiStylePtr style = ImGui.GetStyle();
@@ -176,9 +180,17 @@ namespace Editor.DearImGui
 
                 if (ImGui.BeginChild("##HIERCHY", new Vector2(150.0f, 0.0f), ImGuiChildFlags.Borders, ImGuiWindowFlags.HorizontalScrollbar))
                 {
-                    DrawHierchyForWatcher(Editor.GlobalSingleton.AssetPipeline.ContentWatcher, "Content");
-                    DrawHierchyForWatcher(Editor.GlobalSingleton.AssetPipeline.SourceWatcher, "Source");
+                    AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
 
+                    DrawHierchyForWatcher(pipeline.ContentWatcher, "Content");
+                    DrawHierchyForWatcher(pipeline.SourceWatcher, "Source");
+
+                    ImGui.Separator();
+
+                    if (pipeline.EngineWatcher != null)
+                        DrawHierchyForWatcher(pipeline.EngineWatcher, "Engine");
+                    if (pipeline.EditorWatcher != null)
+                        DrawHierchyForWatcher(pipeline.EditorWatcher, "Editor");
                 }
                 ImGui.EndChild();
 
@@ -190,16 +202,19 @@ namespace Editor.DearImGui
 
                     DrawWatcherIconSet();
 
-                    unsafe
+                    if (_iconBuilder.Texture != null)
                     {
-                        ImTextureRef texId = new ImTextureRef(null, new ImTextureID(_iconBuilder.Texture!.Handle));
-
-                        ImDrawListPtr drawList = ImGui.GetWindowDrawList();
-                        for (int i = 0; i < _deferredIconStack.Count; i++)
+                        unsafe
                         {
-                            DeferredIcon icon = _deferredIconStack[i];
-                            if (_iconBuilder.TryGetIcon(icon.IconId, out Boundaries uvBounds))
-                                drawList.AddImage(texId, icon.Min, icon.Max, uvBounds.Minimum, uvBounds.Maximum, 0xffffffff);
+                            ImTextureRef texId = new ImTextureRef(null, new ImTextureID(_iconBuilder.Texture!.Handle));
+
+                            ImDrawListPtr drawList = ImGui.GetWindowDrawList();
+                            for (int i = 0; i < _deferredIconStack.Count; i++)
+                            {
+                                DeferredIcon icon = _deferredIconStack[i];
+                                if (_iconBuilder.TryGetIcon(icon.IconId, out Boundaries uvBounds))
+                                    drawList.AddImage(texId, icon.Min, icon.Max, uvBounds.Minimum, uvBounds.Maximum, 0xffffffff);
+                            }
                         }
                     }
 
@@ -213,16 +228,20 @@ namespace Editor.DearImGui
         {
             _iconBuilder.ClearIcons();
 
-            int fileUnknownIcon = _iconBuilder.AddIcon("Content/Icons/FileUnknown.png");
-            int fileMaterialIcon = _iconBuilder.AddIcon("Content/Icons/FileMaterial.png");
-            int fileShaderVariantIcon = _iconBuilder.AddIcon("Content/Icons/FileShaderVariant.png");
+            int fileUnknownIcon = _iconBuilder.AddIcon("Editor/Textures/Icons/FileUnknown.png");
+            int fileMaterialIcon = _iconBuilder.AddIcon("Editor/Textures/Icons/FileMaterial.png");
+            int fileShaderVariantIcon = _iconBuilder.AddIcon("Editor/Textures/Icons/FileShaderVariant.png");
+            int fileTOMLIcon = _iconBuilder.AddIcon("Editor/Textures/Icons/FileTOML.png");
+            int fileJSONIcon = _iconBuilder.AddIcon("Editor/Textures/Icons/FileJSON.png");
 
-            _folderFileIconId = _iconBuilder.AddIcon("Content/Icons/Folder.png");
+            _folderFileIconId = _iconBuilder.AddIcon("Editor/Textures/Icons/Folder.png");
 
             Dictionary<int, int> iconAssocations = new Dictionary<int, int>
             {
                 { ".mat".GetDjb2HashCode(), fileMaterialIcon },
-                { ".shvar".GetDjb2HashCode(), fileShaderVariantIcon }
+                { ".shvar".GetDjb2HashCode(), fileShaderVariantIcon },
+                { ".toml".GetDjb2HashCode(), fileTOMLIcon },
+                { ".json".GetDjb2HashCode(), fileJSONIcon }
             };
 
             AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
@@ -316,7 +335,14 @@ namespace Editor.DearImGui
                         {
                             if (!isDirectory && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
                             {
-                                Process.Start("explorer.exe", $@"""{Path.Combine(Editor.GlobalSingleton.ProjectPath, fullLocalPath).Replace('/', '\\')}""");
+                                string extension = Path.GetExtension(fullLocalPath);
+                                if (extension == ".sdf")
+                                {
+                                    SceneManager sceneManager = Editor.GlobalSingleton.SceneManager;
+                                    sceneManager.LoadScene(fullLocalPath, LoadSceneMode.Single);
+                                }
+
+                                //Process.Start("explorer.exe", $@"""{Path.Combine(Editor.GlobalSingleton.ProjectPath, fullLocalPath).Replace('/', '\\')}""");
                             }
                         }
                         if (pressed)
@@ -332,6 +358,8 @@ namespace Editor.DearImGui
                                     Editor.GlobalSingleton.PropertiesView.SetInspected(new TextureProperties.TargetData(fullLocalPath));
                                 else if (ext == ".hlsl")
                                     Editor.GlobalSingleton.PropertiesView.SetInspected(new ShaderProperties.TargetData(fullLocalPath));
+                                else if (ext == ".fbx" || ext == ".obj")
+                                    Editor.GlobalSingleton.PropertiesView.SetInspected(new ModelProperties.TargetData(fullLocalPath));
                             }
                         }
 
@@ -368,6 +396,17 @@ namespace Editor.DearImGui
 
                             ImGui.Separator();
 
+                            if (ImGui.MenuItem("Copy asset id"))
+                            {
+                                AssetId assetId = Editor.GlobalSingleton.AssetPipeline.Identifier.RetriveIdForPath(fullLocalPath);
+                                if (id != AssetId.Invalid)
+                                {
+                                    SDL3.SDL_SetClipboardText(assetId.ToString());
+                                }
+                            }
+
+                            ImGui.Separator();
+
                             ImGui.BeginDisabled();
                             if (ImGui.MenuItem("Rename (WIP)")) ;
                             if (ImGui.MenuItem("Copy (WIP)")) ;
@@ -386,7 +425,7 @@ namespace Editor.DearImGui
                                 {
                                     try
                                     {
-                                        _fileLength = new FileInfo(Path.Combine(Editor.GlobalSingleton.ProjectPath, fullLocalPath)).Length;
+                                        _fileLength = new FileInfo(_activeWatcher.SubFilesystem.GetFullPath(fullLocalPath)).Length;
                                     }
                                     catch (Exception ex)
                                     {
@@ -394,6 +433,7 @@ namespace Editor.DearImGui
                                     }
                                 }
 
+                                _fileId = Editor.GlobalSingleton.AssetPipeline.Identifier.RetriveIdForPath(fullLocalPath);
                                 _activeTooltipPath = fullLocalPath;
                             }
 
@@ -409,14 +449,15 @@ namespace Editor.DearImGui
                             Vector2 textSizeB = ImGui.CalcTextSize(fullLocalPath);
                             Vector2 textSizeC = ImGui.CalcTextSize(underlineText);
 
-                            float totalImageSize = context.FontSize * 3.0f + style.ItemInnerSpacing.Y * 2.0f;
+                            float totalImageSize = context.FontSize * 4.0f + style.ItemInnerSpacing.Y * 3.0f;
                             float xOffset = totalImageSize + style.FramePadding.X;
 
                             tooltipDrawList.AddRectFilled(tooltipScreen, tooltipScreen + new Vector2(totalImageSize), 0x10ffffff, style.FrameRounding);
                             tooltipDrawList.AddText(tooltipScreen + new Vector2(xOffset + style.FramePadding.X, 0.0f), 0xffffffff, iconText);
                             tooltipDrawList.AddText(tooltipScreen + new Vector2(xOffset + style.FramePadding.Y, context.FontSize + style.ItemInnerSpacing.Y), 0x80ffffff, fullLocalPath);
+                            tooltipDrawList.AddText(tooltipScreen + new Vector2(xOffset + style.FramePadding.Y, (context.FontSize + style.ItemInnerSpacing.Y) * 2.0f), 0x80ffffff, "Id: " + _fileId.ToString());
                             if (underlineText.Length > 0)
-                                tooltipDrawList.AddText(tooltipScreen + new Vector2(xOffset + style.FramePadding.Y, (context.FontSize + style.ItemInnerSpacing.Y) * 2.0f), 0x80ffffff, underlineText);
+                                tooltipDrawList.AddText(tooltipScreen + new Vector2(xOffset + style.FramePadding.Y, (context.FontSize + style.ItemInnerSpacing.Y) * 3.0f), 0x80ffffff, underlineText);
 
                             unsafe
                             {
@@ -559,6 +600,18 @@ namespace Editor.DearImGui
                 _directoryDepth.Push(token.ToString());
             }
 
+            if (_directoryDepth.Count > 0)
+            {
+                switch (_directoryDepth.First())
+                {
+                    case "Content": _activeWatcher = Editor.GlobalSingleton.AssetPipeline.ContentWatcher; break;
+                    case "Source": _activeWatcher = Editor.GlobalSingleton.AssetPipeline.SourceWatcher; break;
+                    case "Engine": _activeWatcher = Editor.GlobalSingleton.AssetPipeline.EngineWatcher ?? Editor.GlobalSingleton.AssetPipeline.ContentWatcher; break;
+                    case "Editor": _activeWatcher = Editor.GlobalSingleton.AssetPipeline.EditorWatcher ?? Editor.GlobalSingleton.AssetPipeline.ContentWatcher; break;
+                    default: break;
+                }
+            }
+
             string newDirPath = BuildPathFromDirectoryStack();
             if (addAsPast)
             {
@@ -613,7 +666,10 @@ namespace Editor.DearImGui
                 drawList.AddRectFilled(arrow_bb.Min, arrow_bb.Max, ImGui.GetColorU32(held ? ImGuiCol.HeaderActive : ImGuiCol.HeaderHovered));
 
             if (ImGuiP.ButtonBehavior(context_bb, ctx_id, &hovered, &held, ImGuiButtonFlags.MouseButtonLeft))
-                ImGuiP.TreeNodeSetOpen(ctx_id, !opened);
+            {
+                string oldStackDir = _directoryPath;
+                SetCurrentStackDirectory(fullPath, true);
+            }
             if (hovered || held)
                 drawList.AddRectFilled(context_bb.Min, context_bb.Max, ImGui.GetColorU32(held ? ImGuiCol.HeaderActive : ImGuiCol.HeaderHovered));
 

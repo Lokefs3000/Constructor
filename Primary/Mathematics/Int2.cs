@@ -1,14 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Mathematics
 {
@@ -84,7 +79,7 @@ namespace Primary.Mathematics
         public static Int2 operator -(Int2 left, Int2 right) => (left.AsVector128Unsafe() - right.AsVector128Unsafe()).AsInt2();
         public static Int2 operator *(Int2 left, Int2 right) => (left.AsVector128Unsafe() * right.AsVector128Unsafe()).AsInt2();
         public static Int2 operator /(Int2 left, Int2 right) => (left.AsVector128Unsafe() / right.AsVector128Unsafe()).AsInt2();
-    
+
         public static Int2 operator *(int left, Int2 right) => (left * right.AsVector128Unsafe()).AsInt2();
         public static Int2 operator *(Int2 left, int right) => (left.AsVector128Unsafe() * right).AsInt2();
         public static Int2 operator /(Int2 left, int right) => (left.AsVector128Unsafe() / right).AsInt2();

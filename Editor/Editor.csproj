@@ -10,6 +10,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="Serialization\NewFolder\**" />
+	  <EmbeddedResource Remove="Serialization\NewFolder\**" />
+	  <None Remove="Serialization\NewFolder\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Editor.Geometry\Editor.Geometry.csproj" />
 		<ProjectReference Include="..\Editor.Gui\Editor.Gui.csproj" />
 		<ProjectReference Include="..\Editor.Interop\Editor.Interop.csproj" />
 		<ProjectReference Include="..\Editor.Processors\Editor.Processors.csproj" />
@@ -17,6 +24,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="CircularBuffer" Version="1.4.0" />
 		<PackageReference Include="CommandLineParser" Version="2.9.1" />
 		<PackageReference Include="CsToml.Generator" Version="1.7.2">
 		  <PrivateAssets>all</PrivateAssets>
@@ -36,7 +44,7 @@
 	  <None Update="splash.bmp">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
-	  <None Update="splash.png">
+	  <None Update="SplashData.bundle">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
 	</ItemGroup>

@@ -1,13 +1,7 @@
-﻿using CommunityToolkit.HighPerformance;
-using Editor.Gui.Decorator;
+﻿using Editor.Gui.Decorator;
 using Editor.Gui.Graphics;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Gui.Elements
 {
@@ -100,7 +94,7 @@ namespace Editor.Gui.Elements
 
         public static void Destroy(Element element)
         {
-            
+
         }
 
         public Element? Parent { get => _parent; set => SetParent(value ?? throw new ArgumentException(nameof(value))); }

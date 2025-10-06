@@ -1,4 +1,5 @@
 ﻿using Primary.Assets;
+using Primary.Common;
 using Primary.Components;
 using Primary.Scenes;
 using System.Numerics;
@@ -72,8 +73,8 @@ namespace Editor.Demos
             PlaceModel(scene, model, "sponza.023", "vase.mat");
             PlaceModel(scene, model, "sponza.024", "Material__25.mat");
 
-            PlaceSpotLight(scene, new Vector3(0.0f, 0.5f, -2.0f), new Vector3(0.0f, 25.0f, 0.0f), new Vector3(1.0f, 0.2f, 0.2f));
-            PlaceSpotLight(scene, new Vector3(4.0f, 2.0f, -1.5f), new Vector3(20.0f, -50.0f, 0.0f), new Vector3(0.1f, 1.0f, 0.2f));
+            PlaceSpotLight(scene, new Vector3(0.0f, 0.5f, -2.0f), new Vector3(0.0f, 25.0f, 0.0f), new Color(1.0f, 0.2f, 0.2f));
+            PlaceSpotLight(scene, new Vector3(4.0f, 2.0f, -1.5f), new Vector3(20.0f, -50.0f, 0.0f), new Color(0.1f, 1.0f, 0.2f));
         }
 
         private static void PlaceModel(Scene scene, ModelAsset model, string meshName, string materialName)
@@ -91,7 +92,7 @@ namespace Editor.Demos
             transform.Scale = new Vector3(0.1f);
         }
 
-        private static void PlaceSpotLight(Scene scene, Vector3 pos, Vector3 euler, Vector3 color)
+        private static void PlaceSpotLight(Scene scene, Vector3 pos, Vector3 euler, Color color)
         {
             SceneEntity body = scene.CreateEntity(SceneEntity.Null);
             body.Name = "SpotLight";

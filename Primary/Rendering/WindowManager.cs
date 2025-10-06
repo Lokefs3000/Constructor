@@ -1,5 +1,4 @@
-﻿using Primary.Common;
-using SDL;
+﻿using SDL;
 using System.Numerics;
 
 namespace Primary.Rendering
@@ -15,7 +14,7 @@ namespace Primary.Rendering
             s_instance = this;
 
             _windows = new Dictionary<SDL_WindowID, Window>();
-            
+
             //ExceptionUtility.Assert(SDL3.SDL_SetHint(SDL3.SDL_HINT_MOUSE_AUTO_CAPTURE, true));
         }
 

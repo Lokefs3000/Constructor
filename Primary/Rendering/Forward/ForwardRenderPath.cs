@@ -1,5 +1,4 @@
 ﻿using Primary.Assets;
-using Primary.Common;
 using Primary.Editor;
 using Primary.Profiling;
 using Primary.Rendering.Batching;
@@ -7,9 +6,7 @@ using Primary.Rendering.Data;
 using Primary.Rendering.Forward;
 using Primary.Rendering.Forward.Debugging;
 using Primary.Rendering.Forward.Managers;
-using Primary.Rendering.Raw;
 using Serilog;
-using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -183,7 +180,7 @@ namespace Primary.Rendering
 
         public void EmitDebugStatistics(DebugDataContainer container)
         {
-            
+
         }
 
         private void PrepareFrameData(RenderingManager renderer, RenderBatcher batcher, RenderPassViewportData viewportData, RenderPassLightingData lightingData)

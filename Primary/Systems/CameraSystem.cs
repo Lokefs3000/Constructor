@@ -3,13 +3,7 @@ using Primary.Components;
 using Primary.Rendering;
 using Primary.Scenes;
 using Schedulers;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Systems
 {
@@ -35,7 +29,7 @@ namespace Primary.Systems
             {
                 projectionData.ClientSize = clientSize;
                 projectionData.ProjectionMatrix = Matrix4x4.CreatePerspectiveFieldOfView(camera.FieldOfView, clientSize.X / clientSize.Y, camera.NearClip, camera.FarClip);
-                
+
                 camera.IsDirty = false;
             }
 

@@ -1,9 +1,5 @@
-﻿using Editor.Processors;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Editor.Storage;
+using Primary.Assets;
 
 namespace Editor.Assets.Importers
 {
@@ -11,7 +7,7 @@ namespace Editor.Assets.Importers
     {
         public MaterialAssetImporter()
         {
-            
+
         }
 
         public void Dispose()
@@ -19,11 +15,26 @@ namespace Editor.Assets.Importers
 
         }
 
-        public void Import(AssetPipeline pipeline, string fullFilePath, string outputFilePath)
+        public bool Import(AssetPipeline pipeline, ProjectSubFilesystem filesystem, string fullFilePath, string outputFilePath, string localOutputFile)
         {
-            pipeline.ReloadAsset(fullFilePath);
+            string localInputFile = fullFilePath.Substring(filesystem.AbsolutePath.Length);
+
+            pipeline.ReloadAsset(pipeline.Identifier.GetOrRegisterAsset(localInputFile));
+
+            Editor.GlobalSingleton.AssetDatabase.AddEntry<MaterialAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localInputFile), localInputFile));
+            return true;
         }
 
-        public string CustomFileIcon => "Content/Icons/FileMaterial.png";
+        public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
+        {
+            if (!ValidateFile(localFilePath, filesystem, pipeline))
+                return;
+
+            Editor.GlobalSingleton.AssetDatabase.AddEntry<MaterialAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath));
+        }
+
+        public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline) => true;
+
+        public string CustomFileIcon => "Editor/Textures/Icons/FileMaterial.png";
     }
 }

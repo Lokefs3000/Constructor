@@ -1,10 +1,4 @@
 ﻿using Primary.Common;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.RHI.Direct3D12.Memory
 {
@@ -22,7 +16,7 @@ namespace Primary.RHI.Direct3D12.Memory
             _device = device;
 
             _isCpuAccessible = isCpuAccesible;
-            _ringBuffers = [ new GPURingBuffer(initialSize, device, isCpuAccesible) ];
+            _ringBuffers = [new GPURingBuffer(initialSize, device, isCpuAccesible)];
         }
 
         private void Dispose(bool disposing)
@@ -40,10 +34,10 @@ namespace Primary.RHI.Direct3D12.Memory
             }
         }
 
-         ~DynamicUploadHeap()
-         {
-             Dispose(disposing: false);
-         }
+        ~DynamicUploadHeap()
+        {
+            Dispose(disposing: false);
+        }
 
         public void Dispose()
         {

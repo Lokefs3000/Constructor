@@ -3,17 +3,9 @@ using Primary.Common;
 using Primary.Polling;
 using Primary.Rendering;
 using SDL;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
-using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.LegacyGui.Managers
 {

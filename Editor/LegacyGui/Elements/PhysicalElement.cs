@@ -1,10 +1,5 @@
 ﻿using Editor.LegacyGui.Data;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.LegacyGui.Elements
 {
@@ -12,7 +7,7 @@ namespace Editor.LegacyGui.Elements
     {
         protected DecoratedValue<Vector2> _position;
         protected DecoratedValue<Vector2> _size;
-    
+
         public PhysicalElement()
         {
             _position = Vector2.Zero;

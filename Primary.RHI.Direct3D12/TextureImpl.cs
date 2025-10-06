@@ -2,7 +2,6 @@
 using Primary.RHI.Direct3D12.Descriptors;
 using Primary.RHI.Direct3D12.Helpers;
 using Primary.RHI.Direct3D12.Interfaces;
-using Primary.RHI.Direct3D12.Memory;
 using Primary.RHI.Direct3D12.Utility;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -52,6 +51,7 @@ namespace Primary.RHI.Direct3D12
                 MemoryUsage.Immutable => HeapType.Default,
                 MemoryUsage.Dynamic => HeapType.Default,
                 MemoryUsage.Staging => HeapType.Upload,
+                MemoryUsage.Readback => HeapType.Readback,
                 _ => HeapType.Default
             };
 
@@ -181,6 +181,12 @@ namespace Primary.RHI.Direct3D12
             GC.SuppressFinalize(this);
         }
 
+        #region Public
+        public override Descriptor AllocateDescriptor(TextureSRDescriptorDescription description)
+        {
+            throw new NotImplementedException();
+        }
+        #endregion
         #region Interface
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void EnsureResourceStates(ResourceBarrierManager manager, ResourceStates requiredStates, bool toggle = false)

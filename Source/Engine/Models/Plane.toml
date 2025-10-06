@@ -1,0 +1,4 @@
+is_compressed = false
+index_stride_mode = "Auto"
+use_half_precision_nodes = false
+use_half_precision_vertices = false

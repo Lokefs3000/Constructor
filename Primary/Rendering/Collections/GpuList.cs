@@ -1,24 +1,16 @@
-﻿using Arch.LowLevel;
-using Primary.Common;
+﻿using Primary.Common;
 using Primary.Rendering.Raw;
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Rendering.Collections
 {
     [DebuggerTypeProxy(typeof(GpuListDebuggerTypeProxy<>))]
     internal unsafe class GpuList<T> : IDisposable where T : unmanaged
     {
-        private T* _array;
-        private OccupancyType* _occupancyArray;
+        private SafePtrArray<T> _array;
+        private SafePtrArray<OccupancyType> _occupancyArray;
 
         private int _capacity;
         private int _count;
@@ -39,8 +31,8 @@ namespace Primary.Rendering.Collections
         {
             minCapacity = Math.Max((int)BitOperations.RoundUpToPowerOf2((uint)minCapacity), 1);
 
-            _array = (T*)NativeMemory.Alloc((uint)minCapacity, (uint)sizeof(T));
-            _occupancyArray = (OccupancyType*)NativeMemory.Alloc((uint)minCapacity, (uint)sizeof(OccupancyType));
+            _array = SafePtrArray<T>.Allocate(minCapacity);
+            _occupancyArray = SafePtrArray<OccupancyType>.Allocate(minCapacity);
 
             _capacity = minCapacity;
             _count = 0;
@@ -62,10 +54,10 @@ namespace Primary.Rendering.Collections
                 Mode = RHI.BufferMode.Structured,
                 Usage = RHI.BufferUsage.ShaderResource
             }, nint.Zero);
-            
+
             _buffer.Name = $"GpuList<{typeof(T).Name}>";
 
-            NativeMemory.Fill(_occupancyArray, (nuint)(minCapacity * sizeof(OccupancyType)), (byte)OccupancyType.Empty);
+            SafePtrArray<OccupancyType>.Fill(_occupancyArray, -1, (byte)OccupancyType.Empty);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -77,13 +69,8 @@ namespace Primary.Rendering.Collections
                     _buffer?.Dispose();
                 }
 
-                if (_array != null)
-                    NativeMemory.Free(_array);
-                if (_occupancyArray != null)
-                    NativeMemory.Free(_occupancyArray);
-
-                _array = null;
-                _occupancyArray = null;
+                _array.Dispose();
+                _occupancyArray.Dispose();
 
                 _capacity = 0;
                 _count = 0;
@@ -223,7 +210,7 @@ namespace Primary.Rendering.Collections
 
                     commandBuffer.Unmap(_buffer);
 
-                    NativeMemory.Fill(_occupancyArray, (nuint)(_count * sizeof(OccupancyType)), (byte)OccupancyType.Occupied);
+                    SafePtrArray<OccupancyType>.Fill(_occupancyArray, _count, (byte)OccupancyType.Occupied);
 
                     _dataMax = _count;
                 }
@@ -237,7 +224,7 @@ namespace Primary.Rendering.Collections
                     {
                         return;
                     }
-                    
+
                     int j = 0;
                     for (int i = 0; i < _dataMax; i++)
                     {
@@ -246,7 +233,7 @@ namespace Primary.Rendering.Collections
                             mappedPointer[j++] = _array[i];
                         }
                     }
-                    
+
                     commandBuffer.Unmap(_buffer);
 
                     int idxStart = -1;
@@ -263,7 +250,7 @@ namespace Primary.Rendering.Collections
                                         int length = idxStart - i;
 
                                         commandBuffer.CopyBufferRegion(_buffer, (uint)(idxEnd * sizeof(T)), _buffer, (uint)(idxStart * sizeof(T)), (uint)(length * sizeof(T)));
-                                        NativeMemory.Copy(&_array[idxStart], &_array[idxEnd], (nuint)(length * sizeof(T)));
+                                        SafePtrArray<T>.Copy(_array, idxStart, _array, idxEnd, length);
 
                                         i = idxEnd - 1;
                                     }
@@ -284,7 +271,7 @@ namespace Primary.Rendering.Collections
                         }
                     }
 
-                    NativeMemory.Fill(_occupancyArray, (nuint)(_count * sizeof(OccupancyType)), (byte)OccupancyType.Occupied);
+                    SafePtrArray<OccupancyType>.Fill(_occupancyArray, _count, (byte)OccupancyType.Occupied);
 
                     _dataMax = _count;
                 }
@@ -296,16 +283,14 @@ namespace Primary.Rendering.Collections
 
         private void ResizeCpuArray(int newCapacity)
         {
-            T* newArray = (T*)NativeMemory.Alloc((uint)newCapacity, (uint)sizeof(T));
-            OccupancyType* newOccupancyArray = (OccupancyType*)NativeMemory.Alloc((uint)newCapacity, (uint)sizeof(OccupancyType));
+            SafePtrArray<T> newArray = SafePtrArray<T>.Allocate(newCapacity);
+            SafePtrArray<OccupancyType> newOccupancyArray = SafePtrArray<OccupancyType>.Allocate(newCapacity);
 
-            NativeMemory.Copy(_array, newArray, (nuint)(_capacity * sizeof(T)));
-            NativeMemory.Copy(_occupancyArray, newOccupancyArray, (nuint)(_capacity * sizeof(OccupancyType)));
+            SafePtrArray<T>.Copy(_array, newArray);
+            SafePtrArray<OccupancyType>.Copy(_occupancyArray, newOccupancyArray);
 
-            if (_array == null)
-                NativeMemory.Free(_array);
-            if (_occupancyArray == null)
-                NativeMemory.Free(_occupancyArray);
+            _array.Dispose();
+            _occupancyArray.Dispose();
 
             _array = newArray;
             _occupancyArray = newOccupancyArray;

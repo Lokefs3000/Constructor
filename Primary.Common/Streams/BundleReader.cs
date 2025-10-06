@@ -1,13 +1,8 @@
 ﻿using CommunityToolkit.HighPerformance;
-using System;
 using System.Buffers;
 using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Common.Streams
 {
@@ -37,7 +32,7 @@ namespace Primary.Common.Streams
             if (magic == HeaderMagic || version == HeaderVersion)
             {
                 BinaryReader br = new BinaryReader(stream, Encoding.UTF8, true);
- 
+
                 Dictionary<string, BundleFileEntry> entries = new Dictionary<string, BundleFileEntry>();
 
                 uint fileCount = stream.Read<uint>();

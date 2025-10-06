@@ -1,6 +1,6 @@
-﻿using Primary.Common;
-using Primary.Rendering;
+﻿using Primary.Rendering;
 using System.Collections.Frozen;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Primary.Assets
@@ -22,6 +22,9 @@ namespace Primary.Assets
 
         public ResourceStatus Status => _assetData.Status;
 
+        public string Name => _assetData.Name;
+        public AssetId Id => _assetData.Id;
+
         internal ShaderBindGroup? BindGroup => _assetData.BindGroup;
     }
 
@@ -30,6 +33,9 @@ namespace Primary.Assets
         private readonly WeakReference _asset;
 
         private ResourceStatus _status;
+
+        private readonly AssetId _id;
+        private string _name;
 
         private ShaderAsset? _targetShader;
 
@@ -41,11 +47,14 @@ namespace Primary.Assets
         private GCHandle _gc;
         private nint _handle;
 
-        internal MaterialAssetData()
+        internal MaterialAssetData(AssetId id)
         {
             _asset = new WeakReference(null);
 
             _status = ResourceStatus.Pending;
+
+            _id = id;
+            _name = string.Empty;
 
             _targetShader = null;
 
@@ -71,17 +80,14 @@ namespace Primary.Assets
             _handle = nint.Zero;
         }
 
-        public void ResetInternalState()
+        public void SetAssetInternalStatus(ResourceStatus status)
         {
-            Dispose();
-
-            _status = ResourceStatus.Pending;
+            _status = status;
         }
 
-        public void PromoteStateToRunning()
+        public void SetAssetInternalName(string name)
         {
-            if (_status == ResourceStatus.Pending)
-                _status = ResourceStatus.Running;
+            _name = name;
         }
 
         internal void UpdateAssetData(MaterialAsset asset)
@@ -127,6 +133,9 @@ namespace Primary.Assets
 
         internal ResourceStatus Status => _status;
 
+        internal AssetId Id => _id;
+        internal string Name => _name;
+
         internal ShaderAsset? TargetShader => _targetShader;
 
         internal nint Handle => _handle;
@@ -134,6 +143,7 @@ namespace Primary.Assets
         internal ShaderBindGroup? BindGroup => _bindGroup;
 
         public Type AssetType => typeof(MaterialAsset);
+        public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
     }
 
     internal record struct MaterialProperty
