@@ -1,5 +1,6 @@
 ﻿using Primary.Common;
 using Primary.Rendering;
+using Primary.Rendering.Tree;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -19,6 +20,9 @@ namespace Primary.Console
             _variables = new Dictionary<string, FieldInfo>();
 
             ScanClassForCVars(typeof(RenderingCVars));
+            ScanClassForCVars(typeof(TreeCVars));
+
+            EngLog.Console.Information("Found #{c} cvars in classes..", _variables.Count);
         }
 
         internal void ScanClassForCVars([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicFields)] Type type)

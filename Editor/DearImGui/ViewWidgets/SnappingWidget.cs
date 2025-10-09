@@ -26,5 +26,6 @@ namespace Editor.DearImGui.ViewWidgets
         public override ReadOnlySpan<string> RequiredIcons => new string[] {
             "Editor/Textures/Icons/WgGridSnapIcon.png",
         };
+        public override bool IsFloating => false;
     }
 }

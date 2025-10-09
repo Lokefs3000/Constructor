@@ -11,12 +11,14 @@ Engine/Models/Torus.fbx;Engine/Models/Torus.toml
 Editor/Shaders/GeoBillboard.hlsl;Editor/Shaders/GeoBillboard.toml
 Engine/Shaders/Debug/Wireframe.hlsl;Engine/Shaders/Debug/Wireframe.toml;Engine/Shaders/Buffers.hlsl;Engine/Shaders/Converters.hlsl
 Engine/Textures/MissingTex.png;Engine/Textures/MissingTex.toml
+Editor/Textures/ToolNumerical.png;Editor/Textures/ToolNumerical.toml
 Engine/Shaders/Debug/LightingOnly.hlsl;Engine/Shaders/Debug/LightingOnly.toml;Engine/Shaders/Buffers.hlsl;Engine/Shaders/Converters.hlsl;Engine/Shaders/Lighting.hlsl;Engine/Shaders/TextureUtil.hlsl
 Engine/Models/Icosphere.fbx;Engine/Models/Icosphere.toml
 Engine/Shaders/Debug/Unlit.hlsl;Engine/Shaders/Debug/Unlit.toml;Engine/Shaders/Buffers.hlsl;Engine/Shaders/Converters.hlsl;Engine/Shaders/Lighting.hlsl;Engine/Shaders/TextureUtil.hlsl
 Engine/Shaders/Unlit.hlsl;Engine/Shaders/Unlit.toml;Engine/Shaders/Buffers.hlsl;Engine/Shaders/Converters.hlsl;Engine/Shaders/Lighting.hlsl;Engine/Shaders/TextureUtil.hlsl
 Engine/Models/Capsule.fbx;Engine/Models/Capsule.toml
 Engine/Shaders/Debug/DetailLighting.hlsl;Engine/Shaders/Debug/DetailLighting.toml;Engine/Shaders/Buffers.hlsl;Engine/Shaders/Converters.hlsl;Engine/Shaders/Lighting.hlsl;Engine/Shaders/TextureUtil.hlsl
+Editor/Shaders/ToolsNumerics.hlsl;Editor/Shaders/ToolsNumerics.toml
 Editor/Shaders/Gizmos/GZSphereShader.hlsl;Editor/Shaders/Gizmos/GZSphereShader.toml
 Editor/Shaders/GeoTriangle.hlsl;Editor/Shaders/GeoTriangle.toml
 Editor/Textures/NoPreview.png;Editor/Textures/NoPreview.toml

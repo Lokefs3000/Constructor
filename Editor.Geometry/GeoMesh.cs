@@ -59,8 +59,8 @@ namespace Editor.Geometry
             Quad = quad;
         }
 
-        public static implicit operator GeoFace(GeoTriangle tri) => new GeoFace(ushort.MaxValue, uint.MaxValue, tri);
-        public static implicit operator GeoFace(GeoQuad quad) => new GeoFace(ushort.MaxValue, uint.MaxValue, quad);
+        public static implicit operator GeoFace(GeoTriangle tri) => new GeoFace(ushort.MaxValue, 0, tri);
+        public static implicit operator GeoFace(GeoQuad quad) => new GeoFace(ushort.MaxValue, 0, quad);
     }
 
     public enum GeoFaceType : byte

@@ -72,6 +72,10 @@ namespace Editor.Rendering
             _cubeData.Clear();
 
             _counter = 0;
+
+            DrawLine(Vector3.Zero, Vector3.UnitX, new Vector4(1.0f, 0.0f, 0.0f, 0.5f));
+            DrawLine(Vector3.Zero, Vector3.UnitY, new Vector4(0.0f, 1.0f, 0.0f, 0.5f));
+            DrawLine(Vector3.Zero, Vector3.UnitZ, new Vector4(0.0f, 0.0f, 1.0f, 0.5f));
         }
 
         internal void FinalizeBuffers()

@@ -176,6 +176,14 @@ namespace Editor.Interaction.Controls
                     }
             }
 
+            if (ToolManager.IsSnappingActive)
+            {
+                float snapScale = ToolManager.SnapScale;
+
+                _shape.Extents = Vector3.Round(_shape.Extents / snapScale) * snapScale;
+                _brush.Transform.Position = Vector3.Round(_brush.Transform.Position / snapScale) * snapScale;
+            }
+
             if (hasModifiedExtents)
             {
                 Vector3 min = Vector3.Min(_brush.Transform.Position, _shape.Extents);

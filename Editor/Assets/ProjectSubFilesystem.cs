@@ -160,7 +160,9 @@ namespace Editor.Assets
                     if (waitIfImportPending)
                     {
                         EdLog.Assets.Information("Waiting on file import: {lc}", path.ToString());
-                        pipeline.ImportChangesOrGetRunning(path)?.Wait();
+
+                        Task? task = pipeline.ImportChangesOrGetRunning(path);
+                        task?.Wait(2000);
                     }
                 }
 
@@ -174,7 +176,11 @@ namespace Editor.Assets
                     if (pipeline.CanBeImported(path))
                     {
                         if (waitIfImportPending)
-                            pipeline.ImportChangesOrGetRunning(path)?.Wait();
+                        {
+                            Task? task = pipeline.ImportChangesOrGetRunning(path);
+                            task?.Wait(2000);
+                        }
+
                         if (_fileRemappings.TryGetValue(localPath, out remap))
                         {
                             absolutePath = Path.Combine(Editor.GlobalSingleton.ProjectPath, remap);

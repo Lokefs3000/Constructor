@@ -2,10 +2,10 @@
 using Primary.Editor;
 using Primary.Profiling;
 using Primary.Rendering.Batching;
-using Primary.Rendering.Data;
 using Primary.Rendering.Forward;
 using Primary.Rendering.Forward.Debugging;
 using Primary.Rendering.Forward.Managers;
+using Primary.Rendering.Pass;
 using Serilog;
 using System.Numerics;
 using System.Runtime.CompilerServices;

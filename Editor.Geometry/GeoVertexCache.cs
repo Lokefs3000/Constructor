@@ -15,14 +15,14 @@ namespace Editor.Geometry
         private object _cacheLock;
         private Dictionary<IGeoShape, CachedGeoShape> _cachedShapes;
 
-        internal GeoVertexCache()
+        public GeoVertexCache()
         {
             _cacheLock = new object();
             _cachedShapes = new Dictionary<IGeoShape, CachedGeoShape>();
         }
 
         /// <summary>Thread-safe</summary>
-        internal void Store(IGeoShape shape, CachedGeoShape data)
+        public void Store(IGeoShape shape, CachedGeoShape data)
         {
             lock (_cacheLock)
             {
@@ -31,7 +31,7 @@ namespace Editor.Geometry
         }
 
         /// <summary>Thread-safe</summary>
-        internal bool Retrieve(IGeoShape shape, out CachedGeoShape data)
+        public bool Retrieve(IGeoShape shape, out CachedGeoShape data)
         {
             lock (_cacheLock)
             {

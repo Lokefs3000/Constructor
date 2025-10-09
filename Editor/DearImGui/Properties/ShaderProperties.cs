@@ -369,7 +369,7 @@ namespace Editor.DearImGui.Properties
                     }
                     catch (Exception ex)
                     {
-                        EdLog.Gui.Error(ex, "Writing updated texture data to disk failed: {f}", td.LocalPath);
+                        EdLog.Gui.Error(ex, "Writing updated shader data to disk failed: {f}", td.LocalPath);
                     }
                 }
             }
@@ -383,7 +383,7 @@ namespace Editor.DearImGui.Properties
                     }
                     catch (Exception ex)
                     {
-                        EdLog.Gui.Error(ex, "Writing importing texture data to disk failed: {f}", td.LocalPath);
+                        EdLog.Gui.Error(ex, "Writing importing shader data to disk failed: {f}", td.LocalPath);
                     }
                 }
 

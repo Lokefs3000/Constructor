@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using System.Buffers;
 using System.Collections.Frozen;
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -142,8 +143,10 @@ namespace Primary.Common.Streams
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            return _hashCode.GetValueOrDefault(base.GetHashCode());
+            return _hashCode.GetValueOrDefault(base.GetHashCode()); 
         }
+
+        public ImmutableArray<string> Files => _entries.Keys;
 
         private const uint HeaderMagic = 0x4c444e42;
         private const uint HeaderVersion = 0;

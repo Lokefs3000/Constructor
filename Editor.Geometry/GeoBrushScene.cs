@@ -10,7 +10,7 @@ namespace Editor.Geometry
     {
         private List<GeoBrush> _brushes;
 
-        internal GeoBrushScene()
+        public GeoBrushScene()
         {
             _brushes = new List<GeoBrush>();
         }

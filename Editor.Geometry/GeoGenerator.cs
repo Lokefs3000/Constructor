@@ -1,12 +1,54 @@
-﻿using Editor.Geometry.Shapes;
+﻿using Arch.LowLevel;
+using Editor.Geometry.Shapes;
 using Primary.Common;
 using System.Buffers;
 using System.Numerics;
+using Array = System.Array;
 
 namespace Editor.Geometry
 {
     public sealed class GeoGenerator
     {
+        private readonly GeoVertexCache _vertexCache;
+
+        private List<CachedGeoShape> _activeShapes;
+        private HashSet<uint> _cachedLayers;
+
+        private Dictionary<uint, MaterialGeoContainer> _layerContainers;
+
+        public GeoGenerator(GeoVertexCache vertexCache)
+        {
+            _vertexCache = vertexCache;
+
+            _activeShapes = new List<CachedGeoShape>();
+            _cachedLayers = new HashSet<uint>();
+
+            _layerContainers = new Dictionary<uint, MaterialGeoContainer>();
+        }
+
+        public void GenerateMesh(GeoBrushScene scene)
+        {
+            _activeShapes.Clear();
+            _cachedLayers.Clear();
+
+            foreach (GeoBrush brush in scene.Brushes)
+            {
+                if (brush.Shape != null)
+                {
+                    IGeoShape shape = brush.Shape;
+                    if (!_vertexCache.Retrieve(shape, out CachedGeoShape cachedShape) || shape.IsDirty)
+                    {
+                        GeoMesh mesh = shape.GenerateMesh();
+                        cachedShape = Transform(mesh, brush.Transform);
+
+                        _vertexCache.Store(shape, cachedShape);
+                    }
+
+                    _activeShapes.Add(cachedShape);
+                }
+            }
+        }
+
         public static CachedGeoShape Transform(GeoMesh mesh, GeoTransform transform, bool generateMatLayers = true)
         {
             GeoFace[] faces = new GeoFace[mesh.Faces.Length];
@@ -48,7 +90,7 @@ namespace Editor.Geometry
             bool hasRotation = transform.Rotation != Quaternion.Identity;
             bool hasPivot = transform.Origin != Vector3.Zero;
 
-            Vector3 pivotOffset = hasPivot ? Vector3.Lerp(mesh.Boundaries.Minimum, mesh.Boundaries.Maximum, transform.Origin) : Vector3.Zero;
+            Vector3 pivotOffset = transform.Position + (hasPivot ? Vector3.Lerp(mesh.Boundaries.Minimum, mesh.Boundaries.Maximum, transform.Origin) : Vector3.Zero);
 
             int vtxOffset = 0, idxOffset = 0;
             if (generateMatLayers)
@@ -58,12 +100,12 @@ namespace Editor.Geometry
 
                 Array.Sort(faces, (a, b) => a.MaterialIndex.CompareTo(b.MaterialIndex));
 
-                for (int i = 0; i < faces.Length; i++)
+                for (int i = 0, j = 0; i < faces.Length; i++)
                 {
                     ref GeoFace face = ref faces[i];
-                    if (!uniqueMaterials.Contains(face.MaterialIndex))
+                    if (uniqueMaterials.Add(face.MaterialIndex))
                     {
-                        layers[i] = new GeoShapeLayer(idxOffset);
+                        layers[j++] = new GeoShapeLayer(idxOffset);
                     }
 
                     idxOffset += face.Type == GeoFaceType.Triangle ? 3 : 6;
@@ -84,16 +126,9 @@ namespace Editor.Geometry
                 {
                     ref GeoTriangle triangle = ref face.Triangle;
 
-                    Vector3 v0 = mesh.Vertices[triangle.Point0.Index];
-                    Vector3 v1 = mesh.Vertices[triangle.Point1.Index];
-                    Vector3 v2 = mesh.Vertices[triangle.Point2.Index];
-
-                    if (hasPivot)
-                    {
-                        v0 += pivotOffset;
-                        v1 += pivotOffset;
-                        v2 += pivotOffset;
-                    }
+                    Vector3 v0 = mesh.Vertices[triangle.Point0.Index] + pivotOffset;
+                    Vector3 v1 = mesh.Vertices[triangle.Point1.Index] + pivotOffset;
+                    Vector3 v2 = mesh.Vertices[triangle.Point2.Index] + pivotOffset;
 
                     if (hasRotation)
                     {
@@ -119,18 +154,10 @@ namespace Editor.Geometry
                 {
                     ref GeoQuad quad = ref face.Quad;
 
-                    Vector3 v0 = mesh.Vertices[quad.Point0.Index];
-                    Vector3 v1 = mesh.Vertices[quad.Point1.Index];
-                    Vector3 v2 = mesh.Vertices[quad.Point2.Index];
-                    Vector3 v3 = mesh.Vertices[quad.Point3.Index];
-
-                    if (hasPivot)
-                    {
-                        v0 += pivotOffset;
-                        v1 += pivotOffset;
-                        v2 += pivotOffset;
-                        v3 += pivotOffset;
-                    }
+                    Vector3 v0 = mesh.Vertices[quad.Point0.Index] + pivotOffset;
+                    Vector3 v1 = mesh.Vertices[quad.Point1.Index] + pivotOffset;
+                    Vector3 v2 = mesh.Vertices[quad.Point2.Index] + pivotOffset;
+                    Vector3 v3 = mesh.Vertices[quad.Point3.Index] + pivotOffset;
 
                     if (hasRotation)
                     {
@@ -160,6 +187,24 @@ namespace Editor.Geometry
             }
 
             return new CachedGeoShape(vertices, indices, layers);
+        }
+
+        private struct MaterialGeoContainer : IDisposable
+        {
+            internal UnsafeList<GeoVertex> Vertices;
+            internal UnsafeList<ushort> Indices;
+
+            public MaterialGeoContainer()
+            {
+                Vertices = new UnsafeList<GeoVertex>(8);
+                Indices = new UnsafeList<ushort>(8);
+            }
+
+            public void Dispose()
+            {
+                Vertices.Dispose();
+                Indices.Dispose();
+            }
         }
     }
 }

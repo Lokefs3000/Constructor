@@ -25,5 +25,8 @@
         public const float rRPBufferManagerHistoryTime = 0.2f;
         public const int rRPBufferManagerMinimumSize = 64; //bytes
         public const int rRPBufferManagerMaximumSize = 1024; //bytes
+
+        public const int rRenderTreeRegionSize = 128;
+        public const int rRenderTreeDepth = 6;
     }
 }

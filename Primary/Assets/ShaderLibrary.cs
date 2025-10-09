@@ -66,7 +66,7 @@ namespace Primary.Assets
 
             if (raw == null)
             {
-                Log.Error("Failed to find graphics shader at path: \"{path}\"!", path);
+                EngLog.Assets.Error("Failed to find graphics shader at path: \"{path}\"!", path);
                 return false;
             }
 
@@ -76,13 +76,13 @@ namespace Primary.Assets
 
                 if (br.ReadUInt32() != HeaderId)
                 {
-                    Log.Error("[g:{path}]: Invalid header id present!", path);
+                    EngLog.Assets.Error("[g:{path}]: Invalid header id present!", path);
                     return false;
                 }
 
                 if (br.ReadUInt32() != HeaderVersion)
                 {
-                    Log.Error("[g:{path}]: Invalid header version present!", path);
+                    EngLog.Assets.Error("[g:{path}]: Invalid header version present!", path);
                     return false;
                 }
 

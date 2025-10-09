@@ -5,6 +5,7 @@ namespace Primary.Rendering
 {
     public class WindowManager : IDisposable
     {
+        private Window? _primaryWindow;
         private Dictionary<SDL_WindowID, Window> _windows;
 
         private bool _disposedValue;
@@ -13,6 +14,7 @@ namespace Primary.Rendering
         {
             s_instance = this;
 
+            _primaryWindow = null;
             _windows = new Dictionary<SDL_WindowID, Window>();
 
             //ExceptionUtility.Assert(SDL3.SDL_SetHint(SDL3.SDL_HINT_MOUSE_AUTO_CAPTURE, true));
@@ -23,6 +25,8 @@ namespace Primary.Rendering
             Window window = new Window(windowTitle, clientSize, flags);
             _windows.Add(window.ID, window);
 
+            if (_primaryWindow == null)
+                _primaryWindow = window;
             return window;
         }
 
@@ -31,6 +35,9 @@ namespace Primary.Rendering
             _windows.Remove(window.ID);
 
             window.Dispose();
+
+            if (_primaryWindow == window)
+                _primaryWindow = _windows.Count > 0 ? _windows.Values.GetEnumerator().Current : null;
         }
 
         public Window? FindWindow(SDL_WindowID id)
@@ -65,6 +72,8 @@ namespace Primary.Rendering
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
+
+        public Window? PrimaryWindow => _primaryWindow;
 
         private static WindowManager? s_instance;
         public static WindowManager Instance => s_instance!;

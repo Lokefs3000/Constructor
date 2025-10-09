@@ -1,4 +1,5 @@
-﻿using Editor.DearImGui;
+﻿using Editor.Assets.Types;
+using Editor.DearImGui;
 using Editor.Geometry;
 using Editor.Geometry.Shapes;
 using Editor.Interaction;
@@ -6,6 +7,8 @@ using Editor.Interaction.Tools;
 using Editor.Rendering;
 using Hexa.NET.ImGui;
 using Primary.Common;
+using Primary.Input;
+using Primary.Input.Devices;
 using Primary.Mathematics;
 using SharpGen.Runtime;
 using System;
@@ -36,8 +39,21 @@ namespace Editor.GeoEdit
             _editorView = editorView;
         }
 
-        private void ClearData()
+        private void ClearData(bool clearSelection)
         {
+            if (clearSelection)
+            {
+                SelectionManager.DeselectMultiple((x) =>
+                {
+                    if (x is SelectedGeoBrush geoBrush)
+                        return geoBrush.Brush == _temporaryBrush;
+                    else if (x is SelectedGeoShapeBase geoShapeBase)
+                        return geoShapeBase.Brush == _temporaryBrush;
+
+                    return false;
+                });
+            }
+
             _isDragValid = false;
             _isPlacingBrush = false;
             _startPlacement = Vector3.Zero;
@@ -51,12 +67,13 @@ namespace Editor.GeoEdit
 
         public void ConnectEvents()
         {
-            ClearData();
+            ClearData(true);
 
             SceneView view = Editor.GlobalSingleton.SceneView;
             view.MouseDown += Event_MouseDown;
             view.MouseUp += Event_MouseUp;
             view.MouseMoved += Event_MouseMoved;
+            view.KeyDown += Event_KeyDown;
         }
 
         public void DisconnectEvents()
@@ -64,12 +81,13 @@ namespace Editor.GeoEdit
             if (_isPlacingBrush || _temporaryShape != null)
                 _editorView.UnlockCurrentScene();
 
-            ClearData();
+            ClearData(true);
 
             SceneView view = Editor.GlobalSingleton.SceneView;
             view.MouseDown -= Event_MouseDown;
             view.MouseUp -= Event_MouseUp;
             view.MouseMoved -= Event_MouseMoved;
+            view.KeyDown -= Event_KeyDown;
         }
 
         public void Update()
@@ -172,9 +190,9 @@ namespace Editor.GeoEdit
                 {
                     case GeoEditorView.PlaceShape.Box:
                         {
-                            @interface.AddLine(min, new Vector3(max.X, min.Y, min.Z), 0xffffff00);
+                            @interface.AddLine(min, new Vector3(max.X, min.Y, min.Z), LineColor);
                             @interface.AddLine(new Vector3(min.X, min.Y, max.Z), new Vector3(max.X, min.Y, max.Z), LineColor);
-                            @interface.AddLine(min, new Vector3(min.X, min.Y, max.Z), 0xffffff00);
+                            @interface.AddLine(min, new Vector3(min.X, min.Y, max.Z), LineColor);
                             @interface.AddLine(new Vector3(max.X, min.Y, min.Z), new Vector3(max.X, min.Y, max.Z), LineColor);
 
                             @interface.AddLine(new Vector3(min.X, max.Y, min.Z), new Vector3(max.X, max.Y, min.Z), LineColor);
@@ -199,7 +217,7 @@ namespace Editor.GeoEdit
             {
                 if (_temporaryShape == null)
                 {
-                    ClearData();
+                    ClearData(true);
 
                     _isDragValid = _editorView.LastPickResult.HasValue;
                     if (_editorView.LastPickResult.HasValue)
@@ -221,7 +239,7 @@ namespace Editor.GeoEdit
 
                         if (face.ShapeFaceIndex != ushort.MaxValue)
                         {
-                            SelectionManager.Select(new SelectedGeoBoxShape(_temporaryBrush!, face.ShapeFaceIndex));
+                            SelectionManager.Select(new SelectedGeoBoxShape(_temporaryBrush!, face.ShapeFaceIndex), SelectionMode.Multi);
                         }
                     }
                 }
@@ -254,7 +272,7 @@ namespace Editor.GeoEdit
                         }
                     };
 
-                    ClearData();
+                    ClearData(true);
 
                     _temporaryBrush = new GeoBrush(new GeoTransform(min, Quaternion.Identity, Vector3.Zero), shape);
                     _temporaryShape = shape;
@@ -264,7 +282,7 @@ namespace Editor.GeoEdit
                     if (_isPlacingBrush)
                         _editorView.UnlockCurrentScene();
 
-                    ClearData();
+                    ClearData(true);
                 }
             }
         }
@@ -293,6 +311,26 @@ namespace Editor.GeoEdit
                 else
                 {
                     _brushPickResult = null;
+                }
+            }
+        }
+
+        private void Event_KeyDown()
+        {
+            if (_temporaryShape != null && _editorView.ActiveScene != null)
+            {
+                if (InputSystem.Keyboard.IsKeyDown(KeyCode.Return))
+                {
+                    GeoSceneAsset asset = _editorView.ActiveScene;
+                    if (asset.BrushScene != null)
+                    {
+                        asset.BrushScene.AddBrush(_temporaryBrush!);
+
+                        SelectionManager.Select(new SelectedGeoBrush(_temporaryBrush!), SelectionMode.Multi);
+
+                        ClearData(false);
+                        _editorView.UnlockCurrentScene();
+                    }
                 }
             }
         }

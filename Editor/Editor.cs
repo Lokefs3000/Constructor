@@ -2,8 +2,11 @@
 using Editor.Assets.Loaders;
 using Editor.Assets.Types;
 using Editor.DearImGui;
+using Editor.DearImGui.Extra;
+using Editor.Demos;
 using Editor.Gui;
 using Editor.Interaction;
+using Editor.Platform.Windows;
 using Editor.Rendering;
 using Editor.Storage;
 using Hexa.NET.ImGui;
@@ -55,16 +58,31 @@ namespace Editor
         private InputDebugger _inputDebugger;
         private DebugView _debugView;
         private GeoEditorView _geoEditorView;
+        private BundleExplorer _bundleExplorer;
 
         internal Editor(string baseProjectPath) : base()
         {
+            using StartupDisplayUI ui = new StartupDisplayUI();
+
+            CancellationTokenSource cts = new CancellationTokenSource();
+            Task pumpTask = Task.Factory.StartNew(() =>
+            {
+                while (!cts.IsCancellationRequested)
+                {
+                    ui.Poll();
+                    ui.Draw();
+                }
+            });
+
             if (!baseProjectPath.EndsWith(Path.DirectorySeparatorChar))
                 baseProjectPath += Path.DirectorySeparatorChar;
 
             VerifyProjectPath(baseProjectPath);
-
             _baseProjectPath = baseProjectPath;
+
             EditorFilepaths.Initialize(baseProjectPath);
+
+            ui.PushStep("Setup filesystem");
 
             _projectSubFilesystem = new ProjectSubFilesystem(EditorFilepaths.ContentPath);
             _projectShaderLibrary = new ProjectShaderLibrary(EditorFilepaths.ContentPath);
@@ -73,9 +91,15 @@ namespace Editor
             _editorFilesystem = new ProjectSubFilesystem(@"D:/source/repos/Constructor/Source/Editor");
 
             _assetDatabase = new AssetDatabase();
-            _assetPipeline = new AssetPipeline();
+            _assetPipeline = new AssetPipeline(ui);
 
+            ui.PopStep();
+
+            ui.PushStep("Initialize engine");
             base.Initialize(_assetPipeline.Identifier);
+            ui.PopStep();
+
+            ui.PushStep("Initialize editor");
 
             RegisterComponentsDefault.RegisterDefault();
 
@@ -100,6 +124,13 @@ namespace Editor
             _inputDebugger = new InputDebugger();
             _debugView = new DebugView();
             _geoEditorView = new GeoEditorView();
+            _bundleExplorer = new BundleExplorer();
+
+            ui.PopStep();
+
+            cts.Cancel();
+            pumpTask.Wait();
+            cts.Dispose();
         }
 
         public override void Dispose()
@@ -130,7 +161,7 @@ namespace Editor
             SceneManager.CreateScene("Default", LoadSceneMode.Single);
             //Scene scene = SceneManager.CreateScene("Demo");
 
-            //StaticDemoScene2.Load(this);
+            StaticDemoScene3.Load(this);
 
             EventManager.PumpDefaultPause += PumpEditorLoop;
 
@@ -189,6 +220,12 @@ namespace Editor
                 if (ImGui.BeginMainMenuBar())
                 {
                     _debugView.MenuBar();
+                    
+                    if (ImGui.BeginMenu("View"))
+                    {
+                        _bundleExplorer.MenuBar();
+                        ImGui.EndMenu();
+                    }
 
                     ImGui.EndMainMenuBar();
                 }
@@ -206,6 +243,7 @@ namespace Editor
                 _inputDebugger.Render();
                 _debugView.Render();
                 _geoEditorView.Render();
+                _bundleExplorer.Render();
 
                 //GCMemoryInfo memoryInfo = GC.GetGCMemoryInfo();
                 //

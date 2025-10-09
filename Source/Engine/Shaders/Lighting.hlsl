@@ -28,7 +28,6 @@ struct cbDirectionalLight
 {
     float3 Direction;
 	
-    float3 Ambient;
     float3 Diffuse;
     float3 Specular;
 };
@@ -149,14 +148,13 @@ float CalculateSpotShadowIntensity(sbRawLight lightData, float3 normal, float3 l
     return shadow;
 }
 
-void ComputeDirectionalLight(MatProps mat, float3 viewDir, float3 normal, out float3 ambient, out float3 diffuse, out float3 specular)
+void ComputeDirectionalLight(MatProps mat, float3 viewDir, float3 normal, out float3 diffuse, out float3 specular)
 {
     float diff = max(dot(normal, cbDirectional.Direction), 0.0);
-    float3 reflectDir = reflect(-cbDirectional.Diffuse, normal);
+    float3 reflectDir = reflect(-cbDirectional.Direction, normal);
     float3 halfwayDir = normalize(cbDirectional.Direction + viewDir);
     float spec = pow(max(dot(normal, halfwayDir), 0.0), mat.Shininess);
     
-    ambient = cbDirectional.Ambient;
     diffuse = cbDirectional.Diffuse * diff;
     specular = cbDirectional.Specular * spec;
 }
@@ -235,9 +233,9 @@ void ComputeSpotLight(sbRawLight light, MatProps mat, float3 fragPos, float3 ver
     specular = light.Specular * (spec * attenutation);
 }
 
-float3 ComputeLightColor(MatProps mat, float3 ambient, float3 diffuse, float3 specular)
+float3 ComputeLightColor(MatProps mat, float3 diffuse, float3 specular)
 {
-    return mat.Diffuse * ambient + mat.Diffuse * diffuse + mat.Specular * specular;
+    return mat.Diffuse * diffuse + mat.Specular * specular;
 }
 
 float3 ComputeAllLights(MatProps mat, float3 fragPos, float3 vertexPos, float3 normal)
@@ -250,8 +248,8 @@ float3 ComputeAllLights(MatProps mat, float3 fragPos, float3 vertexPos, float3 n
 #ifndef __IntLighting_DirLightTg_False
     if (cbWorld.HasDirLight)
     {
-        ComputeDirectionalLight(mat, viewDir, normal, ambient, diffuse, specular);
-        color = ComputeLightColor(mat, ambient, diffuse, specular);
+        ComputeDirectionalLight(mat, viewDir, normal, diffuse, specular);
+        color += ComputeLightColor(mat, diffuse, specular);
     }
 #endif
     
@@ -263,12 +261,12 @@ float3 ComputeAllLights(MatProps mat, float3 fragPos, float3 vertexPos, float3 n
         if (rawLight.Type == LightType_Point)
         {
             ComputePointLight(rawLight, mat, fragPos, viewDir, normal, diffuse, specular);
-            color += ComputeLightColor(mat, 0.0, diffuse, specular);
+            color += ComputeLightColor(mat, diffuse, specular);
         }
         else if (rawLight.Type == LightType_Spot)
         {
             ComputeSpotLight(rawLight, mat, fragPos, vertexPos, viewDir, normal, diffuse, specular);
-            color += ComputeLightColor(mat, 0.0, diffuse, specular);
+            color += ComputeLightColor(mat, diffuse, specular);
         }
     }
 #endif

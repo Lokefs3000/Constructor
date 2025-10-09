@@ -4,7 +4,7 @@ using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Primary.Components;
 using Primary.Profiling;
-using Primary.Rendering.Data;
+using Primary.Rendering.Pass;
 using Serilog;
 using System.Numerics;
 using System.Runtime.CompilerServices;

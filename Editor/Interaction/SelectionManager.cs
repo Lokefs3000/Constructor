@@ -1,5 +1,7 @@
-﻿using Primary.Scenes;
+﻿using Editor.Interaction.Logic;
+using Primary.Scenes;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace Editor.Interaction
@@ -9,10 +11,16 @@ namespace Editor.Interaction
         private List<SelectedBase> _selected;
         private SelectedBase? _currentContext;
 
+        private Dictionary<Type, GenericSelectionLogic> _selectionLogicCache;
+        private Dictionary<Type, GenericSelectionLogic?> _selectionObjectCache;
+
         internal SelectionManager()
         {
             _selected = new List<SelectedBase>();
             _currentContext = null;
+
+            _selectionLogicCache = new Dictionary<Type, GenericSelectionLogic>();
+            _selectionObjectCache = new Dictionary<Type, GenericSelectionLogic?>();
 
             SceneEntityManager.SceneEntityDeleted += (e) =>
             {
@@ -39,6 +47,48 @@ namespace Editor.Interaction
         }
 
         /// <summary>Not thread-safe</summary>
+        private GenericSelectionLogic? FindSelectionLogic(Type type)
+        {
+            if (_selectionLogicCache.TryGetValue(type, out GenericSelectionLogic? selectionLogic))
+            {
+                return selectionLogic;
+            }
+
+            ConstructorInfo? constructor = type.GetConstructor(Array.Empty<Type>());
+            if (constructor == null)
+            {
+                EdLog.Interaction.Error("Failed to find public parameterless constructor for selection logic: {lg}", type.Name);
+                return null;
+            }
+
+            GenericSelectionLogic generic = Unsafe.As<GenericSelectionLogic>(constructor.Invoke(null));
+            _selectionLogicCache[type] = generic;
+
+            return generic;
+        }
+
+        /// <summary>Not thread-safe</summary>
+        private GenericSelectionLogic? TryGetObjectLogic(Type type)
+        {
+            if (_selectionObjectCache.TryGetValue(type, out GenericSelectionLogic? logic))
+            {
+                return logic;
+            }
+
+            SelectionLogicAttribute? attribute = type.GetCustomAttribute<SelectionLogicAttribute>();
+            if (attribute == null)
+            {
+                _selectionObjectCache[type] = null;
+                return null;
+            }
+
+            logic = FindSelectionLogic(attribute.Logic);
+            _selectionObjectCache[type] = logic;
+
+            return logic;
+        }
+
+        /// <summary>Not thread-safe</summary>
         internal void SetOnlySelectedContext(SelectedBase selected)
         {
             bool hasFound = false;
@@ -60,6 +110,9 @@ namespace Editor.Interaction
 
             if (!hasFound)
             {
+                GenericSelectionLogic? logic = TryGetObjectLogic(selected.GetType());
+                logic?.RunGeneric(selected);
+
                 _selected.Add(selected);
                 _currentContext = selected;
 
@@ -72,6 +125,9 @@ namespace Editor.Interaction
         {
             Debug.Assert(!_selected.Contains(selected));
 
+            GenericSelectionLogic? logic = TryGetObjectLogic(selected.GetType());
+            logic?.RunGeneric(selected);
+
             _selected.Add(selected);
             _currentContext = selected;
 
@@ -82,6 +138,9 @@ namespace Editor.Interaction
         internal void AddSelected(SelectedBase selected)
         {
             Debug.Assert(!_selected.Contains(selected));
+
+            GenericSelectionLogic? logic = TryGetObjectLogic(selected.GetType());
+            logic?.RunGeneric(selected);
 
             _selected.Add(selected);
 
@@ -167,6 +226,41 @@ namespace Editor.Interaction
         }
 
         /// <summary>Not thread-safe</summary>
+        public static void DeselectMultiple(params SelectedBase[] selected) => DeselectMultiple(selected.AsSpan());
+
+        /// <summary>Not thread-safe</summary>
+        public static void DeselectMultiple(ReadOnlySpan<SelectedBase> selected)
+        {
+            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
+            for (int i = 0; i < selected.Length; i++)
+            {
+                @this.RemoveSelected(selected[i]);
+            }
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public static void DeselectMultiple(Predicate<SelectedBase> predicate)
+        {
+            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
+            SelectedBase? selected = null;
+            while ((selected = @this._selected.Find(predicate)) != null)
+            {
+                @this.RemoveSelected(selected);
+            }
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public static void DeselectMultiple<T>(Predicate<T> predicate) where T : SelectedBase
+        {
+            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
+            SelectedBase? selected = null;
+            while ((selected = @this._selected.Find((x) => x is T t && predicate(t))) != null)
+            {
+                @this.RemoveSelected(selected);
+            }
+        }
+
+        /// <summary>Not thread-safe</summary>
         public static void Clear()
         {
             SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
@@ -177,6 +271,9 @@ namespace Editor.Interaction
 
             @this._selected.Clear();
         }
+
+        internal static SelectedBase? ActiveContext => Editor.GlobalSingleton.SelectionManager._currentContext;
+        internal static IReadOnlyList<SelectedBase> ActiveSelection => Editor.GlobalSingleton.SelectionManager._selected;
 
         internal SelectedBase? CurrentContext => _currentContext;
 
@@ -201,7 +298,8 @@ namespace Editor.Interaction
     public enum SelectionMode : byte
     {
         Single = 0,
-        Multi
+        Multi,
+        Unique
     }
 
     public abstract class SelectedBase

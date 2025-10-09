@@ -1,4 +1,5 @@
 ﻿using Editor.Assets.Types;
+using Editor.Geometry;
 using Primary.Assets;
 using Primary.Common.Streams;
 using System;
@@ -33,7 +34,11 @@ namespace Editor.Assets.Loaders
 
             try
             {
-                geoSceneData.UpdateAssetData(geoScene);
+                GeoBrushScene brushScene = new GeoBrushScene();
+                GeoVertexCache vertexCache = new GeoVertexCache();
+                GeoGenerator generator = new GeoGenerator(vertexCache);
+
+                geoSceneData.UpdateAssetData(geoScene, brushScene, vertexCache, generator);
             }
             finally
             {

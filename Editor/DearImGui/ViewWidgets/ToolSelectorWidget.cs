@@ -34,5 +34,6 @@ namespace Editor.DearImGui.ViewWidgets
             "Editor/Textures/Icons/WgTranslateIcon.png",
             "Editor/Textures/Icons/WgRotateIcon.png",
         };
+        public override bool IsFloating => false;
     }
 }

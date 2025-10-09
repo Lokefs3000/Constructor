@@ -8,6 +8,7 @@ namespace Editor
         public static readonly ILogger Gui = Create("Gui");
         public static readonly ILogger Reflection = Create("Refl");
         public static readonly ILogger Serialization = Create("Serialize");
+        public static readonly ILogger Interaction = Create("Interaction");
 
         private static ILogger Create(string prefix)
         {

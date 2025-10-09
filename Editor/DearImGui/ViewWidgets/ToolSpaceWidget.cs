@@ -23,6 +23,7 @@ namespace Editor.DearImGui.ViewWidgets
         }
 
         public override ReadOnlySpan<string> RequiredIcons => ReadOnlySpan<string>.Empty;
+        public override bool IsFloating => false;
 
         private static string[] s_originMode = Enum.GetNames<EditorOriginMode>();
         private static string[] s_toolSpace = Enum.GetNames<EditorToolSpace>();

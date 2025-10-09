@@ -1,6 +1,7 @@
 ﻿using Primary.Assets;
 using Primary.Rendering.Batching;
 using Primary.Rendering.Data;
+using Primary.Rendering.Pass;
 using Primary.Rendering.Raw;
 using System.Diagnostics;
 
@@ -80,7 +81,7 @@ namespace Primary.Rendering.Forward
 
             commandBuffer.SetShader(shader);
 
-            ModelAsset? activeModel = null;
+            IRenderMeshSource? activeMeshSource = null;
             for (int i = 0; i < batchDatas.Length; i++)
             {
                 RenderMeshBatchData batchData = batchDatas[i];
@@ -88,7 +89,7 @@ namespace Primary.Rendering.Forward
                     continue;
 
                 Debug.Assert(batchData.Mesh != null);
-                RenderMesh mesh = batchData.Mesh!;
+                RawRenderMesh mesh = batchData.Mesh!;
 
                 Span<BatchedRenderFlag> renderFlags = batchData.BatchableFlags.AsSpan();
 
@@ -98,15 +99,15 @@ namespace Primary.Rendering.Forward
                     commandBuffer.Unmap(path.CbObjectData);
                 }
 
-                if (activeModel != mesh.Model)
+                if (activeMeshSource != mesh.Source)
                 {
-                    activeModel = mesh.Model;
+                    activeMeshSource = mesh.Source;
 
-                    Debug.Assert(activeModel.VertexBuffer != null);
-                    Debug.Assert(activeModel.IndexBuffer != null);
+                    Debug.Assert(activeMeshSource.VertexBuffer != null);
+                    Debug.Assert(activeMeshSource.IndexBuffer != null);
 
-                    commandBuffer.SetVertexBuffer(0, activeModel.VertexBuffer!);
-                    commandBuffer.SetIndexBuffer(activeModel.IndexBuffer!);
+                    commandBuffer.SetVertexBuffer(0, activeMeshSource.VertexBuffer!);
+                    commandBuffer.SetIndexBuffer(activeMeshSource.IndexBuffer!);
                 }
 
                 MaterialAsset? material = batcher.GetMaterialFromIndex(renderFlags[0].MaterialIndex);

@@ -1,6 +1,6 @@
 ﻿using System.Collections.Frozen;
 
-namespace Primary.Rendering.Data
+namespace Primary.Rendering.Pass
 {
     public sealed class RenderPassData
     {

@@ -1,4 +1,4 @@
-﻿using Primary.Rendering.Data;
+﻿using Primary.Rendering.Pass;
 
 namespace Primary.Rendering
 {

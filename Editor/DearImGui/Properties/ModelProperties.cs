@@ -69,7 +69,7 @@ namespace Editor.DearImGui.Properties
             }
             else
             {
-                if (ImGui.Button("Import"))
+                if (ImGui.Button(_hasLocalConfigFile ? "Import (L)"u8 : "Import (P)"u8))
                 {
                     try
                     {
@@ -79,6 +79,35 @@ namespace Editor.DearImGui.Properties
                     {
                         EdLog.Gui.Error(ex, "Writing importing model data to disk failed: {f}", td.LocalPath);
                     }
+                }
+
+                if (ImGui.BeginPopupContextItem())
+                {
+                    if (ImGui.MenuItem("Project"u8, !_hasLocalConfigFile))
+                    {
+                        if (_hasLocalConfigFile)
+                        {
+                            AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
+
+                            _configFile = pipeline.Configuration.GetFilePath(td.LocalPath, "Shader");
+                            _hasLocalConfigFile = false;
+                        }
+                    }
+
+                    if (ImGui.MenuItem("Local"u8, _hasLocalConfigFile))
+                    {
+                        if (!_hasLocalConfigFile)
+                        {
+                            ProjectSubFilesystem? subFilesystem = AssetPipeline.SelectAppropriateFilesystem(AssetPipeline.GetFileNamespace(td.LocalPath));
+                            if (subFilesystem != null)
+                            {
+                                _configFile = Path.ChangeExtension(subFilesystem.GetFullPath(td.LocalPath), ".toml");
+                                _hasLocalConfigFile = true;
+                            }
+                        }
+                    }
+
+                    ImGui.EndPopup();
                 }
             }
 

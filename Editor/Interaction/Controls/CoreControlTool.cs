@@ -24,6 +24,11 @@ namespace Editor.Interaction.Controls
         {
             _transformList.Clear();
 
+            foreach (SelectedBase @base in SelectionManager.ActiveSelection)
+            {
+                Event_NewSelected(@base);
+            }
+
             SelectionManager.NewSelected += Event_NewSelected;
             SelectionManager.OldDeselected += Event_OldDeselected;
         }
@@ -78,6 +83,12 @@ namespace Editor.Interaction.Controls
 
         public void SetWorldTransform(Vector3 position, Vector3 delta)
         {
+            if (ToolManager.IsSnappingActive)
+            {
+                float snapScale = ToolManager.SnapScale;
+                position = Vector3.Round(position / snapScale) * snapScale;
+            }
+
             ref Transform transform = ref _entity.GetComponent<Transform>();
             if (!_entity.Parent.IsNull)
                 transform.Position = position - -_entity.Parent.GetComponent<WorldTransform>().Transformation.Translation;

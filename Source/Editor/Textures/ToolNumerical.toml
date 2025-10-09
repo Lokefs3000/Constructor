@@ -1,0 +1,14 @@
+image_type = "Grayscale"
+swizzle = ["R", "R", "R", "R"]
+image_format = "R8a"
+alpha_source = "None"
+gamma_correct = false
+premultiplied_alpha = false
+cutout_dither = false
+cutout_threshold = 127
+generate_mipmaps = false
+scale_alpha_for_mipmaps = false
+max_mipmap_count = 2147483647
+min_mipmap_size = 1
+mipmap_filter = "Box"
+flip_vertical = true

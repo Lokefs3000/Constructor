@@ -1,5 +1,6 @@
 ﻿using Primary.Assets;
 using Primary.Editor;
+using Primary.Rendering.Data;
 using Primary.Scenes;
 using System.Runtime.Serialization;
 
@@ -12,10 +13,10 @@ namespace Primary.Components
         [IgnoreDataMember]
         private SceneEntity _self;
 
-        private RenderMesh? _mesh;
+        private RawRenderMesh? _mesh;
         private MaterialAsset? _material;
 
-        public RenderMesh? Mesh
+        public RawRenderMesh? Mesh
         {
             get => _mesh;
             set

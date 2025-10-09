@@ -1,7 +1,7 @@
 ﻿using Primary.Components;
 using System.Numerics;
 
-namespace Primary.Rendering.Data
+namespace Primary.Rendering.Pass
 {
     public sealed class RenderPassViewportData : IRenderPassDataObject
     {

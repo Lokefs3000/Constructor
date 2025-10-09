@@ -266,6 +266,8 @@ namespace Editor.DearImGui
 
                 DrawTempIcons(ref data);
 
+                ImGui.Dummy(new Vector2(0.0f, data.TreeCursor.Y - data.Cursor.Y));
+
                 if (data.SelectionMode == SelectingType.None)
                 {
                     if (data.Context.IO.MouseClicked_0 && _hoveredObject is not SceneEntity && ImGui.IsWindowHovered())

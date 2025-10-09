@@ -1,5 +1,5 @@
 ﻿using Primary.Profiling;
-using Primary.Rendering.Data;
+using Primary.Rendering.Pass;
 using Serilog;
 using System.Reflection;
 

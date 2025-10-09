@@ -16,36 +16,58 @@ namespace Editor.DearImGui.ViewWidgets
 
         internal void RenderSelf()
         {
-            ImGuiContextPtr context = ImGui.GetCurrentContext();
-            if (ImGui.BeginChild(GetType().Name, ImGuiChildFlags.AutoResizeX))
+            if (IsFloating)
             {
+                ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 6.0f);
+                ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(6.0f));
+                ImGui.PushStyleColor(ImGuiCol.WindowBg, 0x80303030);
+                ImGui.PushStyleColor(ImGuiCol.Border, 0xaa606060);
+
+                bool windowRet = ImGui.Begin(GetType().Name, ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoDocking);
+
+                ImGui.PopStyleVar(2);
+                ImGui.PopStyleColor(2);
+
+                if (windowRet)
                 {
-                    ref ImGuiWindowPtr window = ref context.CurrentWindow;
-
-                    uint id = ImGui.GetID(3000);
-                    ImRect bounds = new ImRect(window.DC.CursorPos, window.DC.CursorPos + new Vector2(6.0f, window.DC.CursorMaxPos.Y));
-
-                    bool hovered = false, held = false;
-                    ImGuiP.ButtonBehavior(bounds, id, ref hovered, ref held);
-
-                    ImGuiCol col = held ? ImGuiCol.ButtonActive : (hovered ? ImGuiCol.ButtonHovered : ImGuiCol.Button);
-                    uint abgr = new Color32(context.Style.Colors[(int)col]).ABGR;
-
-                    window.DrawList.AddRectFilled(new Vector2(bounds.Min.X, bounds.Min.Y + 2.0f), new Vector2(bounds.Min.X + 1.0f, bounds.Max.Y - 2.0f), abgr);
-                    window.DrawList.AddRectFilled(new Vector2(bounds.Max.X - 1.0f, bounds.Min.Y + 2.0f), new Vector2(bounds.Max.X, bounds.Max.Y - 2.0f), abgr);
-
-                    ImGuiP.ItemAdd(bounds, id);
-                    ImGuiP.ItemSize(bounds);
-
-                    ImGui.SameLine();
+                    Render();
                 }
+                ImGui.End();
+            }
+            else
+            {
+                ImGuiContextPtr context = ImGui.GetCurrentContext();
+                if (ImGui.BeginChild(GetType().Name, ImGuiChildFlags.AutoResizeX))
+                {
+                    {
+                        ref ImGuiWindowPtr window = ref context.CurrentWindow;
 
-                Render();
-                ImGui.EndChild();
+                        uint id = ImGui.GetID(3000);
+                        ImRect bounds = new ImRect(window.DC.CursorPos, window.DC.CursorPos + new Vector2(6.0f, window.DC.CursorMaxPos.Y));
+
+                        bool hovered = false, held = false;
+                        ImGuiP.ButtonBehavior(bounds, id, ref hovered, ref held);
+
+                        ImGuiCol col = held ? ImGuiCol.ButtonActive : (hovered ? ImGuiCol.ButtonHovered : ImGuiCol.Button);
+                        uint abgr = new Color32(context.Style.Colors[(int)col]).ABGR;
+
+                        window.DrawList.AddRectFilled(new Vector2(bounds.Min.X, bounds.Min.Y + 2.0f), new Vector2(bounds.Min.X + 1.0f, bounds.Max.Y - 2.0f), abgr);
+                        window.DrawList.AddRectFilled(new Vector2(bounds.Max.X - 1.0f, bounds.Min.Y + 2.0f), new Vector2(bounds.Max.X, bounds.Max.Y - 2.0f), abgr);
+
+                        ImGuiP.ItemAdd(bounds, id);
+                        ImGuiP.ItemSize(bounds);
+
+                        ImGui.SameLine();
+                    }
+
+                    Render();
+                    ImGui.EndChild();
+                }
             }
         }
 
         protected abstract void Render();
+        public abstract bool IsFloating { get; }
 
         protected static float CalculateMetrics()
         {

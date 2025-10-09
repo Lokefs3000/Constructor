@@ -3,6 +3,7 @@ using Primary.Assets;
 using Primary.Components;
 using Primary.Rendering;
 using Primary.Rendering.Data;
+using Primary.Rendering.Pass;
 using Primary.Rendering.Raw;
 using Primary.Scenes;
 using System.Diagnostics;
@@ -207,12 +208,12 @@ namespace Editor.Rendering
                     commandBuffer.Unmap(_matrixBuffer!);
                 }
 
-                ModelAsset? meshModel = ro.Mesh.Model;
-                if (meshModel.VertexBuffer == null || meshModel.IndexBuffer == null)
+                IRenderMeshSource? meshSource = ro.Mesh.Source;
+                if (meshSource.VertexBuffer == null || meshSource.IndexBuffer == null)
                     continue;
 
-                commandBuffer.SetVertexBuffer(0, meshModel.VertexBuffer);
-                commandBuffer.SetIndexBuffer(meshModel.IndexBuffer);
+                commandBuffer.SetVertexBuffer(0, meshSource.VertexBuffer);
+                commandBuffer.SetIndexBuffer(meshSource.IndexBuffer);
                 commandBuffer.DrawIndexedInstanced(new RHI.DrawIndexedInstancedArgs(ro.Mesh.IndexCount, ro.Mesh.IndexOffset, (int)ro.Mesh.VertexOffset));
             }
         }
@@ -230,7 +231,7 @@ namespace Editor.Rendering
             commandBuffer.DrawInstanced(new RHI.DrawInstancedArgs(3));
         }
 
-        private readonly record struct RenderObject(RenderMesh Mesh, SceneEntity Entity);
+        private readonly record struct RenderObject(RawRenderMesh Mesh, SceneEntity Entity);
 
         private readonly record struct SampleConstants(float Near, float Far);
     }

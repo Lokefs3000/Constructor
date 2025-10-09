@@ -24,6 +24,7 @@ namespace Editor.Interaction.Tools
         private Quaternion _baseRotation;
 
         private Vector3 _lastDragDelta;
+        private float _currentPlaneDist;
 
         private bool _isHoveringAxis;
         private Vector3 _hoveredAxis;
@@ -157,9 +158,9 @@ namespace Editor.Interaction.Tools
                 float zValue = (negZ ? -0.25f : 0.25f) * scale;
 
                 Vector3 hit1 = Vector3.Transform(new Vector3(negX ? -startLength : startLength, 0.0f, 0.0f), lookMatrix);
-                Vector3 hit2 = Vector3.Transform(new Vector3(negX ? -shortLength : shortLength, yValue, 0.0f), lookMatrix);
+                Vector3 hit2 = Vector3.Transform(new Vector3(negX ? -shortLength : shortLength, yValue + yValue, 0.0f), lookMatrix);
                 Vector3 hit3 = Vector3.Transform(new Vector3(negX ? -longLength : longLength, 0.0f, 0.0f), lookMatrix);
-                Vector3 hit4 = Vector3.Transform(new Vector3(negX ? -shortLength : shortLength, 0.0f, zValue), lookMatrix);
+                Vector3 hit4 = Vector3.Transform(new Vector3(negX ? -shortLength : shortLength, 0.0f, zValue + zValue), lookMatrix);
 
                 bool hovered = ScreenRectDetection(vp, clientSize, mouseHit, hit1, hit2, hit3, hit4);
 
@@ -181,9 +182,9 @@ namespace Editor.Interaction.Tools
                 float zValue = (negZ ? -0.25f : 0.25f) * scale;
 
                 Vector3 hit1 = Vector3.Transform(new Vector3(0.0f, negY ? -startLength : startLength, 0.0f), lookMatrix);
-                Vector3 hit2 = Vector3.Transform(new Vector3(xValue, negY ? -shortLength : shortLength, 0.0f), lookMatrix);
+                Vector3 hit2 = Vector3.Transform(new Vector3(xValue + xValue, negY ? -shortLength : shortLength, 0.0f), lookMatrix);
                 Vector3 hit3 = Vector3.Transform(new Vector3(0.0f, negY ? -longLength : longLength, 0.0f), lookMatrix);
-                Vector3 hit4 = Vector3.Transform(new Vector3(0.0f, negY ? -shortLength : shortLength, zValue), lookMatrix);
+                Vector3 hit4 = Vector3.Transform(new Vector3(0.0f, negY ? -shortLength : shortLength, zValue + zValue), lookMatrix);
 
                 bool hovered = ScreenRectDetection(vp, clientSize, mouseHit, hit1, hit2, hit3, hit4);
 
@@ -205,9 +206,9 @@ namespace Editor.Interaction.Tools
                 float zValue = (negZ ? -shortLength : longLength);
 
                 Vector3 hit1 = Vector3.Transform(new Vector3(0.0f, 0.0f, negZ ? -startLength : startLength), lookMatrix);
-                Vector3 hit2 = Vector3.Transform(new Vector3(xValue, 0.0f, negZ ? -shortLength : shortLength), lookMatrix);
+                Vector3 hit2 = Vector3.Transform(new Vector3(xValue + xValue, 0.0f, negZ ? -shortLength : shortLength), lookMatrix);
                 Vector3 hit3 = Vector3.Transform(new Vector3(0.0f, 0.0f, negZ ? -longLength : longLength), lookMatrix);
-                Vector3 hit4 = Vector3.Transform(new Vector3(0.0f, yValue, negZ ? -shortLength : shortLength), lookMatrix);
+                Vector3 hit4 = Vector3.Transform(new Vector3(0.0f, yValue + yValue, negZ ? -shortLength : shortLength), lookMatrix);
 
                 bool hovered = ScreenRectDetection(vp, clientSize, mouseHit, hit1, hit2, hit3, hit4);
 
@@ -241,7 +242,7 @@ namespace Editor.Interaction.Tools
                 if (InputSystem.Pointer.IsButtonPressed(MouseButton.Left))
                 {
                     _hasBegunDragging = true;
-                    _startDist = dist;
+                    _startDist = float.PositiveInfinity;
                     _axisLock = Vector3.Normalize(_hoveredAxis);
                     _dragAxis = axis;
                     _baseRotation = baseQuat;
@@ -258,7 +259,7 @@ namespace Editor.Interaction.Tools
             SceneView sceneView = Editor.GlobalSingleton.SceneView;
             if (!InputSystem.Pointer.IsButtonHeld(MouseButton.Left) || !sceneView.IsViewVisible)
                 _hasBegunDragging = false;
-
+            
             Vector3 absoluteMin = Vector3.Zero;
             Vector3 absoluteMax = Vector3.Zero;
 
@@ -279,11 +280,19 @@ namespace Editor.Interaction.Tools
             Ray ray = ExMath.ViewportToWorld(sceneView.ProjectionMatrix, sceneView.ViewMatrix, sceneView.RelativeMouseHit);
             float dist = GetPlaneDistance(_dragAxis, origin, ray, _baseRotation, _axisLock);
 
+            if (float.IsPositiveInfinity(_startDist))
+            {
+                _startDist = dist;
+            }
+
             if (dist != 0.0f)
             {
+                _currentPlaneDist = dist;
                 Vector3 delta = _axisLock * (dist - _startDist);
-                if (delta != Vector3.Zero && ToolManager.IsSnappingActive)
-                    delta = Vector3.Round(delta / ToolManager.SnapScale) * ToolManager.SnapScale;
+                //if (ToolManager.IsSnappingActive)
+                //{
+                //    delta = Vector3.Round(delta / ToolManager.SnapScale) * ToolManager.SnapScale;
+                //}
 
                 if (_lastDragDelta != delta)
                 {
@@ -346,6 +355,10 @@ namespace Editor.Interaction.Tools
         public bool IsInteracting => _isHoveringAxis || _hasBegunDragging;
         public bool IsActive => _hasBegunDragging;
 
+        internal DragAxis Axis => _dragAxis;
+        internal float PlaneDistance => _currentPlaneDist;
+        internal float Delta => _currentPlaneDist - _startDist;
+
         private static Vector3 FindNearestOnInfiniteLine(Vector3 origin, Vector3 direction, Vector3 point)
         {
             Vector3 lhs = point - origin;
@@ -402,7 +415,7 @@ namespace Editor.Interaction.Tools
 
         private record struct StoredData(IToolTransform Selected, Vector3 BasePosition);
 
-        private enum DragAxis : byte
+        internal enum DragAxis : byte
         {
             None = 0,
 

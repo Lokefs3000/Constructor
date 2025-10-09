@@ -134,12 +134,12 @@ namespace Editor.DearImGui
                                 _activeScene = activeScene.Scene;
                                 if (GeoPicker.Pick(Editor.GlobalSingleton.SceneView.CameraMouseRay, activeScene.Scene, true, out GeoPickResult tmp))
                                 {
-                                    _lastPickResult = tmp;
-
                                     if (ToolManager.IsSnappingActive)
                                     {
                                         tmp = new GeoPickResult(Vector3.Round(tmp.Position / ToolManager.SnapScale) * ToolManager.SnapScale, tmp.Normal, tmp.HitBrush, tmp.FaceIndex);
                                     }
+
+                                    _lastPickResult = tmp;
                                 }
 
                                 ImGui.EndTabItem();

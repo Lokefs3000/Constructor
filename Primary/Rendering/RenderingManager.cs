@@ -5,7 +5,7 @@ using Primary.Components;
 using Primary.Editor;
 using Primary.Profiling;
 using Primary.Rendering.Batching;
-using Primary.Rendering.Data;
+using Primary.Rendering.Pass;
 using Primary.Rendering.Pooling;
 using Primary.Rendering.Raw;
 using Primary.RenderLayer;
@@ -227,6 +227,10 @@ namespace Primary.Rendering
         internal event Action<IDebugCallbacks>? EmitDebugData;
 
         public static GraphicsDevice Device => NullableUtility.ThrowIfNull((GraphicsDevice?)s_gd.Target);
+
+        /// <summary>Not thread-safe</summary>
+        //TODO: better implementation
+        public static IDebugRenderer? DebugRenderer { get; set; }
     }
 
     public struct RenderingConfig

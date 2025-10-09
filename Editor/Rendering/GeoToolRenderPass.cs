@@ -1,9 +1,12 @@
 ﻿using Arch.LowLevel;
 using Editor.DearImGui;
 using Editor.GeoEdit;
+using Editor.Geometry;
+using Editor.Geometry.Shapes;
+using Editor.Interaction;
 using Primary.Assets;
 using Primary.Rendering;
-using Primary.Rendering.Data;
+using Primary.Rendering.Pass;
 using Primary.Rendering.Raw;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -112,14 +115,27 @@ namespace Editor.Rendering
 
             if (editor.ActiveScene != null)
             {
+                SelectedBase? active = SelectionManager.ActiveContext;
+                foreach (SelectedBase @base in SelectionManager.ActiveSelection)
+                {
+                    if (@base is SelectedGeoBrush brush)
+                    {
+                        if (brush.Brush != null && brush.Brush.Shape != null)
+                        {
+                            DrawGeoBrushLineShape(brush.Brush.Transform, editor.ActiveScene.VertexCache, brush.Brush.Shape);
+                        }
+                    }
+                }
+
                 GeoToolRenderInterface @interface = new GeoToolRenderInterface(ref _billboards, ref _lineGeometry, ref _triangleGeometry);
 
                 IGeoTool? tool = editor.CurrentTool;
                 tool?.Render(in @interface);
 
-                if (GeoPicker.Pick(view.CameraMouseRay, editor.ActiveScene, true, out GeoPickResult result))
+                if (editor.LastPickResult.HasValue)
                 {
-                    AddBillboard(result.Position, 0.2f, new Vector3(1.0f, 0.0f, 0.0f));
+                    GeoPickResult result = editor.LastPickResult.Value;
+                    AddLine(result.Position, result.Position + result.Normal, 0xffff0000);
                 }
 
                 RenderNewGeometry(commandBuffer, passData);
@@ -227,6 +243,34 @@ namespace Editor.Rendering
                 commandBuffer.SetVertexBuffer(0, _geometryBuffer!);
 
                 commandBuffer.DrawInstanced(new RHI.DrawInstancedArgs((uint)(_lineGeometry.Count * 2), (uint)(_triangleGeometry.Count * 3)));
+            }
+        }
+
+        private void DrawGeoBrushLineShape(GeoTransform transform, GeoVertexCache? vertexCache, IGeoShape shape)
+        {
+            CachedGeoShape cachedShape;
+            if (vertexCache == null || !vertexCache.Retrieve(shape, out cachedShape))
+            {
+                cachedShape = GeoGenerator.Transform(shape.GenerateMesh(), transform);
+                vertexCache?.Store(shape, cachedShape);
+            }
+
+            if (shape is GeoBoxShape boxShape)
+            {
+                AddLine(cachedShape.Vertices[0].Position, cachedShape.Vertices[1].Position, 0xffffffff);
+                AddLine(cachedShape.Vertices[2].Position, cachedShape.Vertices[3].Position, 0xffffffff);
+                AddLine(cachedShape.Vertices[4].Position, cachedShape.Vertices[5].Position, 0xffffffff);
+                AddLine(cachedShape.Vertices[6].Position, cachedShape.Vertices[7].Position, 0xffffffff);
+
+                AddLine(cachedShape.Vertices[0].Position, cachedShape.Vertices[5].Position, 0xffffffff);
+                AddLine(cachedShape.Vertices[1].Position, cachedShape.Vertices[4].Position, 0xffffffff);
+                AddLine(cachedShape.Vertices[2].Position, cachedShape.Vertices[7].Position, 0xffffffff);
+                AddLine(cachedShape.Vertices[3].Position, cachedShape.Vertices[6].Position, 0xffffffff);
+
+                AddLine(cachedShape.Vertices[0].Position, cachedShape.Vertices[2].Position, 0xffffffff);
+                AddLine(cachedShape.Vertices[1].Position, cachedShape.Vertices[3].Position, 0xffffffff);
+                AddLine(cachedShape.Vertices[4].Position, cachedShape.Vertices[6].Position, 0xffffffff);
+                AddLine(cachedShape.Vertices[5].Position, cachedShape.Vertices[7].Position, 0xffffffff);
             }
         }
 

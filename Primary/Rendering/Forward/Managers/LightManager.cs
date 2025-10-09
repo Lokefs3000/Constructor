@@ -17,6 +17,7 @@ namespace Primary.Rendering.Forward.Managers
         private RHI.Buffer _directionalLight;
 
         private bool _hasDirectionalLight;
+        private SceneEntity _directionalLightEntity;
 
         private GpuList<RawLight> _gpuRawLightList;
         private bool _needsStructureRebuild;
@@ -85,6 +86,9 @@ namespace Primary.Rendering.Forward.Managers
         {
             using (new ProfilingScope("PrepareLights"))
             {
+                _hasDirectionalLight = false;
+                _directionalLightEntity = SceneEntity.Null;
+
                 if (_needsStructureRebuild)
                 {
                     _gpuRawLightList.Clear();
@@ -97,6 +101,24 @@ namespace Primary.Rendering.Forward.Managers
                 else
                 {
                     RunResolveDirtyLights(false, shadowManager);
+                }
+
+                if (_hasDirectionalLight)
+                {
+                    ref WorldTransform world = ref _directionalLightEntity.GetComponent<WorldTransform>();
+                    ref Light light = ref _directionalLightEntity.GetComponent<Light>();
+
+                    DirectionalLightData data = new DirectionalLightData
+                    {
+                        Direction = -world.ForwardVector,
+
+                        Diffuse = light.Diffuse.AsVector3() * light.Brightness,
+                        Specular = light.Specular.AsVector3() * light.Brightness,
+                    };
+
+                    DirectionalLightData* mapped = (DirectionalLightData*)commandBuffer.Map(_directionalLight, RHI.MapIntent.Write).ToPointer();
+                    *mapped = data;
+                    commandBuffer.Unmap(_directionalLight);
                 }
 
                 _gpuRawLightList.Flush(commandBuffer);
@@ -182,9 +204,13 @@ namespace Primary.Rendering.Forward.Managers
                             This._gpuRawLightList.Remove(i);
                         }
                     }
-                    else
+                    else if (!This._hasDirectionalLight)
                     {
-                        //dir light
+                        if (enabled.Enabled)
+                        {
+                            This._hasDirectionalLight = true;
+                            This._directionalLightEntity = (SceneEntity)e;
+                        }
                     }
 
                     light.Dirty = false;
@@ -198,7 +224,6 @@ namespace Primary.Rendering.Forward.Managers
     {
         public Vector3 Direction;
 
-        public Vector3 Ambient;
         public Vector3 Diffuse;
         public Vector3 Specular;
     }

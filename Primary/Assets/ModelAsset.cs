@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using Primary.Rendering.Data;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -29,16 +30,13 @@ namespace Primary.Assets
 
         internal ModelAssetData AssetData => _assetData;
 
-        public RHI.Buffer? VertexBuffer => _assetData.VertexBuffer;
-        public RHI.Buffer? IndexBuffer => _assetData.IndexBuffer;
-
         public ResourceStatus Status => _assetData.Status;
 
         public string Name => _assetData.Name;
         public AssetId Id => _assetData.Id;
     }
 
-    internal sealed class ModelAssetData : IInternalAssetData
+    internal sealed class ModelAssetData : IInternalAssetData, IRenderMeshSource
     {
         private readonly WeakReference _asset;
 
@@ -132,8 +130,8 @@ namespace Primary.Assets
             return false;
         }
 
-        internal RHI.Buffer? VertexBuffer => _vertexBuffer;
-        internal RHI.Buffer? IndexBuffer => _indexBuffer;
+        public RHI.Buffer? VertexBuffer => _vertexBuffer;
+        public RHI.Buffer? IndexBuffer => _indexBuffer;
 
         internal ResourceStatus Status => _status;
 
@@ -144,43 +142,19 @@ namespace Primary.Assets
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
     }
 
-    public class RenderMesh
+    public class RenderMesh : RawRenderMesh
     {
-        private readonly ModelAsset _model;
         private readonly string _id;
-        private readonly GCHandle _gc;
-        private readonly nint _handle;
 
-        private readonly uint _vertexOffset;
-        private readonly uint _indexOffset;
-
-        private readonly uint _indexCount;
-
-        internal RenderMesh(ModelAsset modelAsset, string id, uint vertexOffset, uint indexOffset, uint indexCount)
+        internal RenderMesh(ModelAssetData modelAssetData, string id, uint vertexOffset, uint indexOffset, uint indexCount) : base(modelAssetData, vertexOffset, indexOffset, indexCount)
         {
-            _model = modelAsset;
             _id = id;
-            _gc = GCHandle.Alloc(this, GCHandleType.Normal);
-            _handle = GCHandle.ToIntPtr(_gc);
-            _vertexOffset = vertexOffset;
-            _indexOffset = indexOffset;
-            _indexCount = indexCount;
         }
 
-        internal void FreeHandle()
-        {
-            _gc.Free();
-        }
+        internal new void FreeHandle() => base.FreeHandle();
 
-        public ModelAsset Model => _model;
+        public ModelAsset Model => Unsafe.As<ModelAsset>(Unsafe.As<ModelAssetData>(Source).Definition ?? throw new NullReferenceException());
         public string Id => _id;
-
-        internal nint Handle => _handle;
-
-        public uint VertexOffset => _vertexOffset;
-        public uint IndexOffset => _indexOffset;
-
-        public uint IndexCount => _indexCount;
     }
 
     public sealed record class ModelNode

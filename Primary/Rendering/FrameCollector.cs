@@ -3,6 +3,7 @@ using Primary.Assets;
 using Primary.Components;
 using Primary.Profiling;
 using Primary.Rendering.Batching;
+using Primary.Rendering.Data;
 using System.Numerics;
 
 namespace Primary.Rendering
@@ -58,7 +59,7 @@ namespace Primary.Rendering
 
                 if (renderer.Mesh != null)
                 {
-                    RenderMesh mesh = renderer.Mesh;
+                    RawRenderMesh mesh = renderer.Mesh;
                     //TODO: add backup material
                     MaterialAsset? material = renderer.Material;
                     if (material?.Shader == null)

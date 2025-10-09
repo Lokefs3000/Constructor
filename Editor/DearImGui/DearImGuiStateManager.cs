@@ -3,7 +3,7 @@ using Hexa.NET.ImGui.Backends.SDL3;
 using Primary.Assets;
 using Primary.Common;
 using Primary.Rendering;
-using Primary.Rendering.Data;
+using Primary.Rendering.Pass;
 using Primary.Rendering.Raw;
 using SDL;
 using System.Numerics;

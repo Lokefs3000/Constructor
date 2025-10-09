@@ -47,7 +47,7 @@ namespace Editor.Assets
 
         private bool _disposedValue;
 
-        internal AssetPipeline()
+        internal AssetPipeline(StartupDisplayUI startupUi)
         {
             bool needsDbRefresh = false;
             if (!Directory.Exists(EditorFilepaths.LibraryImportedPath))
@@ -118,7 +118,7 @@ namespace Editor.Assets
             AddImporter<MaterialAssetImporter>(".mat");
             AddImporter<GeoSceneAssetImporter>(".geoscn");
 
-            RefreshDatabase(needsDbRefresh);
+            RefreshDatabase(needsDbRefresh, startupUi);
         }
 
         private void Dispose(bool disposing)
@@ -473,7 +473,7 @@ namespace Editor.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        private void RefreshDatabase(bool cleanOldData)
+        private void RefreshDatabase(bool cleanOldData, StartupDisplayUI startupUi)
         {
             long timeStart = Stopwatch.GetTimestamp();
 
@@ -545,26 +545,25 @@ namespace Editor.Assets
 
                 if (foundImportableFile)
                 {
-                    using ImporterDisplay display = new ImporterDisplay();
+                    startupUi.PushStep("Importing assets");
 
                     while (true)
                     {
-                        display.Poll();
-
                         //PollContentUpdates();
 
                         int total = _importerTasksTotal;
                         int completed = total - _importerTasksCount;
 
-                        display.Progress = completed / (float)total;
-                        display.Completed = completed;
-                        display.Total = total;
-
-                        display.Draw();
+                        startupUi.Description = $"{completed}/{total}";
+                        startupUi.Progress = completed / (float)total;
 
                         if (completed >= total)
                             break;
+
+                        Thread.Sleep(50);
                     }
+
+                    startupUi.PopStep();
                 }
 
                 File.WriteAllText(AssetIdentifier.DataFilePath, _identifier.TrySerializeAssetIds());

@@ -1,4 +1,5 @@
-﻿using SDL;
+﻿using Primary.Common;
+using SDL;
 
 namespace Primary.Input.Devices
 {
@@ -7,10 +8,16 @@ namespace Primary.Input.Devices
         private bool[] _keyStates;
         private Dictionary<KeyCode, KeyState> _newlyUpdatedStates;
 
+        private AnyState _anyKeyState;
+        private int _keysHeld;
+
         internal KeyboardDevice()
         {
             _keyStates = new bool[byte.MaxValue];
             _newlyUpdatedStates = new Dictionary<KeyCode, KeyState>();
+
+            _anyKeyState = AnyState.None;
+            _keysHeld = 0;
         }
 
         public bool HandleInputEvent(ref readonly SDL_Event @event)
@@ -21,7 +28,11 @@ namespace Primary.Input.Devices
                 if (key != KeyCode.Unknown)
                 {
                     if (!_keyStates[(int)key])
+                    {
                         _newlyUpdatedStates[key] = KeyState.Released;
+                        _anyKeyState |= AnyState.Pressed;
+                        _keysHeld++;
+                    }
 
                     _keyStates[(int)key] = true;
                     return true;
@@ -33,7 +44,11 @@ namespace Primary.Input.Devices
                 if (key != KeyCode.Unknown)
                 {
                     if (_keyStates[(int)key])
+                    {
                         _newlyUpdatedStates[key] = KeyState.Released;
+                        _anyKeyState |= AnyState.Released;
+                        _keysHeld--;
+                    }
 
                     _keyStates[(int)key] = false;
                     return true;
@@ -46,6 +61,8 @@ namespace Primary.Input.Devices
         public void UpdateFrame()
         {
             _newlyUpdatedStates.Clear();
+
+            _anyKeyState = AnyState.None;
         }
 
         public int ResolveBindingPath(ReadOnlySpan<char> bindingPath)
@@ -68,6 +85,9 @@ namespace Primary.Input.Devices
         public bool IsKeyDown(KeyCode key) => _keyStates[(int)key];
         public bool IsKeyPressed(KeyCode key) => _newlyUpdatedStates.TryGetValue(key, out KeyState state) && state == KeyState.Pressed;
         public bool IsKeyReleased(KeyCode key) => _newlyUpdatedStates.TryGetValue(key, out KeyState state) && state == KeyState.Released;
+
+        public bool IsAnyKeyPressed => FlagUtility.HasFlag(_anyKeyState, AnyState.Pressed);
+        public bool IsAnyKeyReleased => FlagUtility.HasFlag(_anyKeyState, AnyState.Released);
 
         private static KeyCode TranslateKey(SDL_Keycode keycode) => keycode switch
         {
@@ -217,6 +237,13 @@ namespace Primary.Input.Devices
         {
             Pressed = 0,
             Released
+        }
+
+        private enum AnyState : byte
+        {
+            None = 0,
+            Pressed = 1 << 0,
+            Released = 1 << 1,
         }
     }
 

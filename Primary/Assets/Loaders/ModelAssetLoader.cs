@@ -119,7 +119,7 @@ namespace Primary.Assets.Loaders
                         indexDataOffset += indexDataSize;
                     }
 
-                    meshes[i] = new RenderMesh(model, mesh.Name, 0, indexOffsetTotal, mesh.IndexCount);
+                    meshes[i] = new RenderMesh(modelData, mesh.Name, 0, indexOffsetTotal, mesh.IndexCount);
                     indexOffsetTotal += mesh.IndexCount;
                 }
 

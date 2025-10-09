@@ -1,4 +1,5 @@
-﻿using Primary.Assets;
+﻿using Editor.Geometry;
+using Primary.Assets;
 using Silk.NET.Assimp;
 using System;
 using System.Collections.Frozen;
@@ -20,6 +21,10 @@ namespace Editor.Assets.Types
             _assetData = assetData;
         }
 
+        internal GeoBrushScene? BrushScene => _assetData.BrushScene;
+        internal GeoVertexCache? VertexCache => _assetData.VertexCache;
+        internal GeoGenerator? Generator => _assetData.Generator;
+
         internal GeoSceneAssetData AssetData => _assetData;
 
         public ResourceStatus Status => _assetData.Status;
@@ -37,6 +42,10 @@ namespace Editor.Assets.Types
         private readonly AssetId _id;
         private string _name;
 
+        private GeoBrushScene? _brushScene;
+        private GeoVertexCache? _vertexCache;
+        private GeoGenerator? _generator;
+
         internal GeoSceneAssetData(AssetId id)
         {
             _asset = new WeakReference(null);
@@ -45,6 +54,8 @@ namespace Editor.Assets.Types
 
             _id = id;
             _name = string.Empty;
+
+            _brushScene = null;
         }
 
         public void Dispose()
@@ -64,11 +75,15 @@ namespace Editor.Assets.Types
             _name = name;
         }
 
-        internal void UpdateAssetData(GeoSceneAsset asset)
+        internal void UpdateAssetData(GeoSceneAsset asset, GeoBrushScene brushScene, GeoVertexCache vertexCache, GeoGenerator generator)
         {
             _asset.Target = asset;
 
             _status = ResourceStatus.Success;
+
+            _brushScene = brushScene;
+            _vertexCache = vertexCache;
+            _generator = generator;
         }
 
         internal void UpdateAssetFailed(GeoSceneAsset asset)
@@ -77,6 +92,10 @@ namespace Editor.Assets.Types
 
             _status = ResourceStatus.Error;
         }
+
+        internal GeoBrushScene? BrushScene => _brushScene;
+        internal GeoVertexCache? VertexCache => _vertexCache;
+        internal GeoGenerator? Generator => _generator;
 
         internal ResourceStatus Status => _status;
 

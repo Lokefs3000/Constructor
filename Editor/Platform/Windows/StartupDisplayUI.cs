@@ -11,7 +11,7 @@ using static SDL.SDL3;
 
 namespace Editor.Platform.Windows
 {
-    internal unsafe sealed class ImporterDisplay : IDisposable
+    internal unsafe sealed class StartupDisplayUI : IDisposable
     {
         private SDL_Window* _window;
         private SDL_Renderer* _renderer;
@@ -21,17 +21,25 @@ namespace Editor.Platform.Windows
 
         private GlyphData[] _glyphs;
 
-        private float _progress;
-        private int _completed;
-        private int _total;
+        private AutoResetEvent _updateEvent;
+        private object _updateLock;
+
+        private bool _stepsHaveChanged;
+        private bool _progressHasChanged;
+
+        private Stack<LoadingStep> _activeSteps;
+        private Stack<BackupStep> _progressStack;
+
+        private string _currentDescription;
+        private float _currentProgress;
 
         private DateTime _startTime;
 
         private bool _disposedValue;
 
-        internal ImporterDisplay()
+        internal StartupDisplayUI()
         {
-            _window = SDL_CreateWindow("Importer", 500, 300, SDL_WindowFlags.SDL_WINDOW_BORDERLESS);
+            _window = SDL_CreateWindow("Startup", 500, 300, SDL_WindowFlags.SDL_WINDOW_BORDERLESS);
             _renderer = SDL_CreateRenderer(_window, "software");
 
             SDL_SetWindowHitTest(_window, &HitTest, nint.Zero);
@@ -99,6 +107,18 @@ namespace Editor.Platform.Windows
                 }
             }
 
+            _updateEvent = new AutoResetEvent(false);
+            _updateLock = new object();
+
+            _stepsHaveChanged = false;
+            _progressHasChanged = false;
+
+            _activeSteps = new Stack<LoadingStep>();
+            _progressStack = new Stack<BackupStep>();
+
+            _currentDescription = string.Empty;
+            _currentProgress = 0.0f;
+
             _startTime = DateTime.UtcNow;
 
             DrawInitial();
@@ -121,7 +141,7 @@ namespace Editor.Platform.Windows
             }
         }
 
-        ~ImporterDisplay()
+        ~StartupDisplayUI()
         {
             Dispose(disposing: false);
         }
@@ -135,25 +155,39 @@ namespace Editor.Platform.Windows
         internal void Poll()
         {
             SDL_WaitEventTimeout(null, 100);
-
+            
             SDL_Event @event = new SDL_Event();
             while (SDL_PollEvent(&@event)) ;
         }
 
         internal void Draw()
         {
-            SDL_FRect srcRect = new SDL_FRect { x = 11, y = 254, w = 200 - 11, h = 14 };
-            SDL_RenderTexture(_renderer, _splashTexture, &srcRect, &srcRect);
+            lock (_updateLock)
+            {
+                if (_progressHasChanged)
+                {
+                    if (_activeSteps.Count == 0)
+                        return;
 
-            SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
-            DrawText(new Vector2(10.0f, 266.0f), 14.0f, $"{_completed}/{_total} - {(DateTime.UtcNow - _startTime).ToString(@"hh\.mm\:ss\:ff", CultureInfo.InvariantCulture)}");
+                    if (_stepsHaveChanged)
+                    {
+                        ResetForStepChange();
+                    }
 
-            SDL_FRect barRect = new SDL_FRect { x = 11, y = 273, w = 348 * MathF.Min((float)(_completed / (double)_total), 1.0f), h = 16 };
+                    SDL_FRect srcRect = new SDL_FRect { x = 11, y = 254, w = 200 - 11, h = 14 };
+                    SDL_RenderTexture(_renderer, _splashTexture, &srcRect, &srcRect);
 
-            SDL_SetRenderDrawColor(_renderer, 184, 118, 51, 255);
-            SDL_RenderFillRect(_renderer, &barRect);
+                    SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
+                    DrawText(new Vector2(10.0f, 266.0f), 14.0f, $"{_currentDescription} - {(DateTime.UtcNow - _startTime).ToString(@"hh\.mm\:ss\:ff", CultureInfo.InvariantCulture)}");
 
-            SDL_RenderPresent(_renderer);
+                    SDL_FRect barRect = new SDL_FRect { x = 11, y = 273, w = 348 * _currentProgress, h = 16 };
+
+                    SDL_SetRenderDrawColor(_renderer, 184, 118, 51, 255);
+                    SDL_RenderFillRect(_renderer, &barRect);
+
+                    SDL_RenderPresent(_renderer);
+                }
+            }
         }
 
         private void DrawInitial()
@@ -168,8 +202,8 @@ namespace Editor.Platform.Windows
 
             SDL_SetRenderDrawBlendMode(_renderer, SDL_BlendMode.SDL_BLENDMODE_BLEND);
 
-            DrawText(new Vector2(10.0f, 248.0f), 24.0f, "Importing assets..");
-            DrawText(new Vector2(10.0f, 266.0f), 14.0f, $"{_completed}/{_total} - {(DateTime.UtcNow - _startTime).ToString(@"hh\.mm\:ss\:ff", CultureInfo.InvariantCulture)}");
+            DrawText(new Vector2(10.0f, 248.0f), 24.0f, "???");
+            //DrawText(new Vector2(10.0f, 266.0f), 14.0f, $"{_completed}/{_total} - {(DateTime.UtcNow - _startTime).ToString(@"hh\.mm\:ss\:ff", CultureInfo.InvariantCulture)}");
 
             SDL_SetRenderDrawBlendMode(_renderer, SDL_BlendMode.SDL_BLENDMODE_NONE);
 
@@ -190,6 +224,21 @@ namespace Editor.Platform.Windows
             SDL_RenderPresent(_renderer);
 
             SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
+        }
+
+        private void ResetForStepChange()
+        {
+            SDL_FRect dstRect = new SDL_FRect { x = 10, y = 224, w = 490, h = 24 };
+
+            SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
+            SDL_RenderTexture(_renderer, _splashTexture, &dstRect, &dstRect);
+
+            DrawText(new Vector2(10.0f, 248.0f), 24.0f, _activeSteps.Peek().Title);
+
+            SDL_FRect bgRect = new SDL_FRect { x = 10, y = 272, w = 350, h = 18 };
+
+            SDL_SetRenderDrawColor(_renderer, 40, 40, 40, 255);
+            SDL_RenderFillRect(_renderer, &bgRect);
         }
 
         private void DrawText(Vector2 pos, float scale, in string text)
@@ -215,10 +264,75 @@ namespace Editor.Platform.Windows
             }
         }
 
-        internal float Progress { get => _progress; set => _progress = MathF.Min(MathF.Max(value, 0.0f), 1.0f); }
+        public void PushStep(string title, string? newDescription = null, float newProgress = 0.0f)
+        {
+            lock (_updateLock)
+            {
+                _activeSteps.Push(new LoadingStep(title));
+                _progressStack.Push(new BackupStep(_currentProgress, _currentDescription, _startTime));
 
-        internal int Completed { get => _completed; set => _completed = value; }
-        internal int Total { get => _total; set => _total = value; }
+                _currentDescription = newDescription ?? string.Empty;
+                _currentProgress = newProgress;
+                _startTime = DateTime.UtcNow;
+
+                _stepsHaveChanged = true;
+                _progressHasChanged = true;
+            }
+        }
+
+        public void PopStep()
+        {
+            lock (_updateLock)
+            {
+                _activeSteps.Pop();
+                BackupStep backup = _progressStack.Pop();
+
+                _currentDescription = backup.Description;
+                _currentProgress = backup.Progress;
+                _startTime = backup.Time;
+
+                _stepsHaveChanged = true;
+                _progressHasChanged = true;
+            }
+        }
+
+        public string Description
+        {
+            get
+            {
+                lock (_updateLock)
+                {
+                    return _currentDescription;
+                }
+            }
+            set
+            {
+                lock (_updateLock)
+                {
+                    _currentDescription = value;
+                    _progressHasChanged = true;
+                }
+            }
+        }
+
+        public float Progress
+        {
+            get
+            {
+                lock (_updateLock)
+                {
+                    return _currentProgress;
+                }
+            }
+            set
+            {
+                lock (_updateLock)
+                {
+                    _currentProgress = value;
+                    _progressHasChanged = true;
+                }
+            }
+        }
 
         [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
         private static SDL_HitTestResult HitTest(SDL_Window* window, SDL_Point* point, nint userData)
@@ -227,5 +341,7 @@ namespace Editor.Platform.Windows
         }
 
         private readonly record struct GlyphData(bool IsDrawable, Vector4 Boundaries, SDL_FRect Source, float Advance);
+        private readonly record struct LoadingStep(string Title);
+        private readonly record struct BackupStep(float Progress, string Description, DateTime Time);
     }
 }

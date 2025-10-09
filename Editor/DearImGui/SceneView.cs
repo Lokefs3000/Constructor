@@ -69,7 +69,8 @@ namespace Editor.DearImGui
             _widgets = [
                 new ToolSpaceWidget(),
                 new ToolSelectorWidget(),
-                new SnappingWidget()
+                new SnappingWidget(),
+                new FramePacingWidget()
                 ];
 
             for (int i = 0; i < _widgets.Count; i++)
@@ -177,7 +178,8 @@ namespace Editor.DearImGui
                 {
                     for (int i = 0; i < _widgets.Count; i++)
                     {
-                        _widgets[i].RenderSelf();
+                        if (!_widgets[i].IsFloating)
+                            _widgets[i].RenderSelf();
                     }
 
                     //if (ImGui.BeginMenu("Viewmode"))
@@ -286,6 +288,16 @@ namespace Editor.DearImGui
                 //}
             }
             ImGui.End();
+
+            ImGui.PushID("SV"u8);
+
+            for (int i = 0; i < _widgets.Count; i++)
+            {
+                if (_widgets[i].IsFloating)
+                    _widgets[i].RenderSelf();
+            }
+
+            ImGui.PopID();
 
             ImGuiIOPtr io = ImGui.GetIO();
 

@@ -2,6 +2,7 @@
 using Primary.Rendering.Batching;
 using Primary.Rendering.Data;
 using Primary.Rendering.Forward.Managers;
+using Primary.Rendering.Pass;
 using Primary.Rendering.Raw;
 using System.Diagnostics;
 using System.Numerics;
@@ -98,7 +99,7 @@ namespace Primary.Rendering.Forward
 
             commandBuffer.SetViewport(new RHI.Viewport(lightData.AtlasOffset.X, lightData.AtlasOffset.Y, lightData.AtlasResolution, lightData.AtlasResolution));
 
-            ModelAsset? currentlyBoundAsset = null;
+            IRenderMeshSource? currentlyBoundSource = null;
 
             uint offsetInMatrixBuffer = 0;
 
@@ -111,7 +112,7 @@ namespace Primary.Rendering.Forward
                 for (int j = 0; j < batchDatas.Length; j++)
                 {
                     RenderMeshBatchData data = batchDatas[j];
-                    RenderMesh mesh = data.Mesh!;
+                    RawRenderMesh mesh = data.Mesh!;
 
                     Debug.Assert(mesh != null);
 
@@ -121,12 +122,12 @@ namespace Primary.Rendering.Forward
                         commandBuffer.Unmap(path.CbObjectData);
                     }
 
-                    if (currentlyBoundAsset != mesh.Model)
+                    if (currentlyBoundSource != mesh.Source)
                     {
-                        commandBuffer.SetVertexBuffer(0, mesh.Model.VertexBuffer!);
-                        commandBuffer.SetIndexBuffer(mesh.Model.IndexBuffer);
+                        commandBuffer.SetVertexBuffer(0, mesh.Source.VertexBuffer!);
+                        commandBuffer.SetIndexBuffer(mesh.Source.IndexBuffer);
 
-                        currentlyBoundAsset = mesh.Model;
+                        currentlyBoundSource = mesh.Source;
                     }
 
                     commandBuffer.DrawIndexedInstanced(new RHI.DrawIndexedInstancedArgs(mesh.IndexCount, mesh.IndexOffset, (int)mesh.VertexOffset, (uint)data.BatchableFlags.Count));

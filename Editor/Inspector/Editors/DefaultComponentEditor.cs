@@ -2,6 +2,7 @@
 using Editor.Inspector.Entities;
 using Primary.Assets;
 using Primary.Components;
+using Primary.Rendering.Data;
 using Primary.Scenes;
 using System.Collections.Frozen;
 using System.Numerics;
@@ -75,6 +76,7 @@ namespace Editor.Inspector.Editors
             { typeof(Enum), (x) => new VSEnum(x) },
             { typeof(RenderMesh), (x) => new VSMesh(x) },
             { typeof(MaterialAsset), (x) => new VSMaterial(x) },
+            { typeof(RawRenderMesh), (x) => new VSRawRenderMesh(x) },
         }.ToFrozenDictionary();
     }
 }

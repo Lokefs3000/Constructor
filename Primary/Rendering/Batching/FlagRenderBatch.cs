@@ -1,6 +1,7 @@
 ﻿using Arch.LowLevel;
 using CommunityToolkit.HighPerformance;
 using Primary.Assets;
+using Primary.Rendering.Data;
 using SharpGen.Runtime;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -61,13 +62,13 @@ namespace Primary.Rendering.Batching
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void AddFlag(RenderMesh mesh, uint matIdx, ref Matrix4x4 model)
+        internal void AddFlag(RawRenderMesh mesh, uint matIdx, ref Matrix4x4 model)
         {
             if (!_activeBatches.TryGetValue(mesh.Handle, out RenderMeshBatchData? batchData))
                 AppendNewBatch_SlowPath(mesh, out batchData);
             batchData.Add(ref model, ref matIdx);
 
-            void AppendNewBatch_SlowPath(RenderMesh mesh, out RenderMeshBatchData batchData)
+            void AppendNewBatch_SlowPath(RawRenderMesh mesh, out RenderMeshBatchData batchData)
             {
                 if (!_storedBatchData.TryPop(out batchData!))
                     batchData = new RenderMeshBatchData();
@@ -123,7 +124,7 @@ namespace Primary.Rendering.Batching
 
     internal class RenderMeshBatchData : IDisposable
     {
-        public RenderMesh? Mesh = null;
+        public RawRenderMesh? Mesh = null;
         public UnsafeList<BatchedRenderFlag> BatchableFlags;
 
         internal RenderMeshBatchData()
