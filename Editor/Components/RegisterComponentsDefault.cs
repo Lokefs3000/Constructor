@@ -8,6 +8,7 @@ namespace Primary.Components
         public static void RegisterDefault()
         {
             SceneEntityManager.Register<GeoSceneComponent>();
+            SceneEntityManager.Register<GeoSceneGeneratedTag>();
 
             SceneEntityManager.BuildRequirementHierchies();
         }

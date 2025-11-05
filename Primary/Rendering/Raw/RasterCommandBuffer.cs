@@ -190,9 +190,9 @@ namespace Primary.Rendering.Raw
                                 {
                                     TextureAsset? asset = Unsafe.As<TextureAsset>(staticRes.Resource);
                                     if (asset == null || asset.Status != ResourceStatus.Success)
-                                        resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), AssetManager.Static.DefaultWhite.Texture, null, 0);
+                                        resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), AssetManager.Static.DefaultWhite.RawRHITexture, null, 0);
                                     else
-                                        resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), asset.Texture, null, 0);
+                                        resourceLocations[staticRes.ConstantsOffset] = new RHI.ResourceLocation((ushort)(startIndex + staticRes.ConstantsOffset), asset.RawRHITexture, null, 0);
                                     break;
                                 }
                             case BindGroupResourceType.RHITexture:

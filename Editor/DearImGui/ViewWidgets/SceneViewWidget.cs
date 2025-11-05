@@ -61,8 +61,8 @@ namespace Editor.DearImGui.ViewWidgets
                     }
 
                     Render();
-                    ImGui.EndChild();
                 }
+                ImGui.EndChild();
             }
         }
 

@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.HighPerformance;
+using Editor.Assets;
 using Editor.DearImGui.Popups;
 using Hexa.NET.ImGui;
 using Primary.Assets;
@@ -13,6 +14,17 @@ namespace Editor.DearImGui
     {
         #region Core
         public static Vector3 Header(in string headerText)
+        {
+            Vector2 contentAvail = ImGui.GetContentRegionAvail();
+            Vector2 screenCursor = ImGui.GetCursorScreenPos();
+
+            ImGui.TextUnformatted(headerText);
+            ImGui.SameLine();
+
+            return new Vector3(screenCursor + new Vector2(contentAvail.X * 0.4f, 0.0f), contentAvail.X * 0.6f);
+        }
+
+        public static Vector3 Header(in ReadOnlySpan<byte> headerText)
         {
             Vector2 contentAvail = ImGui.GetContentRegionAvail();
             Vector2 screenCursor = ImGui.GetCursorScreenPos();
@@ -270,11 +282,11 @@ namespace Editor.DearImGui
                     {
                         selected = curr;
                         ret = true;
-
+                
                         break;
                     }
                 }
-
+            
                 ImGui.EndCombo();
             }
 
@@ -601,7 +613,148 @@ namespace Editor.DearImGui
 
             if (ImGuiP.ButtonBehavior(button_bb, id2, &hovered, &held))
             {
-                Editor.GlobalSingleton.PopupManager.Open(new AssetPicker<T>(update));
+                Editor.GlobalSingleton.PopupManager.Open(new AssetPicker(typeof(T), value?.Id ?? AssetId.Invalid, (x) => update((x as T)!), null));
+            }
+
+            drawList.AddRectFilled(button_bb.Min, button_bb.Max, new Color32(context.Style.Colors[(int)(held ? ImGuiCol.ButtonActive : (hovered ? ImGuiCol.ButtonHovered : ImGuiCol.Button))]).ABGR, context.Style.FrameRounding);
+            drawList.AddRect(button_bb.Min, button_bb.Max, new Color32(context.Style.Colors[(int)ImGuiCol.Border]).ABGR, context.Style.FrameRounding);
+
+            drawList.AddCircle(Vector2.Lerp(button_bb.Min, button_bb.Max, 0.5f), 4.0f, 0xffffffff);
+
+            ImGuiP.ItemAdd(bb, id2);
+            ImGuiP.ItemSize(bb);
+
+            ImGui.PopID();
+
+            return false;
+        }
+
+        public static bool SelectorAsset(in string headerText, Type type, IAssetDefinition? value, Action<IAssetDefinition> update)
+        {
+            Vector2 contentAvail = ImGui.GetContentRegionAvail();
+            Vector2 screenCursor = ImGui.GetCursorScreenPos();
+
+            ImGuiContextPtr context = ImGui.GetCurrentContext();
+            ImDrawListPtr drawList = ImGui.GetWindowDrawList();
+
+            ImGui.TextUnformatted(headerText);
+            ImGui.SameLine();
+
+            ImGui.PushID(headerText);
+
+            byte def1 = 1;
+            byte def2 = 2;
+
+            uint id1 = ImGui.GetID(&def1);
+            uint id2 = ImGui.GetID(&def2);
+
+            bool hovered, held;
+
+            string assetName = value?.Name ?? "null";
+
+            float buttonWidth = context.Style.FramePadding.Y * 2.0f + context.FontSize;
+
+            ImRect bb = new ImRect(screenCursor + new Vector2(contentAvail.X * 0.4f, 0.0f), screenCursor + new Vector2(contentAvail.X, buttonWidth));
+            ImRect disp_bb = new ImRect(bb.Min, new Vector2(bb.Max.X - buttonWidth, bb.Max.Y));
+            ImRect button_bb = new ImRect(new Vector2(bb.Max.X - buttonWidth, bb.Min.Y), bb.Max);
+
+            Vector2 textSize = ImGui.CalcTextSize(assetName);
+
+            drawList.AddRectFilled(bb.Min, bb.Max, new Color32(context.Style.Colors[(int)ImGuiCol.FrameBg]).ABGR, context.Style.FrameRounding);
+            drawList.AddRect(bb.Min, bb.Max, new Color32(context.Style.Colors[(int)ImGuiCol.Border]).ABGR, context.Style.FrameRounding);
+            drawList.AddText(Vector2.Lerp(disp_bb.Min, disp_bb.Max, 0.5f) - textSize * 0.5f, 0xffffffff, assetName);
+
+            ImGuiP.ItemAdd(bb, id1);
+            ImGuiP.ItemSize(bb);
+
+            if (ImGui.BeginItemTooltip())
+            {
+                if (value != null)
+                {
+                    ImGui.TextUnformatted(value.Name);
+                    ImGui.TextColored(new Vector4(1.0f, 1.0f, 1.0f, 0.5f), "Id: " + value.Id);
+                    ImGui.TextColored(new Vector4(1.0f, 1.0f, 1.0f, 0.5f), "Status: " + value.Status);
+                }
+
+                ImGui.TextColored(new Vector4(1.0f, 1.0f, 1.0f, 0.5f), type.Name);
+
+                ImGui.EndTooltip();
+            }
+
+            ImGui.SameLine();
+
+            if (ImGuiP.ButtonBehavior(button_bb, id2, &hovered, &held))
+            {
+                Editor.GlobalSingleton.PopupManager.Open(new AssetPicker(type, value?.Id ?? AssetId.Invalid, update, null));
+            }
+
+            drawList.AddRectFilled(button_bb.Min, button_bb.Max, new Color32(context.Style.Colors[(int)(held ? ImGuiCol.ButtonActive : (hovered ? ImGuiCol.ButtonHovered : ImGuiCol.Button))]).ABGR, context.Style.FrameRounding);
+            drawList.AddRect(button_bb.Min, button_bb.Max, new Color32(context.Style.Colors[(int)ImGuiCol.Border]).ABGR, context.Style.FrameRounding);
+
+            drawList.AddCircle(Vector2.Lerp(button_bb.Min, button_bb.Max, 0.5f), 4.0f, 0xffffffff);
+
+            ImGuiP.ItemAdd(bb, id2);
+            ImGuiP.ItemSize(bb);
+
+            ImGui.PopID();
+
+            return false;
+        }
+
+        public static bool SelectorAssetId<T>(in string headerText, AssetId id, Action<AssetId> update) where T : class, IAssetDefinition
+        {
+            Vector2 contentAvail = ImGui.GetContentRegionAvail();
+            Vector2 screenCursor = ImGui.GetCursorScreenPos();
+
+            ImGuiContextPtr context = ImGui.GetCurrentContext();
+            ImDrawListPtr drawList = ImGui.GetWindowDrawList();
+
+            AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
+
+            ImGui.TextUnformatted(headerText);
+            ImGui.SameLine();
+
+            ImGui.PushID(headerText);
+
+            byte def1 = 1;
+            byte def2 = 2;
+
+            uint id1 = ImGui.GetID(&def1);
+            uint id2 = ImGui.GetID(&def2);
+
+            bool hovered, held;
+
+            string? path = pipeline.Identifier.RetrievePathForId(id);
+            string assetName = Path.GetFileNameWithoutExtension(path) ?? "null";
+
+            float buttonWidth = context.Style.FramePadding.Y * 2.0f + context.FontSize;
+
+            ImRect bb = new ImRect(screenCursor + new Vector2(contentAvail.X * 0.4f, 0.0f), screenCursor + new Vector2(contentAvail.X, buttonWidth));
+            ImRect disp_bb = new ImRect(bb.Min, new Vector2(bb.Max.X - buttonWidth, bb.Max.Y));
+            ImRect button_bb = new ImRect(new Vector2(bb.Max.X - buttonWidth, bb.Min.Y), bb.Max);
+
+            Vector2 textSize = ImGui.CalcTextSize(assetName);
+
+            drawList.AddRectFilled(bb.Min, bb.Max, new Color32(context.Style.Colors[(int)ImGuiCol.FrameBg]).ABGR, context.Style.FrameRounding);
+            drawList.AddRect(bb.Min, bb.Max, new Color32(context.Style.Colors[(int)ImGuiCol.Border]).ABGR, context.Style.FrameRounding);
+            drawList.AddText(Vector2.Lerp(disp_bb.Min, disp_bb.Max, 0.5f) - textSize * 0.5f, 0xffffffff, assetName);
+
+            ImGuiP.ItemAdd(bb, id1);
+            ImGuiP.ItemSize(bb);
+
+            if (ImGui.BeginItemTooltip())
+            {
+                ImGui.TextUnformatted("Id: " + id);
+                ImGui.TextColored(new Vector4(1.0f, 1.0f, 1.0f, 0.5f), typeof(T).Name);
+            
+                ImGui.EndTooltip();
+            }
+
+            ImGui.SameLine();
+
+            if (ImGuiP.ButtonBehavior(button_bb, id2, &hovered, &held))
+            {
+                Editor.GlobalSingleton.PopupManager.Open(new AssetPicker(typeof(T), id, null, update));
             }
 
             drawList.AddRectFilled(button_bb.Min, button_bb.Max, new Color32(context.Style.Colors[(int)(held ? ImGuiCol.ButtonActive : (hovered ? ImGuiCol.ButtonHovered : ImGuiCol.Button))]).ABGR, context.Style.FrameRounding);

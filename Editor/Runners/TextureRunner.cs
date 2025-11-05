@@ -33,7 +33,7 @@ namespace Editor.Runners
             TextureProcessor processor = new TextureProcessor();
             processor.Execute(new TextureProcessorArgs
             {
-                AbsoluteFilepath = Path.GetFullPath(value.Input),
+                Sources = [new TextureProcessorArgs.Source { AbsoluteFilepath = Path.GetFullPath(value.Input) }],
                 AbsoluteOutputPath = Path.GetFullPath(value.Output),
 
                 FlipVertical = value.FlipVertical,

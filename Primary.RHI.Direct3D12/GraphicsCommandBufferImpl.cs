@@ -1189,7 +1189,7 @@ namespace Primary.RHI.Direct3D12
 
                         impl.EnsureResourceStates(_barrierManager, ResourceStates.Common, true);
 
-                        if (!(descriptor?.IsDynamic ?? true) && _activeDescriptors.TryGetValue(key, out uint handle))
+                        if (!(descriptor?.IsDynamic ?? false) && _activeDescriptors.TryGetValue(key, out uint handle))
                         {
                             descriptors[i] = handle;
                         }

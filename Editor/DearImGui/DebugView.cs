@@ -23,7 +23,8 @@ namespace Editor.DearImGui
             _debuggers = [
                 new DynAtlasDebugger(),
                 new ToolDebugger(),
-                new AssetDebugger()
+                new AssetDebugger(),
+                new RenderDebugger()
                 ];
             _activeDebuggerIndex = -1;
         }

@@ -85,6 +85,7 @@ namespace Primary
 
         }
 
+        public ConsoleManager ConsoleManager => _consoleManager;
         public Time Time => _time;
         public ProfilingManager ProfilingManager => _profilingManager;
         public AssetFilesystem AssetFilesystem => _assetFilesystem;
@@ -98,5 +99,11 @@ namespace Primary
         public InputSystem InputSystem => _inputSystem;
 
         public static Engine GlobalSingleton => s_instance!;
+
+#if DEBUG
+        public const bool IsDebugBuild = true;
+#else
+        public const bool IsDebugBuild = false;
+#endif
     }
 }

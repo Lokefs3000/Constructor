@@ -152,6 +152,7 @@ namespace Primary.Rendering
                     {
                         _shadowPass.ExecutePass(renderPass);
                         _opaquePass.ExecutePass(renderPass);
+                        renderer.EffectManager.SetupEffectsInPass(renderPass);
                         _finalBlit.ExecutePass(renderPass);
 
                         break;
@@ -185,16 +186,13 @@ namespace Primary.Rendering
 
         private void PrepareFrameData(RenderingManager renderer, RenderBatcher batcher, RenderPassViewportData viewportData, RenderPassLightingData lightingData)
         {
-            Span<FlagRenderBatch> batches = batcher.UsedBatches;
+            ReadOnlySpan<ShaderRenderBatch> batches = batcher.UsedBatches;
 
             int totalMatrixCount = 0;
             for (int i = 0; i < batches.Length; i++)
             {
-                Span<RenderMeshBatchData> batchDatas = batches[i].RenderMeshBatches;
-                for (int j = 0; j < batchDatas.Length; j++)
-                {
-                    totalMatrixCount += batchDatas[j].BatchableFlags.Count;
-                }
+                Span<BatchedRenderFlag> batchedFlags = batches[i].RenderFlags;
+                totalMatrixCount += batchedFlags.Length;
             }
 
             if (totalMatrixCount > 0)
@@ -231,17 +229,8 @@ namespace Primary.Rendering
                         int totalOffsetInBuffer = 0;
                         for (int i = 0; i < batches.Length; i++)
                         {
-                            Span<RenderMeshBatchData> batchDatas = batches[i].RenderMeshBatches;
-                            for (int j = 0; j < batchDatas.Length; j++)
-                            {
-                                RenderMeshBatchData batchData = batchDatas[j];
-                                if (batchData.BatchableFlags.Count == 0)
-                                    continue;
-
-                                batchData.BatchableFlags.AsSpan().CopyTo(bufferSpan.Slice(totalOffsetInBuffer, batchData.BatchableFlags.Count));
-
-                                totalOffsetInBuffer += batchData.BatchableFlags.Count;
-                            }
+                            batches[i].RenderFlags.CopyTo(bufferSpan.Slice(totalOffsetInBuffer, batches[i].RenderFlags.Length));
+                            totalOffsetInBuffer += batches[i].RenderFlags.Length;
                         }
                     }
                 }

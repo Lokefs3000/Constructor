@@ -58,7 +58,7 @@ namespace Primary.Components
 
     [ComponentUsage(CanBeAdded: false), DontSerializeComponent]
     [InspectorHidden]
-    public record struct WorldTransform : IComponent
+    public struct WorldTransform : IComponent
     {
         public Matrix4x4 Transformation;
         public int UpdateIndex;

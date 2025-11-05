@@ -45,7 +45,7 @@ namespace Editor.Interaction.Controls
         {
             if (@base is SelectedSceneEntity selected)
             {
-                if (!_transformList.Exists((x) => x is EntityToolTransform transform && transform.Entity != selected.Entity))
+                if (!_transformList.Exists((x) => x is EntityToolTransform transform && transform.Entity == selected.Entity))
                 {
                     _transformList.Add(new EntityToolTransform(selected.Entity));
                     NewTransformSelected?.Invoke(_transformList.Last());
@@ -57,7 +57,7 @@ namespace Editor.Interaction.Controls
         {
             if (@base is SelectedSceneEntity selected)
             {
-                int idx = _transformList.FindIndex((x) => x is EntityToolTransform transform && transform.Entity != selected.Entity);
+                int idx = _transformList.FindIndex((x) => x is EntityToolTransform transform && transform.Entity == selected.Entity);
                 if (idx != -1)
                 {
                     OldTransformDeselected?.Invoke(_transformList[idx]);

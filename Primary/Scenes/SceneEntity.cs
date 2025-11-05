@@ -9,7 +9,7 @@ using System.Runtime.Serialization;
 
 namespace Primary.Scenes
 {
-    public record struct SceneEntity : IEquatable<SceneEntity>
+    public struct SceneEntity : IEquatable<SceneEntity>, IEqualityComparer<SceneEntity>
     {
         private Entity _entity;
 
@@ -241,7 +241,10 @@ namespace Primary.Scenes
 
         public override string ToString() => IsNull ? "null" : Name;
         public override int GetHashCode() => _entity.GetHashCode();
-        public bool Equals(SceneEntity entity) => entity._entity == _entity;
+        public bool Equals(SceneEntity entity) => entity._entity.Equals(_entity);
+
+        public bool Equals(SceneEntity x, SceneEntity y) => x._entity.Equals(y._entity);
+        public int GetHashCode([DisallowNull] SceneEntity obj) => obj._entity.GetHashCode();
 
         [IgnoreDataMember]
         public Entity WrappedEntity => _entity;
@@ -253,5 +256,8 @@ namespace Primary.Scenes
 
         public static implicit operator SceneEntity(Entity entity) => new SceneEntity(entity);
         public static explicit operator Entity(SceneEntity sceneEntity) => sceneEntity.WrappedEntity;
+
+        public static bool operator ==(SceneEntity left, SceneEntity right) => left.Equals(right);
+        public static bool operator !=(SceneEntity left, SceneEntity right) => !left.Equals(right);
     }
 }

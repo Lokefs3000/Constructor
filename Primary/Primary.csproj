@@ -5,6 +5,12 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<Configurations>Debug;Release;ReleaseWithDebug</Configurations>
+	</PropertyGroup>
+	
+	  	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
+	  <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+	  <Optimize>True</Optimize>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -13,6 +19,10 @@
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
 		<IsAotCompatible>True</IsAotCompatible>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
+	  <IsAotCompatible>True</IsAotCompatible>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -27,7 +37,9 @@
 	<ItemGroup>
 		<Folder Include="Audio\" />
 		<Folder Include="Networking\" />
+		<Folder Include="Expression\" />
 		<Folder Include="Physics\" />
+		<Folder Include="Pooling\Concurrent\" />
 		<Folder Include="Scripting\" />
 	</ItemGroup>
 
@@ -39,6 +51,7 @@
 		<PackageReference Include="ppy.SDL3-CS" Version="2025.920.0" />
 		<PackageReference Include="Serilog" Version="4.3.0" />
 		<PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+		<PackageReference Include="System.Text.Json" Version="9.0.10" />
 		<PackageReference Include="Vortice.DXGI" Version="3.6.2" />
 		<PackageReference Include="ZeroAllocJobScheduler" Version="1.1.2" />
 	</ItemGroup>

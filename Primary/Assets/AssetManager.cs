@@ -34,6 +34,7 @@ namespace Primary.Assets
                 { typeof(ShaderAsset), new ShaderAssetLoader() },
                 { typeof(MaterialAsset), new MaterialAssetLoader() },
                 { typeof(TextureAsset), new TextureAssetLoader() },
+                { typeof(PostProcessingVolumeAsset), new EffectVolumeLoader() }
             }.ToFrozenDictionary();
 
             _invalidAssets = new Dictionary<Type, (IAssetDefinition, IInternalAssetData)>();
@@ -44,7 +45,8 @@ namespace Primary.Assets
             {
                 return new ImmutableAssets(
                     NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_White.png", true)),
-                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Normal.png", true)));
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Normal.png", true)),
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Mask.png", true)));
             }, LazyThreadSafetyMode.PublicationOnly);
 
             s_instance = this;
@@ -357,5 +359,6 @@ namespace Primary.Assets
 
     public record class ImmutableAssets(
         TextureAsset DefaultWhite,
-        TextureAsset DefaultNormal);
+        TextureAsset DefaultNormal,
+        TextureAsset DefaultMask);
 }

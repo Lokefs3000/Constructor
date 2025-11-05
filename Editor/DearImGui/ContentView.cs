@@ -354,12 +354,16 @@ namespace Editor.DearImGui
                             else
                             {
                                 string ext = Path.GetExtension(fullLocalPath);
-                                if (ext == ".png" || ext == ".jpg" || ext == ".jpeg")
+                                if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".texcomp" || ext == ".cubemap")
                                     Editor.GlobalSingleton.PropertiesView.SetInspected(new TextureProperties.TargetData(fullLocalPath));
                                 else if (ext == ".hlsl")
                                     Editor.GlobalSingleton.PropertiesView.SetInspected(new ShaderProperties.TargetData(fullLocalPath));
                                 else if (ext == ".fbx" || ext == ".obj")
                                     Editor.GlobalSingleton.PropertiesView.SetInspected(new ModelProperties.TargetData(fullLocalPath));
+                                else if (ext == ".mat")
+                                    Editor.GlobalSingleton.PropertiesView.SetInspected(new MaterialProperties.TargetData(fullLocalPath));
+                                else if (ext == ".fxvol")
+                                    Editor.GlobalSingleton.PropertiesView.SetInspected(new EffectVolumeProperties.TargetData(fullLocalPath));
                             }
                         }
 

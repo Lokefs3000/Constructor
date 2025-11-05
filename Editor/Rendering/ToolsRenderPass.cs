@@ -107,7 +107,7 @@ namespace Editor.Rendering
             }
         }
 
-        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
+        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData, object? userArg)
         {
             _lines.Clear();
             _triangles.Clear();

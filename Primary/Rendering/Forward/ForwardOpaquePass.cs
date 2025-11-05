@@ -1,4 +1,5 @@
 ﻿using Primary.Assets;
+using Primary.Profiling;
 using Primary.Rendering.Batching;
 using Primary.Rendering.Data;
 using Primary.Rendering.Pass;
@@ -44,54 +45,75 @@ namespace Primary.Rendering.Forward
             }
         }
 
-        public unsafe void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
+        public unsafe void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData, object? userArg)
         {
-            using (new CommandBufferEventScope(commandBuffer, "ForwardRP - Opaque"))
+            using (new ProfilingScope("Fwd-OpaquePass"))
             {
-                RenderingManager manager = Engine.GlobalSingleton.RenderingManager;
-                RenderBatcher batcher = manager.RenderBatcher;
-
-                ForwardRenderPath renderPath = (ForwardRenderPath)manager.RenderPath;
-
-                RenderPassViewportData viewportData = passData.Get<RenderPassViewportData>()!;
-
-                commandBuffer.ClearRenderTarget(viewportData.CameraRenderTarget, viewportData.Camera.ClearColor.AsVector4());
-                commandBuffer.ClearDepthStencil(viewportData.CameraRenderTarget, RHI.ClearFlags.Depth);
-
-                commandBuffer.SetRenderTarget(viewportData.CameraRenderTarget, true);
-                commandBuffer.SetScissorRect(new RHI.ScissorRect(0, 0, 100000, 100000));
-
-                Span<FlagRenderBatch> batches = batcher.UsedBatches;
-                uint offsetInMatrixBuffer = 0;
-
-                for (int i = 0; i < batches.Length; i++)
+                using (new CommandBufferEventScope(commandBuffer, "ForwardRP - Opaque"))
                 {
-                    FlagRenderBatch renderBatch = batches[i];
-                    HandleRenderBatch(commandBuffer, batcher, renderPath, renderBatch, ref offsetInMatrixBuffer);
+                    RenderingManager manager = Engine.GlobalSingleton.RenderingManager;
+                    RenderBatcher batcher = manager.RenderBatcher;
+
+                    ForwardRenderPath renderPath = (ForwardRenderPath)manager.RenderPath;
+
+                    RenderPassViewportData viewportData = passData.Get<RenderPassViewportData>()!;
+
+                    commandBuffer.ClearRenderTarget(viewportData.CameraRenderTarget, viewportData.Camera.ClearColor.AsVector4());
+                    commandBuffer.ClearDepthStencil(viewportData.CameraRenderTarget, RHI.ClearFlags.Depth);
+
+                    commandBuffer.SetRenderTarget(viewportData.CameraRenderTarget, true);
+                    commandBuffer.SetScissorRect(new RHI.ScissorRect(0, 0, 100000, 100000));
+
+                    ReadOnlySpan<ShaderRenderBatch> batches = batcher.UsedBatches;
+                    uint offsetInMatrixBuffer = 0;
+                    
+                    for (int i = 0; i < batches.Length; i++)
+                    {
+                        ShaderRenderBatch renderBatch = batches[i];
+                        HandleRenderBatch(commandBuffer, batcher, renderPath, renderBatch, ref offsetInMatrixBuffer);
+                    }
                 }
             }
         }
 
-        private unsafe void HandleRenderBatch(RasterCommandBuffer commandBuffer, RenderBatcher batcher, ForwardRenderPath path, FlagRenderBatch renderBatch, ref uint offsetInMatrixBuffer)
+        private unsafe void HandleRenderBatch(RasterCommandBuffer commandBuffer, RenderBatcher batcher, ForwardRenderPath path, ShaderRenderBatch renderBatch, ref uint offsetInMatrixBuffer)
         {
-            Span<RenderMeshBatchData> batchDatas = renderBatch.RenderMeshBatches;
-
             Debug.Assert(renderBatch.ShaderReference != null);
             ShaderAsset shader = renderBatch.ShaderReference!;
-
+            
             commandBuffer.SetShader(shader);
 
-            IRenderMeshSource? activeMeshSource = null;
-            for (int i = 0; i < batchDatas.Length; i++)
+            Span<BatchedRenderFlag> renderFlags = renderBatch.RenderFlags;
+            Span<BatchedSegment> segments = renderBatch.Segments;
+
+            IRenderMeshSource? oldSource = null;
+            MaterialAsset? oldMaterial = null;
+
+            for (int i = 0; i < segments.Length; i++)
             {
-                RenderMeshBatchData batchData = batchDatas[i];
-                if (batchData.BatchableFlags.Count == 0)
-                    continue;
+                ref BatchedSegment segment = ref segments[i];
+                
+                if (oldSource != segment.Mesh.Source)
+                {
+                    oldSource = segment.Mesh.Source;
 
-                Debug.Assert(batchData.Mesh != null);
-                RawRenderMesh mesh = batchData.Mesh!;
+                    Debug.Assert(oldSource.VertexBuffer != null);
+                    Debug.Assert(oldSource.IndexBuffer != null);
 
-                Span<BatchedRenderFlag> renderFlags = batchData.BatchableFlags.AsSpan();
+                    commandBuffer.SetVertexBuffer(0, oldSource.VertexBuffer!);
+                    commandBuffer.SetIndexBuffer(oldSource.IndexBuffer!);
+                }
+
+                if (oldMaterial != segment.Material)
+                {
+                    oldMaterial = segment.Material;
+
+                    if (oldMaterial.BindGroup == null)
+                        commandBuffer.SetBindGroups(path.BuffersBindGroup, path.LightingBindGroup);
+                    else
+                        commandBuffer.SetBindGroups(oldMaterial.BindGroup, path.BuffersBindGroup, path.LightingBindGroup);
+                    commandBuffer.CommitShaderResources();
+                }
 
                 {
                     cbObjectDataStruct* mapPointer = (cbObjectDataStruct*)commandBuffer.Map(path.CbObjectData, RHI.MapIntent.Write, (ulong)sizeof(cbObjectDataStruct));
@@ -99,39 +121,19 @@ namespace Primary.Rendering.Forward
                     commandBuffer.Unmap(path.CbObjectData);
                 }
 
-                if (activeMeshSource != mesh.Source)
-                {
-                    activeMeshSource = mesh.Source;
+                int count = segment.IdxEnd - segment.IdxStart;
+                Debug.Assert(count > 0);
 
-                    Debug.Assert(activeMeshSource.VertexBuffer != null);
-                    Debug.Assert(activeMeshSource.IndexBuffer != null);
-
-                    commandBuffer.SetVertexBuffer(0, activeMeshSource.VertexBuffer!);
-                    commandBuffer.SetIndexBuffer(activeMeshSource.IndexBuffer!);
-                }
-
-                MaterialAsset? material = batcher.GetMaterialFromIndex(renderFlags[0].MaterialIndex);
-                if (material == null)
-                {
-                    throw new NotImplementedException();
-                }
-
-                if (material.BindGroup == null)
-                    commandBuffer.SetBindGroups(path.BuffersBindGroup, path.LightingBindGroup);
-                else
-                    commandBuffer.SetBindGroups(material.BindGroup, path.BuffersBindGroup, path.LightingBindGroup);
-
-                commandBuffer.CommitShaderResources();
                 commandBuffer.DrawIndexedInstanced(new RHI.DrawIndexedInstancedArgs
                 {
-                    IndexCountPerInstance = mesh.IndexCount,
-                    InstanceCount = (uint)(batchData.BatchableFlags.Count),
-                    StartIndexLocation = mesh.IndexOffset,
-                    BaseVertexLocation = (int)mesh.VertexOffset,
+                    IndexCountPerInstance = segment.Mesh.IndexCount,
+                    InstanceCount = (uint)count,
+                    StartIndexLocation = segment.Mesh.IndexOffset,
+                    BaseVertexLocation = (int)segment.Mesh.VertexOffset,
                     StartInstanceLocation = 0
                 });
 
-                offsetInMatrixBuffer += (uint)batchData.BatchableFlags.Count;
+                offsetInMatrixBuffer += (uint)count;
             }
         }
     }

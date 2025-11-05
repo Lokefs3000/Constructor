@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -25,6 +27,21 @@ namespace Primary.Common
             Minimum = minimum;
             Maximum = maximum;
         }
+
+        public AABB(Vector128<float> minimum, Vector128<float> maximum)
+        {
+            Minimum = minimum.AsVector3();
+            Maximum = maximum.AsVector3();
+        }
+
+        public AABB(Vector256<float> value)
+        {
+            Minimum = value.GetLower().AsVector3();
+            Maximum = value.GetUpper().AsVector3();
+        }
+
+        public Vector256<float> AsVector256() => Vector256.Create(Minimum.AsVector128(), Maximum.AsVector128());
+        public Vector256<float> AsVector256Unsafe() => Vector256.Create(Minimum.AsVector128Unsafe(), Maximum.AsVector128Unsafe());
 
         public string ToString([StringSyntax(StringSyntaxAttribute.NumericFormat)] string? format, IFormatProvider? formatProvider)
         {
@@ -49,7 +66,25 @@ namespace Primary.Common
         public Vector3 Size => Maximum - Minimum;
         public Vector3 Center => Vector3.Lerp(Minimum, Maximum, 0.5f);
 
+        public static AABB Offset(AABB aabb, Vector3 offset)
+        {
+            return new AABB(aabb.Minimum + offset, aabb.Maximum + offset);
+        }
+
+        public static AABB Add(AABB left, AABB right)
+        {
+            return new AABB(Vector256.Add(left.AsVector256Unsafe(), right.AsVector256Unsafe()));
+        }
+
+        public static AABB Subtract(AABB left, AABB right)
+        {
+            return new AABB(Vector256.Subtract(left.AsVector256Unsafe(), right.AsVector256Unsafe()));
+        }
+
         public static readonly AABB Zero = new AABB();
         public static readonly AABB Infinite = new AABB(Vector3.NegativeInfinity, Vector3.PositiveInfinity);
+
+        public static AABB operator +(AABB left, AABB right) => Add(left, right);
+        public static AABB operator -(AABB left, AABB right) => Subtract(left, right);
     }
 }

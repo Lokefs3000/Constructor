@@ -23,7 +23,7 @@ namespace Editor.Geometry.Shapes
         {
             _shapeFaces = new GeoShapeFace[6];
 
-            Array.Fill(_shapeFaces, new GeoShapeFace(0, GeoShapeQuad.Default));
+            Array.Fill(_shapeFaces, new GeoShapeFace(null, GeoShapeQuad.Default));
         }
 
         public GeoMesh GenerateMesh()

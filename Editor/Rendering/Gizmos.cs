@@ -2,14 +2,11 @@
 using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Primary.Mathematics;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+
+using R2 = Primary.Rendering2;
 
 namespace Editor.Rendering
 {
@@ -145,6 +142,21 @@ namespace Editor.Rendering
             @this._counter += 2;
         }
 
+        public static void DrawVector(Vector3 center)
+        {
+            Vector3 ext = center + Vector3.One;
+
+            Gizmos @this = Instance;
+            @this.EnsureCommand(GizmoPolyType.Line, @this._lineVertices.Count);
+            @this._lineVertices.Add(new GZLineVertex(center, new Vector4(1.0f, 0.0f, 0.0f, 1.0f)));
+            @this._lineVertices.Add(new GZLineVertex(new Vector3(ext.X, center.Y, center.Z), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)));
+            @this._lineVertices.Add(new GZLineVertex(center, new Vector4(0.0f, 1.0f, 0.0f, 1.0f)));
+            @this._lineVertices.Add(new GZLineVertex(new Vector3(center.X, ext.Y, center.Z), new Vector4(0.0f, 1.0f, 0.0f, 1.0f)));
+            @this._lineVertices.Add(new GZLineVertex(center, new Vector4(0.0f, 0.0f, 1.0f, 1.0f)));
+            @this._lineVertices.Add(new GZLineVertex(new Vector3(center.X, center.Y, ext.Z), new Vector4(0.0f, 0.0f, 1.0f, 1.0f)));
+            @this._counter += 6;
+        }
+
         public static void DrawRay(Ray ray, float length, Vector4 color)
         {
             Gizmos @this = Instance;
@@ -162,14 +174,13 @@ namespace Editor.Rendering
             @this._counter += 1;
         }
 
-        public static void DrawWireCube(Vector3 center, Vector3 size, Vector4 color)
+        public static void DrawWireCube(AABB aabb, Vector4 color)
         {
             Gizmos @this = Instance;
             @this.EnsureCommand(GizmoPolyType.Line, @this._lineVertices.Count);
 
-            Vector3 halfSize = size * 0.5f;
-            Vector3 min = center - size;
-            Vector3 max = center + size;
+            Vector3 min = aabb.Minimum;
+            Vector3 max = aabb.Maximum;
 
             @this._lineVertices.Add(new GZLineVertex(new Vector3(min.X, min.Y, min.Z), color));
             @this._lineVertices.Add(new GZLineVertex(new Vector3(min.X, min.Y, max.Z), color));
@@ -191,9 +202,18 @@ namespace Editor.Rendering
             @this._lineVertices.Add(new GZLineVertex(new Vector3(max.X, min.Y, max.Z), color));
             @this._lineVertices.Add(new GZLineVertex(new Vector3(max.X, max.Y, max.Z), color));
 
-            @this._counter += 16;
+            @this._lineVertices.Add(new GZLineVertex(new Vector3(min.X, min.Y, min.Z), color));
+            @this._lineVertices.Add(new GZLineVertex(new Vector3(max.X, min.Y, min.Z), color));
+            @this._lineVertices.Add(new GZLineVertex(new Vector3(min.X, max.Y, min.Z), color));
+            @this._lineVertices.Add(new GZLineVertex(new Vector3(max.X, max.Y, min.Z), color));
+
+            @this._lineVertices.Add(new GZLineVertex(new Vector3(min.X, min.Y, max.Z), color));
+            @this._lineVertices.Add(new GZLineVertex(new Vector3(max.X, min.Y, max.Z), color));
+            @this._lineVertices.Add(new GZLineVertex(new Vector3(min.X, max.Y, max.Z), color));
+            @this._lineVertices.Add(new GZLineVertex(new Vector3(max.X, max.Y, max.Z), color));
+
+            @this._counter += 24;
         }
-        public static void DrawWireCube(AABB aabb, Vector4 color) => DrawWireCube(aabb.Center, aabb.Size, color);
 
         public static void DrawWireSphere(Vector3 center, float radius, int subDivisions, Vector4 color)
         {
@@ -241,6 +261,24 @@ namespace Editor.Rendering
         internal bool IsEmpty => _commands.Count == 0;
 
         internal static Gizmos Instance => NullableUtility.ThrowIfNull(Unsafe.As<Gizmos>(s_instance.Target));
+        internal static readonly R2DebugRenderer R2 = new R2DebugRenderer();
+
+        internal class R2DebugRenderer : R2.Debuggable.IDebugRenderer
+        {
+            public void DrawLine(Vector3 from, Vector3 to, Vector4 color) => Gizmos.DrawLine(from, to, color);
+
+            public void DrawVector(Vector3 position) => Gizmos.DrawVector(position);
+
+            public void DrawWireAABB(AABB aabb, Vector4 color) => Gizmos.DrawWireCube(aabb, color);
+
+            public void DrawWireBox(Vector3 center, Vector3 extents, Vector4 color)
+            {
+                Vector3 half = extents * 0.5f;
+                Gizmos.DrawWireCube(new AABB(center - half, center + half), color);
+            }
+
+            public void DrawWireSphere(Vector3 center, float radius, Vector4 color) => Gizmos.DrawWireSphere(center, radius, 16, color);
+        }
     }
 
     [StructLayout(LayoutKind.Explicit)]

@@ -11,28 +11,46 @@ namespace Primary.RHI
 
         public abstract void Dispose();
 
+        /// <summary>Not thread-safe</summary>
         public abstract void SynchronizeDevice(SynchronizeDeviceTargets targets);
 
+        /// <summary>Not thread-safe</summary>
         public abstract void BeginFrame();
+        /// <summary>Not thread-safe</summary>
         public abstract void FinishFrame();
 
+        /// <summary>Thread-safe</summary>
         public abstract void Submit(CommandBuffer commandBuffer);
 
+        /// <summary>Thread-safe</summary>
         public abstract SwapChain CreateSwapChain(Vector2 clientSize, nint windowHandle);
+        /// <summary>Thread-safe</summary>
         public abstract Buffer CreateBuffer(BufferDescription description, nint bufferData);
+        /// <summary>Thread-safe</summary>
         public abstract Texture CreateTexture(TextureDescription description, Span<nint> textureData);
+        /// <summary>Thread-safe</summary>
         public abstract PipelineLibrary CreatePipelineLibrary(Span<byte> initialData);
+        /// <summary>Thread-safe</summary>
         public abstract GraphicsPipeline CreateGraphicsPipeline(GraphicsPipelineDescription description, GraphicsPipelineBytecode bytecode);
+        /// <summary>Thread-safe</summary>
         public abstract CopyCommandBuffer CreateCopyCommandBuffer();
+        /// <summary>Thread-safe</summary>
         public abstract GraphicsCommandBuffer CreateGraphicsCommandBuffer();
+        /// <summary>Thread-safe</summary>
         public abstract RenderTarget CreateRenderTarget(RenderTargetDescription description);
+        /// <summary>Thread-safe</summary>
         public abstract Fence CreateFence(ulong initialValue = 0);
 
+        /// <summary>Thread-safe</summary>
         public abstract bool IsSupported(RenderTargetFormat format);
+        /// <summary>Thread-safe</summary>
         public abstract bool IsSupported(DepthStencilFormat format);
+        /// <summary>Thread-safe</summary>
         public abstract bool IsSupported(TextureFormat format, TextureDimension dimension);
 
+        /// <summary>Not thread-safe</summary>
         public abstract void InstallTracker(IObjectTracker tracker);
+        /// <summary>Not thread-safe</summary>
         public abstract void UninstallTracker(IObjectTracker tracker);
     }
 

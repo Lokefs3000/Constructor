@@ -70,7 +70,7 @@ namespace Editor.Inspector.Entities
             if (newQuat != _value)
             {
                 _value = newQuat;
-                _euler = newQuat.ToEuler();
+                _euler = Vector3.RadiansToDegrees(newQuat.ToEuler());
             }
 
             if (ImGuiWidgets.InputVector3(headerText, ref _euler))

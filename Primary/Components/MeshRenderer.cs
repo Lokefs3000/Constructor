@@ -2,19 +2,22 @@
 using Primary.Editor;
 using Primary.Rendering.Data;
 using Primary.Scenes;
+using Primary.Timing;
 using System.Runtime.Serialization;
 
 namespace Primary.Components
 {
-    [ComponentConnections(typeof(RenderableAdditionalData))]
+    [ComponentConnections(typeof(RenderableAdditionalData), typeof(RenderBounds))]
     [ComponentUsage(HasSelfReference: true)]
-    public record struct MeshRenderer : IComponent
+    public struct MeshRenderer : IComponent
     {
         [IgnoreDataMember]
         private SceneEntity _self;
 
         private RawRenderMesh? _mesh;
         private MaterialAsset? _material;
+
+        private int _frameIndex;
 
         public RawRenderMesh? Mesh
         {
@@ -23,6 +26,8 @@ namespace Primary.Components
             {
                 //if (_mesh != value)
                 //    RenderFlagContainer.Instance.ChangeMesh(_self);
+                if (_mesh != value)
+                    _frameIndex = Time.FrameIndex;
                 _mesh = value;
             }
         }
@@ -36,6 +41,8 @@ namespace Primary.Components
                 _material = value;
             }
         }
+
+        public int UpdateIndex => _frameIndex;
     }
 
     [ComponentUsage(CanBeAdded: false)]

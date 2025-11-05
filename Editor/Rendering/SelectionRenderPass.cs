@@ -98,7 +98,7 @@ namespace Editor.Rendering
             }
         }
 
-        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
+        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData, object? userArg)
         {
             _meshes.Clear();
             for (int i = 0; i < _renderableEntities.Count; i++)

@@ -95,15 +95,24 @@ namespace Primary.Rendering
             return true;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public object? GetResource(string path)
+        {
+            ref readonly ShaderBindGroupVariable variable = ref _variables.GetValueRefOrNullRef(path.GetDjb2HashCode());
+            if (Unsafe.IsNullRef(in variable))
+            {
+                return null;
+            }
+
+            return _staticLocations[variable.LocalIndex].Resource;
+        }
+
+        public bool HasResource(string path) => _variables.ContainsKey(path.GetDjb2HashCode());
+
+        public bool SetResource(string path, object? resource) => SetResource(path, resource, BindGroupResourceType.Pending);
         public bool SetResource(string path, TextureAsset? texture) => SetResource(path, texture, BindGroupResourceType.TextureAsset);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool SetResource(string path, RHI.Resource? resource) => SetResource(path, resource, BindGroupResourceType.Pending);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool SetResource(string path, RHI.Texture? texture) => SetResource(path, texture, BindGroupResourceType.RHITexture);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool SetResource(string path, RHI.Buffer? buffer) => SetResource(path, buffer, BindGroupResourceType.RHIBuffer);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool SetResource(string path, RHI.RenderTextureView? texture) => SetResource(path, texture, BindGroupResourceType.RHIRenderTextureView);
 
         public string GroupName => _groupName;

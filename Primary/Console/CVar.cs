@@ -23,6 +23,15 @@ namespace Primary.Console
             Value = value;
         }
 
+        public override int GetHashCode()
+        {
+            return Value.GetHashCode();
+        }
+
+        public override string ToString()
+        {
+            return Value.ToString();
+        }
 
         public object GetValue() => Value;
 
@@ -33,5 +42,7 @@ namespace Primary.Console
         }
 
         public Type VariableType => typeof(T);
+
+        public static implicit operator T(CVar<T> var) => var.Value;
     }
 }

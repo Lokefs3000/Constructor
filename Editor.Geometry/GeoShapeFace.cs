@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Primary.Assets;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -8,33 +9,37 @@ using System.Threading.Tasks;
 
 namespace Editor.Geometry
 {
-    [StructLayout(LayoutKind.Explicit, Pack = 1)]
     public struct GeoShapeFace
     {
-        [FieldOffset(0)]
         public readonly GeoFaceShapeType Type;
+        public MaterialAsset? MaterialIndex;
 
-        [FieldOffset(1)]
-        public uint MaterialIndex;
+        public GeoShapeTriangle Triangle { get => _union.Triangle; set => _union.Triangle = value; }
+        public GeoShapeQuad Quad { get => _union.Quad; set => _union.Quad = value; }
 
-        [FieldOffset(5)]
-        public GeoShapeTriangle Triangle;
+        private __Union _union;
 
-        [FieldOffset(5)]
-        public GeoShapeQuad Quad;
-
-        public GeoShapeFace(uint materialIndex, GeoShapeTriangle triangle)
+        public GeoShapeFace(MaterialAsset? materialIndex, GeoShapeTriangle triangle)
         {
             Type = GeoFaceShapeType.Triangle;
             MaterialIndex = materialIndex;
             Triangle = triangle;
         }
 
-        public GeoShapeFace(uint materialIndex, GeoShapeQuad quad)
+        public GeoShapeFace(MaterialAsset? materialIndex, GeoShapeQuad quad)
         {
             Type = GeoFaceShapeType.Quad;
             MaterialIndex = materialIndex;
             Quad = quad;
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct __Union
+        {
+            [FieldOffset(0)]
+            public GeoShapeTriangle Triangle;
+            [FieldOffset(0)]
+            public GeoShapeQuad Quad;
         }
     }
 

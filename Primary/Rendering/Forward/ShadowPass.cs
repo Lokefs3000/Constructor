@@ -1,4 +1,5 @@
 ﻿using Primary.Assets;
+using Primary.Profiling;
 using Primary.Rendering.Batching;
 using Primary.Rendering.Data;
 using Primary.Rendering.Forward.Managers;
@@ -49,29 +50,32 @@ namespace Primary.Rendering.Forward
             }
         }
 
-        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
+        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData, object? userArg)
         {
-            RenderingManager manager = Engine.GlobalSingleton.RenderingManager;
-            RenderBatcher batcher = manager.RenderBatcher;
-
-            ForwardRenderPath forward = (ForwardRenderPath)manager.RenderPath;
-            ShadowManager shadows = forward.Shadows;
-
-            using (new CommandBufferEventScope(commandBuffer, "ForwardRP - Shadows"))
+            using (new ProfilingScope("Fwd-ShadowPass"))
             {
-                commandBuffer.SetDepthStencil(shadows.ShadowAtlas);
-                commandBuffer.ClearDepthStencil(shadows.ShadowAtlas, RHI.ClearFlags.Depth);
+                RenderingManager manager = Engine.GlobalSingleton.RenderingManager;
+                RenderBatcher batcher = manager.RenderBatcher;
 
-                commandBuffer.SetScissorRect(new RHI.ScissorRect(0, 0, 10000, 10000));
+                ForwardRenderPath forward = (ForwardRenderPath)manager.RenderPath;
+                ShadowManager shadows = forward.Shadows;
 
-                commandBuffer.SetShader(_shadowPassShader);
-                commandBuffer.SetBindGroups(forward.BuffersBindGroup, forward.LightingBindGroup, _shadowBindGroup);
-
-                Span<ShadowManager.FrameCasterData> casters = shadows.FrameCasters;
-                for (int i = 0; i < casters.Length; i++)
+                using (new CommandBufferEventScope(commandBuffer, "ForwardRP - Shadows"))
                 {
-                    ref ShadowManager.FrameCasterData lightData = ref casters[i];
-                    DrawCasterView(commandBuffer, forward, batcher, ref lightData);
+                    commandBuffer.SetDepthStencil(shadows.ShadowAtlas);
+                    commandBuffer.ClearDepthStencil(shadows.ShadowAtlas, RHI.ClearFlags.Depth);
+
+                    commandBuffer.SetScissorRect(new RHI.ScissorRect(0, 0, 10000, 10000));
+
+                    commandBuffer.SetShader(_shadowPassShader);
+                    commandBuffer.SetBindGroups(forward.BuffersBindGroup, forward.LightingBindGroup, _shadowBindGroup);
+
+                    Span<ShadowManager.FrameCasterData> casters = shadows.FrameCasters;
+                    for (int i = 0; i < casters.Length; i++)
+                    {
+                        ref ShadowManager.FrameCasterData lightData = ref casters[i];
+                        DrawCasterView(commandBuffer, forward, batcher, ref lightData);
+                    }
                 }
             }
         }
@@ -103,37 +107,37 @@ namespace Primary.Rendering.Forward
 
             uint offsetInMatrixBuffer = 0;
 
-            Span<FlagRenderBatch> batches = batcher.UsedBatches;
-            for (int i = 0; i < batches.Length; i++)
-            {
-                FlagRenderBatch batch = batches[i];
-
-                Span<RenderMeshBatchData> batchDatas = batch.RenderMeshBatches;
-                for (int j = 0; j < batchDatas.Length; j++)
-                {
-                    RenderMeshBatchData data = batchDatas[j];
-                    RawRenderMesh mesh = data.Mesh!;
-
-                    Debug.Assert(mesh != null);
-
-                    {
-                        cbObjectDataStruct* mapPointer = (cbObjectDataStruct*)commandBuffer.Map(path.CbObjectData, RHI.MapIntent.Write, (ulong)sizeof(cbObjectDataStruct));
-                        mapPointer->MatrixId = offsetInMatrixBuffer;
-                        commandBuffer.Unmap(path.CbObjectData);
-                    }
-
-                    if (currentlyBoundSource != mesh.Source)
-                    {
-                        commandBuffer.SetVertexBuffer(0, mesh.Source.VertexBuffer!);
-                        commandBuffer.SetIndexBuffer(mesh.Source.IndexBuffer);
-
-                        currentlyBoundSource = mesh.Source;
-                    }
-
-                    commandBuffer.DrawIndexedInstanced(new RHI.DrawIndexedInstancedArgs(mesh.IndexCount, mesh.IndexOffset, (int)mesh.VertexOffset, (uint)data.BatchableFlags.Count));
-                    offsetInMatrixBuffer += (uint)data.BatchableFlags.Count;
-                }
-            }
+            //ReadOnlySpan<ShaderRenderBatch> batches = batcher.UsedBatches;
+            //for (int i = 0; i < batches.Length; i++)
+            //{
+            //    FlagRenderBatch batch = batches[i];
+            //
+            //    Span<RenderMeshBatchData> batchDatas = batch.RenderMeshBatches;
+            //    for (int j = 0; j < batchDatas.Length; j++)
+            //    {
+            //        RenderMeshBatchData data = batchDatas[j];
+            //        RawRenderMesh mesh = data.Mesh!;
+            //
+            //        Debug.Assert(mesh != null);
+            //
+            //        {
+            //            cbObjectDataStruct* mapPointer = (cbObjectDataStruct*)commandBuffer.Map(path.CbObjectData, RHI.MapIntent.Write, (ulong)sizeof(cbObjectDataStruct));
+            //            mapPointer->MatrixId = offsetInMatrixBuffer;
+            //            commandBuffer.Unmap(path.CbObjectData);
+            //        }
+            //
+            //        if (currentlyBoundSource != mesh.Source)
+            //        {
+            //            commandBuffer.SetVertexBuffer(0, mesh.Source.VertexBuffer!);
+            //            commandBuffer.SetIndexBuffer(mesh.Source.IndexBuffer);
+            //
+            //            currentlyBoundSource = mesh.Source;
+            //        }
+            //
+            //        commandBuffer.DrawIndexedInstanced(new RHI.DrawIndexedInstancedArgs(mesh.IndexCount, mesh.IndexOffset, (int)mesh.VertexOffset, (uint)data.BatchableFlags.Count));
+            //        offsetInMatrixBuffer += (uint)data.BatchableFlags.Count;
+            //    }
+            //}
         }
 
         private record struct ShadowData(Matrix4x4 LightProjection, Vector4 LightPos_FarPlane);

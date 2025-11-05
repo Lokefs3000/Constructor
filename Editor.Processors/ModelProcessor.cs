@@ -253,10 +253,14 @@ namespace Editor.Processors
 
         private void WriteMeshes(BinaryWriter bw, List<PMFMesh> meshes, Scene* scene, bool useHalfPrecision, bool useLargeIndices)
         {
+            MeshInfos = new ModelMeshInfo[meshes.Count];
+
             Span<PMFMesh> span = meshes.AsSpan();
             for (int i = 0; i < span.Length; i++)
             {
                 ref PMFMesh mesh = ref span[i];
+
+                MeshInfos[i] = new ModelMeshInfo(mesh.Name);
 
                 bw.Write(mesh.Name);
                 bw.Write(mesh.VertexCount);
@@ -268,10 +272,15 @@ namespace Editor.Processors
                 int stride = 12 + channelCount * 2;
 
                 Mesh* assimpMesh = scene->MMeshes[i];
+                bool hasTangentAndBitangents = assimpMesh->MTangents != null && assimpMesh->MBitangents != null;
+
+                Vector3 zero = Vector3.Zero;
+
                 if (useHalfPrecision)
                 {
                     using PoolArray<Half> vertices = ArrayPool<Half>.Shared.Rent((int)mesh.VertexCount * stride);
                     Span<Half> verticesSpan = vertices.AsSpan((int)mesh.VertexCount * stride);
+
 
                     for (int j = 0; j < assimpMesh->MNumVertices; j++)
                     {
@@ -281,6 +290,12 @@ namespace Editor.Processors
                         ref Vector3 normal = ref assimpMesh->MNormals[j];
                         ref Vector3 tangent = ref assimpMesh->MTangents[j];
                         ref Vector3 bitangent = ref assimpMesh->MBitangents[j];
+
+                        if (!hasTangentAndBitangents)
+                        {
+                            tangent = ref zero;
+                            bitangent = ref normal;
+                        }
 
                         localVertices[0] = (Half)position.X;
                         localVertices[1] = (Half)position.Y;
@@ -328,6 +343,12 @@ namespace Editor.Processors
                         ref Vector3 normal = ref assimpMesh->MNormals[j];
                         ref Vector3 tangent = ref assimpMesh->MTangents[j];
                         ref Vector3 bitangent = ref assimpMesh->MBitangents[j];
+
+                        if (!hasTangentAndBitangents)
+                        {
+                            tangent = ref zero;
+                            bitangent = ref normal;
+                        }
 
                         ref Vector3 baseV3 = ref Unsafe.As<float, Vector3>(ref localVertices.DangerousGetReference());
 

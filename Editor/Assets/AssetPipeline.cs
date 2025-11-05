@@ -11,6 +11,8 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Editor.Assets
@@ -22,6 +24,7 @@ namespace Editor.Assets
 
         private AssetIdentifier _identifier;
         private AssetConfiguration _configuration;
+        private AssetAssociator _associator;
 
         private AssetFilesystemWatcher _contentWatcher;
         private AssetFilesystemWatcher _sourceWatcher;
@@ -32,11 +35,10 @@ namespace Editor.Assets
         private List<AssetImporterData> _importerList;
         private Dictionary<string, IAssetImporter> _importerLookup;
 
-        private ConcurrentDictionary<string, FileAssociationData> _fileAssocations;
         private HashSet<AssetId> _assetsToReload;
 
-        private HashSet<string> _pendingImports;
-        private Dictionary<string, Task> _runningImports;
+        private HashSet<AssetId> _pendingImports;
+        private Dictionary<AssetId, Task> _runningImports;
 
         private ConcurrentDictionary<AssetId, DateTime> _importedAssets;
 
@@ -67,23 +69,23 @@ namespace Editor.Assets
 
             _identifier = new AssetIdentifier();
             _configuration = new AssetConfiguration(this);
+            _associator = new AssetAssociator();
 
             _contentWatcher = new AssetFilesystemWatcher(EditorFilepaths.ContentPath, Editor.GlobalSingleton.ProjectSubFilesystem, this);
             _sourceWatcher = new AssetFilesystemWatcher(EditorFilepaths.SourcePath, null!, this);
 
 #if true || DEBUG
-            _engineContentWatcher = new AssetFilesystemWatcher(@"D:/source/repos/Constructor/Source/Engine", Editor.GlobalSingleton.EngineFilesystem, this);
-            _editorCotentWatcher = new AssetFilesystemWatcher(@"D:/source/repos/Constructor/Source/Editor", Editor.GlobalSingleton.EditorFilesystem, this);
+            _engineContentWatcher = new AssetFilesystemWatcher(EditorFilepaths.EnginePath, Editor.GlobalSingleton.EngineFilesystem, this);
+            _editorCotentWatcher = new AssetFilesystemWatcher(EditorFilepaths.EditorPath, Editor.GlobalSingleton.EditorFilesystem, this);
 #endif
 
             _importerList = new List<AssetImporterData>();
             _importerLookup = new Dictionary<string, IAssetImporter>();
 
-            _fileAssocations = new ConcurrentDictionary<string, FileAssociationData>();
             _assetsToReload = new HashSet<AssetId>();
 
-            _pendingImports = new HashSet<string>();
-            _runningImports = new Dictionary<string, Task>();
+            _pendingImports = new HashSet<AssetId>();
+            _runningImports = new Dictionary<AssetId, Task>();
 
             _importedAssets = new ConcurrentDictionary<AssetId, DateTime>();
 
@@ -91,10 +93,7 @@ namespace Editor.Assets
 
             _filesystems = [Editor.GlobalSingleton.ProjectSubFilesystem, Editor.GlobalSingleton.EditorFilesystem, Editor.GlobalSingleton.EngineFilesystem];
 
-            string associationFile = AssocationsFilePath;
-            if (File.Exists(associationFile))
-                ReadAssociationsFile(associationFile);
-            else
+            if (!_associator.ReadAssocations())
                 needsDbRefresh = true;
 
             string importedAssetsFile = ImportedAssetsFilePath;
@@ -114,9 +113,10 @@ namespace Editor.Assets
 
             AddImporter<ModelAssetImporter>(".fbx", ".obj");
             AddImporter<ShaderAssetImporter>(".hlsl");
-            AddImporter<TextureAssetImporter>(".png", ".jpg", ".jpeg");
+            AddImporter<TextureAssetImporter>(".png", ".jpg", ".jpeg", ".texcomp", ".cubemap");
             AddImporter<MaterialAssetImporter>(".mat");
             AddImporter<GeoSceneAssetImporter>(".geoscn");
+            AddImporter<EffectVolumeAssetImporter>(".fxvol");
 
             RefreshDatabase(needsDbRefresh, startupUi);
         }
@@ -141,7 +141,7 @@ namespace Editor.Assets
                     Editor.GlobalSingleton.EngineFilesystem.FlushFileRemappings();
                     Editor.GlobalSingleton.EditorFilesystem.FlushFileRemappings();
 
-                    FlushAssociationsFile();
+                    _associator.FlushAssociations();
                     FlushImportedAssets();
                 }
 
@@ -161,33 +161,6 @@ namespace Editor.Assets
         {
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
-        }
-
-        /// <summary>Not thread-safe</summary>
-        private void ReadAssociationsFile(string filePath)
-        {
-            StringBuilder sb = new StringBuilder();
-            string[] lines = File.ReadAllLines(filePath);
-
-            string[] temporaryArray = ArrayPool<string>.Shared.Rent(32);
-
-            try
-            {
-                foreach (string line in lines)
-                {
-                    int i = 0;
-                    foreach (ReadOnlySpan<char> file in line.Tokenize(';'))
-                    {
-                        temporaryArray[i++] = file.ToString();
-                    }
-
-                    MakeFileAssociations(temporaryArray[0], temporaryArray.AsMemory(1, i - 1));
-                }
-            }
-            finally
-            {
-                ArrayPool<string>.Shared.Return(temporaryArray);
-            }
         }
 
         /// <summary>Not thread-safe</summary>
@@ -213,7 +186,7 @@ namespace Editor.Assets
                 ReadOnlySpan<char> localPath = line.Slice(ranges[0].Start.Value, ranges[0].End.Value - ranges[0].Start.Value);
                 ReadOnlySpan<char> lastWriteTime = line.Slice(ranges[1].Start.Value, ranges[1].End.Value - ranges[1].Start.Value);
 
-                AssetId id = new AssetId(ulong.Parse(localPath));
+                AssetId id = new AssetId(uint.Parse(localPath));
                 if (!_identifier.IsIdValid(id))
                 {
                     EdLog.Assets.Warning("Invalid asset id in imported assets: {id}", id);
@@ -226,40 +199,6 @@ namespace Editor.Assets
                     continue;
                 }
             }
-        }
-
-        /// <summary>Not thread-safe</summary>
-        private void FlushAssociationsFile()
-        {
-            string associationFile = Path.Combine(EditorFilepaths.LibraryIntermediatePath, "FileAssociations.dat");
-
-            StringBuilder sb = new StringBuilder();
-            foreach (var kvp in _fileAssocations)
-            {
-                if (kvp.Value.AssociatedWith.Count == 0)
-                {
-                    //resolvable when loading in the file
-                    continue;
-                }
-
-                sb.Append(kvp.Key);
-                sb.Append(';');
-
-                int i = 0;
-                foreach (string associate in kvp.Value.AssociatedWith)
-                {
-                    sb.Append(associate);
-
-                    if (i == kvp.Value.AssociatedWith.Count - 1)
-                        sb.AppendLine();
-                    else
-                        sb.Append(';');
-
-                    i++;
-                }
-            }
-
-            File.WriteAllText(associationFile, sb.ToString());
         }
 
         /// <summary>Not thread-safe</summary>
@@ -291,78 +230,6 @@ namespace Editor.Assets
                 {
                     EdLog.Assets.Warning("[i:{im}]: A previous asset importer has already taken association: {asso}", typeof(T).Name, associations[i]);
                 }
-            }
-        }
-
-        /// <summary>Thread-safe</summary>
-        public void MakeFileAssociations(string path, params string[] assocations)
-         => MakeFileAssociations(path, assocations.AsMemory());
-
-        //TODO: prevent associating a file with itself
-        /// <summary>Thread-safe</summary>
-        public void MakeFileAssociations(string path, ReadOnlyMemory<string> assocations)
-        {
-            if (!EnsureLocalPath(path, out string? localRootPath))
-            {
-                //bad
-                return;
-            }
-
-            lock (_importLock)
-            {
-                ReadOnlySpan<string> span = assocations.Span;
-                for (int i = 0; i < assocations.Length; i++)
-                {
-                    if (!EnsureLocalPath(span[i], out string? localPath))
-                    {
-                        //bad
-                        continue;
-                    }
-
-                    _fileAssocations.AddOrUpdate(localPath, (x) =>
-                    {
-                        FileAssociationData data = new FileAssociationData(new HashSet<string>(), new HashSet<string>());
-                        data.ExternalAssociates.Add(localRootPath);
-
-                        return data;
-                    }, (x, y) =>
-                    {
-                        lock (y.ExternalAssociates)
-                        {
-                            y.ExternalAssociates.Add(localRootPath);
-                        }
-
-                        return y;
-                    });
-                }
-
-                _fileAssocations.AddOrUpdate(localRootPath, (x) =>
-                {
-                    FileAssociationData data = new FileAssociationData(new HashSet<string>(), new HashSet<string>());
-
-                    ReadOnlySpan<string> span = assocations.Span;
-                    for (int i = 0; i < assocations.Length; i++)
-                    {
-                        if (EnsureLocalPath(span[i], out string? localPath))
-                            data.AssociatedWith.Add(localPath);
-                    }
-
-                    return data;
-
-                }, (x, y) =>
-                {
-                    ReadOnlySpan<string> span = assocations.Span;
-                    for (int i = 0; i < assocations.Length; i++)
-                    {
-                        if (EnsureLocalPath(span[i], out string? localPath))
-                            lock (y.AssociatedWith)
-                            {
-                                y.AssociatedWith.Add(localPath);
-                            }
-                    }
-
-                    return y;
-                });
             }
         }
 
@@ -400,30 +267,71 @@ namespace Editor.Assets
             return false;
         }
 
-        //TODO: implement an actual check as this can return false if something updates before PollFilesystem is called
         /// <summary>Thread-safe</summary>
-        internal bool IsAssetUpToDate(ReadOnlySpan<char> path)
+        private bool IsAssetUpToDate(AssetId id, string localPath)
         {
-            string str = path.ToString();
-
-            lock (_importLock)
+            ProjectSubFilesystem? filesystem = SelectAppropriateFilesystem(GetFileNamespace(localPath));
+            if (filesystem == null)
             {
-                if (_runningImports.ContainsKey(str))
-                    return false;
-                if (_pendingImports.Contains(str))
-                    return false;
+                EdLog.Assets.Error("Failed to find filesystem for local path: {lp}", localPath);
+                return false;
             }
 
-            return true;
+            if (_importedAssets.TryGetValue(id, out DateTime time))
+            {
+                return File.GetLastWriteTime(filesystem.GetFullPath(localPath)) == time;
+            }
+
+            return false;
         }
 
         /// <summary>Thread-safe</summary>
-        internal bool IsImportingAsset(ReadOnlySpan<char> path)
+        internal bool IsAssetUpToDate(AssetId id)
+        {
+            string? localPath = _identifier.RetrievePathForId(id);
+            if (localPath == null)
+            {
+                EdLog.Assets.Error("Failed to find local path for id: {id}", id);
+                return false;
+            }
+
+            return IsAssetUpToDate(id, localPath);
+        }
+
+        /// <summary>Thread-safe</summary>
+        internal bool IsAssetUpToDate(string localPath)
+        {
+            if (!_identifier.TryGetAssetId(localPath, out AssetId id))
+            {
+                EdLog.Assets.Error("Failed to find id for local path: {lp}", localPath);
+                return false;
+            }
+
+            return IsAssetUpToDate(id, localPath);
+        }
+
+        /// <summary>Thread-safe</summary>
+        internal bool IsImportingAsset(AssetId id)
         {
             lock (_importLock)
             {
-                return _runningImports.ContainsKey(path.ToString());
+                return _runningImports.ContainsKey(id);
             }
+        }
+
+        /// <summary>Thread-safe</summary>
+        internal bool IsImportingAsset(string localPath)
+        {
+            if (_identifier.TryGetAssetId(localPath, out AssetId id))
+            {
+                lock (_importLock)
+                {
+                    return _runningImports.ContainsKey(id);
+                }
+            }
+
+            EdLog.Assets.Error("Failed to find id for local path: {lp}", localPath);
+            return false;
         }
 
         /// <summary>Not thread-safe</summary>
@@ -467,9 +375,16 @@ namespace Editor.Assets
         }
 
         /// <summary>Thread-safe</summary>
-        internal Task? ImportChangesOrGetRunning(ReadOnlySpan<char> path)
+        internal Task? ImportChangesOrGetRunning(AssetId id) => ImportNewFile(id);
+
+        /// <summary>Thread-safe</summary>
+        internal Task? ImportChangesOrGetRunning(string localPath)
         {
-            return ImportNewFile(path.ToString());
+            if (_identifier.TryGetAssetId(localPath, out AssetId id))
+                return ImportNewFile(id);
+
+            EdLog.Assets.Warning("Failed to find id for local path: {lp}", localPath);
+            return null;
         }
 
         /// <summary>Not thread-safe</summary>
@@ -493,7 +408,7 @@ namespace Editor.Assets
                     _engineContentWatcher?.ClearEventQueue();
                     _editorCotentWatcher?.ClearEventQueue();
 
-                    _fileAssocations.Clear();
+                    _associator.ClearAllAssocations();
                     _assetsToReload.Clear();
 
                     Directory.Delete(EditorFilepaths.LibraryImportedPath, true);
@@ -534,8 +449,20 @@ namespace Editor.Assets
                         string localPath = file.Substring(rootDir.Length + 1).Replace('\\', '/');
                         AssetId id = _identifier.GetOrRegisterAsset(localPath);
 
-                        if (!IsFileImportedAndValid(id) && ImportNewFile(localPath) != null)
-                            foundImportableFile = true;
+                        if (!IsFileImportedAndValid(id))
+                        {
+                            if (TryGetImporter(localPath, out IAssetImporter? importer))
+                            {
+                                ProjectSubFilesystem? filesystem = SelectAppropriateFilesystem(GetFileNamespace(localPath));
+                                if (filesystem != null && filesystem.Exists(localPath))
+                                {
+                                    importer?.Preload(localPath, filesystem, this);
+                                }
+                            }
+
+                            if (ImportNewFile(id) != null)
+                                foundImportableFile = true;
+                        }
                     }
                 }
 
@@ -574,7 +501,7 @@ namespace Editor.Assets
                 Editor.GlobalSingleton.EngineFilesystem.FlushFileRemappings();
                 Editor.GlobalSingleton.EditorFilesystem.FlushFileRemappings();
 
-                FlushAssociationsFile();
+                _associator.FlushAssociations();
                 FlushImportedAssets();
             }
             catch (Exception ex)
@@ -589,13 +516,27 @@ namespace Editor.Assets
 
         //TODO: avoid importing files that are not changed
         /// <summary>Thread-safe</summary>
-        private Task? ImportNewFile(string localPath)
+        private Task? ImportNewFile(AssetId id)
         {
             lock (_importLock)
             {
-                if (_runningImports.TryGetValue(localPath, out Task? task))
+                if (_runningImports.TryGetValue(id, out Task? task))
                 {
                     return task;
+                }
+
+                string? localPath = _identifier.RetrievePathForId(id);
+                if (localPath == null)
+                {
+                    EdLog.Assets.Error("Failed to find path for id: {id}", id);
+                    return null;
+                }
+
+                ProjectSubFilesystem? filesystem = SelectAppropriateFilesystem(GetFileNamespace(localPath));
+                if (filesystem == null)
+                {
+                    EdLog.Assets.Error("Failed to find filesystem for local path: {p}", localPath);
+                    return null;
                 }
 
                 string extension = Path.GetExtension(localPath);
@@ -610,19 +551,14 @@ namespace Editor.Assets
                         //Log.Information("importing: {x}", localPath);
 
                         _importerTasksTotal++;
-                        if (!_runningImports.ContainsKey(localPath))
+                        if (!_runningImports.ContainsKey(id))
                         {
-                            _pendingImports.Remove(localPath);
+                            _pendingImports.Remove(id);
 
                             task = Task.Run(() =>
                             {
                                 try
                                 {
-                                    int firstIndex = localPath.IndexOf('/');
-                                    string @namespace = localPath.Substring(0, firstIndex);
-
-                                    ProjectSubFilesystem filesystem = SelectAppropriateFilesystem(@namespace);
-
                                     string realPath = Path.Combine(filesystem.AbsolutePath, localPath);
                                     string assetPath = GetAssetPath(localPath);
 
@@ -634,7 +570,7 @@ namespace Editor.Assets
                                 }
                                 catch (Exception ex)
                                 {
-                                    EdLog.Assets.Error(ex, "Exception occured trying to import asset: {x}", localPath);
+                                    EdLog.Assets.Error(ex, "Exception occured trying to import asset: {x}", id);
 #if DEBUG
                                     throw;
 #endif
@@ -644,7 +580,7 @@ namespace Editor.Assets
                                     Interlocked.Decrement(ref _importerTasksCount);
                                     lock (_importLock)
                                     {
-                                        _runningImports.Remove(localPath);
+                                        _runningImports.Remove(id);
                                         //if (_pendingImports.Contains(localPath))
                                         //{
                                         //    ImportNewFile(localPath);
@@ -655,13 +591,13 @@ namespace Editor.Assets
 
                             Interlocked.Increment(ref _importerTasksCount);
 
-                            _runningImports.Add(localPath, task);
+                            _runningImports.Add(id, task);
                             return task;
                         }
                         else
                         {
-                            _pendingImports.Add(localPath);
-                            return _runningImports[localPath];
+                            _pendingImports.Add(id);
+                            return _runningImports[id];
                         }
                     }
                 }
@@ -677,25 +613,25 @@ namespace Editor.Assets
 
         }
 
-        private HashSet<string> _assocationRingAvoidance = new HashSet<string>();
+        private HashSet<AssetId> _assocationRingAvoidance = new HashSet<AssetId>();
         /// <summary>Not thread-safe</summary>
-        private void ImportAssociatedFiles(string localPath)
+        private void ImportAssociatedFiles(AssetId localPath)
         {
             _assocationRingAvoidance.Clear();
             Logic(localPath);
 
-            void Logic(string path)
+            void Logic(AssetId path)
             {
                 if (!_assocationRingAvoidance.Add(path))
                 {
                     return;
                 }
 
-                if (_fileAssocations.TryGetValue(path, out FileAssociationData associationData))
+                using (_associator.GetDependentsWithLockScope(path, out HashSet<AssetId>? dependencies))
                 {
-                    lock (associationData.ExternalAssociates)
+                    if (dependencies != null)
                     {
-                        foreach (string association in associationData.ExternalAssociates)
+                        foreach (AssetId association in dependencies)
                         {
                             ImportNewFile(association);
                             Logic(association);
@@ -742,8 +678,10 @@ namespace Editor.Assets
                                 case FilesystemEventType.FileAdded:
                                 case FilesystemEventType.FileChanged:
                                     {
-                                        ImportNewFile(@event.LocalPath);
-                                        ImportAssociatedFiles(@event.LocalPath);
+                                        AssetId id = _identifier.GetOrRegisterAsset(@event.LocalPath);
+
+                                        ImportAssociatedFiles(id);
+                                        ImportNewFile(id);
                                         break;
                                     }
                                 case FilesystemEventType.FileRemoved: CleanOldFile(@event.LocalPath); break;
@@ -829,6 +767,7 @@ namespace Editor.Assets
 
         public AssetIdentifier Identifier => _identifier;
         public AssetConfiguration Configuration => _configuration;
+        public AssetAssociator Associator => _associator;
 
         internal event Action<ProjectSubFilesystem, FilesystemEvent>? NewFilesystemEvent;
         internal event Action<string, string>? FileRenamed;
@@ -899,15 +838,95 @@ namespace Editor.Assets
             return path.Slice(0, idx);
         }
 
-        private static int s_contentNamespaceHash = "Content".GetDjb2HashCode();
-        private static int s_sourceNamespaceHash = "Source".GetDjb2HashCode();
-        private static int s_engineNamespaceHash = "Engine".GetDjb2HashCode();
-        private static int s_editorNamespaceHash = "Editor".GetDjb2HashCode();
+        /// <summary>Thread-safe</summary>
+        public static bool IsLocalPath(ReadOnlySpan<char> path)
+        {
+            int idx = path.IndexOf('/');
+            if (idx == -1 || idx == 0)
+                return false;
 
-        public string AssocationsFilePath = Path.Combine(EditorFilepaths.LibraryIntermediatePath, "FileAssociations.dat");
+            int hash = path.Slice(0, idx).GetDjb2HashCode();
+
+            if (hash == s_contentNamespaceHash || hash == s_sourceNamespaceHash || hash == s_engineNamespaceHash || hash == s_editorNamespaceHash)
+                return true;
+            else
+                return false;
+        }
+
+        /// <summary>Thread-safe</summary>
+        public static bool TryGetLocalPathFromFull(string fullPath, [NotNullWhen(true)] out string? localPath)
+        {
+            fullPath = fullPath.Replace('\\', '/');
+            ReadOnlySpan<char> span = fullPath.AsSpan();
+
+            if (GetFileNamespace(span.Slice(EditorFilepaths.ContentPath.Length - 7)).GetDjb2HashCode() == s_contentNamespaceHash)
+            {
+                localPath = fullPath.Substring(EditorFilepaths.ContentPath.Length - 7);
+                return true;
+            }
+            else if (GetFileNamespace(span.Slice(EditorFilepaths.SourcePath.Length - 6)).GetDjb2HashCode() == s_sourceNamespaceHash)
+            {
+                localPath = fullPath.Substring(EditorFilepaths.SourcePath.Length - 6);
+                return true;
+            }
+            else if (GetFileNamespace(span.Slice(EditorFilepaths.EnginePath.Length - 6)).GetDjb2HashCode() == s_engineNamespaceHash)
+            {
+                localPath = fullPath.Substring(EditorFilepaths.EnginePath.Length - 6);
+                return true;
+            }
+            else if (GetFileNamespace(span.Slice(EditorFilepaths.EditorPath.Length - 5)).GetDjb2HashCode() == s_editorNamespaceHash)
+            {
+                localPath = fullPath.Substring(EditorFilepaths.EditorPath.Length - 5);
+                return true;
+            }
+
+            localPath = null;
+            return false;
+        }
+
+        private static readonly int s_contentNamespaceHash = "Content".GetDjb2HashCode();
+        private static readonly int s_sourceNamespaceHash = "Source".GetDjb2HashCode();
+        private static readonly int s_engineNamespaceHash = "Engine".GetDjb2HashCode();
+        private static readonly int s_editorNamespaceHash = "Editor".GetDjb2HashCode();
+
         public string ImportedAssetsFilePath = Path.Combine(EditorFilepaths.LibraryIntermediatePath, "ImportedAssets.dat");
 
         internal record struct AssetImporterData(HashSet<string> AssociatedExtensions, IAssetImporter Importer);
-        private record struct FileAssociationData(HashSet<string> AssociatedWith, HashSet<string> ExternalAssociates);
+        private record struct FileAssociationData(Lock Lock, HashSet<AssetVariantId> ExternalAssociates);
+    }
+
+    public readonly record struct AssetVariantId : IEquatable<AssetVariantId>
+    {
+        private readonly AssetId _id;
+        private readonly string? _path;
+
+        public AssetVariantId(AssetId id)
+        {
+            _id = id;
+            _path = null;
+        }
+
+        public AssetVariantId(string path)
+        {
+            _id = AssetId.Invalid;
+            _path = null;
+        }
+
+        public override int GetHashCode() => _path?.GetHashCode() ?? _id.GetHashCode();
+        public override string ToString() => _path ?? _id.ToString();
+
+        public bool Equals(AssetVariantId other)
+        {
+            if (_path == null)
+                return other._id == _id;
+            else
+                return _path == other._path;
+        }
+
+        public AssetId Id => _id;
+        public string? Path => _path;
+
+        public static explicit operator AssetVariantId(AssetId id) => new AssetVariantId(id);
+        public static explicit operator AssetVariantId(string path) => new AssetVariantId(path);
     }
 }

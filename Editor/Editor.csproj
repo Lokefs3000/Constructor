@@ -7,31 +7,33 @@
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<StartupObject>Editor.Program</StartupObject>
+		<Configurations>Debug;Release;ReleaseWithDebug</Configurations>
 	</PropertyGroup>
 
-	<ItemGroup>
-	  <Compile Remove="Serialization\NewFolder\**" />
-	  <EmbeddedResource Remove="Serialization\NewFolder\**" />
-	  <None Remove="Serialization\NewFolder\**" />
-	</ItemGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
+	  <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+	  <Optimize>True</Optimize>
+	</PropertyGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\Editor.Geometry\Editor.Geometry.csproj" />
 		<ProjectReference Include="..\Editor.Gui\Editor.Gui.csproj" />
 		<ProjectReference Include="..\Editor.Interop\Editor.Interop.csproj" />
 		<ProjectReference Include="..\Editor.Processors\Editor.Processors.csproj" />
+		<ProjectReference Include="..\Primary.R2.ForwardPlus\Primary.R2.ForwardPlus.csproj" />
+		<ProjectReference Include="..\Primary.Rendering2\Primary.Rendering2.csproj" />
 		<ProjectReference Include="..\Primary\Primary.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="CircularBuffer" Version="1.4.0" />
 		<PackageReference Include="CommandLineParser" Version="2.9.1" />
-		<PackageReference Include="CsToml.Generator" Version="1.7.2">
+		<PackageReference Include="CsToml.Generator" Version="1.7.3">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Hexa.NET.ImGui" Version="2.2.8.5" />
-		<PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.17.4" />
+		<PackageReference Include="Hexa.NET.ImGui" Version="2.2.9" />
+		<PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.18" />
 		<PackageReference Include="RectpackSharp" Version="1.2.0" />
 		<PackageReference Include="StbImageSharper" Version="1.0.1" />
 	</ItemGroup>

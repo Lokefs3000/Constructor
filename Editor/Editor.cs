@@ -3,6 +3,7 @@ using Editor.Assets.Loaders;
 using Editor.Assets.Types;
 using Editor.DearImGui;
 using Editor.DearImGui.Extra;
+using Editor.DearImGui.Tooling;
 using Editor.Demos;
 using Editor.Gui;
 using Editor.Interaction;
@@ -13,15 +14,19 @@ using Hexa.NET.ImGui;
 using Primary;
 using Primary.Assets;
 using Primary.Components;
-using Primary.Mathematics;
 using Primary.Polling;
 using Primary.Profiling;
+using Primary.R2.ForwardPlus;
 using Primary.Rendering;
 using Primary.Scenes;
 using Primary.Timing;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
+
+using R2 = Primary.Rendering2;
 
 namespace Editor
 {
@@ -37,6 +42,9 @@ namespace Editor
 
         private AssetDatabase _assetDatabase;
         private AssetPipeline _assetPipeline;
+
+        private R2.RenderingManager _r2Renderer;
+
         private DearImGuiStateManager _dearImGuiStateManager;
         //private EditorGuiManager _guiManager;
         private SelectionManager _selectionManager;
@@ -59,11 +67,13 @@ namespace Editor
         private DebugView _debugView;
         private GeoEditorView _geoEditorView;
         private BundleExplorer _bundleExplorer;
+        private ConsoleView _consoleView;
+        private CubemapTool _cubemapTool;
 
         internal Editor(string baseProjectPath) : base()
         {
             using StartupDisplayUI ui = new StartupDisplayUI();
-
+  
             CancellationTokenSource cts = new CancellationTokenSource();
             Task pumpTask = Task.Factory.StartNew(() =>
             {
@@ -101,7 +111,10 @@ namespace Editor
 
             ui.PushStep("Initialize editor");
 
+            R2.Components.RegisterComponentsDefault.RegisterDefault();
             RegisterComponentsDefault.RegisterDefault();
+
+            _r2Renderer = new R2.RenderingManager();
 
             _dearImGuiStateManager = new DearImGuiStateManager(this);
             //_guiManager = new EditorGuiManager();
@@ -125,6 +138,8 @@ namespace Editor
             _debugView = new DebugView();
             _geoEditorView = new GeoEditorView();
             _bundleExplorer = new BundleExplorer();
+            _consoleView = new ConsoleView();
+            _cubemapTool = new CubemapTool();
 
             ui.PopStep();
 
@@ -148,10 +163,29 @@ namespace Editor
 
         public void Run()
         {
-            Window window = WindowManager.CreateWindow("Primary", new Vector2(1336, 726), CreateWindowFlags.Resizable);
-            RenderingManager.DefaultWindow = window;
+            EdLog.Gui.Information("Hardware acceleration:");
 
+            EdLog.Gui.Information("     Vector128: {b}", Vector128.IsHardwareAccelerated);
+            EdLog.Gui.Information("         SSE: {b}", Sse.IsSupported);
+            EdLog.Gui.Information("         SSE2: {b}", Sse2.IsSupported);
+            EdLog.Gui.Information("         SSE3: {b}", Sse3.IsSupported);
+            EdLog.Gui.Information("         SSE41: {b}", Sse41.IsSupported);
+            EdLog.Gui.Information("         SSE42: {b}", Sse42.IsSupported);
+
+            EdLog.Gui.Information("     Vector256: {b}", Vector256.IsHardwareAccelerated);
+            EdLog.Gui.Information("         AVX: {b}", Avx.IsSupported);
+            EdLog.Gui.Information("         AVX2: {b}", Avx2.IsSupported);
+
+            EdLog.Gui.Information("     Vector512: {b}", Vector512.IsHardwareAccelerated);
+            EdLog.Gui.Information("         AVX512: {b}", Avx512F.IsSupported);
+            EdLog.Gui.Information("         AVX10.1: {b}", Avx10v1.IsSupported);
+
+            Window window = WindowManager.CreateWindow("Primary", new Vector2(1336, 726), CreateWindowFlags.Resizable);
+
+            RenderingManager.DefaultWindow = window;
             RenderingManager.PostRender += _editorRenderManager.SetupPasses;
+
+            _r2Renderer.SetNewRenderPath(new ForwardPlusRenderPath());
 
             _dearImGuiStateManager.InitWindow(window);
             _guiAtlasManager.TriggerRebuild();
@@ -176,7 +210,6 @@ namespace Editor
 
         private void PumpEditorLoop()
         {
-
             Time.BeginNewFrame();
             ProfilingManager.StartProfilingForFrame();
 
@@ -194,6 +227,8 @@ namespace Editor
             InputSystem.UpdatePending();
             EventManager.PollEvents();
             SystemManager.RunSystems();
+            _r2Renderer.Render();
+            _r2Renderer.RenderDebug(Gizmos.R2);
             RenderingManager.ExecuteRender();
         }
 
@@ -233,7 +268,7 @@ namespace Editor
                 _profilerView.Render();
                 _hierchyView.Render();
                 _propertiesView.Render();
-                //_renderingView.Render();
+                        //_renderingView.Render();
                 _editorTaskViewer.Render();
                 _contentView.Render();
                 _sceneView.Render();
@@ -244,6 +279,8 @@ namespace Editor
                 _debugView.Render();
                 _geoEditorView.Render();
                 _bundleExplorer.Render();
+                _consoleView.Render();
+                _cubemapTool.Render();
 
                 //GCMemoryInfo memoryInfo = GC.GetGCMemoryInfo();
                 //

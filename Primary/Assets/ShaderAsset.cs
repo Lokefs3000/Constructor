@@ -14,12 +14,14 @@ namespace Primary.Assets
             _assetData = assetData;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override int GetHashCode()
+        {
+            return _assetData.HashCode;
+        }
+
         internal ShaderBindGroupVariable[] GetVariablesForBindGroup(string bindGroup) => _assetData.GetVariablesForBindGroup(bindGroup);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal int GetIndexForBindGroup(string bindGroup) => _assetData.GetIndexForBindGroup(bindGroup);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ShaderBindGroup CreateDefaultBindGroup() => new ShaderBindGroup(this, "__Default");
 
         internal ShaderAssetData AssetData => _assetData;

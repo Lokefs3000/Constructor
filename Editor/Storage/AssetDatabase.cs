@@ -66,5 +66,20 @@ namespace Editor.Storage
 
             return category;
         }
+
+        /// <summary>Thread-safe</summary>
+        public AssetCategoryDatabase? GetCategory(Type type, bool createIfNull = true)
+        {
+            if (!_categories.TryGetValue(type, out AssetCategoryDatabase? category))
+            {
+                if (!createIfNull)
+                    return null;
+
+                category = new AssetCategoryDatabase(type);
+                category = _categories.GetOrAdd(type, category);
+            }
+
+            return category;
+        }
     }
 }

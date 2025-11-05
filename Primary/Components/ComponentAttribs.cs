@@ -47,4 +47,17 @@
     {
 
     }
+
+    [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
+    public sealed class IncompatibleComponentsAttribute : Attribute
+    {
+        private Type[] _components;
+
+        public IncompatibleComponentsAttribute(params Type[] Components)
+        {
+            _components = Components;
+        }
+
+        public Type[] ComponentTypes => _components;
+    }
 }

@@ -6,6 +6,7 @@ using Editor.Interaction;
 using Editor.Interaction.Tools;
 using Editor.Rendering;
 using Hexa.NET.ImGui;
+using Primary.Assets;
 using Primary.Common;
 using Primary.Input;
 using Primary.Input.Devices;
@@ -24,6 +25,8 @@ namespace Editor.GeoEdit
     {
         private readonly GeoEditorView _editorView;
 
+        private MaterialAsset _defaultMaterial;
+
         private bool _isDragValid;
         private bool _isPlacingBrush;
         private Vector3 _startPlacement;
@@ -37,6 +40,8 @@ namespace Editor.GeoEdit
         internal PlaceTool(GeoEditorView editorView)
         {
             _editorView = editorView;
+
+            _defaultMaterial = AssetManager.LoadAsset<MaterialAsset>("Engine/Materials/DefaultArchitecture1M1.mat", true);
         }
 
         private void ClearData(bool clearSelection)
@@ -324,7 +329,15 @@ namespace Editor.GeoEdit
                     GeoSceneAsset asset = _editorView.ActiveScene;
                     if (asset.BrushScene != null)
                     {
+                        foreach (ref GeoShapeFace face in _temporaryShape.Faces)
+                        {
+                            face.MaterialIndex = _defaultMaterial;
+                        }
+
+                        _temporaryShape.ForceDirty();
+
                         asset.BrushScene.AddBrush(_temporaryBrush!);
+                        asset.NeedsRegeneration = true;
 
                         SelectionManager.Select(new SelectedGeoBrush(_temporaryBrush!), SelectionMode.Multi);
 

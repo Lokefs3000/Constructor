@@ -8,7 +8,9 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Vortice.Direct3D12;
 using Vortice.DXGI;
+
 using Terra = TerraFX.Interop.DirectX;
+using D3D12MemAlloc = Interop.D3D12MemAlloc;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -23,7 +25,7 @@ namespace Primary.RHI.Direct3D12
         private nint _handlePtr;
 
         private ID3D12Resource _resource;
-        private Terra.D3D12MA_Allocation* _allocation;
+        private D3D12MemAlloc.Allocation* _allocation;
         private DescriptorHeapAllocation _descriptor;
         private ResourceStates _defaultState;
         private Format _indexStrideFormat;
@@ -106,20 +108,20 @@ namespace Primary.RHI.Direct3D12
                 resDesc.Width = (ulong)(desc.ByteWidth + (-desc.ByteWidth & mask));
             }
 
-            Terra.D3D12MA_ALLOCATION_DESC allocDesc = new Terra.D3D12MA_ALLOCATION_DESC
+            D3D12MemAlloc.ALLOCATION_DESC allocDesc = new D3D12MemAlloc.ALLOCATION_DESC
             {
-                Flags = Terra.D3D12MA_ALLOCATION_FLAGS.D3D12MA_ALLOCATION_FLAG_NONE,
+                Flags = D3D12MemAlloc.ALLOCATION_FLAGS.ALLOCATION_FLAG_NONE,
                 HeapType = (Terra.D3D12_HEAP_TYPE)heapType,
                 ExtraHeapFlags = Terra.D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
                 CustomPool = null,
                 pPrivateData = null,
             };
 
-            Terra.D3D12MA_Allocation* ptr = null;
+            D3D12MemAlloc.Allocation* ptr = null;
             void* outPtr = null;
             Guid guid = typeof(ID3D12Resource).GUID;
 
-            ResultChecker.ThrowIfUnhandled(device.D3D12MAAllocator->CreateResource(&allocDesc, (Terra.D3D12_RESOURCE_DESC*)&resDesc, (Terra.D3D12_RESOURCE_STATES)usingState, null, &ptr, &guid, &outPtr).Value, device);
+            ResultChecker.ThrowIfUnhandled(D3D12MemAlloc.Allocator.CreateResource(device.D3D12MAAllocator, &allocDesc, (Terra.D3D12_RESOURCE_DESC*)&resDesc, (Terra.D3D12_RESOURCE_STATES)usingState, null, &ptr, &guid, &outPtr), device);
 
             _allocation = ptr;
             _resource = new ID3D12Resource((nint)outPtr);
@@ -201,7 +203,7 @@ namespace Primary.RHI.Direct3D12
                     if (!_descriptor.IsNull)
                         _device.CpuSRVCBVUAVDescriptors.Return(_descriptor);
                     if (_allocation != null)
-                        _allocation->Release();
+                        _allocation->Base.Release();
                     _resource?.Dispose();
                 });
 

@@ -126,6 +126,9 @@ namespace Editor.Assets
             else
                 absolutePath = Path.Combine(_absolutePath, localPath);
 
+            if (!File.Exists(absolutePath))
+                return null;
+
             try
             {
                 return File.ReadAllText(absolutePath);
@@ -155,13 +158,13 @@ namespace Editor.Assets
             AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
             if (_fileRemappings.TryGetValue(localPath, out string? remap))
             {
-                if (pipeline != null && pipeline.IsImportingAsset(path))
+                if (pipeline != null && pipeline.IsImportingAsset(localPath))
                 {
                     if (waitIfImportPending)
                     {
                         EdLog.Assets.Information("Waiting on file import: {lc}", path.ToString());
 
-                        Task? task = pipeline.ImportChangesOrGetRunning(path);
+                        Task? task = pipeline.ImportChangesOrGetRunning(localPath);
                         task?.Wait(2000);
                     }
                 }
@@ -177,7 +180,7 @@ namespace Editor.Assets
                     {
                         if (waitIfImportPending)
                         {
-                            Task? task = pipeline.ImportChangesOrGetRunning(path);
+                            Task? task = pipeline.ImportChangesOrGetRunning(localPath);
                             task?.Wait(2000);
                         }
 
@@ -194,6 +197,9 @@ namespace Editor.Assets
             }
             else
                 absolutePath = Path.Combine(_absolutePath, localPath);
+
+            if (!File.Exists(absolutePath))
+                return null;
 
             return FileUtility.TryWaitOpenNoThrow(absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         }

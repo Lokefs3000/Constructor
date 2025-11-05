@@ -182,7 +182,7 @@ namespace Editor.DearImGui
                 }
             }
 
-            private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
+            private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData, object? userArg)
             {
                 ImDrawDataPtr drawData = ImGui.GetDrawData();
                 if (drawData.IsNull || drawData.TotalVtxCount == 0 || drawData.TotalIdxCount == 0)

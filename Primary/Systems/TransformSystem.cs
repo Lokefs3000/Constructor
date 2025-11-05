@@ -42,8 +42,10 @@ namespace Primary.Systems
                 Entity childEntity = child.WrappedEntity;
 
                 ref Transform tr = ref childEntity.Get<Transform>();
-                if (tr.Invalid || true)
+                if (tr.Invalid)
                 {
+                    tr.Invalid = false;
+
                     ref WorldTransform wt = ref childEntity.Get<WorldTransform>();
                     ref LocalTransform lt = ref childEntity.Get<LocalTransform>();
 

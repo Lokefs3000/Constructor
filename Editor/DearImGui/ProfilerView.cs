@@ -11,6 +11,16 @@ using System.Numerics;
 
 namespace Editor.DearImGui
 {
+	/*
+	
+	WANTS:
+		Default view (more refined)
+		Average view (all frames captured)
+		Spike detection
+		Individual profile point spike detection and averages
+	
+	*/
+	
     internal unsafe sealed class ProfilerView : IDisposable
     {
         private bool _isPaused;

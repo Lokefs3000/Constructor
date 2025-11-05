@@ -1,8 +1,8 @@
 ﻿using CsToml;
+using CsToml.Values;
 using Primary.Common;
 using Primary.Common.Streams;
 using Primary.Rendering;
-using System.Collections.Frozen;
 
 namespace Primary.Assets.Loaders
 {
@@ -43,12 +43,20 @@ namespace Primary.Assets.Loaders
                 TomlDocumentNode root = document.RootNode;
 
                 string shader = string.Empty;
-                ExceptionUtility.Assert(root["shader"u8].TryGetString(out shader));
 
-                ShaderAsset? shaderAsset = AssetManager.LoadAsset<ShaderAsset>(shader, true);
-                if (shaderAsset == null)
+                TomlDocumentNode docNode = root["shader"u8];
+                if (docNode.ValueType != TomlValueType.Integer && docNode.ValueType != TomlValueType.String)
                 {
-                    materialData.ChangeCurrentShader(shaderAsset, FrozenDictionary<string, MaterialProperty>.Empty, null);
+                    materialData.UpdateAssetFailed(material);
+                    return;
+                }
+
+                ShaderAsset shaderAsset = docNode.ValueType == TomlValueType.Integer ?
+                    AssetManager.LoadAsset<ShaderAsset>((AssetId)(uint)docNode.GetInt64(), true) :
+                    AssetManager.LoadAsset<ShaderAsset>(docNode.GetString(), true);
+                if (shaderAsset.Status != ResourceStatus.Success)
+                {
+                    materialData.ChangeCurrentShader(null, null);
                     materialData.UpdateAssetData(material);
 
                     return;
@@ -78,12 +86,14 @@ namespace Primary.Assets.Loaders
                                     _ => throw new NotSupportedException(variable.Type.ToString())
                                 },
                                 VariableName = variable.Name,
+                                Default = property.Default
                             });
 
                             defaultGroup.SetResource(variable.Name, property.Default switch
                             {
                                 ShaderPropertyDefault.White => AssetManager.Static.DefaultWhite,
                                 ShaderPropertyDefault.Normal => AssetManager.Static.DefaultNormal,
+                                ShaderPropertyDefault.Mask => AssetManager.Static.DefaultMask,
                                 _ => AssetManager.Static.DefaultWhite
                             });
                         }
@@ -105,14 +115,14 @@ namespace Primary.Assets.Loaders
                                         TextureAsset? textureAsset = null;
                                         if (child.TryGetInt64(out long id))
                                         {
-                                            textureAsset = AssetManager.LoadAsset<TextureAsset>(new AssetId((ulong)id));
+                                            textureAsset = AssetManager.LoadAsset<TextureAsset>(new AssetId((uint)id));
                                         }
                                         else if (!child.TryGetString(out string value))
                                         {
                                             textureAsset = AssetManager.LoadAsset<TextureAsset>(value);
                                         }
 
-                                        if (textureAsset != null)
+                                        if (textureAsset != null && textureAsset.Status != ResourceStatus.Error)
                                             defaultGroup.SetResource(kvp.Value.VariableName, textureAsset);
                                         break;
                                     }
@@ -121,7 +131,7 @@ namespace Primary.Assets.Loaders
                     }
                 }
 
-                materialData.ChangeCurrentShader(shaderAsset, properties.ToFrozenDictionary(), defaultGroup);
+                materialData.ChangeCurrentShader(shaderAsset, defaultGroup);
                 materialData.UpdateAssetData(material);
             }
 #if DEBUG

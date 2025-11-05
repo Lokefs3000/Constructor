@@ -76,38 +76,44 @@ namespace Primary.Assets.Loaders
                 }
 
                 RHI.TextureDimension dimension = RHI.TextureDimension.Texture2D;
+                if (FlagUtility.HasFlag(header.Flags, TextureFlags.Cubemap))
+                    dimension = RHI.TextureDimension.TextureCube;
 
                 RHI.Texture? rhiTexture = null;
 
                 //TODO: use an ArrayPool instead to avoid memalloc
-                nint[] mipLevels = new nint[header.MipLevels];
+                nint[] planeSlices = new nint[header.ArraySize * header.MipLevels];
                 try
                 {
-                    for (int i = 0; i < header.MipLevels; i++)
+                    for (int j = 0; j < header.ArraySize; j++)
                     {
-                        uint width = (uint)(header.Width >> i);
-                        uint height = (uint)(header.Height >> i);
-                        uint depth = Math.Max(1u, header.Depth);
-
-                        //ulong dataPitch = (ulong)fi.CalculatePitch(width);
-                        //ulong dataSize = (dataPitch * height) * depth;
-                        ulong dataSize = (ulong)fi.CalculateSize(width, height, depth);
-
-                        ExceptionUtility.Assert(dataSize <= uint.MaxValue);
-
-                        nint mipData = (nint)NativeMemory.Alloc((nuint)dataSize);
-                        stream!.ReadExactly(new Span<byte>(mipData.ToPointer(), (int)dataSize));
-
-                        if (header.Format == TextureFormat.BGR8 || header.Format == TextureFormat.RGB8)
+                        Span<nint> mipLevels = planeSlices.AsSpan(j * header.MipLevels, header.MipLevels);
+                        for (int i = 0; i < header.MipLevels; i++)
                         {
-                            ExceptionUtility.Assert(depth > 1, "can depth actually have a 24bit format?");
-                            nint newMipData = AddAlphaChannelToPixelData(mipData, width, height, (uint)fi.BytesPerPixel);
+                            uint width = (uint)(header.Width >> i);
+                            uint height = (uint)(header.Height >> i);
+                            uint depth = Math.Max(1u, header.Depth);
 
-                            NativeMemory.Free(mipData.ToPointer());
-                            mipData = newMipData;
+                            //ulong dataPitch = (ulong)fi.CalculatePitch(width);
+                            //ulong dataSize = (dataPitch * height) * depth;
+                            ulong dataSize = (ulong)fi.CalculateSize(width, height, depth);
+
+                            ExceptionUtility.Assert(dataSize <= uint.MaxValue);
+
+                            nint mipData = (nint)NativeMemory.Alloc((nuint)dataSize);
+                            stream!.ReadExactly(new Span<byte>(mipData.ToPointer(), (int)dataSize));
+
+                            if (header.Format == TextureFormat.BGR8 || header.Format == TextureFormat.RGB8)
+                            {
+                                ExceptionUtility.Assert(depth > 1, "can depth actually have a 24bit format?");
+                                nint newMipData = AddAlphaChannelToPixelData(mipData, width, height, (uint)fi.BytesPerPixel);
+
+                                NativeMemory.Free(mipData.ToPointer());
+                                mipData = newMipData;
+                            }
+
+                            mipLevels[i] = mipData;
                         }
-
-                        mipLevels[i] = mipData;
                     }
 
                     RHI.TextureFormat rhiFormat = header.Format switch
@@ -144,7 +150,7 @@ namespace Primary.Assets.Loaders
                     {
                         Width = header.Width,
                         Height = Math.Max(header.Height, 1u),
-                        Depth = Math.Max(header.Depth, 1u),
+                        Depth = Math.Max(header.Depth, header.ArraySize),
 
                         MipLevels = header.MipLevels,
 
@@ -155,17 +161,17 @@ namespace Primary.Assets.Loaders
                         CpuAccessFlags = RHI.CPUAccessFlags.None,
 
                         Swizzle = new RHI.TextureSwizzle(header.Swizzle.Code),
-                    }, mipLevels.AsSpan());
+                    }, planeSlices.AsSpan());
 
                     rhiTexture.Name = sourcePath;
                 }
                 finally
                 {
-                    for (int i = 0; i < mipLevels.Length; i++)
+                    for (int i = 0; i < planeSlices.Length; i++)
                     {
-                        if (mipLevels[i] != nint.Zero)
+                        if (planeSlices[i] != nint.Zero)
                         {
-                            NativeMemory.Free(mipLevels[i].ToPointer());
+                            NativeMemory.Free(planeSlices[i].ToPointer());
                         }
                     }
                 }
@@ -535,11 +541,12 @@ namespace Primary.Assets.Loaders
         public TextureFlags Flags;
 
         public ushort MipLevels;
+        public ushort ArraySize;
 
         public TextureSwizzle Swizzle;
 
         public const uint Header = 0x44584554;
-        public const uint Version = 1;
+        public const uint Version = 2;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -593,6 +600,7 @@ namespace Primary.Assets.Loaders
     public enum TextureFlags : ushort
     {
         None = 0,
+        Cubemap
     }
 
     public enum TextureSwizzleChannel : byte

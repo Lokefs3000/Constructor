@@ -7,7 +7,9 @@ using System.Runtime.InteropServices;
 using Vortice.Direct3D12;
 using Vortice.DXGI;
 using Vortice.Mathematics;
+
 using Terra = TerraFX.Interop.DirectX;
+using D3D12MemAlloc = Interop.D3D12MemAlloc;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -20,11 +22,11 @@ namespace Primary.RHI.Direct3D12
         private nint _handlePtr;
 
         private ID3D12Resource? _renderTexture;
-        private Terra.D3D12MA_Allocation* _rtAllocation;
+        private D3D12MemAlloc.Allocation* _rtAllocation;
         private DescriptorHeapAllocation _rtDescriptor;
 
         private ID3D12Resource? _depthStencilTexture;
-        private Terra.D3D12MA_Allocation* _dstAllocation;
+        private D3D12MemAlloc.Allocation* _dstAllocation;
         private DescriptorHeapAllocation _dstDescriptor;
 
         private RenderTextureViewImpl? _rtView;
@@ -63,21 +65,21 @@ namespace Primary.RHI.Direct3D12
                     Flags = ResourceFlags.AllowRenderTarget
                 };
 
-                Terra.D3D12MA_ALLOCATION_DESC allocDesc = new Terra.D3D12MA_ALLOCATION_DESC
+                D3D12MemAlloc.ALLOCATION_DESC allocDesc = new D3D12MemAlloc.ALLOCATION_DESC
                 {
-                    Flags = Terra.D3D12MA_ALLOCATION_FLAGS.D3D12MA_ALLOCATION_FLAG_NONE,
+                    Flags = D3D12MemAlloc.ALLOCATION_FLAGS.ALLOCATION_FLAG_NONE,
                     HeapType = Terra.D3D12_HEAP_TYPE.D3D12_HEAP_TYPE_DEFAULT,
                     ExtraHeapFlags = Terra.D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
                     CustomPool = null,
                     pPrivateData = null,
                 };
 
-                Terra.D3D12MA_Allocation* alloc = null;
+                D3D12MemAlloc.Allocation* alloc = null;
                 Guid guid = typeof(ID3D12Resource).GUID;
                 void* resPtr = null;
 
                 ClearValue clearValue = new ClearValue(resDesc.Format, new Color4(0.0f, 0.0f, 0.0f));
-                ResultChecker.ThrowIfUnhandled(device.D3D12MAAllocator->CreateResource(&allocDesc, (Terra.D3D12_RESOURCE_DESC*)&resDesc, Terra.D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_RENDER_TARGET, (Terra.D3D12_CLEAR_VALUE*)&clearValue, &alloc, &guid, &resPtr).Value, device);
+                ResultChecker.ThrowIfUnhandled(D3D12MemAlloc.Allocator.CreateResource(device.D3D12MAAllocator, &allocDesc, (Terra.D3D12_RESOURCE_DESC*)&resDesc, Terra.D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_RENDER_TARGET, (Terra.D3D12_CLEAR_VALUE*)&clearValue, &alloc, &guid, &resPtr), device);
 
                 _renderTexture = new ID3D12Resource((nint)resPtr);
                 _rtAllocation = alloc;
@@ -104,21 +106,21 @@ namespace Primary.RHI.Direct3D12
                     Flags = ResourceFlags.AllowDepthStencil
                 };
 
-                Terra.D3D12MA_ALLOCATION_DESC allocDesc = new Terra.D3D12MA_ALLOCATION_DESC
+                D3D12MemAlloc.ALLOCATION_DESC allocDesc = new D3D12MemAlloc.ALLOCATION_DESC
                 {
-                    Flags = Terra.D3D12MA_ALLOCATION_FLAGS.D3D12MA_ALLOCATION_FLAG_NONE,
+                    Flags = D3D12MemAlloc.ALLOCATION_FLAGS.ALLOCATION_FLAG_NONE,
                     HeapType = Terra.D3D12_HEAP_TYPE.D3D12_HEAP_TYPE_DEFAULT,
                     ExtraHeapFlags = Terra.D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
                     CustomPool = null,
                     pPrivateData = null,
                 };
 
-                Terra.D3D12MA_Allocation* alloc = null;
+                D3D12MemAlloc.Allocation* alloc = null;
                 Guid guid = typeof(ID3D12Resource).GUID;
                 void* resPtr = null;
 
                 ClearValue clearValue = new ClearValue(resDesc.Format, 1.0f, 0xff);
-                ResultChecker.ThrowIfUnhandled(device.D3D12MAAllocator->CreateResource(&allocDesc, (Terra.D3D12_RESOURCE_DESC*)&resDesc, Terra.D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_DEPTH_WRITE, FormatHelper.IsTypeless(resDesc.Format) ? null : (Terra.D3D12_CLEAR_VALUE*)&clearValue, &alloc, &guid, &resPtr).Value, device);
+                ResultChecker.ThrowIfUnhandled(D3D12MemAlloc.Allocator.CreateResource(device.D3D12MAAllocator, &allocDesc, (Terra.D3D12_RESOURCE_DESC*)&resDesc, Terra.D3D12_RESOURCE_STATES.D3D12_RESOURCE_STATE_DEPTH_WRITE, FormatHelper.IsTypeless(resDesc.Format) ? null : (Terra.D3D12_CLEAR_VALUE*)&clearValue, &alloc, &guid, &resPtr), device);
 
                 _depthStencilTexture = new ID3D12Resource((nint)resPtr);
                 _dstAllocation = alloc;
@@ -188,11 +190,11 @@ namespace Primary.RHI.Direct3D12
 
                     _renderTexture?.Dispose();
                     if (_rtAllocation != null)
-                        _rtAllocation->Release();
+                        _rtAllocation->Base.Release();
 
                     _depthStencilTexture?.Dispose();
                     if (_dstAllocation != null)
-                        _dstAllocation->Release();
+                        _dstAllocation->Base.Release();
                 });
 
                 _device.InvokeObjectDestructionTracking(this);

@@ -5,15 +5,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Configurations>Debug;Release;ReleaseWithDebug</Configurations>
   </PropertyGroup>
+  
+    	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
+	  <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+	  <Optimize>True</Optimize>
+	</PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Serilog" Version="4.3.0" />
-    <PackageReference Include="Vortice.D3D12MA.Native" Version="1.0.0" />
     <PackageReference Include="Vortice.Direct3D12" Version="3.6.2" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Interop.D3D12MemAlloc\Interop.D3D12MemAlloc.csproj" />
     <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
     <ProjectReference Include="..\Primary.Interop\Primary.Interop.csproj" />
     <ProjectReference Include="..\Primary.RHI\Primary.RHI.csproj" />

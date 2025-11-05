@@ -7,6 +7,7 @@ using Primary.RHI;
 using Primary.Utility;
 using System.Buffers;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -119,7 +120,19 @@ namespace Primary.Assets.Loaders
                         indexDataOffset += indexDataSize;
                     }
 
-                    meshes[i] = new RenderMesh(modelData, mesh.Name, 0, indexOffsetTotal, mesh.IndexCount);
+                    int totalChannels = 12 + (uvChannelCount * 2);
+
+                    AABB aabb = new AABB(Unsafe.As<float, Vector3>(ref vertices[0]), Unsafe.As<float, Vector3>(ref vertices[0]));
+
+                    for (int j = totalChannels; j < vertices.Length; j += totalChannels)
+                    {
+                        Vector3 pos = Unsafe.As<float, Vector3>(ref vertices[j]);
+
+                        aabb.Minimum = Vector3.Min(aabb.Minimum, pos);
+                        aabb.Maximum = Vector3.Max(aabb.Maximum, pos);
+                    }
+
+                    meshes[i] = new RenderMesh(modelData, i, mesh.Name, aabb, 0, indexOffsetTotal, mesh.IndexCount);
                     indexOffsetTotal += mesh.IndexCount;
                 }
 
@@ -256,11 +269,6 @@ namespace Primary.Assets.Loaders
                     throw new Exception("Unexpected error");
                 }
             }
-            finally
-            {
-                vertexBuffer?.Dispose();
-                indexBuffer?.Dispose();
-            }
 #if !DEBUG
             catch (Exception ex)
             {
@@ -268,6 +276,11 @@ namespace Primary.Assets.Loaders
                 EngLog.Assets.Error(ex, "Failed to load model: {name}", sourcePath);
             }
 #endif
+            finally
+            {
+                vertexBuffer?.Dispose();
+                indexBuffer?.Dispose();
+            }
         }
     }
 

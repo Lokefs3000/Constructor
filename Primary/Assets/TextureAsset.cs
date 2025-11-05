@@ -2,7 +2,7 @@
 
 namespace Primary.Assets
 {
-    public sealed class TextureAsset : IAssetDefinition
+    public class TextureAsset : IAssetDefinition
     {
         private readonly TextureAssetData _assetData;
 
@@ -12,7 +12,7 @@ namespace Primary.Assets
         }
 
         internal TextureAssetData AssetData => _assetData;
-        internal RHI.Texture? Texture => _assetData.Texture;
+        public RHI.Texture? RawRHITexture => _assetData.Texture;
 
         public ResourceStatus Status => _assetData.Status;
 
@@ -26,7 +26,7 @@ namespace Primary.Assets
         public nint Handle => _assetData.Texture?.Handle ?? nint.Zero;
     }
 
-    internal sealed class TextureAssetData : IInternalAssetData
+    internal class TextureAssetData : IInternalAssetData
     {
         private readonly WeakReference _asset;
 

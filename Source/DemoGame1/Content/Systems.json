@@ -1,1 +1,1 @@
-["Primary.Systems.TransformSystem, Primary", "Primary.Systems.CameraSystem, Primary"]
+["Primary.Systems.TransformSystem, Primary", "Primary.Systems.CameraSystem, Primary", "Primary.Systems.RenderBoundsSystem, Primary"]

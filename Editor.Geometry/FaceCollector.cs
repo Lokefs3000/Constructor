@@ -1,4 +1,5 @@
 ﻿using Arch.LowLevel;
+using Primary.Assets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,7 +13,7 @@ namespace Editor.Geometry
 {
     public sealed class FaceCollector : IDisposable
     {
-        private Dictionary<uint, MaterialLayer> _layers;
+        private Dictionary<MaterialAsset, MaterialLayer> _layers;
 
         private int _vertexCount;
         private int _indexCount;
@@ -21,7 +22,7 @@ namespace Editor.Geometry
 
         internal FaceCollector()
         {
-            _layers = new Dictionary<uint, MaterialLayer>();
+            _layers = new Dictionary<MaterialAsset, MaterialLayer>();
 
             _vertexCount = 0;
             _indexCount = 0;
@@ -55,44 +56,38 @@ namespace Editor.Geometry
         }
 
         /// <summary>Not thread-safe</summary>
-        public void AddTriangle(uint layer, FaceTriangleRaw triangle)
+        public void AddTriangle(MaterialAsset layer, FaceTriangleRaw triangle)
         {
-            if (layer != uint.MaxValue)
+            ref MaterialLayer data = ref CollectionsMarshal.GetValueRefOrNullRef(_layers, layer);
+            if (Unsafe.IsNullRef(ref data))
             {
-                ref MaterialLayer data = ref CollectionsMarshal.GetValueRefOrNullRef(_layers, layer);
-                if (Unsafe.IsNullRef(ref data))
-                {
-                    data = new MaterialLayer();
-                    _layers.Add(layer, data);
-                }
-
-                data.Triangles.Add(triangle);
-
-                _vertexCount += 3;
-                _indexCount += 3;
+                data = new MaterialLayer();
+                _layers.Add(layer, data);
             }
+
+            data.Triangles.Add(triangle);
+
+            _vertexCount += 3;
+            _indexCount += 3;
         }
 
         /// <summary>Not thread-safe</summary>
-        public void AddQuad(uint layer, FaceQuadRaw quad)
+        public void AddQuad(MaterialAsset layer, FaceQuadRaw quad)
         {
-            if (layer != uint.MaxValue)
+            ref MaterialLayer data = ref CollectionsMarshal.GetValueRefOrNullRef(_layers, layer);
+            if (Unsafe.IsNullRef(ref data))
             {
-                ref MaterialLayer data = ref CollectionsMarshal.GetValueRefOrNullRef(_layers, layer);
-                if (Unsafe.IsNullRef(ref data))
-                {
-                    data = new MaterialLayer();
-                    _layers.Add(layer, data);
-                }
-
-                data.Quads.Add(quad);
-
-                _vertexCount += 4;
-                _indexCount += 6;
+                data = new MaterialLayer();
+                _layers.Add(layer, data);
             }
+
+            data.Quads.Add(quad);
+
+            _vertexCount += 4;
+            _indexCount += 6;
         }
 
-        internal IReadOnlyDictionary<uint, MaterialLayer> Layers => _layers;
+        internal IReadOnlyDictionary<MaterialAsset, MaterialLayer> Layers => _layers;
 
         internal int VertexCount => _vertexCount;
         internal int IndexCount => _indexCount;
@@ -120,11 +115,13 @@ namespace Editor.Geometry
 
     internal struct MaterialLayer : IDisposable
     {
+        public readonly MaterialAsset Material;
         public readonly UnsafeList<FaceTriangleRaw> Triangles;
         public readonly UnsafeList<FaceQuadRaw> Quads;
 
-        public MaterialLayer()
+        public MaterialLayer(MaterialAsset material)
         {
+            Material = material;
             Triangles = new UnsafeList<FaceTriangleRaw>(8);
             Quads = new UnsafeList<FaceQuadRaw>(8);
         }

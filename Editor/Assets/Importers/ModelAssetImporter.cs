@@ -28,6 +28,9 @@ namespace Editor.Assets.Importers
         {
             string localInputFile = fullFilePath.Substring(filesystem.AbsolutePath.Length);
 
+            AssetId id = pipeline.Identifier.GetOrRegisterAsset(localInputFile);
+            pipeline.Associator.ClearAssocations(id);
+
             bool hasLocalConfig = false;
             string configFile = pipeline.Configuration.GetFilePath(localInputFile, "Texture");
             if (!File.Exists(configFile))
@@ -36,6 +39,9 @@ namespace Editor.Assets.Importers
                 hasLocalConfig = true;
                 if (!File.Exists(configFile))
                     return false;
+
+                AssetId configId = pipeline.Identifier.GetOrRegisterAsset(Path.ChangeExtension(localInputFile, ".toml"));
+                pipeline.Associator.MakeAssocations(id, new ReadOnlySpan<AssetId>(in configId));
             }
 
             TomlTable rootConfig = Toml.ToModel<TomlTable>(File.ReadAllText(configFile));
@@ -56,17 +62,14 @@ namespace Editor.Assets.Importers
             filesystem.RemapFile(localInputFile, localOutputFile);
             pipeline.ReloadAsset(pipeline.Identifier.GetOrRegisterAsset(localInputFile));
 
-            if (hasLocalConfig)
-                pipeline.MakeFileAssociations(localInputFile, configFile);
-
             AssetId modelId = pipeline.Identifier.GetOrRegisterAsset(localInputFile);
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localInputFile));
+            Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localInputFile, true));
 
             AssetCategoryDatabase category = Editor.GlobalSingleton.AssetDatabase.GetCategory<RenderMesh>()!;
             for (int i = 0; i < proc.MeshInfos.Length; i++)
             {
                 ref ModelMeshInfo mmi = ref proc.MeshInfos[i];
-                category.AddEntry(new AssetDatabaseEntry(modelId, mmi.Name));
+                category.AddEntry(new AssetDatabaseEntry(modelId, mmi.Name, true));
             }
 
             return true;
@@ -94,16 +97,22 @@ namespace Editor.Assets.Importers
         public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
         {
             using Stream? stream = filesystem.OpenStream(localFilePath);
+            AssetId modelId = pipeline.Identifier.GetOrRegisterAsset(localFilePath);
 
-            if (stream == null)
+            if (stream == null || stream.Length < Unsafe.SizeOf<PMFHeader>())
+            {
+                Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, false));
                 return;
+            }
 
             PMFHeader header = stream.Read<PMFHeader>();
             if (header.Header != PMFHeader.ConstHeader || header.Version != PMFHeader.ConstVersion)
+            {
+                Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, false));
                 return;
+            }
 
-            AssetId modelId = pipeline.Identifier.GetOrRegisterAsset(localFilePath);
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath));
+            Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, true));
 
             AssetCategoryDatabase category = Editor.GlobalSingleton.AssetDatabase.GetCategory<RenderMesh>()!;
 
@@ -117,7 +126,7 @@ namespace Editor.Assets.Importers
             for (int i = 0; i < header.MeshCount; i++)
             {
                 string meshName = br.ReadString();
-                category.AddEntry(new AssetDatabaseEntry(modelId, meshName));
+                category.AddEntry(new AssetDatabaseEntry(modelId, meshName, true));
 
                 uint vertexCount = br.ReadUInt32();
                 uint indexCount = br.ReadUInt32();
@@ -127,6 +136,8 @@ namespace Editor.Assets.Importers
 
                 br.Skip((int)vertexCount * (int)vertexStride + (int)indexCount * indexStride);
             }
+
+            return;
         }
 
         public static ModelProcessorArgs ReadTomlDocument(TomlTable document)

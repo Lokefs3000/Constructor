@@ -1,4 +1,5 @@
-﻿using Primary.Rendering;
+﻿using Editor.Rendering.Debugging;
+using Primary.Rendering;
 
 namespace Editor.Rendering
 {
@@ -13,6 +14,9 @@ namespace Editor.Rendering
 
         private Gizmos _gizmos;
 
+        private EntityDebugRenderer _entityDbgRenderer;
+        private StructureDebugRenderer _structureDbgRenderer;
+
         private bool _disposedValue;
 
         internal EditorRenderManager()
@@ -25,6 +29,9 @@ namespace Editor.Rendering
             _geoToolRenderPass = new GeoToolRenderPass();
 
             _gizmos = new Gizmos();
+
+            _entityDbgRenderer = new EntityDebugRenderer();
+            _structureDbgRenderer = new StructureDebugRenderer();
         }
 
         private void Dispose(bool disposing)
@@ -58,6 +65,9 @@ namespace Editor.Rendering
 
         internal void SetupPasses(RenderPass renderPass)
         {
+            _entityDbgRenderer.Render();
+            _structureDbgRenderer.Render();
+
             _gizmos.FinalizeBuffers();
 
             _gizmoPass.SetupRenderState(renderPass);
@@ -66,5 +76,7 @@ namespace Editor.Rendering
             _toolsPass.SetupRenderState(renderPass);
             _editor.DearImGuiStateManager.SetupPasses(renderPass);
         }
+
+        internal Gizmos Gizmos => _gizmos;
     }
 }

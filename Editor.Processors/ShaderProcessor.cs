@@ -35,7 +35,7 @@ namespace Editor.Processors
 
             string sourceSearchDir = Path.GetDirectoryName(args.AbsoluteFilepath)!;
 
-            string[] paths = ["", sourceSearchDir, args.ContentSearchDir];
+            string[] paths = ["", sourceSearchDir, .. args.ContentSearchDirs];
             using IDxcCompiler3 compiler = Dxc.CreateDxcCompiler<IDxcCompiler3>();
 
             //ShaderPreprocessorResult preprocessorResult = ShaderPreprocessor.Inspect(args.Logger, Path.GetFileName(args.AbsoluteFilepath), sourceFile, paths);
@@ -57,7 +57,7 @@ namespace Editor.Processors
                 ReadFiles = includeHandler.ReadFiles;
             }
 
-            ShaderParseResult parseResult = new ShaderSourceParser().ParseSource(processedSource, sourceSearchDir, args.ContentSearchDir);
+            ShaderParseResult parseResult = new ShaderSourceParser().ParseSource(processedSource, sourceSearchDir, args.ContentSearchDirs[0]);
 
             ShaderPath = parseResult.Path;
 
@@ -497,7 +497,7 @@ namespace Editor.Processors
         public string AbsoluteFilepath;
         public string AbsoluteOutputPath;
 
-        public string ContentSearchDir;
+        public string[] ContentSearchDirs;
 
         public ILogger? Logger;
 

@@ -38,7 +38,7 @@ namespace Editor.Runners
                 AbsoluteFilepath = Path.GetFullPath(value.Input),
                 AbsoluteOutputPath = Path.GetFullPath(value.Output),
 
-                ContentSearchDir = Path.GetFullPath(value.ContentSearchDir),
+                ContentSearchDirs = [Path.GetFullPath(value.ContentSearchDir), EditorFilepaths.EnginePath, EditorFilepaths.EditorPath],
 
                 Target = value.API
             });

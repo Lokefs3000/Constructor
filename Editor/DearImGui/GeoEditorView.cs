@@ -2,10 +2,14 @@
 using Editor.Assets.Types;
 using Editor.Components;
 using Editor.GeoEdit;
+using Editor.Geometry;
 using Editor.Interaction;
 using Hexa.NET.ImGui;
+using Primary.Assets;
 using Primary.Common;
+using Primary.Components;
 using Primary.Scenes;
+using Primary.Timing;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -13,6 +17,8 @@ namespace Editor.DearImGui
 {
     internal class GeoEditorView
     {
+        private bool _isFirstFrame;
+
         private ActiveTool _tool;
         private PlaceShape _shape;
 
@@ -25,8 +31,12 @@ namespace Editor.DearImGui
 
         private GeoPickResult? _lastPickResult;
 
+        private float _regenTickTimer;
+
         internal GeoEditorView()
         {
+            _isFirstFrame = true;
+
             _tool = unchecked((ActiveTool)(-1));
             _shape = PlaceShape.Box;
 
@@ -40,6 +50,8 @@ namespace Editor.DearImGui
             _activeSceneLocks = 0;
 
             _lastPickResult = null;
+
+            _regenTickTimer = 0.0f;
 
             SelectionManager.NewSelected += (@base) =>
             {
@@ -97,15 +109,18 @@ namespace Editor.DearImGui
                 _activeScene = null;
             _lastPickResult = null;
 
+            bool hasFocus = true;
             if (ImGui.Begin("Geo viewer"u8))
             {
-                if (ImGui.IsWindowFocused())
+                if (!_isFirstFrame && ImGui.IsWindowFocused())
                 {
                     ToolManager tools = Editor.GlobalSingleton.ToolManager;
                     if (tools.ActiveControlToolType != EditorControlTool.GeoEdit)
                     {
                         tools.SwitchControl(EditorControlTool.GeoEdit);
                     }
+
+                    hasFocus = true;
                 }
 
                 Span<GeoSceneSelectionData> selections = _selection.AsSpan();
@@ -142,6 +157,11 @@ namespace Editor.DearImGui
                                     _lastPickResult = tmp;
                                 }
 
+                                foreach (GeoBrush brush in _activeScene.BrushScene!.Brushes)
+                                {
+                                    
+                                }
+
                                 ImGui.EndTabItem();
                             }
                         }
@@ -152,32 +172,53 @@ namespace Editor.DearImGui
             }
             ImGui.End();
 
-            ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(4.0f));
-            ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 3.0f);
-
-            bool windowRet = ImGui.Begin("##Geo edit"u8, ImGuiWindowFlags.NoDocking | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize);
-
-            if (windowRet)
+            if(hasFocus)
             {
-                if (CustomButton("PLCE"u8, new Vector2(32.0f), _tool == ActiveTool.Place)) ChangeCurrentTool(ActiveTool.Place);
-                if (CustomButton("EDIT"u8, new Vector2(32.0f), _tool == ActiveTool.Edit)) ChangeCurrentTool(ActiveTool.Edit);
-                if (CustomButton("SURF"u8, new Vector2(32.0f), _tool == ActiveTool.Surface)) ChangeCurrentTool(ActiveTool.Surface);
-            }
-            ImGui.End();
+                ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(4.0f));
+                ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 3.0f);
 
-            if (_tool == ActiveTool.Place)
-            {
-                if (ImGui.Begin("##Geo place"u8, ImGuiWindowFlags.NoDocking | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize))
+                bool windowRet = ImGui.Begin("##Geo edit"u8, ImGuiWindowFlags.NoDocking | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize);
+
+                if (windowRet)
                 {
-                    if (CustomButton("Box"u8, new Vector2(32.0f), _shape == PlaceShape.Box)) _shape = PlaceShape.Box;
+                    if (CustomButton("PLCE"u8, new Vector2(32.0f), _tool == ActiveTool.Place)) ChangeCurrentTool(ActiveTool.Place);
+                    if (CustomButton("EDIT"u8, new Vector2(32.0f), _tool == ActiveTool.Edit)) ChangeCurrentTool(ActiveTool.Edit);
+                    if (CustomButton("SURF"u8, new Vector2(32.0f), _tool == ActiveTool.Surface)) ChangeCurrentTool(ActiveTool.Surface);
                 }
                 ImGui.End();
+
+                if (_tool == ActiveTool.Place)
+                {
+                    if (ImGui.Begin("##Geo place"u8, ImGuiWindowFlags.NoDocking | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize))
+                    {
+                        if (CustomButton("Box"u8, new Vector2(32.0f), _shape == PlaceShape.Box)) _shape = PlaceShape.Box;
+                    }
+                    ImGui.End();
+                }
+
+                ImGui.PopStyleVar(2);
+
+                if ((int)_tool < _tools.Length)
+                    _tools[(int)_tool].Update();
             }
 
-            ImGui.PopStyleVar(2);
+            if (_regenTickTimer > 0.2f)
+            {
+                _regenTickTimer = 0.0f;
 
-            if ((int)_tool < _tools.Length)
-                _tools[(int)_tool].Update();
+                Span<GeoSceneSelectionData> selections = _selection.AsSpan();
+                for (int i = 0; i < selections.Length; i++)
+                {
+                    ref GeoSceneSelectionData selectionData = ref selections[i];
+                    if (selectionData.Scene != null && selectionData.Scene.NeedsRegeneration)
+                    {
+                        selectionData.Scene.Regenerate();
+                    }
+                }
+            }
+            _regenTickTimer += Time.DeltaTime;
+
+            _isFirstFrame = false;
         }
 
         private void ChangeCurrentTool(ActiveTool tool)
@@ -249,11 +290,30 @@ namespace Editor.DearImGui
     {
         public readonly SceneEntity Entity;
         public readonly GeoSceneAsset? Scene;
+        public readonly Dictionary<MaterialAsset, SceneEntity> Generated;
 
         public GeoSceneSelectionData(SceneEntity entity, GeoSceneAsset? scene)
         {
             Entity = entity;
             Scene = scene;
+            Generated = new Dictionary<MaterialAsset, SceneEntity>();
+
+            if (scene != null)
+            {
+                foreach (SceneEntity child in entity.Children)
+                {
+                    ref GeoSceneGeneratedTag tag = ref child.GetComponent<GeoSceneGeneratedTag>();
+                    ref MeshRenderer renderer = ref child.GetComponent<MeshRenderer>();
+                    if (!Unsafe.IsNullRef(ref tag) && !Unsafe.IsNullRef(ref renderer) && tag.SceneAssetId == scene.Id && renderer.Material != null)
+                    {
+                        if (!Generated.TryAdd(renderer.Material, child))
+                        {
+                            EdLog.Geo.Warning("Duplicate geo tagged entity found with material: {m} (asset: {a}, id: {id})", renderer.Material, scene.Name, scene.Id);
+                            //TODO: delete duplicate
+                        }
+                    }
+                }
+            }
         }
     }
 }

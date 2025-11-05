@@ -87,7 +87,8 @@ namespace Editor.Processors.Shaders
     internal enum ShaderPropertyDefault : byte
     {
         White = 0,
-        Normal
+        Normal,
+        Mask
     }
 
     internal struct ShaderInputLayout

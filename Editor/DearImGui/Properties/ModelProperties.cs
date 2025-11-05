@@ -123,7 +123,7 @@ namespace Editor.DearImGui.Properties
 
                 if (_model != null && _model.Status == ResourceStatus.Success)
                 {
-                    
+
                 }
 
                 string text = string.Empty;//$"{query.Width}x{query.Height} | {query.Format} | {FileUtility.FormatSize(_textureMemorySize, "F3", CultureInfo.InvariantCulture)}";
@@ -134,8 +134,8 @@ namespace Editor.DearImGui.Properties
                 drawList.AddRectFilled(start - new Vector2(4.0f, 2.0f), start + textSize + new Vector2(4.0f, 2.0f), 0x80000000);
                 drawList.AddText(start, 0xffffffff, text);
 
-                ImGui.EndChild();
             }
+            ImGui.EndChild();
         }
 
         public void Changed(object? target)

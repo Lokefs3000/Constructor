@@ -1,8 +1,10 @@
-﻿using Editor.Processors;
+﻿using Collections.Pooled;
+using Editor.Processors;
 using Editor.Storage;
 using Primary.Assets;
 using Tomlyn;
 using Tomlyn.Model;
+using static Schedulers.JobScheduler;
 using RHI = Primary.RHI;
 
 namespace Editor.Assets.Importers
@@ -25,6 +27,8 @@ namespace Editor.Assets.Importers
         {
             string localInputFile = fullFilePath.Substring(filesystem.AbsolutePath.Length);
 
+            AssetId id = pipeline.Identifier.GetOrRegisterAsset(localInputFile);
+
             bool hasLocalConfigFile = false;
             string tomlFile = pipeline.Configuration.GetFilePath(localInputFile, "Shader");
             if (!File.Exists(tomlFile))
@@ -33,7 +37,12 @@ namespace Editor.Assets.Importers
                 hasLocalConfigFile = true;
                 if (!File.Exists(tomlFile))
                     return false;
+
+                AssetId configId = pipeline.Identifier.GetOrRegisterAsset(Path.ChangeExtension(localInputFile, ".toml"));
+                pipeline.Associator.MakeAssocations(id, new ReadOnlySpan<AssetId>(in configId), true);
             }
+            else
+                pipeline.Associator.ClearAssocations(id);
 
             TomlTable root = Toml.ToModel<TomlTable>(File.ReadAllText(tomlFile));
             ShaderProcessorArgs args = new ShaderProcessorArgs
@@ -41,7 +50,7 @@ namespace Editor.Assets.Importers
                 AbsoluteFilepath = fullFilePath,
                 AbsoluteOutputPath = outputFilePath,
 
-                ContentSearchDir = EditorFilepaths.ContentPath,
+                ContentSearchDirs = [EditorFilepaths.ContentPath, EditorFilepaths.SourcePath, Path.GetDirectoryName(EditorFilepaths.EnginePath)!, Path.GetDirectoryName(EditorFilepaths.EditorPath)!],
 
                 Logger = EdLog.Assets,
 
@@ -64,14 +73,23 @@ namespace Editor.Assets.Importers
             Editor.GlobalSingleton.ProjectShaderLibrary.AddFileToMapping(localInputFile, localOutputFile);
             filesystem.RemapFile(localInputFile, localOutputFile);
 
-            if (hasLocalConfigFile)
-                pipeline.MakeFileAssociations(localInputFile, [tomlFile, .. processor.ReadFiles]);
-            else
-                pipeline.MakeFileAssociations(localInputFile, processor.ReadFiles);
+            using PooledList<AssetId> ids = new PooledList<AssetId>(processor.ReadFiles.Length);
+            for (int i = 0; i < processor.ReadFiles.Length; i++)
+            {
+                AssetId readId = pipeline.Identifier.GetOrRegisterAsset(processor.ReadFiles[i]);
+                if (!readId.IsInvalid)
+                    ids.Add(readId);
+                else
+                    EdLog.Assets.Warning("Failed to get id for shader include: {sf}", processor.ReadFiles[i]);
+            }
+
+            if (ids.Count > 0)
+                pipeline.Associator.MakeAssocations(id, ids.Span);
+
             if (processor.ShaderPath != null)
                 pipeline.ReloadAsset(pipeline.Identifier.GetOrRegisterAsset(localInputFile));
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localInputFile), localInputFile));
+            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localInputFile), localInputFile, true));
             return true;
         }
 
@@ -100,9 +118,12 @@ namespace Editor.Assets.Importers
         public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
         {
             if (!ValidateFile(localFilePath, filesystem, pipeline))
+            {
+                Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, false));
                 return;
+            }
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath));
+            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, true));
         }
 
         public string CustomFileIcon => "Editor/Textures/Icons/FileShader.png";

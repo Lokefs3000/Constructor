@@ -40,17 +40,17 @@ namespace Editor.Assets.Loaders
 
                 geoSceneData.UpdateAssetData(geoScene, brushScene, vertexCache, generator);
             }
+#if !DEBUG
+            catch (Exception ex)
+            {
+                geoSceneData.UpdateAssetFailed(geoScene);
+                EdLog.Assets.Error(ex, "Failed to load geo scene: {name}", sourcePath);
+            }
+#endif
             finally
             {
                 
             }
-#if !DEBUG
-            catch (Exception ex)
-            {
-                geoSceneData.UpdateAssetFailed(model);
-                EdLog.Assets.Error(ex, "Failed to load geo scene: {name}", sourcePath);
-            }
-#endif
         }
     }
 }

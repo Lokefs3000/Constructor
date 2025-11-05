@@ -1,5 +1,6 @@
 ﻿using Arch.Core;
 using Primary.Components;
+using Primary.Profiling;
 using Primary.Rendering;
 using Primary.Scenes;
 using Schedulers;
@@ -11,8 +12,11 @@ namespace Primary.Systems
     {
         public void Schedule(World world, JobScheduler scheduler)
         {
-            SceneManager manager = Engine.GlobalSingleton.SceneManager;
-            manager.World.InlineQuery<CameraSystem, Camera, CameraProjectionData, WorldTransform>(s_query, ref this);
+            using (new ProfilingScope("Camera"))
+            {
+                SceneManager manager = Engine.GlobalSingleton.SceneManager;
+                manager.World.InlineQuery<CameraSystem, Camera, CameraProjectionData, WorldTransform>(s_query, ref this);
+            }
         }
 
         public void Update(ref Camera camera, ref CameraProjectionData projectionData, ref WorldTransform transform)

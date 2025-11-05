@@ -8,6 +8,7 @@ namespace Primary
         internal static readonly ILogger Systems = Create("Systems");
         internal static readonly ILogger Scene = Create("Scene");
         internal static readonly ILogger Console = Create("Console");
+        internal static readonly ILogger Render = Create("Render");
 
         private static ILogger Create(string prefix)
         {

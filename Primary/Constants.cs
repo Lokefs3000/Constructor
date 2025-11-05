@@ -26,7 +26,7 @@
         public const int rRPBufferManagerMinimumSize = 64; //bytes
         public const int rRPBufferManagerMaximumSize = 1024; //bytes
 
-        public const int rRenderTreeRegionSize = 128;
-        public const int rRenderTreeDepth = 6;
+        public const int rRenderTreeRegionSize = 64;
+        public const int rRenderTreeDepth = 1;
     }
 }

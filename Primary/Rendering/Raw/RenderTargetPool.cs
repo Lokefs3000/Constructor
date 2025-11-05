@@ -18,6 +18,9 @@ namespace Primary.Rendering.Raw
 
         internal RHI.RenderTarget GetOrCreate(long id, Vector2 clientSize)
         {
+            if (clientSize == Vector2.Zero)
+                throw new NotImplementedException("placeholder error");
+
             if (!_renderTargets.TryGetValue(id, out RHI.RenderTarget? rt))
             {
                 rt = _device.CreateRenderTarget(new RHI.RenderTargetDescription

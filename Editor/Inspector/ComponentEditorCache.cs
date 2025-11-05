@@ -1,4 +1,4 @@
-﻿using Editor.Inspector.Editors;
+﻿using Editor.Inspector.Components;
 using System.Reflection;
 
 namespace Editor.Inspector

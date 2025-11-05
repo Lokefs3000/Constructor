@@ -2,6 +2,7 @@
 {
     public abstract class Texture : Resource
     {
+        /// <summary>Thread-safe</summary>
         public abstract Descriptor AllocateDescriptor(TextureSRDescriptorDescription description);
 
         public abstract ref readonly TextureDescription Description { get; }

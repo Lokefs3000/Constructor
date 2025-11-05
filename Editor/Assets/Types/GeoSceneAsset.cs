@@ -1,14 +1,9 @@
 ﻿using Editor.Geometry;
 using Primary.Assets;
-using Silk.NET.Assimp;
-using System;
-using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Linq;
+using Primary.Rendering;
+using Primary.Rendering.Data;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+using RHI = Primary.RHI;
 
 namespace Editor.Assets.Types
 {
@@ -21,9 +16,13 @@ namespace Editor.Assets.Types
             _assetData = assetData;
         }
 
+        internal void Regenerate() => _assetData.Regenerate();
+
         internal GeoBrushScene? BrushScene => _assetData.BrushScene;
         internal GeoVertexCache? VertexCache => _assetData.VertexCache;
         internal GeoGenerator? Generator => _assetData.Generator;
+
+        internal bool NeedsRegeneration { get => _assetData.NeedsRegeneration; set => _assetData.NeedsRegeneration = value; }
 
         internal GeoSceneAssetData AssetData => _assetData;
 
@@ -33,7 +32,7 @@ namespace Editor.Assets.Types
         public AssetId Id => _assetData.Id;
     }
 
-    internal class GeoSceneAssetData : IInternalAssetData
+    internal class GeoSceneAssetData : IInternalAssetData//, IRenderMeshSource
     {
         private readonly WeakReference _asset;
 
@@ -46,6 +45,14 @@ namespace Editor.Assets.Types
         private GeoVertexCache? _vertexCache;
         private GeoGenerator? _generator;
 
+        private bool _needsRegenerate;
+
+        private RHI.Buffer? _vertexBuffer;
+        private RHI.Buffer? _indexBuffer;
+
+        private int _vertexBufferSize;
+        private int _indexBufferSize;
+
         internal GeoSceneAssetData(AssetId id)
         {
             _asset = new WeakReference(null);
@@ -56,6 +63,13 @@ namespace Editor.Assets.Types
             _name = string.Empty;
 
             _brushScene = null;
+            _vertexCache = null;
+            _generator = null;
+
+            _needsRegenerate = false;
+
+            _vertexBuffer = null;
+            _indexBuffer = null;
         }
 
         public void Dispose()
@@ -63,6 +77,20 @@ namespace Editor.Assets.Types
             _status = ResourceStatus.Disposed;
 
             _asset.Target = null;
+
+            _generator?.Dispose();
+
+            _brushScene = null;
+            _vertexCache = null;
+            _generator = null;
+
+            _needsRegenerate = false;
+
+            _vertexBuffer?.Dispose();
+            _indexBuffer?.Dispose();
+
+            _vertexBuffer = null;
+            _indexBuffer = null;
         }
 
         public void SetAssetInternalStatus(ResourceStatus status)
@@ -84,6 +112,8 @@ namespace Editor.Assets.Types
             _brushScene = brushScene;
             _vertexCache = vertexCache;
             _generator = generator;
+
+            _needsRegenerate = true;
         }
 
         internal void UpdateAssetFailed(GeoSceneAsset asset)
@@ -93,9 +123,62 @@ namespace Editor.Assets.Types
             _status = ResourceStatus.Error;
         }
 
+        internal void Regenerate()
+        {
+            if (_needsRegenerate)
+            {
+                if (_brushScene != null && _vertexCache != null && _generator != null)
+                {
+                    _generator.GenerateMesh(_brushScene);
+
+                    if (_vertexBuffer == null || _vertexBufferSize < _generator.Vertices.Length)
+                    {
+                        _vertexBufferSize = (int)(_generator.Vertices.Length * 1.5);
+                        unsafe
+                        {
+                            _vertexBuffer = RenderingManager.Device.CreateBuffer(new RHI.BufferDescription
+                            {
+                                ByteWidth = (uint)(Unsafe.SizeOf<GeoVertex>() * _vertexBufferSize),
+                                Stride = (uint)Unsafe.SizeOf<GeoVertex>(),
+                                Memory = RHI.MemoryUsage.Default,
+                                Usage = RHI.BufferUsage.VertexBuffer,
+                                Mode = RHI.BufferMode.None,
+                                CpuAccessFlags = RHI.CPUAccessFlags.Write
+                            }, (nint)Unsafe.AsPointer(ref _generator.Vertices[0]));
+                        }
+                    }
+                    //else
+                    //    FrameUploadManager.ScheduleUpload(_vertexBuffer, _generator.Vertices, new UploadDescription(UploadScheduleTarget.Frame));
+
+                    if (_indexBuffer == null || _indexBufferSize < _generator.Indices.Length)
+                    {
+                        _indexBufferSize = (int)(_generator.Indices.Length * 1.5);
+                        unsafe
+                        {
+                            _indexBuffer = RenderingManager.Device.CreateBuffer(new RHI.BufferDescription
+                            {
+                                ByteWidth = (uint)(Unsafe.SizeOf<ushort>() * _indexBufferSize),
+                                Stride = (uint)Unsafe.SizeOf<ushort>(),
+                                Memory = RHI.MemoryUsage.Default,
+                                Usage = RHI.BufferUsage.IndexBuffer,
+                                Mode = RHI.BufferMode.None,
+                                CpuAccessFlags = RHI.CPUAccessFlags.Write
+                            }, (nint)Unsafe.AsPointer(ref _generator.Indices[0]));
+                        }
+                    }
+                    //else
+                    //    FrameUploadManager.ScheduleUpload(_indexBuffer, _generator.Indices, new UploadDescription(UploadScheduleTarget.Frame));
+                }
+
+                _needsRegenerate = false;
+            }
+        }
+
         internal GeoBrushScene? BrushScene => _brushScene;
         internal GeoVertexCache? VertexCache => _vertexCache;
         internal GeoGenerator? Generator => _generator;
+
+        internal bool NeedsRegeneration { get => _needsRegenerate; set => _needsRegenerate = value; }
 
         internal ResourceStatus Status => _status;
 

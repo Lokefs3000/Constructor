@@ -10,5 +10,7 @@ namespace Primary.Rendering.Data
     {
         public RHI.Buffer? VertexBuffer { get; }
         public RHI.Buffer? IndexBuffer { get; }
+
+        //public ReadOnlySpan<RawRenderMesh> SubMeshes { get; }
     }
 }

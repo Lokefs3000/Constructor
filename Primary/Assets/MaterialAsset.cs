@@ -2,6 +2,7 @@
 using System.Collections.Frozen;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 
 namespace Primary.Assets
 {
@@ -14,9 +15,13 @@ namespace Primary.Assets
             _assetData = assetData;
         }
 
+        public object? GetResource(string path) => _assetData.GetResource(path);
+        public void SetResource(string path, object? resource) => _assetData.SetResource(path, resource);
+
         internal MaterialAssetData AssetData => _assetData;
 
-        public ShaderAsset? Shader => _assetData.TargetShader;
+        public ShaderAsset? Shader { get => _assetData.TargetShader; set => _assetData.ChangeCurrentShader(value, null); }
+        public IReadOnlyDictionary<string, MaterialProperty> Properties => _assetData.Properties;
 
         internal nint Handle => _assetData.Handle;
 
@@ -109,15 +114,62 @@ namespace Primary.Assets
             _targetShader = null;
         }
 
-        internal void ChangeCurrentShader(ShaderAsset? newShader, FrozenDictionary<string, MaterialProperty> properties, ShaderBindGroup? bindGroup)
+        internal void ChangeCurrentShader(ShaderAsset? newShader, ShaderBindGroup? bindGroup)
         {
             if (newShader == _targetShader)
                 return;
 
             _targetShader = newShader;
 
-            _properties = properties;
-            _bindGroup = bindGroup;
+            if (newShader != null)
+            {
+                Dictionary<string, MaterialProperty> properties = new Dictionary<string, MaterialProperty>();
+                ShaderBindGroup newBindGroup = bindGroup ?? newShader.CreateDefaultBindGroup();
+
+                foreach (ShaderVariable variable in newShader.Variables.Values)
+                {
+                    if (variable.BindGroup == newBindGroup.GroupName)
+                    {
+                        int idx = Array.FindIndex(variable.Attributes, (x) => x.Type == ShaderAttributeType.Property);
+                        if (idx >= 0)
+                        {
+                            ref ShaderVariableAttribute attribute = ref variable.Attributes[idx];
+                            ShaderVariableAttribProperty property = (ShaderVariableAttribProperty)attribute.Value!;
+
+                            properties.Add(property.Name, new MaterialProperty
+                            {
+                                Type = variable.Type switch
+                                {
+                                    ShaderVariableType.Texture1D => MaterialVariableType.Texture,
+                                    ShaderVariableType.Texture2D => MaterialVariableType.Texture,
+                                    ShaderVariableType.Texture3D => MaterialVariableType.Texture,
+                                    ShaderVariableType.TextureCube => MaterialVariableType.Texture,
+                                    _ => throw new NotSupportedException(variable.Type.ToString())
+                                },
+                                VariableName = variable.Name,
+                            });
+
+                            if (bindGroup == null)
+                            {
+                                newBindGroup.SetResource(variable.Name, _bindGroup?.GetResource(variable.Name) ?? property.Default switch
+                                {
+                                    ShaderPropertyDefault.White => AssetManager.Static.DefaultWhite,
+                                    ShaderPropertyDefault.Normal => AssetManager.Static.DefaultNormal,
+                                    _ => AssetManager.Static.DefaultWhite
+                                });
+                            }
+                        }
+                    }
+                }
+
+                _properties = properties.ToFrozenDictionary();
+                _bindGroup = newBindGroup;
+            }
+            else
+            {
+                _properties = FrozenDictionary<string, MaterialProperty>.Empty;
+                _bindGroup = null;
+            }
 
             /*Span<ShaderResourceSignature.Resource> resources = resourceSignature.Resources;
             for (int i = 0; i < resources.Length; i++)
@@ -131,12 +183,52 @@ namespace Primary.Assets
             }*/
         }
 
+        internal object? GetResource(string path)
+        {
+            ref readonly MaterialProperty property = ref _properties.GetValueRefOrNullRef(path);
+            if (Unsafe.IsNullRef(in property))
+                return null;
+
+            return _bindGroup?.GetResource(property.VariableName);
+        }
+
+        internal void SetResource(string path, object? resource)
+        {
+            ref readonly MaterialProperty property = ref _properties.GetValueRefOrNullRef(path);
+            if (Unsafe.IsNullRef(in property))
+                return;
+
+            if (resource == null)
+            {
+                _bindGroup?.SetResource(property.VariableName, GetDefault(property.Default));
+            }
+            else
+            {
+                switch (property.Type)
+                {
+                    case MaterialVariableType.Texture: _bindGroup?.SetResource(property.VariableName, resource as TextureAsset ?? GetDefault(property.Default)); break;
+                }
+            }
+
+            static TextureAsset GetDefault(ShaderPropertyDefault @default)
+            {
+                switch (@default)
+                {
+                    case ShaderPropertyDefault.White: return AssetManager.Static.DefaultWhite;
+                    case ShaderPropertyDefault.Normal: return AssetManager.Static.DefaultNormal;
+                }
+
+                throw new NotSupportedException(@default.ToString());
+            }
+        }
+
         internal ResourceStatus Status => _status;
 
         internal AssetId Id => _id;
         internal string Name => _name;
 
         internal ShaderAsset? TargetShader => _targetShader;
+        internal IReadOnlyDictionary<string, MaterialProperty> Properties => _properties;
 
         internal nint Handle => _handle;
 
@@ -146,13 +238,14 @@ namespace Primary.Assets
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
     }
 
-    internal record struct MaterialProperty
+    public record struct MaterialProperty
     {
         public MaterialVariableType Type;
         public string VariableName;
+        public ShaderPropertyDefault Default;
     }
 
-    internal enum MaterialVariableType : byte
+    public enum MaterialVariableType : byte
     {
         Texture
     }

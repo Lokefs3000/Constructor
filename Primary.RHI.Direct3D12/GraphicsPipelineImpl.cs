@@ -227,7 +227,7 @@ namespace Primary.RHI.Direct3D12
             {
                 return value switch
                 {
-                    ComparisonFunc.None => ComparisonFunction.None,
+                    ComparisonFunc.None => ComparisonFunction.Never,
                     ComparisonFunc.Never => ComparisonFunction.Never,
                     ComparisonFunc.Less => ComparisonFunction.Less,
                     ComparisonFunc.Equal => ComparisonFunction.Equal,

@@ -181,24 +181,24 @@ namespace Editor.DearImGui
                         if (!_widgets[i].IsFloating)
                             _widgets[i].RenderSelf();
                     }
-
-                    //if (ImGui.BeginMenu("Viewmode"))
-                    //{
-                    //    ref RenderingConfig rconfig = ref Editor.GlobalSingleton.RenderingManager.Configuration;
-                    //
-                    //    if (ImGui.MenuItem("Lit", rconfig.RenderMode == RenderingMode.Lit)) rconfig.RenderMode = RenderingMode.Lit;
-                    //    if (ImGui.MenuItem("Unlit", rconfig.RenderMode == RenderingMode.Unlit)) rconfig.RenderMode = RenderingMode.Unlit;
-                    //    if (ImGui.MenuItem("Wireframe", rconfig.RenderMode == RenderingMode.Wireframe)) rconfig.RenderMode = RenderingMode.Wireframe;
-                    //    if (ImGui.MenuItem("Normals", rconfig.RenderMode == RenderingMode.Normals)) rconfig.RenderMode = RenderingMode.Normals;
-                    //    if (ImGui.MenuItem("Lighting", rconfig.RenderMode == RenderingMode.Lighting)) rconfig.RenderMode = RenderingMode.Lighting;
-                    //    if (ImGui.MenuItem("Detail lighting", rconfig.RenderMode == RenderingMode.DetailLighting)) rconfig.RenderMode = RenderingMode.DetailLighting;
-                    //    if (ImGui.MenuItem("Reflections", rconfig.RenderMode == RenderingMode.Reflections)) rconfig.RenderMode = RenderingMode.Reflections;
-                    //    if (ImGui.MenuItem("Shader complexity", rconfig.RenderMode == RenderingMode.ShaderComplexity)) rconfig.RenderMode = RenderingMode.ShaderComplexity;
-                    //    if (ImGui.MenuItem("Overdraw", rconfig.RenderMode == RenderingMode.Overdraw)) rconfig.RenderMode = RenderingMode.Overdraw;
-                    //
-                    //    ImGui.EndMenu();
-                    //}
-                    //
+                //
+                //    //if (ImGui.BeginMenu("Viewmode"))
+                //    //{
+                //    //    ref RenderingConfig rconfig = ref Editor.GlobalSingleton.RenderingManager.Configuration;
+                //    //
+                //    //    if (ImGui.MenuItem("Lit", rconfig.RenderMode == RenderingMode.Lit)) rconfig.RenderMode = RenderingMode.Lit;
+                //    //    if (ImGui.MenuItem("Unlit", rconfig.RenderMode == RenderingMode.Unlit)) rconfig.RenderMode = RenderingMode.Unlit;
+                //    //    if (ImGui.MenuItem("Wireframe", rconfig.RenderMode == RenderingMode.Wireframe)) rconfig.RenderMode = RenderingMode.Wireframe;
+                //    //    if (ImGui.MenuItem("Normals", rconfig.RenderMode == RenderingMode.Normals)) rconfig.RenderMode = RenderingMode.Normals;
+                //    //    if (ImGui.MenuItem("Lighting", rconfig.RenderMode == RenderingMode.Lighting)) rconfig.RenderMode = RenderingMode.Lighting;
+                //    //    if (ImGui.MenuItem("Detail lighting", rconfig.RenderMode == RenderingMode.DetailLighting)) rconfig.RenderMode = RenderingMode.DetailLighting;
+                //    //    if (ImGui.MenuItem("Reflections", rconfig.RenderMode == RenderingMode.Reflections)) rconfig.RenderMode = RenderingMode.Reflections;
+                //    //    if (ImGui.MenuItem("Shader complexity", rconfig.RenderMode == RenderingMode.ShaderComplexity)) rconfig.RenderMode = RenderingMode.ShaderComplexity;
+                //    //    if (ImGui.MenuItem("Overdraw", rconfig.RenderMode == RenderingMode.Overdraw)) rconfig.RenderMode = RenderingMode.Overdraw;
+                //    //
+                //    //    ImGui.EndMenu();
+                //    //}
+                //    //
                     //if (ImGui.MenuItem("Stats", _showQuickStats))
                     //    _showQuickStats = !_showQuickStats;
                 }

@@ -23,6 +23,8 @@ namespace Editor.DearImGui
                 { typeof(ModelProperties.TargetData), new ModelProperties() },
                 { typeof(EntityProperties.TargetData), new EntityProperties() },
                 { typeof(GeoEditProperties.TargetData), new GeoEditProperties() },
+                { typeof(MaterialProperties.TargetData), new MaterialProperties() },
+                { typeof(EffectVolumeProperties.TargetData), new EffectVolumeProperties() },
             }.ToFrozenDictionary();
         }
 

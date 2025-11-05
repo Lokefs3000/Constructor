@@ -7,7 +7,9 @@ using Primary.Profiling;
 using Primary.Rendering.Batching;
 using Primary.Rendering.Pass;
 using Primary.Rendering.Pooling;
+using Primary.Rendering.PostProcessing;
 using Primary.Rendering.Raw;
+using Primary.Rendering.Tree;
 using Primary.RenderLayer;
 using Primary.RHI;
 using Serilog;
@@ -30,6 +32,9 @@ namespace Primary.Rendering
         private RenderPassData _renderPassData;
         private RenderTargetPool _renderTargetPool;
         private Blitter _blitter;
+        private RenderTreeManager _renderTreeManager;
+        private RenderTreeCollector _renderTreeCollector;
+        private EffectManager _effectManager;
 
         private RenderPass _renderPass;
 
@@ -58,6 +63,9 @@ namespace Primary.Rendering
             _renderPassData = new RenderPassData(new RenderPassViewportData(), new RenderPassLightingData());
             _renderTargetPool = new RenderTargetPool(_graphicsDevice);
             _blitter = new Blitter();
+            _renderTreeManager = new RenderTreeManager();
+            _renderTreeCollector = new RenderTreeCollector();
+            _effectManager = new EffectManager();
 
             _renderPass = new RenderPass();
 
@@ -82,6 +90,7 @@ namespace Primary.Rendering
 
                     s_gd.Target = null;
 
+                    _effectManager.Dispose();
                     _renderTargetPool.Dispose();
                     _commandBufferPool.Dispose();
                     _frameUploadManager.Dispose();
@@ -114,10 +123,13 @@ namespace Primary.Rendering
 
                 _graphicsDevice.BeginFrame();
 
+                _renderTreeManager.UpdateForFrame();
                 _commandBufferPool.PrepareNewFrame();
                 _renderPassManager.ReorganizePassesIfRequired();
                 _frameCollector.SetupScene(_renderScene);
-                _frameCollector.CollectWorld(_renderBatcher, _missingMaterial);
+                //_frameCollector.CollectWorld(_renderBatcher, _missingMaterial);
+                _renderTreeCollector.CollectTrees(_renderBatcher, _renderTreeManager);
+                _renderBatcher.BatchCollected(_renderTreeCollector);
 
                 //_frameUploadManager.UploadPending();
                 //_frameUploadManager.OpenBuffersForFrame();
@@ -131,25 +143,38 @@ namespace Primary.Rendering
                     {
                         using (new ProfilingScope("RTViewport"))
                         {
-                            SetupRenderState(ref viewports[i]);
+                            using (new ProfilingScope("Prepare"))
+                            {
+                                SetupRenderState(ref viewports[i]);
+                                _effectManager.UpdateActiveVolumes();
 
-                            _path.PreparePasses(_renderPassData);
-                            _path.ExecutePasses(_renderPass);
+                                _path.PreparePasses(_renderPassData);
+                                _path.ExecutePasses(_renderPass);
+                            }
 
+                            using (new ProfilingScope("Dispatch"))
+                            {
+                                DispatchRenderPasses();
+                            }
+                        }
+                    }
+                }
+
+                using (new ProfilingScope("Post"))
+                {
+                    PostRender?.Invoke(_renderPass);
+                    if (!_renderPass.IsEmpty)
+                    {
+                        using (new ProfilingScope("Dispatch"))
+                        {
                             DispatchRenderPasses();
                         }
                     }
                 }
 
-                PostRender?.Invoke(_renderPass);
-                if (!_renderPass.IsEmpty)
-                {
-                    DispatchRenderPasses();
-                }
-
                 //_frameUploadManager.SubmitBuffersForEndOfFrame();
 
-                _renderBatcher.ClearBatchData();
+                _renderBatcher.CleanupPostFrame();
                 _renderScene.ClearInternalData();
             }
 
@@ -214,6 +239,8 @@ namespace Primary.Rendering
         public RenderBatcher RenderBatcher => _renderBatcher;
         public RenderPassManager RenderPassManager => _renderPassManager;
         public FrameCollector FrameCollector => _frameCollector;
+        public RenderTreeManager RenderTreeManager => _renderTreeManager;
+        public EffectManager EffectManager => _effectManager;
 
         public RenderScene RenderScene => _renderScene;
 

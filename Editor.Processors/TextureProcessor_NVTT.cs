@@ -1,4 +1,5 @@
 ﻿using Editor.Interop.NVTT;
+using Primary.Assets;
 using Primary.Assets.Loaders;
 using Primary.Common;
 using Primary.Mathematics;
@@ -33,85 +34,276 @@ namespace Editor.Processors
 
         private ILogger? _logger;
 
-        public unsafe bool Execute(object args_in)
+        public bool Execute(object args_in) => throw new NotImplementedException();
+        public unsafe bool Execute(object args_in, TextureCompositeArgs? compositeArgs, TextureCubemapArgs? cubemapArgs)
         {
             TextureProcessorArgs args = (TextureProcessorArgs)args_in;
 
+            if (args.Sources.Length == 0)
+            {
+                args.Logger?.Error("[NVTT]: No sources specified!");
+                return false;
+            }
+
+            NvttSurface*[]? surfaces = null;
+            NvttCompressionOptions* compressionOptions = null;
+            NvttOutputOptions* outputOptions = null;
+            NvttContext* context = null;
+
             try
             {
-                //unsafe
-                //{
-                //    NVTT.SetMessageCallback(&MessageReporter, (void*)GCHandle.ToIntPtr(handle));
-                //}
+                unsafe
+                {
+                    //NVTT.SetMessageCallback(&MessageReporter, null);
+                }
 
                 NvttBoolean hasAlpha = NvttBoolean.False;
                 byte alphaBits = 8;
 
-                Span<byte> imageBytes;
-                using (FileStream stream = NullableUtility.AlwaysThrowIfNull(FileUtility.TryWaitOpen(args.AbsoluteFilepath, FileMode.Open, FileAccess.Read, FileShare.Read)))
-                {
-                    //TODO: use ArrayPool!!
-                    imageBytes = new Span<byte>(new byte[stream.Length]);
-                    stream.ReadExactly(imageBytes);
-                }
 
-                NvttSurface* surface = NVTT.nvttCreateSurface();
-                if (NVTT.nvttSurfaceLoadFromMemory(surface, Unsafe.AsPointer(ref imageBytes[0]), (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
+                if (compositeArgs.HasValue)
                 {
-                    //report error
-                    args.Logger?.Error("[NVTT]: Failed to load surface from image bytes: {af}", args.AbsoluteFilepath);
-                    return false;
-                }
+                    TextureCompositeArgs composite = compositeArgs.Value;
 
-                int mip0Width = NVTT.nvttSurfaceWidth(surface);
-                int mip0Height = NVTT.nvttSurfaceHeight(surface);
-                int mip0Depth = NVTT.nvttSurfaceDepth(surface);
+                    NvttSurface*[] tempSurfaces = new NvttSurface*[Math.Min(args.Sources.Length, 4)];
+                    TextureSwizzleChannel[] channels = new TextureSwizzleChannel[4];
 
-                if (hasAlpha == NvttBoolean.True)
-                {
-                    switch (args.AlphaSource)
+                    Array.Clear(tempSurfaces);
+                    Array.Fill(channels, TextureSwizzleChannel.Zero);
+
+                    int minTextureSizeX = int.MaxValue;
+                    int minTextureSizeY = int.MaxValue;
+
+                    try
                     {
-                        case TextureAlphaSource.None:
-                        case TextureAlphaSource.Opaque:
+                        for (int i = 0, j = 0; i < 4; i++)
+                        {
+                            if (FlagUtility.HasFlag(composite.Channels, (TextureCompositeChannel)(1 << i)))
                             {
-                                NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.None);
-                                hasAlpha = NvttBoolean.False;
-                                break;
+                                if (j >= args.Sources.Length)
+                                {
+                                    args.Logger?.Error("[NVTT]: Not enough sources returned for composite: {c}", (TextureCompositeChannel)(1 << i));
+                                    return false;
+                                }
+
+                                string absoluteFilepath = args.Sources[j].AbsoluteFilepath;
+
+                                Span<byte> imageBytes;
+                                using (FileStream stream = NullableUtility.AlwaysThrowIfNull(FileUtility.TryWaitOpen(absoluteFilepath, FileMode.Open, FileAccess.Read, FileShare.Read)))
+                                {
+                                    //TODO: use ArrayPool!!
+                                    imageBytes = new Span<byte>(new byte[stream.Length]);
+                                    stream.ReadExactly(imageBytes);
+                                }
+
+                                NvttSurface* tempSurf = NVTT.nvttCreateSurface();
+                                if (NVTT.nvttSurfaceLoadFromMemory(tempSurf, Unsafe.AsPointer(ref imageBytes[0]), (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
+                                {
+                                    args.Logger?.Error("[NVTT]: Failed to load composite channel file: {af} (channel: {c})", absoluteFilepath, (TextureCompositeChannel)(1 << i));
+                                    return false;
+                                }
+
+                                minTextureSizeX = Math.Min(minTextureSizeX, NVTT.nvttSurfaceWidth(tempSurf));
+                                minTextureSizeY = Math.Min(minTextureSizeY, NVTT.nvttSurfaceHeight(tempSurf));
+
+                                tempSurfaces[j] = tempSurf;
+                                channels[i] = (TextureSwizzleChannel)j;
+
+                                j++;
                             }
-                        case TextureAlphaSource.Red:
+                        }
+
+                        surfaces = [NVTT.nvttCreateSurface()];
+                        NvttSurface* surface = surfaces[0];
+
+                        if (NVTT.nvttSurfaceSetImage(surface, minTextureSizeX, minTextureSizeY, 1, null) == NvttBoolean.False)
+                        {
+                            args.Logger?.Error("[NVTT]: Failed to create composite texture");
+                            NVTT.nvttDestroySurface(surface);
+                            return false;
+                        }
+
+                        if (tempSurfaces.Length > 3)
+                        {
+                            hasAlpha = NvttBoolean.True;
+                            args.AlphaSource = TextureAlphaSource.Source;
+                            NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.Transparency);
+
+                            if (args.ImageFormat == TextureImageFormat.Undefined)
+                                args.ImageFormat = TextureImageFormat.BC3; //TODO: 'BC3' (DXT5) might not have a good enough alpha channel for this
+                        }
+                        else
+                        {
+                            hasAlpha = NvttBoolean.False;
+                            args.AlphaSource = TextureAlphaSource.None;
+                            NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.None);
+                        }
+
+                        for (int i = 0; i < tempSurfaces.Length; i++)
+                        {
+                            Checking.Assert(tempSurfaces[i] != null);
+
+                            int sourceChannel = args.Sources[i].Channel switch
                             {
-                                NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.Transparency);
+                                TextureSwizzleChannel.R => 0,
+                                TextureSwizzleChannel.G => 1,
+                                TextureSwizzleChannel.B => 2,
+                                TextureSwizzleChannel.A => 3,
+                                _ => throw new NotImplementedException()
+                            };
 
-                                float* red = NVTT.nvttSurfaceChannel(surface, 0);
-                                float* alpha = NVTT.nvttSurfaceChannel(surface, 3);
-
-                                NativeMemory.Copy(red, alpha, (nuint)(mip0Width * mip0Height * mip0Depth * sizeof(float)));
-                                break;
+                            switch (i)
+                            {
+                                case 0: args.TextureSwizzle.R = RemapSwizzleChannel(args.TextureSwizzle.R); break;
+                                case 1: args.TextureSwizzle.G = RemapSwizzleChannel(args.TextureSwizzle.G); break;
+                                case 2: args.TextureSwizzle.B = RemapSwizzleChannel(args.TextureSwizzle.B); break;
+                                case 3: args.TextureSwizzle.A = RemapSwizzleChannel(args.TextureSwizzle.A); break;
                             }
+
+                            NvttSurface* sourceSurface = tempSurfaces[i];
+                            if (minTextureSizeX == NVTT.nvttSurfaceWidth(sourceSurface) && minTextureSizeY == NVTT.nvttSurfaceHeight(sourceSurface))
+                            {
+                                float* srcChannelData = NVTT.nvttSurfaceChannel(sourceSurface, sourceChannel);
+                                float* dstChannelData = NVTT.nvttSurfaceChannel(surface, i);
+
+                                NativeMemory.Copy(srcChannelData, dstChannelData, (nuint)(minTextureSizeX * minTextureSizeY * sizeof(float)));
+                            }
+                            else
+                            {
+                                float* srcChannelData = NVTT.nvttSurfaceChannel(sourceSurface, sourceChannel);
+                                float* dstChannelData = NVTT.nvttSurfaceChannel(surface, i);
+
+                                int srcRowPitch = NVTT.nvttSurfaceWidth(sourceSurface);
+                                int dstRowPitch = minTextureSizeX;
+
+                                for (int row = 0; row < minTextureSizeY; row++)
+                                {
+                                    float* src = srcChannelData + srcRowPitch * row;
+                                    float* dst = dstChannelData + dstRowPitch * row;
+
+                                    NativeMemory.Copy(src, dst, (nuint)(dstRowPitch * sizeof(float)));
+                                }
+                            }
+                        }
+
+                        TextureSwizzleChannel RemapSwizzleChannel(TextureSwizzleChannel channel)
+                        {
+                            if ((int)channel >= channels.Length)
+                                return channel;
+
+                            switch (channel)
+                            {
+                                case TextureSwizzleChannel.R: return channels[0];
+                                case TextureSwizzleChannel.G: return channels[1];
+                                case TextureSwizzleChannel.B: return channels[2];
+                                case TextureSwizzleChannel.A: return channels[3];
+                                default: return channel;
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        for (int i = 0; i < tempSurfaces.Length; i++)
+                        {
+                            if (tempSurfaces[i] != null)
+                                NVTT.nvttDestroySurface(tempSurfaces[i]);
+                        }
+                    }
+                }
+                else if (cubemapArgs.HasValue)
+                {
+                    if (args.Sources.Length != 6)
+                    {
+                        args.Logger?.Warning("[NVTT]: Incorrect number of sources specified for cubemap.");
+                        return false;
+                    }
+
+                    TextureCubemapArgs cubemap = cubemapArgs.Value;
+
+                    surfaces = new NvttSurface*[6];
+                    Array.Clear(surfaces);
+
+                    int generalSizeX = 0;
+                    int generalSizeY = 0;
+
+                    for (int i = 0; i < args.Sources.Length; i++)
+                    {
+                        Span<byte> imageBytes;
+                        using (FileStream stream = NullableUtility.AlwaysThrowIfNull(FileUtility.TryWaitOpen(args.Sources[i].AbsoluteFilepath, FileMode.Open, FileAccess.Read, FileShare.Read)))
+                        {
+                            //TODO: use ArrayPool!!
+                            imageBytes = new Span<byte>(new byte[stream.Length]);
+                            stream.ReadExactly(imageBytes);
+                        }
+
+                        surfaces[i] = NVTT.nvttCreateSurface();
+                        if (NVTT.nvttSurfaceLoadFromMemory(surfaces[i], Unsafe.AsPointer(ref imageBytes[0]), (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
+                        {
+                            //report error
+                            args.Logger?.Error("[NVTT]: Failed to load surface from image bytes: {af}", args.Sources[i].AbsoluteFilepath);
+                            return false;
+                        }
+
+                        if (i == 0)
+                        {
+                            generalSizeX = NVTT.nvttSurfaceWidth(surfaces[i]);
+                            generalSizeY = NVTT.nvttSurfaceHeight(surfaces[i]);
+
+                            if (generalSizeX != generalSizeY)
+                            {
+                                args.Logger?.Error("[NVTT]: Cubemap texture must be square: {af}", args.Sources[i].AbsoluteFilepath);
+                                return false;
+                            }
+
+                            if (!int.IsPow2(generalSizeX))
+                            {
+                                args.Logger?.Error("[NVTT]: Cubemap texture must be a power of 2: {af}", args.Sources[i].AbsoluteFilepath);
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            int sizeX = NVTT.nvttSurfaceWidth(surfaces[i]);
+                            int sizeY = NVTT.nvttSurfaceHeight(surfaces[i]);
+
+                            if (sizeX != generalSizeX || sizeY != generalSizeY)
+                            {
+                                args.Logger?.Error("[NVTT]: Cubemap texture has an inconsistent size: {af}", args.Sources[i].AbsoluteFilepath);
+                                return false;
+                            }
+                        }
                     }
                 }
                 else
                 {
-                    if (args.AlphaSource == TextureAlphaSource.Red)
+                    if (args.Sources.Length > 1)
                     {
-                        NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.Transparency);
+                        args.Logger?.Warning("[NVTT]: More then one source specified on non composite texture. Excess will go unused.");
+                    }
 
-                        float* red = NVTT.nvttSurfaceChannel(surface, 0);
-                        float* alpha = NVTT.nvttSurfaceChannel(surface, 3);
+                    string absoluteFilepath = args.Sources[0].AbsoluteFilepath;
 
-                        NativeMemory.Copy(red, alpha, (nuint)(mip0Width * mip0Height * mip0Depth * sizeof(float)));
+                    Span<byte> imageBytes;
+                    using (FileStream stream = NullableUtility.AlwaysThrowIfNull(FileUtility.TryWaitOpen(absoluteFilepath, FileMode.Open, FileAccess.Read, FileShare.Read)))
+                    {
+                        //TODO: use ArrayPool!!
+                        imageBytes = new Span<byte>(new byte[stream.Length]);
+                        stream.ReadExactly(imageBytes);
+                    }
+
+                    surfaces = [NVTT.nvttCreateSurface()];
+                    if (NVTT.nvttSurfaceLoadFromMemory(surfaces[0], Unsafe.AsPointer(ref imageBytes[0]), (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
+                    {
+                        //report error
+                        args.Logger?.Error("[NVTT]: Failed to load surface from image bytes: {af}", absoluteFilepath);
+                        return false;
                     }
                 }
 
-                if (!args.FlipVertical)
-                {
-                    NVTT.nvttSurfaceFlipY(surface, null);
-                }
-
-                NvttCompressionOptions* compressionOptions = NVTT.nvttCreateCompressionOptions();
+                compressionOptions = NVTT.nvttCreateCompressionOptions();
                 NVTT.nvttSetCompressionOptionsQuality(compressionOptions, NvttQuality.Normal);
 
-                NvttOutputOptions* outputOptions = NVTT.nvttCreateOutputOptions();
+                outputOptions = NVTT.nvttCreateOutputOptions();
                 NVTT.nvttErrorHandlerDelegate @delegate = ErrorReporter;
                 NVTT.nvttSetOutputOptionsErrorHandler(outputOptions, ErrorReporter);
 
@@ -121,6 +313,7 @@ namespace Editor.Processors
                     switch (args.ImageType)
                     {
                         case TextureImageType.Color:
+                        case TextureImageType.Cubemap:
                             {
                                 switch (args.AlphaSource)
                                 {
@@ -206,6 +399,128 @@ namespace Editor.Processors
                     NVTT.nvttSetCompressionOptionsQuantization(compressionOptions, NvttBoolean.False, NvttBoolean.True, NvttBoolean.False, args.CutoutThreshold);
                 }
 
+                Checking.Assert(surfaces != null);
+
+                int mip0Width = NVTT.nvttSurfaceWidth(surfaces![0]);
+                int mip0Height = NVTT.nvttSurfaceHeight(surfaces![0]);
+                int mip0Depth = NVTT.nvttSurfaceDepth(surfaces![0]);
+
+                int mipmapCount = args.GenerateMipmaps ? (int)Math.Log2(Math.Max(mip0Width, mip0Height)) + 1 : 1;
+                int arraySize = cubemapArgs.HasValue ? 6 : 1;
+
+                TextureHeader header = new TextureHeader
+                {
+                    FileHeader = TextureHeader.Header,
+                    FileVersion = TextureHeader.Version,
+
+                    Width = (ushort)mip0Width,
+                    Height = (ushort)mip0Height,
+                    Depth = (ushort)mip0Depth,
+
+                    Format = (TextureFormat)(imageFormat - 1),
+                    Flags = TextureFlags.None,
+
+                    MipLevels = (ushort)mipmapCount,
+                    ArraySize = (ushort)arraySize,
+
+                    Swizzle = new TextureSwizzle(args.TextureSwizzle.Code),
+                };
+
+                if (args.ImageType == TextureImageType.Cubemap)
+                    header.Flags |= TextureFlags.Cubemap;
+
+                using OutputHandler outputHandler = new OutputHandler(args.AbsoluteOutputPath, header);
+
+                NVTT.nvttBeginImageDelegate beginImageDelegate = outputHandler.nvttBeginImage;
+                NVTT.nvttWriteDataWriteData writeDataWriteData = outputHandler.nvttWriteData;
+                NVTT.nvttEndImageDelegate endImageDelegate = outputHandler.nvttEndImage;
+
+                NVTT.nvttSetOutputOptionsOutputHandler(outputOptions, beginImageDelegate, writeDataWriteData, endImageDelegate);
+
+                context = NVTT.nvttCreateContext();
+                for (int i = 0; i < surfaces.Length; i++)
+                {
+                    CompressSingle(ref args, context, surfaces[i], outputOptions, compressionOptions, hasAlpha, alphaBits, imageFormat);
+                }
+
+                GC.KeepAlive(beginImageDelegate);
+                GC.KeepAlive(writeDataWriteData);
+                GC.KeepAlive(endImageDelegate);
+                return true;
+            }
+            finally
+            {
+                if (surfaces != null)
+                {
+                    for (int i = 0; i < surfaces.Length; i++)
+                    {
+                        if (surfaces[i] != null)
+                            NVTT.nvttDestroySurface(surfaces[i]);
+                    }
+                }
+
+                if (outputOptions != null)
+                    NVTT.nvttDestroyOutputOptions(outputOptions);
+                if (compressionOptions != null)
+                    NVTT.nvttDestroyCompressionOptions(compressionOptions);
+
+                if (context != null)
+                    NVTT.nvttDestroyContext(context);
+            }
+        }
+
+        private unsafe bool CompressSingle(ref TextureProcessorArgs args, NvttContext* context, NvttSurface* surface, NvttOutputOptions* outputOptions, NvttCompressionOptions* compressionOptions, NvttBoolean hasAlpha, byte alphaBits, TextureImageFormat imageFormat)
+        {
+            NvttBatchList* batchList = null;
+            List<nint> surfaces = new List<nint>();
+
+            try
+            {
+                int mip0Width = NVTT.nvttSurfaceWidth(surface);
+                int mip0Height = NVTT.nvttSurfaceHeight(surface);
+                int mip0Depth = NVTT.nvttSurfaceDepth(surface);
+
+                if (hasAlpha == NvttBoolean.True)
+                {
+                    switch (args.AlphaSource)
+                    {
+                        case TextureAlphaSource.None:
+                        case TextureAlphaSource.Opaque:
+                            {
+                                NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.None);
+                                hasAlpha = NvttBoolean.False;
+                                break;
+                            }
+                        case TextureAlphaSource.Red:
+                            {
+                                NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.Transparency);
+
+                                float* red = NVTT.nvttSurfaceChannel(surface, 0);
+                                float* alpha = NVTT.nvttSurfaceChannel(surface, 3);
+
+                                NativeMemory.Copy(red, alpha, (nuint)(mip0Width * mip0Height * mip0Depth * sizeof(float)));
+                                break;
+                            }
+                    }
+                }
+                else
+                {
+                    if (args.AlphaSource == TextureAlphaSource.Red)
+                    {
+                        NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.Transparency);
+
+                        float* red = NVTT.nvttSurfaceChannel(surface, 0);
+                        float* alpha = NVTT.nvttSurfaceChannel(surface, 3);
+
+                        NativeMemory.Copy(red, alpha, (nuint)(mip0Width * mip0Height * mip0Depth * sizeof(float)));
+                    }
+                }
+
+                if (!args.FlipVertical)
+                {
+                    NVTT.nvttSurfaceFlipY(surface, null);
+                }
+
                 if (args.GammaCorrect)
                     NVTT.nvttSurfaceToSrgbUnclamped(surface, null);
 
@@ -265,29 +580,6 @@ namespace Editor.Processors
 
                 mipmapCount = Math.Max(1, mipmapCount);
 
-                OutputHandler outputHandler = new OutputHandler(args.AbsoluteOutputPath, new TextureHeader
-                {
-                    FileHeader = TextureHeader.Header,
-                    FileVersion = TextureHeader.Version,
-
-                    Width = (ushort)mip0Width,
-                    Height = (ushort)mip0Height,
-                    Depth = (ushort)mip0Depth,
-
-                    Format = (TextureFormat)(imageFormat - 1),
-                    Flags = TextureFlags.None,
-
-                    MipLevels = (ushort)mipmapCount,
-
-                    Swizzle = new TextureSwizzle(args.TextureSwizzle.Code),
-                });
-
-                NVTT.nvttBeginImageDelegate beginImageDelegate = outputHandler.nvttBeginImage;
-                NVTT.nvttWriteDataWriteData writeDataWriteData = outputHandler.nvttWriteData;
-                NVTT.nvttEndImageDelegate endImageDelegate = outputHandler.nvttEndImage;
-
-                NVTT.nvttSetOutputOptionsOutputHandler(outputOptions, beginImageDelegate, writeDataWriteData, endImageDelegate);
-
                 switch (args.ImageType)
                 {
                     case TextureImageType.Color: break;
@@ -321,7 +613,7 @@ namespace Editor.Processors
                         }
                 }
 
-                NvttBatchList* batchList = NVTT.nvttCreateBatchList();
+                batchList = NVTT.nvttCreateBatchList();
 
                 if (NVTT.nvttSurfaceIsNormalMap(surface) == NvttBoolean.True)
                 {
@@ -337,81 +629,85 @@ namespace Editor.Processors
                         //NVTT.nvttSurfaceToNormalMap(surface, 1.0f / 1.875f, 0.5f / 1.875f, 0.25f / 1.875f, 0.125f / 1.875f, null);
 
                         NvttSurface* referenceCopy = NVTT.nvttSurfaceClone(surface);
-
-                        float* srcData = NVTT.nvttSurfaceChannel(referenceCopy, 0);
-
-                        float* dstData0 = NVTT.nvttSurfaceChannel(surface, 0);
-                        float* dstData1 = NVTT.nvttSurfaceChannel(surface, 1);
-                        float* dstData2 = NVTT.nvttSurfaceChannel(surface, 2);
-
-                        Int2 oneLessSize = new Int2(mip0Width, mip0Height) - Int2.One;
-                        Vector2 step = Vector2.One / new Vector2(mip0Width, mip0Height);
-
-                        float maxHeight = 0.0f;
-
-                        for (int y = 0; y < mip0Height; y++)
+                        try
                         {
-                            int ySlice = y * mip0Width;
-                            for (int x = 0; x < mip0Width; x++)
+                            float* srcData = NVTT.nvttSurfaceChannel(referenceCopy, 0);
+
+                            float* dstData0 = NVTT.nvttSurfaceChannel(surface, 0);
+                            float* dstData1 = NVTT.nvttSurfaceChannel(surface, 1);
+                            float* dstData2 = NVTT.nvttSurfaceChannel(surface, 2);
+
+                            Int2 oneLessSize = new Int2(mip0Width, mip0Height) - Int2.One;
+                            Vector2 step = Vector2.One / new Vector2(mip0Width, mip0Height);
+
+                            float maxHeight = 0.0f;
+
+                            for (int y = 0; y < mip0Height; y++)
                             {
-                                Int2 posPu = new Int2(x + 1, y);
-                                Int2 posMu = new Int2(x - 1, y);
-                                Int2 posPv = new Int2(x, y + 1);
-                                Int2 posMv = new Int2(x, y - 1);
-
-                                posPu.X = (posPu.X < 0) ? oneLessSize.X : ((posPu.X > oneLessSize.X) ? 0 : posPu.X);
-                                posMu.X = (posMu.X < 0) ? oneLessSize.X : ((posMu.X > oneLessSize.X) ? 0 : posMu.X);
-
-                                posPv.Y = (posPv.Y < 0) ? oneLessSize.Y : ((posPv.Y > oneLessSize.Y) ? 0 : posPv.Y);
-                                posMv.Y = (posMv.Y < 0) ? oneLessSize.Y : ((posMv.Y > oneLessSize.Y) ? 0 : posMv.Y);
-
-                                float height = srcData[x + ySlice];
-
-                                Vector2 dxy = new Vector2(height) - new Vector2(
-                                    srcData[posPu.X + ySlice],
-                                    srcData[posPv.X + posPv.Y * mip0Width]);
-
-                                Vector2 n = dxy;
-                                if (dxy.X != 0.0f && dxy.Y != 0.0f)
+                                int ySlice = y * mip0Width;
+                                for (int x = 0; x < mip0Width; x++)
                                 {
-                                    Vector3 tempNorm = Vector3.Normalize(new Vector3(dxy, 1.0f));
-                                    n = new Vector2(tempNorm.X, tempNorm.Y);
+                                    Int2 posPu = new Int2(x + 1, y);
+                                    Int2 posMu = new Int2(x - 1, y);
+                                    Int2 posPv = new Int2(x, y + 1);
+                                    Int2 posMv = new Int2(x, y - 1);
 
-                                    Vector2 absN = Vector2.Abs(n);
-                                    maxHeight = MathF.Max(MathF.Max(absN.X, absN.Y), maxHeight);
+                                    posPu.X = (posPu.X < 0) ? oneLessSize.X : ((posPu.X > oneLessSize.X) ? 0 : posPu.X);
+                                    posMu.X = (posMu.X < 0) ? oneLessSize.X : ((posMu.X > oneLessSize.X) ? 0 : posMu.X);
+
+                                    posPv.Y = (posPv.Y < 0) ? oneLessSize.Y : ((posPv.Y > oneLessSize.Y) ? 0 : posPv.Y);
+                                    posMv.Y = (posMv.Y < 0) ? oneLessSize.Y : ((posMv.Y > oneLessSize.Y) ? 0 : posMv.Y);
+
+                                    float height = srcData[x + ySlice];
+
+                                    Vector2 dxy = new Vector2(height) - new Vector2(
+                                        srcData[posPu.X + ySlice],
+                                        srcData[posPv.X + posPv.Y * mip0Width]);
+
+                                    Vector2 n = dxy;
+                                    if (dxy.X != 0.0f && dxy.Y != 0.0f)
+                                    {
+                                        Vector3 tempNorm = Vector3.Normalize(new Vector3(dxy, 1.0f));
+                                        n = new Vector2(tempNorm.X, tempNorm.Y);
+
+                                        Vector2 absN = Vector2.Abs(n);
+                                        maxHeight = MathF.Max(MathF.Max(absN.X, absN.Y), maxHeight);
+                                    }
+
+                                    dstData0[x + ySlice] = n.X;
+                                    dstData1[x + ySlice] = n.Y;
+                                    dstData2[x + ySlice] = 1.0f;
+
+                                    //float samplePu = srcData[posPu.X + ySlice];
+                                    //float sampleMu = srcData[posMu.X + ySlice];
+                                    //float samplePv = srcData[posPv.X + posPv.Y * mip0Width];
+                                    //float sampleMv = srcData[posMv.X + posMv.Y * mip0Width];
+                                    //
+                                    //float du = sampleMu - samplePu;
+                                    //float dv = sampleMv - samplePv;
+                                    //
+                                    //Vector3 n = Vector3.Normalize(new Vector3(du, dv, 1.0f));
+                                    //
+                                    //dstVec3[x + ySlice] = n * 0.5f + new Vector3(0.5f);
                                 }
+                            }
 
-                                dstData0[x + ySlice] = n.X;
-                                dstData1[x + ySlice] = n.Y;
-                                dstData2[x + ySlice] = 1.0f;
+                            int total = mip0Width * mip0Height;
+                            for (int i = 0; i < total; i++)
+                            {
+                                ref float nx = ref dstData0[i];
+                                ref float ny = ref dstData1[i];
 
-                                //float samplePu = srcData[posPu.X + ySlice];
-                                //float sampleMu = srcData[posMu.X + ySlice];
-                                //float samplePv = srcData[posPv.X + posPv.Y * mip0Width];
-                                //float sampleMv = srcData[posMv.X + posMv.Y * mip0Width];
-                                //
-                                //float du = sampleMu - samplePu;
-                                //float dv = sampleMv - samplePv;
-                                //
-                                //Vector3 n = Vector3.Normalize(new Vector3(du, dv, 1.0f));
-                                //
-                                //dstVec3[x + ySlice] = n * 0.5f + new Vector3(0.5f);
+                                Vector2 n = new Vector2(nx, ny) * 0.5f + new Vector2(0.5f);
+
+                                nx = n.X;
+                                ny = n.Y;
                             }
                         }
-
-                        int total = mip0Width * mip0Height;
-                        for (int i = 0; i < total; i++)
+                        finally
                         {
-                            ref float nx = ref dstData0[i];
-                            ref float ny = ref dstData1[i];
-
-                            Vector2 n = new Vector2(nx, ny) * 0.5f + new Vector2(0.5f);
-
-                            nx = n.X;
-                            ny = n.Y;
+                            NVTT.nvttDestroySurface(referenceCopy);
                         }
-
-                        NVTT.nvttDestroySurface(referenceCopy);
                     }
                 }
                 else
@@ -428,9 +724,6 @@ namespace Editor.Processors
                     NVTT.nvttSurfaceToSrgbUnclamped(surface, null);
                 }
 
-                List<nint> surfaces = new List<nint>();
-
-                NvttContext* context = NVTT.nvttCreateContext();
                 NVTT.nvttSetContextCudaAcceleration(context, NvttBoolean.False);
                 NVTT.nvttContextQuantize(context, temp, compressionOptions);
 
@@ -482,50 +775,23 @@ namespace Editor.Processors
                     surfaces.Add((nint)surf);
                 }
 
-                var cleanup = () =>
-                {
-                    for (int i = 0; i < surfaces.Count; i++)
-                    {
-                        NVTT.nvttDestroySurface((NvttSurface*)surfaces[i]);
-                    }
-
-                    NVTT.nvttDestroyBatchList(batchList);
-
-                    NVTT.nvttDestroySurface(surface);
-                    NVTT.nvttDestroyContext(context);
-
-                    NVTT.nvttDestroyOutputOptions(outputOptions);
-                    NVTT.nvttDestroyCompressionOptions(compressionOptions);
-
-                    outputHandler.Dispose();
-                };
-
-                outputHandler.Skip = true;
-                if (NVTT.nvttContextOutputHeaderData(context, NvttTextureType._2D, mip0Width, mip0Height, mip0Depth, mipmapCount, NVTT.nvttSurfaceIsNormalMap(surface), compressionOptions, outputOptions) != NvttBoolean.True)
-                {
-                    cleanup();
-                    //bad
-                    return false;
-                }
-
-                outputHandler.Skip = false;
                 if (NVTT.nvttContextCompressBatch(context, batchList, compressionOptions) != NvttBoolean.True)
                 {
-                    cleanup();
-                    //bad
                     return false;
                 }
 
-                cleanup();
-
-                GC.KeepAlive(beginImageDelegate);
-                GC.KeepAlive(writeDataWriteData);
-                GC.KeepAlive(endImageDelegate);
                 return true;
             }
             finally
             {
+                if (batchList != null)
+                    NVTT.nvttDestroyBatchList(batchList);
 
+                for (int i = 0; i < surfaces.Count; i++)
+                {
+                    if (surfaces[i] != nint.Zero)
+                        NVTT.nvttDestroySurface((NvttSurface*)surfaces[i]);
+                }
             }
         }
 
@@ -622,7 +888,7 @@ namespace Editor.Processors
 
     public record struct TextureProcessorArgs
     {
-        public string AbsoluteFilepath;
+        public Source[] Sources;
         public string AbsoluteOutputPath;
 
         public ILogger? Logger;
@@ -678,6 +944,12 @@ namespace Editor.Processors
 
             public static readonly Swizzle Default = new Swizzle(TextureSwizzleChannel.R, TextureSwizzleChannel.G, TextureSwizzleChannel.B, TextureSwizzleChannel.A);
         }
+
+        public record struct Source
+        {
+            public TextureSwizzleChannel Channel;
+            public string AbsoluteFilepath;
+        }
     }
 
     public record struct TextureProcessorNormalArgs
@@ -688,6 +960,43 @@ namespace Editor.Processors
     public record struct TextureProcessorSpecularArgs
     {
         public TextureSpecularSource Source;
+    }
+
+    public record struct TextureCompositeArgs
+    {
+        public TextureCompositeChannel Channels;
+
+        public TextureCompositeChannelArgs Red;
+        public TextureCompositeChannelArgs Green;
+        public TextureCompositeChannelArgs Blue;
+        public TextureCompositeChannelArgs Alpha;
+    }
+
+    public record struct TextureCompositeChannelArgs
+    {
+        public AssetId Asset;
+        public TextureCompositeChannel Source;
+        public bool Invert;
+
+        public TextureCompositeChannelArgs()
+        {
+            Asset = AssetId.Invalid;
+            Source = TextureCompositeChannel.Red;
+            Invert = false;
+        }
+    }
+
+    public record struct TextureCubemapArgs
+    {
+        public TextureCubemapSource Source;
+
+        public AssetId PositiveX;
+        public AssetId PositiveY;
+        public AssetId PositiveZ;
+
+        public AssetId NegativeX;
+        public AssetId NegativeY;
+        public AssetId NegativeZ;
     }
 
     public enum TextureImageFormat : byte
@@ -743,6 +1052,7 @@ namespace Editor.Processors
         Grayscale,
         Normal,
         Specular,
+        Cubemap
     }
 
     public enum TextureSwizzleChannel : byte
@@ -767,5 +1077,20 @@ namespace Editor.Processors
         Colored = 0,
         Grayscale,
         Roughness
+    }
+
+    public enum TextureCompositeChannel : byte
+    {
+        None = 0,
+
+        Red = 1 << 0,
+        Green = 1 << 1,
+        Blue = 1 << 2,
+        Alpha = 1 << 3,
+    }
+
+    public enum TextureCubemapSource : byte
+    {
+        Composited = 0
     }
 }

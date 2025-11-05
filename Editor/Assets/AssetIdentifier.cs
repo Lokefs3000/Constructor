@@ -13,14 +13,14 @@ namespace Editor.Assets
         private ConcurrentDictionary<string, AssetId> _assets;
         private ConcurrentDictionary<AssetId, string> _assetPaths;
 
-        private HashSet<ulong> _idHashSet;
+        private HashSet<uint> _idHashSet;
 
         internal AssetIdentifier()
         {
             _assets = new ConcurrentDictionary<string, AssetId>();
             _assetPaths = new ConcurrentDictionary<AssetId, string>();
 
-            _idHashSet = new HashSet<ulong>();
+            _idHashSet = new HashSet<uint>();
 
             if (File.Exists(DataFilePath))
             {
@@ -41,7 +41,7 @@ namespace Editor.Assets
                 string localFilePath = tokenizer.Current.ToString();
 
                 tokenizer.MoveNext();
-                ulong localId = ulong.Parse(tokenizer.Current.ToString());
+                uint localId = uint.Parse(tokenizer.Current.ToString());
 
                 _assets.TryAdd(localFilePath, new AssetId(localId));
                 _assetPaths.TryAdd(new AssetId(localId), localFilePath);
@@ -72,6 +72,15 @@ namespace Editor.Assets
         /// <summary>Thread-safe</summary>
         internal AssetId GetOrRegisterAsset(string localPath)
         {
+            if (!AssetPipeline.IsLocalPath(localPath))
+            {
+                if (!AssetPipeline.TryGetLocalPathFromFull(localPath, out localPath))
+                {
+                    EdLog.Assets.Warning("Cannot get asset id for not local path: {path}", localPath);
+                    return AssetId.Invalid;
+                }
+            }
+
             AssetId id = _assets.GetOrAdd(localPath, (_) =>
             {
                 lock (_idHashSet)
@@ -104,10 +113,10 @@ namespace Editor.Assets
         public bool IsIdValid(AssetId id) => !id.IsInvalid && _assetPaths.ContainsKey(id);
 
         /// <summary>Not thread-safe</summary>
-        private ulong GenerateId()
+        private uint GenerateId()
         {
-            ulong id = (ulong)Stopwatch.GetTimestamp();
-            while (id == Invalid || _idHashSet.Contains(id))
+            uint id = (uint)Stopwatch.GetTimestamp();
+            while (id == IAssetIdProvider.Invalid || _idHashSet.Contains(id))
             {
                 id++;
             }
@@ -133,7 +142,5 @@ namespace Editor.Assets
         #endregion
 
         public static string DataFilePath = Path.Combine(EditorFilepaths.LibraryPath, "assets.ids");
-
-        public const ulong Invalid = ulong.MaxValue;
     }
 }

@@ -1,7 +1,7 @@
 ﻿using Arch.Core;
 using Arch.Core.Extensions;
 using Editor.Inspector;
-using Editor.Inspector.Editors;
+using Editor.Inspector.Components;
 using Editor.Inspector.Entities;
 using Editor.Interaction;
 using Hexa.NET.ImGui;

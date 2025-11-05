@@ -10,8 +10,9 @@ namespace Primary.Rendering
 
         private RenderPassThreadingPolicy _threadingPolicy;
         private int _threadingSplitCount;
+        private object? _userArgument;
 
-        private Action<RasterCommandBuffer, RenderPassData>? _function;
+        private Action<RasterCommandBuffer, RenderPassData, object?>? _function;
 
         internal RasterPassDescription()
         {
@@ -32,6 +33,7 @@ namespace Primary.Rendering
 
             _threadingPolicy = RenderPassThreadingPolicy.None;
             _threadingSplitCount = 0;
+            _userArgument = null;
 
             _function = null;
         }
@@ -55,7 +57,13 @@ namespace Primary.Rendering
         }
 
         /// <summary>Not thread-safe</summary>
-        public void SetFunction(Action<RasterCommandBuffer, RenderPassData> function)
+        public void SetUserArgument(object? argument)
+        {
+            _userArgument = argument;
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public void SetFunction(Action<RasterCommandBuffer, RenderPassData, object?> function)
         {
             _function = function;
         }
@@ -64,7 +72,7 @@ namespace Primary.Rendering
         {
             RasterCommandBuffer commandBuffer = CommandBufferPool.Get();
 
-            _function!.Invoke(commandBuffer, passData);
+            _function!.Invoke(commandBuffer, passData, _userArgument);
 
             CommandBufferPool.Return(commandBuffer);
         }

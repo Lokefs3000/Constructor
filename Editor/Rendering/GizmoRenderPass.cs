@@ -84,7 +84,7 @@ namespace Editor.Rendering
             }
         }
 
-        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
+        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData, object? userArg)
         {
             DrawGrid(commandBuffer, passData);
             DrawGizmos(commandBuffer, passData);

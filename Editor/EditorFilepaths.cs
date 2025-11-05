@@ -10,6 +10,9 @@
         public static string LibraryIntermediatePath { get; private set; } = string.Empty;
         public static string LibraryAssetsPath { get; private set; } = string.Empty;
 
+        public static string EnginePath { get; private set; } = string.Empty;
+        public static string EditorPath { get; private set; } = string.Empty;
+
         internal static void Initialize(string filePath)
         {
             ContentPath = Path.Combine(filePath, "Content");
@@ -19,6 +22,9 @@
             LibraryImportedPath = Path.Combine(LibraryPath, "Imported");
             LibraryIntermediatePath = Path.Combine(LibraryPath, "Intermediate");
             LibraryAssetsPath = Path.Combine(LibraryPath, "Assets");
+
+            EnginePath = @"D:/source/repos/Constructor/Source/Engine";
+            EditorPath = @"D:/source/repos/Constructor/Source/Editor";
         }
     }
 }

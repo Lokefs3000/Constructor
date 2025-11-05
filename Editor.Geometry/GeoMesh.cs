@@ -1,6 +1,8 @@
-﻿using Primary.Common;
+﻿using Primary.Assets;
+using Primary.Common;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -25,25 +27,18 @@ namespace Editor.Geometry
         }
     }
 
-    [StructLayout(LayoutKind.Explicit)]
     public struct GeoFace
     {
-        [FieldOffset(0)]
         public readonly GeoFaceType Type;
-
-        [FieldOffset(1)]
         public ushort ShapeFaceIndex;
+        public MaterialAsset? MaterialIndex;
 
-        [FieldOffset(3)]
-        public uint MaterialIndex;
+        public ref GeoTriangle Triangle { [UnscopedRef] get => ref _union.Triangle; }
+        public ref GeoQuad Quad { [UnscopedRef] get => ref _union.Quad; }
 
-        [FieldOffset(7)]
-        public GeoTriangle Triangle;
+        private __Union _union;
 
-        [FieldOffset(7)]
-        public GeoQuad Quad;
-
-        public GeoFace(ushort faceIndex, uint materialIndex, GeoTriangle tri)
+        public GeoFace(ushort faceIndex, MaterialAsset? materialIndex, GeoTriangle tri)
         {
             Type = GeoFaceType.Triangle;
             ShapeFaceIndex = faceIndex;
@@ -51,7 +46,7 @@ namespace Editor.Geometry
             Triangle = tri;
         }
 
-        public GeoFace(ushort faceIndex, uint materialIndex, GeoQuad quad)
+        public GeoFace(ushort faceIndex, MaterialAsset? materialIndex, GeoQuad quad)
         {
             Type = GeoFaceType.Quad;
             ShapeFaceIndex = faceIndex;
@@ -59,8 +54,17 @@ namespace Editor.Geometry
             Quad = quad;
         }
 
-        public static implicit operator GeoFace(GeoTriangle tri) => new GeoFace(ushort.MaxValue, 0, tri);
-        public static implicit operator GeoFace(GeoQuad quad) => new GeoFace(ushort.MaxValue, 0, quad);
+        public static implicit operator GeoFace(GeoTriangle tri) => new GeoFace(ushort.MaxValue, null, tri);
+        public static implicit operator GeoFace(GeoQuad quad) => new GeoFace(ushort.MaxValue, null, quad);
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct __Union
+        {
+            [FieldOffset(0)]
+            public GeoTriangle Triangle;
+            [FieldOffset(0)]
+            public GeoQuad Quad;
+        }
     }
 
     public enum GeoFaceType : byte

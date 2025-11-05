@@ -7,7 +7,7 @@ namespace Primary.RHI.Direct3D12.Utility
     internal static class ResultChecker
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        [DebuggerHidden]
+        [StackTraceHidden]
         public static void ThrowIfUnhandled(Result result, GraphicsDeviceImpl? device = null)
         {
             if (result.Failure)

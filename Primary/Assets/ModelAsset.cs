@@ -1,4 +1,5 @@
-﻿using Primary.Rendering.Data;
+﻿using Primary.Common;
+using Primary.Rendering.Data;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -146,7 +147,7 @@ namespace Primary.Assets
     {
         private readonly string _id;
 
-        internal RenderMesh(ModelAssetData modelAssetData, string id, uint vertexOffset, uint indexOffset, uint indexCount) : base(modelAssetData, vertexOffset, indexOffset, indexCount)
+        internal RenderMesh(ModelAssetData modelAssetData, int uniqueId, string id, AABB boundaries, uint vertexOffset, uint indexOffset, uint indexCount) : base(modelAssetData, uniqueId, boundaries, vertexOffset, indexOffset, indexCount)
         {
             _id = id;
         }

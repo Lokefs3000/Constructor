@@ -3,7 +3,7 @@
 namespace Primary.Components
 {
     [InspectorHidden]
-    internal record struct EntityEnabled : IComponent
+    public record struct EntityEnabled : IComponent
     {
         public bool Enabled;
     }

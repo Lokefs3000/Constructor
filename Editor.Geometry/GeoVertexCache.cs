@@ -1,4 +1,5 @@
 ﻿using Editor.Geometry.Shapes;
+using Primary.Assets;
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
@@ -41,7 +42,7 @@ namespace Editor.Geometry
     }
 
     public readonly record struct CachedGeoShape(GeoVertex[] Vertices, ushort[] Indices, GeoShapeLayer[] Layers);
-    public readonly record struct GeoShapeLayer(int IndexOffset);
+    public readonly record struct GeoShapeLayer(int IndexOffset, MaterialAsset Material);
 
     public record struct GeoVertex
     {

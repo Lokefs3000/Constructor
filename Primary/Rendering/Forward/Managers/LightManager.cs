@@ -86,9 +86,6 @@ namespace Primary.Rendering.Forward.Managers
         {
             using (new ProfilingScope("PrepareLights"))
             {
-                _hasDirectionalLight = false;
-                _directionalLightEntity = SceneEntity.Null;
-
                 if (_needsStructureRebuild)
                 {
                     _gpuRawLightList.Clear();
@@ -145,7 +142,7 @@ namespace Primary.Rendering.Forward.Managers
 
         public int PendingLightUpdateCount => _pendingLightUpdates.Count;
 
-        internal bool HasDirectionalLight => _hasDirectionalLight;
+        internal bool HasDirectionalLight => _hasDirectionalLight && _directionalLightEntity.Enabled;
 
         internal RHI.Buffer DirectionalBuffer => _directionalLight;
         internal GpuList<RawLight> GpuLightList => _gpuRawLightList;

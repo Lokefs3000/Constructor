@@ -373,6 +373,7 @@ namespace Primary.Assets
     public enum ShaderPropertyDefault : byte
     {
         White = 0,
-        Normal
+        Normal,
+        Mask
     }
 }

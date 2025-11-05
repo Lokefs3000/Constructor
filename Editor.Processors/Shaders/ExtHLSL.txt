@@ -32,3 +32,9 @@ List:
 			Class: The input classification to use for the input element
 			Format: The new format to use for the input element
 		Description: Change the data of an input element.
+
+	"[global(Name: string?)]"
+		Valid: StructuredBuffer<>, ConstantBuffer<>, Texture1..3D<>
+		Requires: None,
+		Arguments:
+			Name: Global name to use instead of decleration name.

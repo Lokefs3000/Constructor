@@ -19,12 +19,15 @@ namespace Editor.DearImGui.Properties
     internal sealed class TextureProperties : IObjectPropertiesViewer
     {
         private string? _localPath;
+        private TextureAssetType _assetType;
 
         private TextureAsset? _texture;
         private string? _configFile;
         private bool _hasLocalConfigFile;
 
         private TextureProcessorArgs _args;
+        private TextureCompositeArgs _compositeArgs;
+        private TextureCubemapArgs _cubemapArgs;
 
         private TextureHeader? _query;
         private long _textureMemorySize;
@@ -45,6 +48,77 @@ namespace Editor.DearImGui.Properties
             if (ImGuiWidgets.ComboBox("Type:", ref imageType, s_imageTypes))
             {
                 _args.ImageType = Enum.Parse<TextureImageType>(imageType);
+            }
+
+            if (_assetType == TextureAssetType.Composite)
+            {
+                if (ImGui.CollapsingHeader("Composite channels"u8))
+                {
+                    ImGui.Indent();
+                    Selector("Red"u8, TextureCompositeChannel.Red, ref _compositeArgs.Channels, ref _compositeArgs.Red);
+                    Selector("Green"u8, TextureCompositeChannel.Green, ref _compositeArgs.Channels, ref _compositeArgs.Green);
+                    Selector("Blue"u8, TextureCompositeChannel.Blue, ref _compositeArgs.Channels, ref _compositeArgs.Blue);
+                    Selector("Alpha"u8, TextureCompositeChannel.Alpha, ref _compositeArgs.Channels, ref _compositeArgs.Alpha);
+                    ImGui.Unindent();
+
+                    void Selector(in ReadOnlySpan<byte> headerText, TextureCompositeChannel channel, ref TextureCompositeChannel channels, ref TextureCompositeChannelArgs args)
+                    {
+                        ImGui.PushID(headerText);
+
+                        byte def = 1;
+                        bool r = FlagUtility.HasFlag(channels, channel);
+
+                        if (ImGui.Checkbox(ref def, ref r))
+                        {
+                            if (r)
+                                channels |= channel;
+                            else
+                                channels &= ~channel;
+                        }
+
+                        ImGui.SameLine(56.0f);
+
+                        if (!r)
+                            ImGui.BeginDisabled();
+                        if (ImGui.CollapsingHeader(headerText, ImGuiTreeNodeFlags.DefaultOpen) && r)
+                        {
+                            string sourceText = args.Source.ToString();
+
+                            ImGuiWidgets.SelectorAssetId<TextureAsset>("Asset:", args.Asset, (x) =>
+                            {
+                                switch (channel)
+                                {
+                                    case TextureCompositeChannel.Red: _compositeArgs.Red.Asset = x; break;
+                                    case TextureCompositeChannel.Green: _compositeArgs.Green.Asset = x; break;
+                                    case TextureCompositeChannel.Blue: _compositeArgs.Blue.Asset = x; break;
+                                    case TextureCompositeChannel.Alpha: _compositeArgs.Alpha.Asset = x; break;
+                                }
+                            });
+                            if (ImGuiWidgets.ComboBox("Source:", ref sourceText, s_compositeChannels))
+                            {
+                                args.Source = Enum.Parse<TextureCompositeChannel>(sourceText);
+                            }
+                            ImGuiWidgets.Checkbox("Invert:", ref args.Invert);
+                        }
+                        if (!r)
+                            ImGui.EndDisabled();
+
+                        ImGui.PopID();
+                    }
+                }
+            }
+            else if (_assetType == TextureAssetType.Cubemap)
+            {
+                if (ImGui.CollapsingHeader("Cubemap"u8))
+                {
+                    ImGuiWidgets.SelectorAssetId<TextureAsset>("Positive X:", _cubemapArgs.PositiveX, (x) => _cubemapArgs.PositiveX = x);
+                    ImGuiWidgets.SelectorAssetId<TextureAsset>("Positive Y:", _cubemapArgs.PositiveY, (x) => _cubemapArgs.PositiveY = x);
+                    ImGuiWidgets.SelectorAssetId<TextureAsset>("Positive Z:", _cubemapArgs.PositiveZ, (x) => _cubemapArgs.PositiveZ = x);
+
+                    ImGuiWidgets.SelectorAssetId<TextureAsset>("Negative X:", _cubemapArgs.NegativeX, (x) => _cubemapArgs.NegativeX = x);
+                    ImGuiWidgets.SelectorAssetId<TextureAsset>("Negative Y:", _cubemapArgs.NegativeY, (x) => _cubemapArgs.NegativeY = x);
+                    ImGuiWidgets.SelectorAssetId<TextureAsset>("Negative Z:", _cubemapArgs.NegativeZ, (x) => _cubemapArgs.NegativeZ = x);
+                }
             }
 
             switch (_args.ImageType)
@@ -79,7 +153,7 @@ namespace Editor.DearImGui.Properties
                     }
             }
 
-            if (ImGui.CollapsingHeader("Source", ImGuiTreeNodeFlags.DefaultOpen))
+            if (ImGui.CollapsingHeader("Source"u8, ImGuiTreeNodeFlags.DefaultOpen))
             {
                 string imageFormat = _args.ImageFormat.ToString();
                 string alphaSource = _args.AlphaSource.ToString();
@@ -99,7 +173,7 @@ namespace Editor.DearImGui.Properties
                 }
             }
 
-            if (ImGui.CollapsingHeader("Process", ImGuiTreeNodeFlags.DefaultOpen))
+            if (ImGui.CollapsingHeader("Process"u8, ImGuiTreeNodeFlags.DefaultOpen))
             {
                 int cutoutThreshold = _args.CutoutThreshold;
 
@@ -223,7 +297,7 @@ namespace Editor.DearImGui.Properties
                 if (_texture != null && _texture.Status == ResourceStatus.Success)
                 {
                     Vector2 center = screen + avail * 0.5f;
-                    Vector2 halfAspectCorrect = ((_texture.Width <= _texture.Height) ?
+                    Vector2 halfAspectCorrect = ((avail.X > avail.Y) ?
                         new Vector2((float)_texture.Width / (float)_texture.Height * avail.Y, avail.Y) :
                         new Vector2(avail.X, (float)_texture.Height / (float)_texture.Width * avail.X)) * 0.5f;
 
@@ -243,8 +317,8 @@ namespace Editor.DearImGui.Properties
                     drawList.AddText(start, 0xffffffff, text);
                 }
 
-                ImGui.EndChild();
             }
+            ImGui.EndChild();
         }
 
         public void Changed(object? target)
@@ -273,6 +347,67 @@ namespace Editor.DearImGui.Properties
                 }
 
                 _localPath = localPath;
+                _assetType = Path.GetExtension(localPath) switch
+                {
+                    ".texcomp" => TextureAssetType.Composite,
+                    ".cubemap" => TextureAssetType.Cubemap,
+                    _ => TextureAssetType.Texture
+                };
+
+                if (_assetType == TextureAssetType.Composite)
+                {
+                    ProjectSubFilesystem? subFilesystem = AssetPipeline.SelectAppropriateFilesystem(AssetPipeline.GetFileNamespace(localPath));
+                    if (subFilesystem != null)
+                    {
+                        string fullPath = subFilesystem.GetFullPath(td.LocalPath);
+                        using FileStream? compositeStream = FileUtility.TryWaitOpenNoThrow(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 10, 50);
+                        if (compositeStream != null)
+                        {
+                            TomlTable compositeDoc = Toml.ToModel<TomlTable>(File.ReadAllText(fullPath), localPath);
+                            _compositeArgs = TextureAssetImporter.ReadCompositeDocument(compositeDoc);
+                        }
+                        else
+                        {
+                            _compositeArgs = new TextureCompositeArgs
+                            {
+                                Channels = TextureCompositeChannel.None,
+                                Red = new TextureCompositeChannelArgs(),
+                                Green = new TextureCompositeChannelArgs(),
+                                Blue = new TextureCompositeChannelArgs(),
+                                Alpha = new TextureCompositeChannelArgs(),
+                            };
+                        }
+                    }
+                }
+                else if (_assetType == TextureAssetType.Cubemap)
+                {
+                    ProjectSubFilesystem? subFilesystem = AssetPipeline.SelectAppropriateFilesystem(AssetPipeline.GetFileNamespace(localPath));
+                    if (subFilesystem != null)
+                    {
+                        string fullPath = subFilesystem.GetFullPath(td.LocalPath);
+                        using FileStream? compositeStream = FileUtility.TryWaitOpenNoThrow(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 10, 50);
+                        if (compositeStream != null)
+                        {
+                            TomlTable cubemapDoc = Toml.ToModel<TomlTable>(File.ReadAllText(fullPath), localPath);
+                            _cubemapArgs = TextureAssetImporter.ReadCubemapDocument(cubemapDoc);
+                        }
+                        else
+                        {
+                            _cubemapArgs = new TextureCubemapArgs
+                            {
+                                Source = TextureCubemapSource.Composited,
+
+                                PositiveX = AssetId.Invalid,
+                                PositiveY = AssetId.Invalid,
+                                PositiveZ = AssetId.Invalid,
+
+                                NegativeX = AssetId.Invalid,
+                                NegativeY = AssetId.Invalid,
+                                NegativeZ = AssetId.Invalid,
+                            };
+                        }
+                    }
+                }
 
                 if (!File.Exists(altToml))
                 {
@@ -368,6 +503,74 @@ namespace Editor.DearImGui.Properties
         {
             Debug.Assert(_configFile != null);
             Debug.Assert(_localPath != null);
+
+            if (_assetType == TextureAssetType.Composite)
+            {
+                ProjectSubFilesystem? subFilesystem = AssetPipeline.SelectAppropriateFilesystem(AssetPipeline.GetFileNamespace(_localPath));
+                if (subFilesystem != null)
+                {
+                    using (FileStream stream = FileUtility.TryWaitOpen(subFilesystem.GetFullPath(_localPath), FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        if (stream == null)
+                        {
+                            EdLog.Gui.Error("Failed to write composite toml data to disk: {f}", _localPath);
+                            return;
+                        }
+
+                        TomlTable root = new TomlTable();
+                        root["channels"] = (int)_compositeArgs.Channels;
+
+                        if (FlagUtility.HasFlag(_compositeArgs.Channels, TextureCompositeChannel.Red))
+                            root["red"] = CreateTable(ref _compositeArgs.Red);
+                        if (FlagUtility.HasFlag(_compositeArgs.Channels, TextureCompositeChannel.Green))
+                            root["green"] = CreateTable(ref _compositeArgs.Green);
+                        if (FlagUtility.HasFlag(_compositeArgs.Channels, TextureCompositeChannel.Blue))
+                            root["blue"] = CreateTable(ref _compositeArgs.Blue);
+                        if (FlagUtility.HasFlag(_compositeArgs.Channels, TextureCompositeChannel.Alpha))
+                            root["alpha"] = CreateTable(ref _compositeArgs.Alpha);
+
+                        string source = Toml.FromModel(root);
+                        stream.Write(Encoding.UTF8.GetBytes(source));
+
+                        static TomlTable CreateTable(ref TextureCompositeChannelArgs args) => new TomlTable
+                        {
+                            { "asset", args.Asset.Value },
+                            { "source", args.Source },
+                            { "invert", args.Invert },
+                        };
+                    }
+                }
+            }
+            else if (_assetType == TextureAssetType.Cubemap)
+            {
+                ProjectSubFilesystem? subFilesystem = AssetPipeline.SelectAppropriateFilesystem(AssetPipeline.GetFileNamespace(_localPath));
+                if (subFilesystem != null)
+                {
+                    using (FileStream stream = FileUtility.TryWaitOpen(subFilesystem.GetFullPath(_localPath), FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        if (stream == null)
+                        {
+                            EdLog.Gui.Error("Failed to write cubemap toml data to disk: {f}", _localPath);
+                            return;
+                        }
+
+                        TomlTable root = new TomlTable {
+                            { "source", _cubemapArgs.Source },
+
+                            { "positive_x", _cubemapArgs.PositiveX.Value },
+                            { "positive_y", _cubemapArgs.PositiveY.Value },
+                            { "positive_z", _cubemapArgs.PositiveZ.Value },
+
+                            { "negative_x", _cubemapArgs.NegativeX.Value },
+                            { "negative_y", _cubemapArgs.NegativeY.Value },
+                            { "negative_z", _cubemapArgs.NegativeZ.Value },
+                            };
+
+                        string source = Toml.FromModel(root);
+                        stream.Write(Encoding.UTF8.GetBytes(source));
+                    }
+                }
+            }
 
             using (FileStream stream = FileUtility.TryWaitOpen(_configFile, FileMode.Create, FileAccess.Write, FileShare.None))
             {
@@ -489,6 +692,58 @@ namespace Editor.DearImGui.Properties
             };
         }
 
+        private static void ChannelsSelector(in ReadOnlySpan<byte> headerText, ref TextureCompositeChannel channels)
+        {
+            Vector3 data = ImGuiWidgets.Header(headerText);
+
+            ImGuiContextPtr context = ImGui.GetCurrentContext();
+
+            int j = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                if (FlagUtility.HasFlag(channels, (TextureCompositeChannel)(1 << i)))
+                {
+                    s_cachedCompositeChannels[j++] = i switch
+                    {
+                        0 => (byte)'R',
+                        1 => (byte)'G',
+                        2 => (byte)'B',
+                        3 => (byte)'A',
+                        _ => (byte)'?'
+                    };
+                }
+            }
+            s_cachedCompositeChannels[j] = 0;
+
+            byte def = 1;
+
+            ImGui.SetCursorScreenPos(new Vector2(data.X, data.Y));
+            ImGui.SetNextItemWidth(data.Z);
+            if (ImGui.BeginCombo(ref def, "COMBAT"u8))
+            {
+                //for (int i = 0; i < 4; i++)
+                //{
+                //    byte c = i switch
+                //    {
+                //        0 => (byte)'R',
+                //        1 => (byte)'G',
+                //        2 => (byte)'B',
+                //        3 => (byte)'A',
+                //        _ => (byte)'?'
+                //    };
+                //
+                //    if (ImGui.Selectable(ref c, FlagUtility.HasFlag(channels, (TextureCompositeChannel)(1 << i))))
+                //    {
+                //        channels ^= (TextureCompositeChannel)(1 << i);
+                //    }
+                //}
+                //
+                //ImGui.EndCombo();
+            }
+        }
+
+        private static byte[] s_cachedCompositeChannels = new byte[5];
+
         private static readonly string[] s_imageFormats = Enum.GetNames<TextureImageFormat>();
         private static readonly string[] s_mipMapFilters = Enum.GetNames<TextureMipmapFilter>();
         private static readonly string[] s_imageTypes = Enum.GetNames<TextureImageType>();
@@ -496,47 +751,16 @@ namespace Editor.DearImGui.Properties
         private static readonly string[] s_specularSource = Enum.GetNames<TextureSpecularSource>();
         private static readonly string[] s_alphaSource = Enum.GetNames<TextureAlphaSource>();
         private static readonly string[] s_swizzleChannel = Enum.GetNames<Processors.TextureSwizzleChannel>();
+        private static readonly string[] s_compositeChannels = Enum.GetNames<TextureCompositeChannel>();
+        private static readonly string[] s_cubemapSource = Enum.GetNames<TextureCubemapSource>();
 
         internal record class TargetData(string LocalPath);
-    }
 
-    [TomlSerializedObject]
-    internal partial struct TexturePropertiesToml
-    {
-        [TomlValueOnSerialized("flip_vertical")]
-        public bool FlipVertical { get; set; }
-
-        [TomlValueOnSerialized("image_format")]
-        public TextureImageFormat ImageFormat { get; set; }
-
-        [TomlValueOnSerialized("cutout_dither")]
-        public bool CutoutDither { get; set; }
-
-        [TomlValueOnSerialized("cutout_threshold")]
-        public byte CutoutThreshold { get; set; }
-
-        [TomlValueOnSerialized("gamma_correct")]
-        public bool GammaCorrect { get; set; }
-
-        [TomlValueOnSerialized("premultiplied_alpha")]
-        public bool PremultipliedAlpha { get; set; }
-
-        [TomlValueOnSerialized("mipmap_filter")]
-        public TextureMipmapFilter MipmapFilter { get; set; }
-
-        [TomlValueOnSerialized("max_mipmap_count")]
-        public int MaxMipmapCount { get; set; }
-
-        [TomlValueOnSerialized("min_mipmap_size")]
-        public int MinMipmapSize { get; set; }
-
-        [TomlValueOnSerialized("generate_mipmaps")]
-        public bool GenerateMipmaps { get; set; }
-
-        [TomlValueOnSerialized("image_type")]
-        public TextureImageType ImageType { get; set; }
-
-        [TomlValueOnSerialized("scale_alpha_for_mipmaps")]
-        public bool ScaleAlphaForMipmaps { get; set; }
+        private enum TextureAssetType : byte
+        {
+            Texture = 0,
+            Composite,
+            Cubemap
+        }
     }
 }

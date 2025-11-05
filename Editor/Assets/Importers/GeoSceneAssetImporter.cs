@@ -28,7 +28,7 @@ namespace Editor.Assets.Importers
             pipeline.ReloadAsset(pipeline.Identifier.GetOrRegisterAsset(localInputFile));
 
             AssetCategoryDatabase category = Editor.GlobalSingleton.AssetDatabase.GetCategory<GeoSceneAsset>()!;
-            category.AddEntry(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localInputFile), localInputFile));
+            category.AddEntry(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localInputFile), localInputFile, true));
 
             return true;
         }
@@ -36,7 +36,7 @@ namespace Editor.Assets.Importers
         public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
         {
             AssetCategoryDatabase category = Editor.GlobalSingleton.AssetDatabase.GetCategory<GeoSceneAsset>()!;
-            category.AddEntry(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath));
+            category.AddEntry(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, true));
         }
 
         public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)

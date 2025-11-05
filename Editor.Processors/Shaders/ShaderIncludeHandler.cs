@@ -29,7 +29,7 @@ public class ShaderIncludeHandler : CallbackBase, IDxcIncludeHandler
 
     public Result LoadSource(string fileName, out IDxcBlob? includeSource)
     {
-        if (fileName.StartsWith("./"))
+        if (fileName.StartsWith("./") || fileName.StartsWith(".\\"))
             fileName = fileName.Substring(2);
 
         var includeFile = GetFilePath(fileName);
