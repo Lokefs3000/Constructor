@@ -36,6 +36,7 @@ namespace Editor.Processors.Shaders
         public string? VariableName;
         public string Name;
         public string BindGroup;
+        public bool IsGlobal;
         public int Index;
         public ShaderAttribute[] Attributes;
 

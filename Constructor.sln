@@ -1,49 +1,49 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36203.30
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Primary", "Primary\Primary.csproj", "{F9BBAA93-ED09-493B-91E5-AA8DE807267B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Primary", "Primary\Primary.csproj", "{F9BBAA93-ED09-493B-91E5-AA8DE807267B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Runtime", "Runtime\Runtime.csproj", "{F07871A8-A87F-463A-83C5-9A46A6B2031F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Runtime", "Runtime\Runtime.csproj", "{F07871A8-A87F-463A-83C5-9A46A6B2031F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Primary.RHI", "Primary.RHI\Primary.RHI.csproj", "{5E80628A-AF89-4884-A16E-5521C70A13C9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Primary.RHI", "Primary.RHI\Primary.RHI.csproj", "{5E80628A-AF89-4884-A16E-5521C70A13C9}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Engine", "Engine", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Editor", "Editor", "{9290F94F-B0DB-4EE2-BCED-7E32E6D2740A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Editor.Processors", "Editor.Processors\Editor.Processors.csproj", "{B6D0913B-F820-4931-A57B-32743DBFF155}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Editor.Processors", "Editor.Processors\Editor.Processors.csproj", "{B6D0913B-F820-4931-A57B-32743DBFF155}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Editor.Interop", "Editor.Interop\Editor.Interop.csproj", "{B09C69CA-E5FA-48C7-BEC6-AE0ED906404A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Editor.Interop", "Editor.Interop\Editor.Interop.csproj", "{B09C69CA-E5FA-48C7-BEC6-AE0ED906404A}"
 	ProjectSection(ProjectDependencies) = postProject
 		{656E6C57-B883-4A4A-B11A-A62BA4A1965B} = {656E6C57-B883-4A4A-B11A-A62BA4A1965B}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Editor", "Editor\Editor.csproj", "{D9553348-8777-4FED-BA94-554F89787A22}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Editor", "Editor\Editor.csproj", "{D9553348-8777-4FED-BA94-554F89787A22}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Native", "Native", "{572F9968-335F-4076-BFA5-6AD981F19D54}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EditorInterop", "Native\EditorInterop\EditorInterop.vcxproj", "{656E6C57-B883-4A4A-B11A-A62BA4A1965B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Primary.Common", "Primary.Common\Primary.Common.csproj", "{2C84F31E-200D-428C-864A-F1E334B0F819}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Primary.Common", "Primary.Common\Primary.Common.csproj", "{2C84F31E-200D-428C-864A-F1E334B0F819}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Primary.RHI.Direct3D12", "Primary.RHI.Direct3D12\Primary.RHI.Direct3D12.csproj", "{9064F627-FD3C-4581-9E5D-5D05C223573D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Primary.RHI.Direct3D12", "Primary.RHI.Direct3D12\Primary.RHI.Direct3D12.csproj", "{9064F627-FD3C-4581-9E5D-5D05C223573D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Primary.Interop", "Primary.Interop\Primary.Interop.csproj", "{059CE364-99A7-49F5-9628-17D99FEEA34B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Primary.Interop", "Primary.Interop\Primary.Interop.csproj", "{059CE364-99A7-49F5-9628-17D99FEEA34B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SourceGenerators", "SourceGenerators", "{9CB9E828-6EEA-4177-AA11-88B60AE15630}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Primary.SourceGenerator", "Primary.SourceGenerator\Primary.SourceGenerator.csproj", "{604884CF-6075-424A-963D-529A8F99DE5E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Editor.Gui", "Editor.Gui\Editor.Gui.csproj", "{150F19D7-6613-45F6-B6C8-DD6B437A8B06}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Editor.Gui", "Editor.Gui\Editor.Gui.csproj", "{150F19D7-6613-45F6-B6C8-DD6B437A8B06}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A66EFC1D-44BC-4ADB-BEAA-620D328D58B7}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Editor.Geometry", "Editor.Geometry\Editor.Geometry.csproj", "{B3426C1E-8ECD-46B2-A77F-58E8FB59D39C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Editor.Geometry", "Editor.Geometry\Editor.Geometry.csproj", "{B3426C1E-8ECD-46B2-A77F-58E8FB59D39C}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extra", "Extra", "{EE3D4E29-B9A4-4A2A-91DD-A77878A3D28B}"
 EndProject
@@ -51,11 +51,17 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtraFramework", "ExtraFram
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Interop", "Interop", "{C5724CE0-D4B9-4DE3-B6CB-04EBFBFAA7C5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Interop.D3D12MemAlloc", "Interop.D3D12MemAlloc\Interop.D3D12MemAlloc.csproj", "{DB62F88C-B897-424A-9328-A362F1F8F49D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Interop.D3D12MemAlloc", "Interop.D3D12MemAlloc\Interop.D3D12MemAlloc.csproj", "{DB62F88C-B897-424A-9328-A362F1F8F49D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Primary.Rendering2", "Primary.Rendering2\Primary.Rendering2.csproj", "{DDF51677-9E81-4A39-A618-E38206196E4E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Primary.Rendering2", "Primary.Rendering2\Primary.Rendering2.csproj", "{DDF51677-9E81-4A39-A618-E38206196E4E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Primary.R2.ForwardPlus", "Primary.R2.ForwardPlus\Primary.R2.ForwardPlus.csproj", "{71839559-218F-4B74-9CAD-6A30E17DE489}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Primary.R2.ForwardPlus", "Primary.R2.ForwardPlus\Primary.R2.ForwardPlus.csproj", "{71839559-218F-4B74-9CAD-6A30E17DE489}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Editor.Shaders", "Editor.Shaders\Editor.Shaders.csproj", "{45753242-8D34-4290-ADE2-5A9B6F4D6996}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Debug", "Debug", "{32EFD66D-1421-4E5F-82BE-28736BF59D7E}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ShaderGen", "ShaderGen\ShaderGen.csproj", "{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -376,6 +382,42 @@ Global
 		{71839559-218F-4B74-9CAD-6A30E17DE489}.ReleaseWithDebug|x64.Build.0 = Release|Any CPU
 		{71839559-218F-4B74-9CAD-6A30E17DE489}.ReleaseWithDebug|x86.ActiveCfg = Release|Any CPU
 		{71839559-218F-4B74-9CAD-6A30E17DE489}.ReleaseWithDebug|x86.Build.0 = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Debug|x64.Build.0 = Debug|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Debug|x86.Build.0 = Debug|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Release|Any CPU.Build.0 = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Release|x64.ActiveCfg = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Release|x64.Build.0 = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Release|x86.ActiveCfg = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.Release|x86.Build.0 = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.ReleaseWithDebug|Any CPU.ActiveCfg = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.ReleaseWithDebug|Any CPU.Build.0 = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.ReleaseWithDebug|x64.ActiveCfg = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.ReleaseWithDebug|x64.Build.0 = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.ReleaseWithDebug|x86.ActiveCfg = Release|Any CPU
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996}.ReleaseWithDebug|x86.Build.0 = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Debug|x64.Build.0 = Debug|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Debug|x86.Build.0 = Debug|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Release|x64.ActiveCfg = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Release|x64.Build.0 = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Release|x86.ActiveCfg = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.Release|x86.Build.0 = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.ReleaseWithDebug|Any CPU.ActiveCfg = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.ReleaseWithDebug|Any CPU.Build.0 = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.ReleaseWithDebug|x64.ActiveCfg = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.ReleaseWithDebug|x64.Build.0 = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.ReleaseWithDebug|x86.ActiveCfg = Release|Any CPU
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99}.ReleaseWithDebug|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -400,6 +442,9 @@ Global
 		{DB62F88C-B897-424A-9328-A362F1F8F49D} = {C5724CE0-D4B9-4DE3-B6CB-04EBFBFAA7C5}
 		{DDF51677-9E81-4A39-A618-E38206196E4E} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{71839559-218F-4B74-9CAD-6A30E17DE489} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{45753242-8D34-4290-ADE2-5A9B6F4D6996} = {9290F94F-B0DB-4EE2-BCED-7E32E6D2740A}
+		{32EFD66D-1421-4E5F-82BE-28736BF59D7E} = {9290F94F-B0DB-4EE2-BCED-7E32E6D2740A}
+		{1F89755F-53C4-49ED-9F46-FBA22C6BFF99} = {32EFD66D-1421-4E5F-82BE-28736BF59D7E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {163DD1B0-7A37-4D0E-9F49-50703AE7E83C}

@@ -261,6 +261,32 @@ namespace Editor.Processors.Shaders
 
                                 break;
                             }
+                        case "global":
+                            {
+                                SearchForArguments(ref current, source, arguments);
+
+                                AttributeGlobal attribute = new AttributeGlobal { Name = null };
+                                foreach (var kvp in arguments)
+                                {
+                                    string key = kvp.Key;
+                                    switch (key)
+                                    {
+                                        case "Name":
+                                            {
+                                                attribute.Name = attribute.Name;
+                                                break;
+                                            }
+                                        default: throw new ArgumentException(key);
+                                    }
+                                }
+
+                                attribs.Enqueue(new Attrib
+                                {
+                                    Type = AttribType.Global,
+                                    Value = attribute
+                                });
+                                break;
+                            }
                         default: throw new Exception(identifierString);
                     }
 
@@ -293,9 +319,10 @@ namespace Editor.Processors.Shaders
                             current++;
                         }
 
-                        ShaderAttribute[] attribsArray = attribs.Count > 0 ? new ShaderAttribute[attribs.Count((x) => x.Type != AttribType.BindGroup)] : Array.Empty<ShaderAttribute>();
+                        ShaderAttribute[] attribsArray = attribs.Count > 0 ? new ShaderAttribute[attribs.Count((x) => x.Type != AttribType.BindGroup && x.Type != AttribType.Global)] : Array.Empty<ShaderAttribute>();
 
                         string bindGroup = "__Default";
+                        string? globalName = null;
 
                         int index = 0;
                         while (attribs.TryDequeue(out Attrib attrib))
@@ -306,6 +333,10 @@ namespace Editor.Processors.Shaders
                             if (attrib.Type == AttribType.BindGroup)
                             {
                                 bindGroup = ((AttributeBindGroup)attrib.Value).Group;
+                            }
+                            else if (attrib.Type == AttribType.Global)
+                            {
+                                globalName = ((AttributeGlobal)attrib.Value).Name ?? varName;
                             }
                             else
                             {
@@ -321,7 +352,8 @@ namespace Editor.Processors.Shaders
                             Signature = signature,
                             VariableName = varName,
                             Name = ReadIdentifier(ref current, source).ToString(),
-                            BindGroup = bindGroup,
+                            BindGroup = globalName != null ? "__Global" : bindGroup,
+                            IsGlobal = globalName != null,
                             Index = result.Variables.Count,
                             Attributes = attribsArray
                         });
@@ -1255,6 +1287,7 @@ namespace Editor.Processors.Shaders
                 case AttribType.IALayout: return false;
                 case AttribType.Property: return signature.ToString() == "Texture2D";
                 case AttribType.BindGroup: return true;
+                case AttribType.Global: return true;
             }
 
             return false;
@@ -1367,7 +1400,8 @@ namespace Editor.Processors.Shaders
             Constants,
             IALayout,
             Property,
-            BindGroup
+            BindGroup,
+            Global
         }
 
         private record struct AttribVertex
@@ -1405,10 +1439,19 @@ namespace Editor.Processors.Shaders
             public string Group;
         }
 
+        private record struct AttributeGlobal
+        {
+            public string? Name;
+        }
+
         private struct VarBindGroupComparer : IComparer<ShaderVariable>
         {
             public int Compare(ShaderVariable x, ShaderVariable y)
             {
+                int r = x.IsGlobal.CompareTo(y.IsGlobal);
+                if (r != 0)
+                    return r;
+
                 return string.Compare(x.Name, y.Name, StringComparison.InvariantCulture);
             }
         }

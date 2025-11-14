@@ -222,7 +222,7 @@ namespace Primary.Rendering2.Structures
 
         public void SetProperties(PropertyBlock block)
         {
-
+            
         }
 
         public void Upload<T>(FGBufferUploadDesc desc, Span<T> data) where T : unmanaged

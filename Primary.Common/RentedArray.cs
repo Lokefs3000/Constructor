@@ -34,13 +34,17 @@ namespace Primary.Common
 
         public IEnumerator<T> GetEnumerator()
         {
-            return new Enumerator(_array, _count, 0);
+            return new ArraySegment<T>(_array, 0, _count).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return GetEnumerator();
+            return new ArraySegment<T>(_array, 0, _count).GetEnumerator();
         }
+
+        public T[] ToArray() => _array.ToArray();
+        //TODO: cleanup and dont rely on external error testing
+        public T[] ToArray(int start, int length) => _array.AsSpan().Slice(start, length).ToArray();
         #endregion
 
         #region Indexers
@@ -68,43 +72,10 @@ namespace Primary.Common
 
         public ArrayPool<T> Pool => _pool;
         public int Count => _count;
-        public Span<T> Span => _array;
+        public Span<T> Span => _array.AsSpan(0, _count);
         public bool ClearOnReturn => _returnClear;
 
         public static RentedArray<T> Rent(int count, bool clearOnReturn = false) => new RentedArray<T>(count, clearOnReturn);
         public static RentedArray<T> Rent(int count, ArrayPool<T> pool, bool clearOnReturn = false) => new RentedArray<T>(count, pool, clearOnReturn);
-
-        private struct Enumerator : IEnumerator<T>
-        {
-            private readonly T[] _array;
-            private int _count;
-            private int _index;
-
-            public Enumerator(T[] array, int count, int index)
-            {
-                _array = array;
-                _count = count;
-                _index = index;
-            }
-
-            public void Dispose()
-            {
-                _count = 0;
-            }
-
-            public bool MoveNext()
-            {
-                _index++;
-                return _index >= _count;
-            }
-
-            public void Reset()
-            {
-                _index = 0;
-            }
-
-            public T Current => _array[_index];
-            object IEnumerator.Current => Current;
-        }
     }
 }

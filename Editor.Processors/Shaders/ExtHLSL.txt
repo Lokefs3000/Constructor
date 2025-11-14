@@ -1,7 +1,7 @@
-﻿-------- ATTRIBUTES --------
+-------- ATTRIBUTES --------
 
 Syntax:
-	[x?(x...)]
+	[x?(x...), ...?]
 	<expression>
 
 List:
@@ -33,8 +33,26 @@ List:
 			Format: The new format to use for the input element
 		Description: Change the data of an input element.
 
-	"[global(Name: string?)]"
+	"[bindgroup(Group: string)]"
 		Valid: StructuredBuffer<>, ConstantBuffer<>, Texture1..3D<>
 		Requires: None,
 		Arguments:
+			Group: Name of the bind group to associate this resource with
+		Description: Set a custom bind group to associate the resource with other then the default.
+
+	"[property(Name: string?, Default: PropertyDefault?)]"
+		Valid: Texture1..3D<>, TextureCube
+
+	"[display(Display: PropertyDisplay)]"
+		Valid: All property capable types
+		Requires: Propety type
+		Arguments:
+			Display: The display to use for this property
+		Description: Change the a certain property is displayed in the inspector.
+
+	"[global(Name: string?)]"
+		Valid: StructuredBuffer<>, ConstantBuffer<>, Texture1..3D<>, TextureCube
+		Requires: None,
+		Arguments:
 			Name: Global name to use instead of decleration name.
+		Description: Makes the variable bindable with globals instead of parameters.

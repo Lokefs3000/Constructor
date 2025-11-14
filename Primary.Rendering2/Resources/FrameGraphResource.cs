@@ -70,8 +70,12 @@ namespace Primary.Rendering2.Resources
         [UnscopedRef]
         internal ref readonly FrameGraphBufferDesc BufferDesc => ref _union.Buffer;
 
+        internal RHI.Resource? Resource => _resource;
+
         internal FGResourceId ResourceId => (FGResourceId)((int)_resourceId & 0b01111111);
         internal bool IsExternal => FlagUtility.HasFlag(_resourceId, FGResourceId.External);
+
+        internal bool IsValidAndRenderGraph => _resource == null && _index >= 0;
 
         public static readonly FrameGraphResource Invalid = new FrameGraphResource(-1, default(FrameGraphBufferDesc));
 

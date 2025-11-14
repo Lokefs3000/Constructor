@@ -152,6 +152,8 @@ namespace Primary.Rendering2.Assets
                 _properties[remap.IndexOrOffset] = texture.RawRHITexture == null ? default : new PropertyData(FrameGraphResource.Invalid, texture);
             }
         }
+
+        public ShaderAsset? Shader => _shader;
     }
 
     internal readonly record struct PropertyData(FrameGraphResource Resource, object? Aux = null);

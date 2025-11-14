@@ -1,20 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-	<Configurations>Debug;Release;ReleaseWithDebug</Configurations>
+    <Configurations>Debug;Release;ReleaseWithDebug</Configurations>
   </PropertyGroup>
-  
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
-	  <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
-	  <Optimize>True</Optimize>
-	</PropertyGroup>
-
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
+    <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+    <Optimize>True</Optimize>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Primary\Primary.csproj" />
   </ItemGroup>
-
 </Project>

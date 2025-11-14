@@ -1,20 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Collections.Pooled.V2" Version="2.2.2" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
     <ProjectReference Include="..\Primary.RHI\Primary.RHI.csproj" />
     <ProjectReference Include="..\Primary\Primary.csproj" />
   </ItemGroup>
-
 </Project>

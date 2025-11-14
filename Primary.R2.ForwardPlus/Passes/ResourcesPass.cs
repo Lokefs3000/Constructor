@@ -1,4 +1,5 @@
 ﻿using Primary.Rendering2;
+using Primary.Rendering2.Assets;
 using Primary.Rendering2.Batching;
 using Primary.Rendering2.Data;
 using Primary.Rendering2.Recording;
@@ -33,8 +34,11 @@ namespace Primary.R2.ForwardPlus.Passes
                     passData.RenderList = list;
                 }
 
-                desc.UseResource(FGResourceUsage.Write, passData.MatrixBuffer);
+                {
+                    ShaderGlobalsManager.SetGlobalBuffer("sbFP_RenderFlagBuffer", resources.MatrixBuffer);
+                }
 
+                desc.UseResource(FGResourceUsage.Write, passData.MatrixBuffer);
                 desc.SetRenderFunction<PassData>(ExecutePass);
             }
         }

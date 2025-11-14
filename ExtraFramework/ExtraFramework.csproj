@@ -8,9 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Hexa.NET.ImGui" Version="2.2.8.5" />
-    <PackageReference Include="Hexa.NET.ImGui.Backends" Version="1.0.17.4" />
-    <PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.17.4" />
+    <PackageReference Include="Hexa.NET.ImGui" Version="2.2.9" />
+    <PackageReference Include="Hexa.NET.ImGui.Backends" Version="1.0.18" />
+    <PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.18" />
     <PackageReference Include="ppy.SDL3-CS" Version="2025.920.0" />
   </ItemGroup>
 

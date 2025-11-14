@@ -1,4 +1,5 @@
 ﻿using Primary.Profiling;
+using Primary.Rendering2.Assets;
 using Primary.Rendering2.Batching;
 using Primary.Rendering2.Data;
 using Primary.Rendering2.Debuggable;
@@ -14,6 +15,7 @@ namespace Primary.Rendering2
         private RenderContextContainer _contextContainer;
         private RenderPassManager _renderPassManager;
         private BatchingManager _batchingManager;
+        private ShaderGlobalsManager _globalsManager;
 
         private IRenderPath? _currentPath;
 
@@ -24,6 +26,7 @@ namespace Primary.Rendering2
             _contextContainer = new RenderContextContainer();
             _renderPassManager = new RenderPassManager();
             _batchingManager = new BatchingManager();
+            _globalsManager = new ShaderGlobalsManager();
 
             _currentPath = null;
         }
@@ -59,6 +62,8 @@ namespace Primary.Rendering2
                         }
                     }
                 }
+
+                _globalsManager.CleanupTransitional();
             }
         }
 

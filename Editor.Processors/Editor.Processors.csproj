@@ -1,30 +1,25 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Configurations>Debug;Release;ReleaseWithDebug</Configurations>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.0" />
-    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.9.0" />
+    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.9.1" />
     <PackageReference Include="Silk.NET.Assimp" Version="2.22.0" />
-    <PackageReference Include="System.Text.Json" Version="9.0.10" />
     <PackageReference Include="Tomlyn" Version="0.19.0" />
     <PackageReference Include="Vortice.Direct3D12" Version="3.6.2" />
     <PackageReference Include="Vortice.Dxc" Version="3.6.2" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\Editor.Interop\Editor.Interop.csproj" />
     <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
     <ProjectReference Include="..\Primary.RHI\Primary.RHI.csproj" />
     <ProjectReference Include="..\Primary\Primary.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <None Update="runtimes\win-x64\native\dxcompiler.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -33,5 +28,4 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
 </Project>

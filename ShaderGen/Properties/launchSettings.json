@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ShaderGen": {
+      "commandName": "Project",
+      "commandLineArgs": "-i D:\\source\\repos\\Constructor\\Source\\DemoGame1\\Content\\Demo.hlsl -o abc -I D:\\source\\repos\\Constructor\\Source"
+    }
+  }
+}

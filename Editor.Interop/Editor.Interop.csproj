@@ -1,23 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-	<Configurations>Debug;Release;ReleaseWithDebug</Configurations>
+    <Configurations>Debug;Release;ReleaseWithDebug</Configurations>
   </PropertyGroup>
-  
-  	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
-	  <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
-	  <Optimize>True</Optimize>
-	</PropertyGroup>
-
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
+    <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+    <Optimize>True</Optimize>
+  </PropertyGroup>
   <ItemGroup>
     <Folder Include="Compressonator\" />
     <Folder Include="NVTT\" />
   </ItemGroup>
-
   <ItemGroup>
     <None Update="runtimes\win-x64\native\Compressonator_MT_DLL.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -29,5 +25,4 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
 </Project>
