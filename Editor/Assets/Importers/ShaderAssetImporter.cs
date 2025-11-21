@@ -45,6 +45,11 @@ namespace Editor.Assets.Importers
                 pipeline.Associator.ClearAssocations(id);
 
             TomlTable root = Toml.ToModel<TomlTable>(File.ReadAllText(tomlFile));
+            if (root.TryGetValue("use_new_shader_pipeline", out object? val) && val is bool useNewShaderPipeline && useNewShaderPipeline)
+            {
+                return false;
+            }
+
             ShaderProcessorArgs args = new ShaderProcessorArgs
             {
                 AbsoluteFilepath = fullFilePath,

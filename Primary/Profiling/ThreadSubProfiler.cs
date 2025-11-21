@@ -44,9 +44,9 @@ namespace Primary.Profiling
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [StackTraceHidden]
-        public void BeginProfiling(ref string name, int hash)
+        public void BeginProfiling(ref string name, int hash, long timestamp)
         {
-            _scopes.Push(new ThreadProfilingScope(name, ProfilingManager.IncludeStacktrace ? GetStacktrace() : null, hash, _profiler.TimestampFromStart));
+            _scopes.Push(new ThreadProfilingScope(name, ProfilingManager.IncludeStacktrace ? GetStacktrace() : null, hash, timestamp));
         }
 
         public void EndProfiling(int hash)
@@ -92,45 +92,6 @@ namespace Primary.Profiling
         }
     }
 
-    internal readonly record struct ThreadProfilingScope
-    {
-        public readonly string Name;
-        public readonly string? Stacktrace;
-        public readonly long Hash;
-
-        public readonly long StartTimestamp;
-
-        public ThreadProfilingScope(string name, string? stacktrace, long hash, long startTimestamp)
-        {
-            Name = name;
-            Stacktrace = stacktrace;
-            Hash = hash;
-
-            StartTimestamp = startTimestamp;
-        }
-    }
-
-    public readonly record struct ProfilingTimestamp
-    {
-        public readonly string Name;
-        public readonly string? Stacktrace;
-
-        public readonly long ParentHash;
-        public readonly int Depth;
-
-        public readonly long StartTimestamp;
-        public readonly long EndTimestamp;
-
-        public ProfilingTimestamp(string name, string? stacktrace, long parentHash, int depth, long startTimestamp, long endTimestamp)
-        {
-            Name = name;
-            Stacktrace = stacktrace;
-
-            ParentHash = parentHash;
-            Depth = depth;
-
-            StartTimestamp = startTimestamp;
-            EndTimestamp = endTimestamp;
-        }
-    }
+    internal readonly record struct ThreadProfilingScope(string Name, string? Stacktrace, long Hash, long StartTimestamp);
+    public readonly record struct ProfilingTimestamp(string Name, string? Stacktrace, long ParentHash, int Depth, long StartTimestamp, long EndTimestamp);
 }

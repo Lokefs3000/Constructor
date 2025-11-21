@@ -73,11 +73,11 @@ struct sbShadowCubemap
     uint Indices[6];
 };
 
-static const float4x4 s_BiasMatrix = float4x4(
-            0.5, 0.0, 0.0, 0.0,
-            0.0, 0.5, 0.0, 0.0,
-            0.0, 0.0, 0.5, 0.0,
-            0.5, 0.5, 0.5, 1.0);
+//static const float4x4 s_BiasMatrix = float4x4(
+//            0.5, 0.0, 0.0, 0.0,
+//            0.0, 0.5, 0.0, 0.0,
+//            0.0, 0.0, 0.5, 0.0,
+//            0.5, 0.5, 0.5, 1.0);
 
 [bindgroup(Group = __CURR_BINDGROUP)]
 ConstantBuffer<cbDirectionalLight> cbDirectional : register(b7);
@@ -142,7 +142,7 @@ float3 fresnelSchlick(float cosTheta, float3 F0)
 
 float3 ImportanceSampleGGX(float2 Xi, float roughness, float N)
 {
-    
+    return 0.0;
 }
 
 float CalculatePointShadowIntensity(sbRawLight lightData, float3 normal, float3 lightDir, float3 lightPos, float3 pos)

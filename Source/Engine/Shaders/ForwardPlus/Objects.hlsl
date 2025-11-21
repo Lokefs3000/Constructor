@@ -1,6 +1,8 @@
 #ifndef FP_OBJECTS_HLSL
 #define FP_OBJECTS_HLSL
 
+#pragma property_source "baFP_RawDataBuffer.Load<$GENERIC$>(GetRenderFlag($SV_INSTANCEID$).DataId)"
+
 #include "Globals.hlsl"
 
 struct sbRenderFlag
@@ -11,6 +13,9 @@ struct sbRenderFlag
 
 [global]
 StructuredBuffer<sbRenderFlag> sbFP_RenderFlagBuffer;
+
+[global]
+ByteAddressBuffer baFP_RawDataBuffer;
 
 sbRenderFlag GetRenderFlag(uint index)
 {

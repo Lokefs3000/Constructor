@@ -33,6 +33,7 @@ namespace Editor.Shaders
             new AttributeBindGroup(),
             new AttributeProperty(),
             new AttributeDisplay(),
-            new AttributeGlobal());
+            new AttributeGlobal(),
+            new AttributeSampled());
     }
 }

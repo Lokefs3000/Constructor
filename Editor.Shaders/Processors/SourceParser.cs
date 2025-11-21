@@ -19,6 +19,8 @@ namespace Editor.Shaders.Processors
     {
         private readonly ShaderProcessor _processor;
 
+        private bool _encounteredErrors;
+
         private ReadOnlySpan<char> _source;
 
         private int _line;
@@ -34,10 +36,13 @@ namespace Editor.Shaders.Processors
         private Queue<AttributeData> _attributes;
 
         private HashSet<Type> _signatureReqSet;
+        private HashSet<int> _propertySet;
 
         internal SourceParser(ShaderProcessor processor, ReadOnlySpan<char> source, string sourceFile)
         {
             _processor = processor;
+
+            _encounteredErrors = false;
 
             _source = source;
 
@@ -54,9 +59,10 @@ namespace Editor.Shaders.Processors
             _attributes = new Queue<AttributeData>();
 
             _signatureReqSet = new HashSet<Type>();
+            _propertySet = new HashSet<int>();
         }
 
-        internal void Parse()
+        internal bool Parse()
         {
             while (_index < _source.Length)
             {
@@ -81,6 +87,8 @@ namespace Editor.Shaders.Processors
 
                 _start = _index;
             }
+
+            return !_encounteredErrors;
         }
 
         private void ParseIdentifier()
@@ -121,13 +129,15 @@ namespace Editor.Shaders.Processors
 
             ReadOnlySpan<char> name = ReadGeneralIdentifier();
 
-            intent = DecodeIdentifierIntent(identifier, name);
+            if (intent == IdentifierIntent.Unknown)
+                intent = DecodeIdentifierIntent(absoluteStart, identifier, name);
             switch (intent)
             {
                 case IdentifierIntent.Function: ParseFunction(name); break;
-                case IdentifierIntent.Resource: ParseResource(identifier, name, signatureRange); break;
+                case IdentifierIntent.Resource: ParseResource(identifier, name, signatureRange, absoluteStart); break;
                 case IdentifierIntent.Property: ParseProperty(identifier, name, absoluteStart); break;
                 case IdentifierIntent.Struct: ParseStruct(name, absoluteStart); break;
+                case IdentifierIntent.StaticSampler: ParseStaticSampler(absoluteStart); break;
                 default:
                     {
                         _index = backup;
@@ -144,6 +154,54 @@ namespace Editor.Shaders.Processors
             if (attributes.Length > 0)
             {
                 ValidateAttributes(attributes, AttributeUsage.Function);
+            }
+
+            using RentedArray<VariableData> variables = RentedArray<VariableData>.Rent(64, true);
+            int totalVars = 0;
+
+            SkipUntil('(');
+            Advance();
+
+            ValueDataRef dataRef = ValueDataRef.Unspecified;
+            while (Peek() != ')')
+            {
+                _start = _index;
+
+                char c = Advance();
+                if (char.IsLetter(c) || c == '_')
+                {
+                    ReadOnlySpan<char> identifier = ReadGeneralIdentifier();
+
+                    if (dataRef.IsSpecified)
+                    {
+                        VarSemantic? semantic = null;
+                        if (FindAfterWhitespace(':', _index))
+                        {
+                            while (!char.IsLetter(Advance())) ;
+
+                            _start = _index - 1;
+                            ReadOnlySpan<char> semanticName = ReadGeneralIdentifier();
+
+                            semantic = AttemptDecodeSemantic(semanticName);
+                        }
+
+                        if (totalVars >= variables.Count)
+                        {
+                            ReportErrorMessage("Too many arguments in function call!");
+                            return;
+                        }
+
+                        variables[totalVars++] = new VariableData(identifier.ToString(), Array.Empty<AttributeData>(), dataRef, semantic);
+                    }
+                    else
+                    {
+                        dataRef = DecodeValueDataRefFromType(identifier);
+                    }
+                }
+                else if (c == ',')
+                {
+                    dataRef = ValueDataRef.Unspecified;
+                }
             }
 
             SkipUntil('{');
@@ -163,10 +221,10 @@ namespace Editor.Shaders.Processors
                     depth--;
             }
 
-            _processor.AddFunction(new FunctionData(name.ToString(), attributes, new Range(start, _index)));
+            _processor.AddFunction(new FunctionData(name.ToString(), attributes, totalVars > 0 ? variables.ToArray(0, totalVars) : Array.Empty<VariableData>(), new IndexRange(start, _index)));
         }
 
-        private void ParseResource(ReadOnlySpan<char> identifier, ReadOnlySpan<char> name, Range signatureRange)
+        private void ParseResource(ReadOnlySpan<char> identifier, ReadOnlySpan<char> name, Range signatureRange, int absoluteStart)
         {
             AttributeData[] attributes = _attributes.Count > 0 ? _attributes.ToArray() : Array.Empty<AttributeData>();
             _attributes.Clear();
@@ -186,7 +244,9 @@ namespace Editor.Shaders.Processors
                     ResourceType.Texture3D => AttributeUsage.Texture3D,
                     ResourceType.TextureCube => AttributeUsage.TextureCube,
                     ResourceType.ConstantBuffer => AttributeUsage.ConstantBuffer,
-                    ResourceType.StructedBuffer => AttributeUsage.StructuredBuffer,
+                    ResourceType.StructuredBuffer => AttributeUsage.StructuredBuffer,
+                    ResourceType.ByteAddressBuffer => AttributeUsage.ByteAddressBuffer,
+                    ResourceType.SamplerState => AttributeUsage.SamplerState,
                     _ => throw new NotSupportedException()
                 });
             }
@@ -206,8 +266,17 @@ namespace Editor.Shaders.Processors
                     valueRef = DecodeValueDataRefFromType(valueType);
                 }
             }
+            else
+            {
+                signatureRange = new Range(absoluteStart, _index);
+            }
 
-            _processor.AddResource(new ResourceData(name.ToString(), type, valueRef, attributes, new Range(signatureRange.Start, _index)));
+            if (FindAfterWhitespace(':', _index))
+            {
+                SkipUntil(';');
+            }
+
+            _processor.AddResource(new ResourceData(name.ToString(), type, valueRef, attributes, new IndexRange(signatureRange.Start.Value, _index)));
         }
 
         private void ParseProperty(ReadOnlySpan<char> identifier, ReadOnlySpan<char> name, int absoluteStart)
@@ -224,7 +293,7 @@ namespace Editor.Shaders.Processors
             if (variable == ValueDataRef.Unspecified)
                 return;
 
-            _processor.AddProperty(new PropertyData(name.ToString(), variable, attributes, new Range(absoluteStart, _index)));
+            _processor.AddProperty(new PropertyData(name.ToString(), variable, attributes, new IndexRange(absoluteStart, _index)));
         }
 
         private void ParseStruct(ReadOnlySpan<char> name, int absoluteStart)
@@ -300,11 +369,177 @@ namespace Editor.Shaders.Processors
             } while (Peek() != '}');
 
             _processor.AddNewValueRef(name.GetDjb2HashCode());
-            _processor.AddStruct(new StructData(name.ToString(), Array.Empty<AttributeData>(), totalVars > 0 ? tempArray.ToArray(0, totalVars) : Array.Empty<VariableData>(), new Range(absoluteStart, _index)));
+            _processor.AddStruct(new StructData(name.ToString(), Array.Empty<AttributeData>(), totalVars > 0 ? tempArray.ToArray(0, totalVars) : Array.Empty<VariableData>(), new IndexRange(absoluteStart, _index + 1)));
+        }
+
+        private void ParseStaticSampler(int absoluteStart)
+        {
+            AttributeData[] attributes = _attributes.Count > 0 ? _attributes.ToArray() : Array.Empty<AttributeData>();
+            _attributes.Clear();
+
+            if (attributes.Length > 0)
+            {
+                ValidateAttributes(attributes, AttributeUsage.StaticSampler);
+            }
+
+            SkipWhitespace();
+
+            _start = _index;
+            ReadOnlySpan<char> name = ReadGeneralIdentifier();
+
+            SamplerTempData tempData = new SamplerTempData();
+
+            if (FindAfterWhitespace(':', _index))
+            {
+                SkipUntilNextLetter();
+
+                _start = _index;
+                ReadOnlySpan<char> preset = ReadGeneralIdentifier();
+                int djb2 = preset.GetDjb2HashCode();
+
+                if (!s_presetSamplerStates.TryGetValue(djb2, out tempData))
+                {
+                    ReportErrorMessage("Unknown static sampler preset: {pr}", preset.ToString());
+                    return;
+                }
+            }
+
+            if (FindAfterWhitespace('{', _index))
+            {
+                SkipUntilNextLetter();
+
+                _propertySet.Clear();
+                while (Peek() != '}')
+                {
+                    _start = _index;
+                    ReadOnlySpan<char> propName = ReadGeneralIdentifier();
+
+                    int djb2 = propName.GetDjb2HashCode();
+                    if (_propertySet.Contains(djb2))
+                    {
+                        ReportErrorMessage("Sampler property already defined: {p}", propName.ToString());
+                        return;
+                    }
+
+                    if (!FindAfterWhitespace('=', _index))
+                    {
+                        ReportErrorMessage("Expected assignment operator after property name: {p}", propName.ToString());
+                        return;
+                    }
+
+                    SkipUntilNextLetter();
+
+                    if (djb2 == s_samplerFilterName)
+                    {
+                        if (Peek() != '"' || Peek() != '\'')
+                        {
+                            ReportErrorMessage("Expected string for enum value");
+                            return;
+                        }
+
+                    _start = _index;
+                        ReadOnlySpan<char> value = ReadString(Peek());
+                        if (Enum.TryParse(value, false, out SamplerFilter filter))
+                            tempData.Filter = filter;
+                        else
+                        {
+                            ReportErrorMessage("Failed to parse sampler filter value: {v}", value.ToString());
+                            return;
+                        }
+                    }
+                    else if (djb2 == s_samplerAddressUName || djb2 == s_samplerAddressVName || djb2 == s_samplerAddressWName)
+                    {
+                        if (Peek() != '"' || Peek() != '\'')
+                        {
+                            ReportErrorMessage("Expected string for enum value");
+                            return;
+                        }
+
+                    _start = _index;
+                        ReadOnlySpan<char> value = ReadString(Peek());
+                        if (Enum.TryParse(value, false, out SamplerAddressMode addressMode))
+                        {
+                            if (djb2 == s_samplerAddressUName)
+                                tempData.AddressModeU = addressMode;
+                            else if (djb2 == s_samplerAddressUName)
+                                tempData.AddressModeV = addressMode;
+                            else
+                                tempData.AddressModeW = addressMode;
+                        }
+                        else
+                        {
+                            ReportErrorMessage("Failed to parse sampler address mode value: {v}", value.ToString());
+                            return;
+                        }
+                    }
+                    else if (djb2 == s_samplerMaxAnisotropyName)
+                    {
+                        if (!char.IsDigit(Peek()))
+                        {
+                            ReportErrorMessage("Expected digit for number value");
+                            return;
+                        }
+
+                    _start = _index;
+                        ReadOnlySpan<char> value = ReadNumber(false);
+                        if (uint.TryParse(value, CultureInfo.InvariantCulture, out uint result))
+                            tempData.MaxAnisotropy = result;
+                        else
+                        {
+                            ReportErrorMessage("Failed to parse max anisotropy value: {v}", value.ToString());
+                        }
+                    }
+                    else if (djb2 == s_samplerMipLODBiasName || djb2 == s_samplerMinLODName || djb2 == s_samplerMaxLODName)
+                    {
+                        if (!char.IsDigit(Peek()))
+                        {
+                            ReportErrorMessage("Expected digit for number value");
+                            return;
+                        }
+
+                    _start = _index;
+                        ReadOnlySpan<char> value = ReadNumber(true);
+                        if (float.TryParse(value, CultureInfo.InvariantCulture, out float result))
+                        {
+                            if (djb2 == s_samplerMipLODBiasName)
+                                tempData.MipLODBias = result;
+                            else if (djb2 == s_samplerMinLODName)
+                                tempData.MinLOD = result;
+                            else
+                                tempData.MaxLOD = result;
+                        }
+                        else
+                        {
+                            ReportErrorMessage(djb2 == s_samplerMipLODBiasName ? "Failed to parse mip lod bias value: {v}" : (djb2 == s_samplerMaxLODName ? "Failed to parse max lod value: {v}" : "Failed to parse min lod value: {v}"), value.ToString());
+                        }
+                    }
+                    else if (djb2 == s_samplerBorderName)
+                    {
+                        if (Peek() != '"' || Peek() != '\'')
+                        {
+                            ReportErrorMessage("Expected string for enum value");
+                            return;
+                        }
+
+                    _start = _index;
+                        ReadOnlySpan<char> value = ReadString(Peek());
+                        if (Enum.TryParse(value, false, out SamplerBorder filter))
+                            tempData.Border = filter;
+                        else
+                        {
+                            ReportErrorMessage("Failed to parse sampler border value: {v}", value.ToString());
+                            return;
+                        }
+                    }
+                }
+            }
+
+            _processor.AddStaticSampler(new StaticSamplerData(name.ToString(), attributes, tempData.Filter, tempData.AddressModeU, tempData.AddressModeV, tempData.AddressModeW, tempData.MaxAnisotropy, tempData.MipLODBias, tempData.MinLOD, tempData.MaxLOD, tempData.Border, new IndexRange(absoluteStart, _index)));
         }
 
         private void ParseAttribute()
         {
+            int absoluteStart = _index - 1;
             _start = _index;
 
             ReadOnlySpan<char> attributeName = ReadGeneralIdentifier();
@@ -367,6 +602,7 @@ namespace Editor.Shaders.Processors
 
                 int argumentIndex = 0;
                 bool isExpectingSeparator = false;
+                bool hasChangedArgIndex = false;
 
                 while (Peek() != ')')
                 {
@@ -390,6 +626,30 @@ namespace Editor.Shaders.Processors
                             }
 
                             isExpectingSeparator = false;
+
+                            if (!hasChangedArgIndex)
+                            {
+                                if (argumentIndex < signature.Signature.Length)
+                                {
+                                    while (true)
+                                    {
+                                        argumentIndex++;
+
+                                        if (argumentIndex >= signature.Signature.Length)
+                                        {
+                                            argumentIndex = -1;
+                                            break;
+                                        }
+
+                                        if (((1ul << argumentIndex) & bitMask) == 0)
+                                        {
+                                            break;
+                                        }
+                                    }
+                                }
+                                else
+                                    argumentIndex = -1;
+                            }
                         }
                     }
                     else
@@ -425,13 +685,14 @@ namespace Editor.Shaders.Processors
                                     ReportErrorMessage("Attribute argument {n} ({idx}) already provided", findString, findIndex);
                                     return;
                                 }
-                                if (FindAfterWhitespace('=', _index))
+                                if (!FindAfterWhitespace('=', _index))
                                 {
                                     ReportErrorMessage("Expected value after attribute argument name: {n}", findString);
                                     return;
                                 }
 
                                 argumentIndex = findIndex;
+                                hasChangedArgIndex = false;
                             }
                         }
                         else
@@ -441,7 +702,7 @@ namespace Editor.Shaders.Processors
                                 ref AttributeVariable varData = ref signature.Signature[argumentIndex];
                                 bool isNullable = varData.Type == typeof(Nullable<>);
 
-                                if (_numericalConverters.TryGetValue(varData.Type, out Func<ReadOnlySpan<char>, object?>? method))
+                                if (s_numericalConverters.TryGetValue(varData.Type, out Func<ReadOnlySpan<char>, object?>? method))
                                 {
                                     bool isNull = false;
                                     if (varData.Type.IsAssignableTo(typeof(IFloatingPoint<>)))
@@ -538,29 +799,10 @@ namespace Editor.Shaders.Processors
                         }
                     }
 
-                    if (argumentIndex < signature.Signature.Length)
-                    {
-                        while (true)
-                        {
-                            argumentIndex++;
-
-                            if (argumentIndex >= signature.Signature.Length)
-                            {
-                                argumentIndex = -1;
-                                break;
-                            }
-
-                            if (((1ul << argumentIndex) & bitMask) == 0)
-                            {
-                                break;
-                            }
-                        }
-                    }
-                    else
-                        argumentIndex = -1;
+                    hasChangedArgIndex = false;
                 }
 
-                varDatas = tempArray.ToArray();
+                varDatas = tempArray.ToArray(0, signature.Signature.Length);
             }
 
             SkipUntil(']');
@@ -588,7 +830,7 @@ namespace Editor.Shaders.Processors
                 }
             }
 
-            _attributes.Enqueue(new AttributeData(signature, varDatas));
+            _attributes.Enqueue(new AttributeData(signature, varDatas, new IndexRange(absoluteStart, _index + 1)));
         }
 
         private void ParsePreprocessor()
@@ -619,6 +861,22 @@ namespace Editor.Shaders.Processors
                     _diagLine = line;
                     _diagIndex = 0;
                     _diagStart = 0;
+                }
+            }
+            else if (directive.Equals("pragma", StringComparison.Ordinal))
+            {
+                SkipWhitespace();
+
+                _start = _index;
+                ReadOnlySpan<char> pragma = ReadGeneralIdentifier();
+                if (pragma.Equals("property_source", StringComparison.Ordinal))
+                {
+                    SkipWhitespace();
+
+                    _start = _index;
+                    ReadOnlySpan<char> sourceString = ReadString(Advance());
+
+                    _processor.PropertySourceTemplate = sourceString.ToString();
                 }
             }
         }
@@ -726,6 +984,14 @@ namespace Editor.Shaders.Processors
             }
         }
 
+        private void SkipUntilNextLetter()
+        {
+            while (!char.IsLetter(Peek()))
+            {
+                Advance();
+            }
+        }
+
         private void SkipUntil(char c)
         {
             while (!IsEOF && Peek() != c)
@@ -735,11 +1001,15 @@ namespace Editor.Shaders.Processors
             }
         }
 
-        private IdentifierIntent DecodeIdentifierIntent(ReadOnlySpan<char> signature, ReadOnlySpan<char> name)
+        private IdentifierIntent DecodeIdentifierIntent(int absoluteStart, ReadOnlySpan<char> signature, ReadOnlySpan<char> name)
         {
             if (signature.Equals("struct", StringComparison.Ordinal))
             {
                 return IdentifierIntent.Struct;
+            }
+            else if (signature.Equals("static", StringComparison.Ordinal) && name.Equals("SamplerState", StringComparison.Ordinal))
+            {
+                return IdentifierIntent.StaticSampler;
             }
             else if (FindAfterWhitespace('(') && Find(')'))
             {
@@ -926,7 +1196,9 @@ namespace Editor.Shaders.Processors
             "Texture3D".GetDjb2HashCode(),
             "TextureCube".GetDjb2HashCode(),
             "ConstantBuffer".GetDjb2HashCode(),
-            "StructuredBuffer".GetDjb2HashCode()
+            "StructuredBuffer".GetDjb2HashCode(),
+            "ByteAddressBuffer".GetDjb2HashCode(),
+            "SamplerState".GetDjb2HashCode()
             ];
 
         private static readonly int[] s_primitiveNameList = [
@@ -949,9 +1221,12 @@ namespace Editor.Shaders.Processors
             "psize".GetDjb2HashCode(),
             "fog".GetDjb2HashCode(),
             "tessfactor".GetDjb2HashCode(),
+            "sv_instanceid".GetDjb2HashCode(),
+            "sv_vertexid".GetDjb2HashCode(),
+            "sv_position".GetDjb2HashCode()
             ];
 
-        private static readonly FrozenDictionary<Type, Func<ReadOnlySpan<char>, object?>> _numericalConverters = new Dictionary<Type, Func<ReadOnlySpan<char>, object?>>
+        private static readonly FrozenDictionary<Type, Func<ReadOnlySpan<char>, object?>> s_numericalConverters = new Dictionary<Type, Func<ReadOnlySpan<char>, object?>>
         {
             { typeof(float), (x) => { if (float.TryParse(x, CultureInfo.InvariantCulture, out var v)) return v; return null; } },
             { typeof(double), (x) => { if (double.TryParse(x, CultureInfo.InvariantCulture, out var v)) return v; return null; } },
@@ -975,6 +1250,22 @@ namespace Editor.Shaders.Processors
             { typeof(byte?), (x) => { if (byte.TryParse(x, CultureInfo.InvariantCulture, out var v)) return v; return null; } },
             { typeof(sbyte?), (x) => { if (sbyte.TryParse(x, CultureInfo.InvariantCulture, out var v)) return v; return null; } },
         }.ToFrozenDictionary();
+
+        private static readonly FrozenDictionary<int, SamplerTempData> s_presetSamplerStates = new Dictionary<int, SamplerTempData>
+        {
+            { "defaultLinear".GetDjb2HashCode(), new SamplerTempData() },
+            { "defaultPoint".GetDjb2HashCode(), new SamplerTempData(SamplerFilter.Point) },
+        }.ToFrozenDictionary();
+
+        private static readonly int s_samplerFilterName = "Filter".GetDjb2HashCode();
+        private static readonly int s_samplerAddressUName = "AddressU".GetDjb2HashCode();
+        private static readonly int s_samplerAddressVName = "AddressV".GetDjb2HashCode();
+        private static readonly int s_samplerAddressWName = "AddressW".GetDjb2HashCode();
+        private static readonly int s_samplerMaxAnisotropyName = "MaxAnisotropy".GetDjb2HashCode();
+        private static readonly int s_samplerMipLODBiasName = "MipLODBias".GetDjb2HashCode();
+        private static readonly int s_samplerMinLODName = "MinLOD".GetDjb2HashCode();
+        private static readonly int s_samplerMaxLODName = "MaxLOD".GetDjb2HashCode();
+        private static readonly int s_samplerBorderName = "Border".GetDjb2HashCode();
 
         private ref struct IndexBackupStorage(ref SourceParser Parser, int Start, int Index, int Line, int DiagStart, int DiagIndex, int DiagLine) : IDisposable
         {
@@ -1006,6 +1297,17 @@ namespace Editor.Shaders.Processors
             }
         }
 
+        private record struct SamplerTempData(
+            SamplerFilter Filter = SamplerFilter.Linear,
+            SamplerAddressMode AddressModeU = SamplerAddressMode.Repeat,
+            SamplerAddressMode AddressModeV = SamplerAddressMode.Repeat,
+            SamplerAddressMode AddressModeW = SamplerAddressMode.Repeat,
+            uint MaxAnisotropy = 1,
+            float MipLODBias = 2.0f,
+            float MinLOD = 0.0f,
+            float MaxLOD = float.MaxValue,
+            SamplerBorder Border = SamplerBorder.TransparentBlack);
+
         private enum IdentifierIntent : byte
         {
             Unknown = 0,
@@ -1013,6 +1315,7 @@ namespace Editor.Shaders.Processors
             Resource,
             Property,
             Struct,
+            StaticSampler
         }
 
         private enum PrimitiveTypes : byte

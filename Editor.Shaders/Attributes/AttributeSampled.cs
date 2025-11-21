@@ -1,0 +1,21 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace Editor.Shaders.Attributes
+{
+    public sealed class AttributeSampled : AttributeSignature
+    {
+        public AttributeSampled() : base(
+            "sampled",
+            AttributeUsage.GenericTexture,
+            Array.Empty<AttributeRelation>(),
+            s_variables)
+        {
+        }
+
+        private static readonly AttributeVariable[] s_variables = [
+            new AttributeVariable("Sampler", typeof(string), null, AttributeFlags.None),
+            ];
+    }
+}

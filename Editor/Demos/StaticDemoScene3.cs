@@ -41,6 +41,15 @@ namespace Editor.Demos
                 light.Brightness = 1.25f;
             }
 
+            {
+                SceneEntity cam = scene.CreateEntity(SceneEntity.Null);
+                
+                ref Camera camera = ref cam.AddComponent<Camera>();
+                ref Transform transform = ref cam.AddComponent<Transform>();
+
+                transform.Position = new Vector3(0.0f, 0.0f, -10.0f);
+            }
+
             const int Size = 5;
             const float Spacing = 5.0f;
 

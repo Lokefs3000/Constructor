@@ -27,7 +27,9 @@ namespace Editor.Shaders
         Texture3D,
         TextureCube,
         ConstantBuffer,
-        StructedBuffer
+        StructuredBuffer,
+        ByteAddressBuffer,
+        SamplerState
     }
 
     public enum ValueGeneric : byte
@@ -54,5 +56,8 @@ namespace Editor.Shaders
         PSize,
         Fog,
         TessFactor,
+        SV_InstanceId,
+        SV_VertexId,
+        SV_Position
     }
 }

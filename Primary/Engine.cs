@@ -40,16 +40,8 @@ namespace Primary
 
         protected void Initialize(IAssetIdProvider assetIdProvider)
         {
-            Log.Logger = new LoggerConfiguration()
-                .WriteTo.Console()
-#if DEBUG
-                .MinimumLevel.Debug()
-#else
-                .MinimumLevel.Information()
-#endif
-                .CreateLogger();
-
             Thread.CurrentThread.Name = "Main";
+            SystemHelper.EnsureFeaturesPresent();
 
             SDL.SDL3.SDL_Init(SDL.SDL_InitFlags.SDL_INIT_VIDEO | SDL.SDL_InitFlags.SDL_INIT_EVENTS);
 

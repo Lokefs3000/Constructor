@@ -54,6 +54,7 @@ namespace Editor
         private DynamicAtlasManager _guiAtlasManager;
 
         private ProfilerView _profilerView;
+        private ProfilerView2 _profilerView2;
         private HierchyView _hierchyView;
         private PropertiesView _propertiesView;
         private RenderingView _renderingView;
@@ -125,6 +126,7 @@ namespace Editor
             _guiAtlasManager = new DynamicAtlasManager();
 
             _profilerView = new ProfilerView();
+            _profilerView2 = new ProfilerView2();
             _hierchyView = new HierchyView();
             _propertiesView = new PropertiesView();
             _renderingView = new RenderingView();
@@ -266,6 +268,7 @@ namespace Editor
                 }
 
                 _profilerView.Render();
+                _profilerView2.Render();
                 _hierchyView.Render();
                 _propertiesView.Render();
                         //_renderingView.Render();

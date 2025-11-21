@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Primary.Rendering2.Assets
 {
-    internal readonly record struct ShaderProperty(string Name, ShaderPropertyVisiblity Visiblity, ShaderPropertyType Type, ShaderPropertyDefault Default, ShaderPropertyStages Stages);
+    internal readonly record struct ShaderProperty(string Name, int Index, ShaderPropertyVisiblity Visiblity, ShaderPropertyType Type, ShaderPropertyDefault Default, ShaderPropertyStages Stages);
 
     internal enum ShaderPropertyType : byte
     {

@@ -1,9 +1,11 @@
-﻿using Primary.Assets;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets;
 using Primary.Rendering2.Resources;
 using Primary.RHI;
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -57,6 +59,13 @@ namespace Primary.Rendering2.Assets
         {
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
+        }
+
+        /// <summary>Not thread-safe</summary>
+        internal ref readonly PropertyData GetPropertyValue(int index)
+        {
+            Debug.Assert(index >= 0 && index < _properties.Length);
+            return ref _properties.DangerousGetReferenceAt(index);
         }
 
         /// <summary>Not thread-safe</summary>

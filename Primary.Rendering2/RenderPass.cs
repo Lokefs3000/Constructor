@@ -1,4 +1,6 @@
-﻿using Primary.Rendering2.Resources;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Rendering2.Pass;
+using Primary.Rendering2.Resources;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +16,9 @@ namespace Primary.Rendering2
         private RenderPassBlackboard _blackboard;
 
         private Dictionary<Type, IPassData> _passDataPool;
+        private List<RenderPassDescription> _passes;
+
+        private int _resourceCounter;
 
         internal RenderPass()
         {
@@ -21,11 +26,16 @@ namespace Primary.Rendering2
             _blackboard = new RenderPassBlackboard();
 
             _passDataPool = new Dictionary<Type, IPassData>();
+            _passes = new List<RenderPassDescription>();
         }
+
+        internal int GetNewResourceIndex() => _resourceCounter++;
 
         internal void ClearInternals()
         {
+            _passes.Clear();
 
+            _resourceCounter = 0;
         }
 
         public RasterPassDescription SetupRasterPass<T>(string name, out T data) where T : class, IPassData, new()
@@ -43,8 +53,12 @@ namespace Primary.Rendering2
             return desc;
         }
 
+        internal void AddNewRenderPass(RenderPassDescription desc) => _passes.Add(desc);
+
         internal void ReportError(RPErrorSource source, RPErrorType type) => _errorReporter.ReportError(source, type);
 
         public RenderPassBlackboard Blackboard => _blackboard;
+
+        internal ReadOnlySpan<RenderPassDescription> Passes => _passes.AsSpan();
     }
 }

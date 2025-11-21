@@ -3,13 +3,14 @@ using Primary.Common;
 using Primary.Timing;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Primary.Profiling
 {
     public class ProfilingManager : IDisposable
     {
-        private static ProfilingManager? s_instance = null;
+        private static readonly WeakReference s_instance = new WeakReference(null);
 
         private ConcurrentDictionary<int, ThreadSubProfiler> _subProfilers;
         private Dictionary<int, ThreadProfilingTimestamps> _timestamps = new Dictionary<int, ThreadProfilingTimestamps>();
@@ -21,7 +22,7 @@ namespace Primary.Profiling
 
         internal ProfilingManager()
         {
-            s_instance = this;
+            s_instance.Target = this;
 
             _subProfilers = new ConcurrentDictionary<int, ThreadSubProfiler>();
         }
@@ -38,6 +39,7 @@ namespace Primary.Profiling
                     }
                 }
 
+                s_instance.Target = null;
                 _disposedValue = true;
             }
         }
@@ -48,22 +50,27 @@ namespace Primary.Profiling
             GC.SuppressFinalize(this);
         }
 
-        public void BeginProfiling(string name, int hash)
+        public static void BeginProfiling(string name, int hash)
         {
+            ProfilingManager @this = Instance;
+            long timestamp = @this.TimestampFromStart;
+
             int threadId = Thread.CurrentThread.ManagedThreadId;
-            if (!_subProfilers.TryGetValue(threadId, out ThreadSubProfiler? subProfiler))
+            if (!@this._subProfilers.TryGetValue(threadId, out ThreadSubProfiler? subProfiler))
             {
-                subProfiler = new ThreadSubProfiler(this, threadId);
-                _subProfilers.TryAdd(threadId, subProfiler);
+                subProfiler = new ThreadSubProfiler(@this, threadId);
+                @this._subProfilers.TryAdd(threadId, subProfiler);
             }
 
-            subProfiler.BeginProfiling(ref name, hash);
+            subProfiler.BeginProfiling(ref name, hash, timestamp);
         }
 
-        public void EndProfiling(int hash)
+        public static void EndProfiling(int hash)
         {
+            ProfilingManager @this = Instance;
+
             int threadId = Thread.CurrentThread.ManagedThreadId;
-            if (_subProfilers.TryGetValue(threadId, out ThreadSubProfiler? subProfiler))
+            if (@this._subProfilers.TryGetValue(threadId, out ThreadSubProfiler? subProfiler))
             {
                 subProfiler.EndProfiling(hash);
             }
@@ -101,7 +108,7 @@ namespace Primary.Profiling
         public Dictionary<int, ThreadProfilingTimestamps> Timestamps => _timestamps;
         public long StartTimestamp => _lastStartTimestamp;
 
-        public static ProfilingManager Instance => NullableUtility.ThrowIfNull(s_instance);
+        public static ProfilingManager Instance => NullableUtility.ThrowIfNull(Unsafe.As<ProfilingManager>(s_instance.Target));
         public static bool IncludeStacktrace = false;
     }
 

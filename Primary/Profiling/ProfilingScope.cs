@@ -11,13 +11,13 @@ namespace Primary.Profiling
         public ProfilingScope(string name)
         {
             _hash = name.GetDjb2HashCode();
-            ProfilingManager.Instance.BeginProfiling(name, _hash);
+            ProfilingManager.BeginProfiling(name, _hash);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Dispose()
         {
-            ProfilingManager.Instance.EndProfiling(_hash);
+            ProfilingManager.EndProfiling(_hash);
         }
     }
 }

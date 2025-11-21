@@ -1,4 +1,5 @@
 ﻿using Primary.Profiling;
+using Primary.Rendering2.Pass;
 using Primary.Utility;
 using System;
 using System.Collections.Generic;
@@ -11,12 +12,14 @@ namespace Primary.Rendering2
     public sealed class RenderPassManager
     {
         private RenderPass _renderPass;
+        private RenderPassCompiler _renderPassCompiler;
 
         private List<IRenderPass> _activePasses;
 
         internal RenderPassManager()
         {
             _renderPass = new RenderPass();
+            _renderPassCompiler = new RenderPassCompiler();
 
             _activePasses = new List<IRenderPass>();
         }
@@ -30,6 +33,14 @@ namespace Primary.Rendering2
                 {
                     renderPass.SetupRenderPasses(_renderPass, contextContainer);
                 }
+            }
+        }
+
+        internal void CompilePasses(RenderContextContainer contextContainer)
+        {
+            using (new ProfilingScope("Compile"))
+            {
+                _renderPassCompiler.Compile(_renderPass.Passes);
             }
         }
 

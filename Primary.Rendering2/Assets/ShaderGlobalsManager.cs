@@ -72,6 +72,11 @@ namespace Primary.Rendering2.Assets
             _globalProperties[name] = new PropertyData(FrameGraphResource.Invalid, texture);
         }
 
+        internal bool TryGetPropertyValue(string propertyName, out PropertyData data)
+        {
+            return _globalProperties.TryGetValue(propertyName, out data);
+        }
+
         #region Public
         public static void SetGlobalBuffer(string name, FrameGraphBuffer buffer) => Instance.SetBuffer(name, buffer);
         public static void SetGlobalBuffer(string name, RHI.Buffer buffer) => Instance.SetBuffer(name, buffer);

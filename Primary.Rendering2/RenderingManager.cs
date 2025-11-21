@@ -59,6 +59,7 @@ namespace Primary.Rendering2
 
                             _currentPath?.PreRenderPassSetup(this);
                             _renderPassManager.SetupPasses(_contextContainer);
+                            _renderPassManager.CompilePasses(_contextContainer);
                         }
                     }
                 }

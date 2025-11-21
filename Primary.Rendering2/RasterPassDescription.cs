@@ -2,6 +2,7 @@
 using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Primary.Mathematics;
+using Primary.Rendering2.Pass;
 using Primary.Rendering2.Recording;
 using Primary.Rendering2.Resources;
 using System;
@@ -19,8 +20,6 @@ namespace Primary.Rendering2
         private readonly RenderPass _renderPass;
         private readonly string _name;
 
-        private int _resourceCounter;
-
         private PooledList<UsedResourceData> _usedResources;
         private PooledList<UsedRenderTargetData> _usedRenderTargets;
 
@@ -29,15 +28,13 @@ namespace Primary.Rendering2
             _renderPass = renderPass;
             _name = name;
 
-            _resourceCounter = 0;
-
             _usedResources = new PooledList<UsedResourceData>();
             _usedRenderTargets = new PooledList<UsedRenderTargetData>();
         }
 
         public void Dispose()
         {
-
+            _renderPass.AddNewRenderPass(new RenderPassDescription(_name, RenderPassType.Graphics, _usedResources, _usedRenderTargets));
         }
 
         public FrameGraphTexture CreateTexture(FrameGraphTextureDesc desc)
@@ -158,7 +155,7 @@ namespace Primary.Rendering2
                 static bool IsWithinRangeLayers(int dim) => (uint)dim > 2048;
             }
 
-            return new FrameGraphResource(_resourceCounter++, desc).AsTexture();
+            return new FrameGraphResource(_renderPass.GetNewResourceIndex(), desc).AsTexture();
         }
 
         public FrameGraphBuffer CreateBuffer(FrameGraphBufferDesc desc)
@@ -198,7 +195,7 @@ namespace Primary.Rendering2
                 }
             }
 
-            return new FrameGraphResource(_resourceCounter++, desc).AsBuffer();
+            return new FrameGraphResource(_renderPass.GetNewResourceIndex(), desc).AsBuffer();
         }
 
         public void UseResource(FGResourceUsage usage, FrameGraphTexture resource)

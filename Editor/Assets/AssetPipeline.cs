@@ -1,18 +1,13 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Editor.Assets.Importers;
-using Editor.Assets.Loaders;
-using Editor.Assets.Types;
 using Editor.Platform.Windows;
 using Primary.Assets;
 using Primary.Common;
 using Primary.Profiling;
 using SharpGen.Runtime;
-using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Editor.Assets
@@ -178,7 +173,7 @@ namespace Editor.Assets
 
             foreach (ReadOnlySpan<char> line in fileSource.Tokenize('\n'))
             {
-                if (ReadOnlySpanExtensions.Count(line, ';') != 1)
+                if (CommunityToolkit.HighPerformance.ReadOnlySpanExtensions.Count(line, ';') != 1)
                     continue;
 
                 line.Split(ranges, ';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
