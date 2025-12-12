@@ -23,6 +23,9 @@ namespace Primary.Rendering2
         private PooledList<UsedResourceData> _usedResources;
         private PooledList<UsedRenderTargetData> _usedRenderTargets;
 
+        private Type? _passDataType;
+        private Action<RasterPassContext, IPassData>? _function;
+
         internal RasterPassDescription(RenderPass renderPass, string name)
         {
             _renderPass = renderPass;
@@ -30,11 +33,14 @@ namespace Primary.Rendering2
 
             _usedResources = new PooledList<UsedResourceData>();
             _usedRenderTargets = new PooledList<UsedRenderTargetData>();
+
+            _passDataType = null;
+            _function = null;
         }
 
         public void Dispose()
         {
-            _renderPass.AddNewRenderPass(new RenderPassDescription(_name, RenderPassType.Graphics, _usedResources, _usedRenderTargets));
+            _renderPass.AddNewRenderPass(new RenderPassDescription(_name, RenderPassType.Graphics, _usedResources, _usedRenderTargets, _passDataType, _function));
         }
 
         public FrameGraphTexture CreateTexture(FrameGraphTextureDesc desc)
@@ -150,9 +156,9 @@ namespace Primary.Rendering2
                         }
                 }
 
-                static bool IsWithinRange(int dim) => (uint)dim > 16384;
-                static bool IsWithinRange3D(int dim) => (uint)dim > 2048;
-                static bool IsWithinRangeLayers(int dim) => (uint)dim > 2048;
+                static bool IsWithinRange(int dim) => (uint)dim <= 16384;
+                static bool IsWithinRange3D(int dim) => (uint)dim <= 2048;
+                static bool IsWithinRangeLayers(int dim) => (uint)dim <= 2048;
             }
 
             return new FrameGraphResource(_renderPass.GetNewResourceIndex(), desc).AsTexture();
@@ -294,7 +300,7 @@ namespace Primary.Rendering2
                 }
             }
 
-            _usedRenderTargets.Add(new UsedRenderTargetData(FGRenderTargetType.DepthStencil, renderTarget));
+            _usedRenderTargets.Add(new UsedRenderTargetData(FGRenderTargetType.RenderTarget, renderTarget));
         }
 
         public void UseDepthStencil(FrameGraphTexture depthStencil)
@@ -319,7 +325,8 @@ namespace Primary.Rendering2
 
         public void SetRenderFunction<T>(Action<RasterPassContext, T> function) where T : class, IPassData, new()
         {
-
+            _passDataType = typeof(T);
+            _function = (x, y) => function(x, Unsafe.As<T>(y));
         }
 
         private static FGTextureUsage[] s_textureUsageMap = [
@@ -345,6 +352,8 @@ namespace Primary.Rendering2
     {
         Read = 1 << 0,
         Write = 1 << 1,
+
+        ReadWrite = Read | Write
     }
 
     internal record struct UsedResourceData(FGResourceUsage Usage, FrameGraphResource Resource);

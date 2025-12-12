@@ -119,22 +119,31 @@ namespace Primary.Rendering
 
             using (new ProfilingScope("ExecuteRender"))
             {
-                //_graphicsDevice.SynchronizeDevice(SynchronizeDeviceTargets.All);
+                using (new ProfilingScope("Prepare"))
+                {
+                    //_graphicsDevice.SynchronizeDevice(SynchronizeDeviceTargets.All);
 
-                _graphicsDevice.BeginFrame();
+                    using (new ProfilingScope("Gfx"))
+                    {
+                        _graphicsDevice.BeginFrame();
+                    }
 
-                _renderTreeManager.UpdateForFrame();
-                _commandBufferPool.PrepareNewFrame();
-                _renderPassManager.ReorganizePassesIfRequired();
-                _frameCollector.SetupScene(_renderScene);
-                //_frameCollector.CollectWorld(_renderBatcher, _missingMaterial);
-                _renderTreeCollector.CollectTrees(_renderBatcher, _renderTreeManager);
-                _renderBatcher.BatchCollected(_renderTreeCollector);
+                    _renderTreeManager.UpdateForFrame();
+                    _commandBufferPool.PrepareNewFrame();
+                    _renderPassManager.ReorganizePassesIfRequired();
+                    _frameCollector.SetupScene(_renderScene);
+                    //_frameCollector.CollectWorld(_renderBatcher, _missingMaterial);
+                    _renderTreeCollector.CollectTrees(_renderBatcher, _renderTreeManager);
+                    _renderBatcher.BatchCollected(_renderTreeCollector);
 
-                //_frameUploadManager.UploadPending();
-                //_frameUploadManager.OpenBuffersForFrame();
+                    //_frameUploadManager.UploadPending();
+                    //_frameUploadManager.OpenBuffersForFrame();
+                }
 
-                PreRender?.Invoke();
+                using (new ProfilingScope("PreRender"))
+                {
+                    PreRender?.Invoke();
+                }
 
                 Span<RSOutputViewport> viewports = _renderScene.Viewports;
                 if (viewports.Length > 0)
@@ -160,7 +169,7 @@ namespace Primary.Rendering
                     }
                 }
 
-                using (new ProfilingScope("Post"))
+                using (new ProfilingScope("PostRender"))
                 {
                     PostRender?.Invoke(_renderPass);
                     if (!_renderPass.IsEmpty)
@@ -172,10 +181,13 @@ namespace Primary.Rendering
                     }
                 }
 
-                //_frameUploadManager.SubmitBuffersForEndOfFrame();
+                using (new ProfilingScope("Cleanup"))
+                {
+                    //_frameUploadManager.SubmitBuffersForEndOfFrame();
 
-                _renderBatcher.CleanupPostFrame();
-                _renderScene.ClearInternalData();
+                    _renderBatcher.CleanupPostFrame();
+                    _renderScene.ClearInternalData();
+                }
             }
 
             swapChain.Present(PresentParameters.None);

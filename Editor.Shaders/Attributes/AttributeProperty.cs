@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Editor.Shaders.Attributes
 {
-    internal sealed class AttributeProperty : AttributeSignature
+    public sealed class AttributeProperty : AttributeSignature
     {
         public AttributeProperty() : base(
             "property",
@@ -18,7 +18,7 @@ namespace Editor.Shaders.Attributes
 
         private static readonly AttributeVariable[] s_variables = [
             new AttributeVariable("Name", typeof(string), null, AttributeFlags.None),
-            new AttributeVariable("Default", typeof(PropertyDefault), PropertyDefault.White, AttributeFlags.None),
+            new AttributeVariable("Default", typeof(PropertyDefault), PropertyDefault.TexWhite, AttributeFlags.None),
             ];
     }
 }

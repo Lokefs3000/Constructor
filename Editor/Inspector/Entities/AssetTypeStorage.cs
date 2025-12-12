@@ -1,5 +1,6 @@
 ﻿using Editor.DearImGui;
 using Primary.Assets;
+using Primary.Assets.Types;
 
 namespace Editor.Inspector.Entities
 {

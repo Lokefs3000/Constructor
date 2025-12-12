@@ -46,6 +46,7 @@ namespace Editor
         private R2.RenderingManager _r2Renderer;
 
         private DearImGuiStateManager _dearImGuiStateManager;
+        private DearImGuiWindowManager _dearImGuiWindowManager;
         //private EditorGuiManager _guiManager;
         private SelectionManager _selectionManager;
         private ToolManager _toolManager;
@@ -53,7 +54,6 @@ namespace Editor
 
         private DynamicAtlasManager _guiAtlasManager;
 
-        private ProfilerView _profilerView;
         private ProfilerView2 _profilerView2;
         private HierchyView _hierchyView;
         private PropertiesView _propertiesView;
@@ -113,11 +113,13 @@ namespace Editor
             ui.PushStep("Initialize editor");
 
             R2.Components.RegisterComponentsDefault.RegisterDefault();
+            R2.Assets.RegisterAssetsDefault.RegisterDefault();
             RegisterComponentsDefault.RegisterDefault();
 
             _r2Renderer = new R2.RenderingManager();
 
             _dearImGuiStateManager = new DearImGuiStateManager(this);
+            _dearImGuiWindowManager = new DearImGuiWindowManager();
             //_guiManager = new EditorGuiManager();
             _selectionManager = new SelectionManager();
             _toolManager = new ToolManager();
@@ -125,8 +127,7 @@ namespace Editor
 
             _guiAtlasManager = new DynamicAtlasManager();
 
-            _profilerView = new ProfilerView();
-            _profilerView2 = new ProfilerView2();
+            _profilerView2 = new ProfilerView2(_guiAtlasManager);
             _hierchyView = new HierchyView();
             _propertiesView = new PropertiesView();
             _renderingView = new RenderingView();
@@ -152,8 +153,6 @@ namespace Editor
 
         public override void Dispose()
         {
-            _profilerView.Dispose();
-
             _guiAtlasManager.Dispose();
 
             _editorRenderManager.Dispose();
@@ -190,6 +189,9 @@ namespace Editor
             _r2Renderer.SetNewRenderPath(new ForwardPlusRenderPath());
 
             _dearImGuiStateManager.InitWindow(window);
+
+            _dearImGuiWindowManager.Open<FrameGraphViewer>();
+
             _guiAtlasManager.TriggerRebuild();
 
             AssetManager.RegisterCustomAsset<GeoSceneAsset>(new GeoSceneAssetLoader());
@@ -197,7 +199,14 @@ namespace Editor
             SceneManager.CreateScene("Default", LoadSceneMode.Single);
             //Scene scene = SceneManager.CreateScene("Demo");
 
-            StaticDemoScene3.Load(this);
+            try
+            {
+                StaticDemoScene3.Load(this);
+            }
+            catch (Exception ex) when (false)
+            {
+                EdLog.Core.Error(ex, "Demo scene load exception");
+            }
 
             EventManager.PumpDefaultPause += PumpEditorLoop;
 
@@ -267,7 +276,6 @@ namespace Editor
                     ImGui.EndMainMenuBar();
                 }
 
-                _profilerView.Render();
                 _profilerView2.Render();
                 _hierchyView.Render();
                 _propertiesView.Render();
@@ -284,6 +292,7 @@ namespace Editor
                 _bundleExplorer.Render();
                 _consoleView.Render();
                 _cubemapTool.Render();
+                _dearImGuiWindowManager.RenderOpenWindows();
 
                 //GCMemoryInfo memoryInfo = GC.GetGCMemoryInfo();
                 //

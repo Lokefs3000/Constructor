@@ -37,6 +37,9 @@
         public BoundResourceDescription[] BoundResources;
         public KeyValuePair<uint, ImmutableSamplerDescription>[] ImmutableSamplers;
         public uint ExpectedConstantsSize;
+
+        public int Num32BitValues; //HACK: Bad override to allow more advanced control
+        public bool HasConstantBuffer;
     }
 
     public record struct GraphicsPipelineBytecode

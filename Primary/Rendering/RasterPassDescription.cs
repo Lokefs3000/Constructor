@@ -1,4 +1,5 @@
-﻿using Primary.Rendering.Pass;
+﻿using Primary.Profiling;
+using Primary.Rendering.Pass;
 using Primary.Rendering.Pooling;
 using Primary.Rendering.Raw;
 
@@ -7,6 +8,7 @@ namespace Primary.Rendering
     public sealed class RasterPassDescription : IPassDescription, IDisposable
     {
         private RenderPass? _renderPass;
+        private string? _debugName;
 
         private RenderPassThreadingPolicy _threadingPolicy;
         private int _threadingSplitCount;
@@ -68,13 +70,22 @@ namespace Primary.Rendering
             _function = function;
         }
 
+        /// <summary>Not thread-safe</summary>
+        public void SetDebugName(string debugName)
+        {
+            _debugName = debugName;
+        }
+
         void IPassDescription.ExecuteInternal(RenderPassData passData)
         {
-            RasterCommandBuffer commandBuffer = CommandBufferPool.Get();
+            using (new ProfilingScope(_debugName ?? "Pass"))
+            {
+                RasterCommandBuffer commandBuffer = CommandBufferPool.Get();
 
-            _function!.Invoke(commandBuffer, passData, _userArgument);
+                _function!.Invoke(commandBuffer, passData, _userArgument);
 
-            CommandBufferPool.Return(commandBuffer);
+                CommandBufferPool.Return(commandBuffer);
+            }
         }
     }
 }

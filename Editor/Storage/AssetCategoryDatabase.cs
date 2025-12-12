@@ -1,5 +1,5 @@
 ﻿using CommunityToolkit.HighPerformance;
-using Primary.Assets;
+using Primary.Assets.Types;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 
@@ -72,6 +72,7 @@ namespace Editor.Storage
             _updates.Add(new DatabaseUpdate(new AssetDatabaseEntry(id, string.Empty, false), DatabaseUpdateType.Remove));
         }
 
+        public Type AssetType => _category;
         internal IEnumerable<AssetDatabaseEntry> Entries => _entries;
 
         private readonly record struct DatabaseUpdate(AssetDatabaseEntry Entry, DatabaseUpdateType Type);

@@ -2,6 +2,7 @@
 using Editor.Assets.Importers;
 using Editor.Platform.Windows;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Profiling;
 using SharpGen.Runtime;
@@ -112,6 +113,8 @@ namespace Editor.Assets
             AddImporter<MaterialAssetImporter>(".mat");
             AddImporter<GeoSceneAssetImporter>(".geoscn");
             AddImporter<EffectVolumeAssetImporter>(".fxvol");
+            AddImporter<NewShaderImporter>(".hlsl2");
+            AddImporter<NewMaterialAssetImporter>(".mat2");
 
             RefreshDatabase(needsDbRefresh, startupUi);
         }
@@ -387,6 +390,9 @@ namespace Editor.Assets
         {
             long timeStart = Stopwatch.GetTimestamp();
 
+            int filesPreloaded = 0;
+            int filesImported = 0;
+
             try
             {
                 if (cleanOldData)
@@ -426,6 +432,7 @@ namespace Editor.Assets
                             continue;
 
                         importer.Preload(path, filesystem, this);
+                        filesPreloaded++;
                     }
                 }
 
@@ -452,11 +459,15 @@ namespace Editor.Assets
                                 if (filesystem != null && filesystem.Exists(localPath))
                                 {
                                     importer?.Preload(localPath, filesystem, this);
+                                    filesPreloaded++;
                                 }
                             }
 
                             if (ImportNewFile(id) != null)
+                            {
                                 foundImportableFile = true;
+                                filesImported++;
+                            }
                         }
                     }
                 }
@@ -498,6 +509,8 @@ namespace Editor.Assets
 
                 _associator.FlushAssociations();
                 FlushImportedAssets();
+
+                _assetsToReload.Clear();
             }
             catch (Exception ex)
             {
@@ -507,6 +520,9 @@ namespace Editor.Assets
 
             long diff = Stopwatch.GetTimestamp() - timeStart;
             EdLog.Assets.Information("Asset refresh took: {secs}s", diff / (double)Stopwatch.Frequency);
+            EdLog.Assets.Information("    Preloaded: {c}", filesPreloaded);
+            EdLog.Assets.Information("    Imported: {c} (New: {p:F3}%)", filesImported, filesImported / (double)_importedAssets.Count * 100.0);
+            EdLog.Assets.Information("    Total assets: {c} (Ids: {c})", _importedAssets.Count, _identifier.IdCount);
         }
 
         //TODO: avoid importing files that are not changed

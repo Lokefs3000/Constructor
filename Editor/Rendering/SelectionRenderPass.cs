@@ -1,5 +1,6 @@
 ﻿using Editor.Interaction;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Components;
 using Primary.Rendering;
 using Primary.Rendering.Data;
@@ -94,6 +95,7 @@ namespace Editor.Rendering
             using (RasterPassDescription pass = renderPass.CreateRasterPass())
             {
                 pass.SetThreadingPolicy(RenderPassThreadingPolicy.None);
+                pass.SetDebugName("Selection");
                 pass.SetFunction(PassFunction);
             }
         }

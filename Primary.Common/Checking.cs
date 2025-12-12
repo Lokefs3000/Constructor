@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -15,7 +16,26 @@ namespace Primary.Common
         public static void Assert([DoesNotReturnIf(false)] bool condition, [CallerArgumentExpression(nameof(condition))] in string? message = null) //should be inlined
         {
             if (!condition)
-                throw new Exception(message);
+                throw new AssertFailedException(message);
+        }
+    }
+
+    public class AssertFailedException : Exception
+    {
+        public AssertFailedException()
+        {
+        }
+
+        public AssertFailedException(string? message) : base(message)
+        {
+        }
+
+        public AssertFailedException(string? message, Exception? innerException) : base(message, innerException)
+        {
+        }
+
+        protected AssertFailedException(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
         }
     }
 }

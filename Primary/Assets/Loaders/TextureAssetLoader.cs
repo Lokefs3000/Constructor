@@ -1,4 +1,5 @@
-﻿using Primary.Common;
+﻿using Primary.Assets.Types;
+using Primary.Common;
 using Primary.Common.Streams;
 using Primary.Rendering;
 using Primary.Utility;

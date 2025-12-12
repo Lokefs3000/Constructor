@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Editor.Shaders
 {
-    public readonly record struct ShaderProcesserResult(ushort TargetData, ShaderBytecode[] Bytecodes)
+    public readonly record struct ShaderProcesserResult(ushort TargetData, ShaderBytecode[] Bytecodes, string[] IncludedFiles)
     {
         public ShaderCompileTarget Targets => (ShaderCompileTarget)(TargetData & 0x3);
         public ShaderCompileStage Stages => (ShaderCompileStage)((TargetData >> 2) & 0x3fff);

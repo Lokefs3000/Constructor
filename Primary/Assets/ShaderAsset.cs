@@ -1,4 +1,5 @@
-﻿using Primary.Rendering;
+﻿using Primary.Assets.Types;
+using Primary.Rendering;
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -183,6 +184,10 @@ namespace Primary.Assets
 
         public Type AssetType => typeof(ShaderAsset);
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
+
+        AssetId IInternalAssetData.Id => Id;
+        ResourceStatus IInternalAssetData.Status => Status;
+        string IInternalAssetData.Name => Name;
 
         private struct CompareStringsInvariant : IComparer<string>
         {

@@ -878,6 +878,15 @@ namespace Editor.Shaders.Processors
 
                     _processor.PropertySourceTemplate = sourceString.ToString();
                 }
+                else if (pragma.Equals("gen_properties_in_header", StringComparison.Ordinal))
+                {
+                    SkipWhitespace();
+
+                    _start = _index;
+                    ReadOnlySpan<char> enabledValue = ReadIdentifier();
+
+                    _processor.GeneratePropertiesInHeader = (enabledValue.Equals("false", StringComparison.Ordinal) || enabledValue.Equals("0", StringComparison.Ordinal));
+                }
             }
         }
 

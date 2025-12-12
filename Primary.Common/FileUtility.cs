@@ -32,6 +32,14 @@
                     fs = File.Open(fullPath, mode, access, share);
                     return fs;
                 }
+                catch (FileNotFoundException)
+                {
+                    return null;
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    return null;
+                }
                 catch (Exception)
                 {
                     fs?.Dispose();
@@ -50,6 +58,14 @@
                 try
                 {
                     return File.ReadAllText(fullPath);
+                }
+                catch (FileNotFoundException)
+                {
+                    return null;
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    return null;
                 }
                 catch (Exception)
                 {

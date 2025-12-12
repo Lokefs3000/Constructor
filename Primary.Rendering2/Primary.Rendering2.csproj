@@ -9,7 +9,9 @@
     <PackageReference Include="Collections.Pooled.V2" Version="2.2.2" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Interop.D3D12MemAlloc\Interop.D3D12MemAlloc.csproj" />
     <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
+    <ProjectReference Include="..\Primary.RHI.Direct3D12\Primary.RHI.Direct3D12.csproj" />
     <ProjectReference Include="..\Primary.RHI\Primary.RHI.csproj" />
     <ProjectReference Include="..\Primary\Primary.csproj" />
   </ItemGroup>

@@ -1,4 +1,5 @@
-﻿using Primary.Rendering2.Assets;
+﻿using Primary.Assets;
+using Primary.Rendering2.Assets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,12 +25,13 @@ namespace Primary.Rendering2.Recording
     internal struct PropertyMeta
     {
         public SetPropertyType Type;
-        public ShaderPropertyStages Target;
+        public ShPropertyStages Target;
     }
 
     internal struct UnamangedPropertyData
     {
         public PropertyMeta Meta;
+        public bool IsExternal;
         public nint Resource;
     }
 }

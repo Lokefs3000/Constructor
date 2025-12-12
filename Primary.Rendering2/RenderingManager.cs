@@ -3,6 +3,7 @@ using Primary.Rendering2.Assets;
 using Primary.Rendering2.Batching;
 using Primary.Rendering2.Data;
 using Primary.Rendering2.Debuggable;
+using Primary.Rendering2.Resources;
 using Primary.Rendering2.Tree;
 using System.Diagnostics;
 
@@ -55,11 +56,15 @@ namespace Primary.Rendering2
                     {
                         using (new ProfilingScope(Engine.IsDebugBuild ? $"Cam-{outputData.Entity.Name}" : "Cam-Default"))
                         {
+                            _renderPassManager.ClearInternals();
+
                             SetupContextForOutput(outputData);
 
                             _currentPath?.PreRenderPassSetup(this);
+
                             _renderPassManager.SetupPasses(_contextContainer);
                             _renderPassManager.CompilePasses(_contextContainer);
+                            _renderPassManager.ExecutePasses(_contextContainer);
                         }
                     }
                 }
@@ -78,7 +83,27 @@ namespace Primary.Rendering2
 
         private void SetupContextForOutput(RenderOutputData outputData)
         {
+            RenderPass renderPass = _renderPassManager.RenderPass;
+            using (RasterPassDescription desc = renderPass.SetupRasterPass(string.Empty, out GenericPassData _))
+            {
+                {
+                    RenderStateData stateData = _contextContainer.GetOrCreate(() => new RenderStateData());
+                    stateData.Path = _currentPath!;
+                }
+                {
+                    RenderCameraData cameraData = _contextContainer.GetOrCreate(() => new RenderCameraData());
 
+                    FrameGraphTextureDesc baseDesc = new FrameGraphTextureDesc
+                    {
+                        Width = (int)outputData.ProjectionData.ClientSize.X,
+                        Height = (int)outputData.ProjectionData.ClientSize.Y,
+                    };
+
+                    cameraData.CameraEntity = outputData.Entity;
+                    cameraData.ColorTexture = desc.CreateTexture(new FrameGraphTextureDesc(baseDesc) { Format = FGTextureFormat.RGB10A2_UNorm, Usage = FGTextureUsage.RenderTarget });
+                    cameraData.DepthTexture = desc.CreateTexture(new FrameGraphTextureDesc(baseDesc) { Format = FGTextureFormat.D24_UNorm_S8_UInt, Usage = FGTextureUsage.DepthStencil });
+                }
+            }
         }
 
         public void RenderDebug(IDebugRenderer renderer)

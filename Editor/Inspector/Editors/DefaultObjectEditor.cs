@@ -2,6 +2,7 @@
 using Editor.Inspector.Editors;
 using Editor.Inspector.Entities;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Components;
 using Primary.Rendering.Data;
 using Primary.Scenes;

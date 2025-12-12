@@ -1,6 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
 using CommunityToolkit.HighPerformance.Enumerables;
-using Primary.Assets;
+using Primary.Assets.Types;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
@@ -140,6 +140,9 @@ namespace Editor.Assets
             return AssetId.Invalid;
         }
         #endregion
+
+        /// <summary>Thread-safe, Not atomic</summary>
+        public int IdCount => _idHashSet.Count;
 
         public static string DataFilePath = Path.Combine(EditorFilepaths.LibraryPath, "assets.ids");
     }

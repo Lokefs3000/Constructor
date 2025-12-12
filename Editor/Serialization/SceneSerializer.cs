@@ -2,6 +2,7 @@
 using Editor.Inspector;
 using Editor.Serialization.Types;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Components;
 using Primary.Scenes;

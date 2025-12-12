@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Editor.DearImGui.Debuggers
 {
-    internal class AssetDebugger : IVisualDebugger
+    internal sealed class AssetDebugger : IVisualDebugger
     {
         private CircularBuffer<EventStorage> _eventBuffer;
 

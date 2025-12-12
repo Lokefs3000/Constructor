@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Hexa.NET.ImGui;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Rendering;
 using Primary.Timing;

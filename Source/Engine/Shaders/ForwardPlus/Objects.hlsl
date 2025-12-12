@@ -2,6 +2,7 @@
 #define FP_OBJECTS_HLSL
 
 #pragma property_source "baFP_RawDataBuffer.Load<$GENERIC$>(GetRenderFlag($SV_INSTANCEID$).DataId)"
+#pragma gen_properties_in_header false
 
 #include "Globals.hlsl"
 

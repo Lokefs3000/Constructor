@@ -8,7 +8,7 @@ using RHI = Primary.RHI;
 
 namespace Editor.Shaders.Attributes
 {
-    internal sealed class AttributeIALayout : AttributeSignature
+    public sealed class AttributeIALayout : AttributeSignature
     {
         public AttributeIALayout() : base(
             "ialayout",

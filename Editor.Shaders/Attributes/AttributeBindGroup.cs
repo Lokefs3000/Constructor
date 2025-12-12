@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Editor.Shaders.Attributes
 {
-    internal sealed class AttributeBindGroup : AttributeSignature
+    public sealed class AttributeBindGroup : AttributeSignature
     {
         public AttributeBindGroup() : base(
             "bindgroup",

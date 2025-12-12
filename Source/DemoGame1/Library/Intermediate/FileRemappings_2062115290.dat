@@ -4,6 +4,7 @@ Engine/Shaders/Debug/LightingOnly.hlsl;Library/Imported/947409434.iaf
 Engine/Textures/DefaultArchitecture1M1.png;Library/Imported/1370406865.iaf
 Engine/Models/Cylinder.fbx;Library/Imported/947393303.iaf
 Engine/Textures/DefaultTex_Mask.png;Library/Imported/2759279429.iaf
+Engine/Shaders/ForwardPlus/MissingDefault.hlsl2;Library/Imported/3448351787.iaf
 Engine/Textures/MissingTex.png;Library/Imported/947408957.iaf
 Engine/Shaders/Debug/Overdraw.hlsl;Library/Imported/947409659.iaf
 Engine/Models/Capsule.fbx;Library/Imported/947386653.iaf
@@ -22,4 +23,5 @@ Engine/Shaders/Unlit.hlsl;Library/Imported/947406437.iaf
 Engine/Shaders/Debug/DetailLighting.hlsl;Library/Imported/947409303.iaf
 Engine/Shaders/Debug/Wireframe.hlsl;Library/Imported/947410019.iaf
 Engine/Textures/DefaultTex_White.png;Library/Imported/947406844.iaf
+Engine/Shaders/R2DefaultShader.hlsl2;Library/Imported/3448343674.iaf
 Engine/Textures/DefaultTex_Normal.png;Library/Imported/947406660.iaf

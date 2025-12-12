@@ -1,4 +1,5 @@
-﻿using Primary.Common;
+﻿using Primary.Assets.Types;
+using Primary.Common;
 using Primary.Rendering.Data;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -141,6 +142,10 @@ namespace Primary.Assets
 
         public Type AssetType => typeof(ModelAsset);
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
+
+        AssetId IInternalAssetData.Id => Id;
+        ResourceStatus IInternalAssetData.Status => Status;
+        string IInternalAssetData.Name => Name;
     }
 
     public class RenderMesh : RawRenderMesh

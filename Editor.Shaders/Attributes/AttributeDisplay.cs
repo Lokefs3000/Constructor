@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Editor.Shaders.Attributes
 {
-    internal sealed class AttributeDisplay : AttributeSignature
+    public sealed class AttributeDisplay : AttributeSignature
     {
         public AttributeDisplay() : base(
             "display",

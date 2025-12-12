@@ -37,8 +37,8 @@ namespace Primary.Rendering2.Tree
 
         internal void EmplaceChild(SceneEntity entity)
         {
-            Debug.Assert(!_children.Contains(entity));
-            _children.Add(entity);
+            if (!_children.Contains(entity))
+                _children.Add(entity);
         }
 
         internal void RemoveChild(SceneEntity entity)

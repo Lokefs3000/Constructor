@@ -4,7 +4,7 @@ using Editor.DearImGui.Components;
 using Editor.DearImGui.Properties;
 using Editor.Gui;
 using Hexa.NET.ImGui;
-using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.RenderLayer;
 using Primary.Scenes;
@@ -376,10 +376,20 @@ namespace Editor.DearImGui
 
                                 if (hasId)
                                 {
+                                    AssetId assetId = Editor.GlobalSingleton.AssetPipeline.Identifier.RetriveIdForPath(fullLocalPath);
+
                                     if (ImGui.MenuItem("Edit"))
                                     {
 
                                     }
+
+                                    if (Editor.GlobalSingleton.AssetPipeline.IsImportingAsset(assetId))
+                                        ImGui.MenuItem("Importing.."u8, false, false);
+                                    else
+                                        if (ImGui.MenuItem("Reimport"))
+                                        {
+                                            Editor.GlobalSingleton.AssetPipeline.ImportChangesOrGetRunning(assetId);
+                                        }
                                 }
                                 else
                                 {

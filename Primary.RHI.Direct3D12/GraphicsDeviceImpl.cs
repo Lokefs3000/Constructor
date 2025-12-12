@@ -74,6 +74,7 @@ namespace Primary.RHI.Direct3D12
         internal GraphicsDeviceImpl(ILogger logger)
         {
             s_int_logger = logger;
+            Instance = this;
 
             _commandAllocators = new AllocatorStack[6];
 
@@ -826,6 +827,7 @@ namespace Primary.RHI.Direct3D12
         internal bool IsPixEnabled => _isPixEnabled;
 
         internal IDXGIFactory7 DXGIFactory => _factory;
+        internal IDXGIAdapter4 DXGIAdapter => _adapter;
         internal ID3D12DeviceConfiguration D3D12DeviceConfiguration => _deviceConfig;
         internal ID3D12Device14 D3D12Device => _device;
         internal ID3D12CommandQueue DirectCommandQueue => _graphicsQueue;

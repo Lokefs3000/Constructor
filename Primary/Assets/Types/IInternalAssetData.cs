@@ -1,9 +1,14 @@
-﻿namespace Primary.Assets
+﻿namespace Primary.Assets.Types
 {
     public interface IInternalAssetData : IDisposable
     {
-        public Type AssetType { get; }
+        public AssetId Id { get; }
         public IAssetDefinition? Definition { get; }
+
+        public ResourceStatus Status { get; }
+        public string Name { get; }
+
+        public Type AssetType { get; }
 
         /// <summary>Thread-safe</summary>
         public void SetAssetInternalStatus(ResourceStatus status);

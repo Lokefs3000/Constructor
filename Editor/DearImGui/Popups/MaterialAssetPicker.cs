@@ -2,6 +2,7 @@
 using Editor.Storage;
 using Hexa.NET.ImGui;
 using Primary.Assets;
+using Primary.Assets.Types;
 using System.Runtime.InteropServices;
 
 namespace Editor.DearImGui.Popups

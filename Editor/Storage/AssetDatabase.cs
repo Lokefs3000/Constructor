@@ -1,4 +1,4 @@
-﻿using Primary.Assets;
+﻿using Primary.Assets.Types;
 using System.Collections.Concurrent;
 
 namespace Editor.Storage
@@ -81,5 +81,7 @@ namespace Editor.Storage
 
             return category;
         }
+
+        public IEnumerable<AssetCategoryDatabase> Categories => _categories.Values;
     }
 }

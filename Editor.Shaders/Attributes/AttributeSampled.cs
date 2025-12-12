@@ -9,7 +9,7 @@ namespace Editor.Shaders.Attributes
         public AttributeSampled() : base(
             "sampled",
             AttributeUsage.GenericTexture,
-            Array.Empty<AttributeRelation>(),
+            [new AttributeRelation(typeof(AttributeProperty), AttributeRelationFlags.Required)],
             s_variables)
         {
         }

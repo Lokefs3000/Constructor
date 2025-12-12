@@ -1,4 +1,5 @@
-﻿using Primary.Scenes;
+﻿using Primary.Rendering2.Temporary;
+using Primary.Scenes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,6 +13,7 @@ namespace Primary.Rendering2.Components
         public static void RegisterDefault()
         {
             SceneEntityManager.Register<RenderOctantInfo>();
+            SceneEntityManager.Register<MeshRenderer2>();
         }
     }
 }

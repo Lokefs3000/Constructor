@@ -33,6 +33,9 @@ namespace Primary.Rendering2
 
         SetVertexBuffer,
         SetIndexBuffer,
+
+        MapBuffer,
+        MapTexture
     }
 
     public enum RPErrorType : byte
@@ -50,6 +53,7 @@ namespace Primary.Rendering2
         InvalidUsage,
         InvalidOutput,
         SlotOutOfRange,
-        NoResourceAccess
+        NoResourceAccess,
+        OutOfRange
     }
 }

@@ -80,6 +80,7 @@ namespace Editor.Rendering
             using (RasterPassDescription desc = renderPass.CreateRasterPass())
             {
                 desc.SetThreadingPolicy(RenderPassThreadingPolicy.None);
+                desc.SetDebugName("Gizmo");
                 desc.SetFunction(PassFunction);
             }
         }

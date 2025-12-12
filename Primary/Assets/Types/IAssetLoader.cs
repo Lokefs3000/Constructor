@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Primary.Assets
+namespace Primary.Assets.Types
 {
     public interface IAssetLoader
     {

@@ -5,6 +5,7 @@ using Editor.Processors;
 using Hexa.NET.ImGui;
 using Primary.Assets;
 using Primary.Assets.Loaders;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Utility;
 using System.Diagnostics;

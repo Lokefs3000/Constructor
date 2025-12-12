@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Editor.Shaders.Attributes
 {
-    internal sealed class AttributeConstants : AttributeSignature
+    public sealed class AttributeConstants : AttributeSignature
     {
         public AttributeConstants() : base(
             "constants",

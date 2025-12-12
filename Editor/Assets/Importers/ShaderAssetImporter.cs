@@ -2,6 +2,7 @@
 using Editor.Processors;
 using Editor.Storage;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Tomlyn;
 using Tomlyn.Model;
 using static Schedulers.JobScheduler;

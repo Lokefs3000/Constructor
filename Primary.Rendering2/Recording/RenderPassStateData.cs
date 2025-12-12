@@ -22,6 +22,15 @@ namespace Primary.Rendering2.Recording
             _resourceDict = new Dictionary<int, FGResourceStateData>();
         }
 
+        internal void Reset()
+        {
+            _outputDict.Clear();
+            _resourceDict.Clear();
+        }
+
+        internal void AddOutput(int idx, FGOutputType type) => _outputDict[idx] = type;
+        internal void AddResource(int idx, FGResourceStateData data) => _resourceDict[idx] = data;
+
         internal bool ContainsOutput(FrameGraphTexture texture, FGOutputType outputType)
         {
             ref FGOutputType val = ref CollectionsMarshal.GetValueRefOrNullRef(_outputDict, texture.Index);

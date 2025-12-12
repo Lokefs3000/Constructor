@@ -103,6 +103,7 @@ namespace Editor.Rendering
             using (RasterPassDescription desc = renderPass.CreateRasterPass())
             {
                 desc.SetThreadingPolicy(RenderPassThreadingPolicy.None);
+                desc.SetDebugName("Tools");
                 desc.SetFunction(PassFunction);
             }
         }

@@ -1,6 +1,6 @@
 ﻿using Editor.Assets.Types;
 using Editor.Geometry;
-using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common.Streams;
 using System;
 using System.Collections.Generic;

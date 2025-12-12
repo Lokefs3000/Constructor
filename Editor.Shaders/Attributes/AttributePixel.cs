@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Editor.Shaders.Attributes
 {
-    internal sealed class AttributePixel : AttributeSignature
+    public sealed class AttributePixel : AttributeSignature
     {
         public AttributePixel() : base(
             "pixel",

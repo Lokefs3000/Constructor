@@ -24,7 +24,8 @@ namespace Editor.DearImGui
                 new DynAtlasDebugger(),
                 new ToolDebugger(),
                 new AssetDebugger(),
-                new RenderDebugger()
+                new RenderDebugger(),
+                new AssetDatabaseDebugger()
                 ];
             _activeDebuggerIndex = -1;
         }

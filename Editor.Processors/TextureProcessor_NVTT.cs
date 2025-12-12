@@ -1,6 +1,6 @@
 ﻿using Editor.Interop.NVTT;
-using Primary.Assets;
 using Primary.Assets.Loaders;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Mathematics;
 using Primary.Utility;

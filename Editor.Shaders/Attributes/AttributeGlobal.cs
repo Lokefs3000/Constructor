@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Editor.Shaders.Attributes
 {
-    internal sealed class AttributeGlobal : AttributeSignature
+    public sealed class AttributeGlobal : AttributeSignature
     {
         public AttributeGlobal() : base(
             "global",

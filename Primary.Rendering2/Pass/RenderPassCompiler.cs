@@ -1,4 +1,5 @@
 ﻿using Primary.Common;
+using Primary.Profiling;
 using Primary.Rendering2.Recording;
 using Primary.Rendering2.Resources;
 using System;
@@ -26,8 +27,10 @@ namespace Primary.Rendering2.Pass
             _currentPassList = new List<int>();
         }
 
-        internal void Compile(ReadOnlySpan<RenderPassDescription> passes/*, FrameGraphTimeline timeline*/)
+        internal void Compile(FrameGraphTexture finalTexture, ReadOnlySpan<RenderPassDescription> passes, FrameGraphTimeline timeline, FrameGraphState stateManager)
         {
+            timeline.ClearTimeline();
+
             if (_overviews.Length < passes.Length)
             {
                 _overviews = new RPOverview[passes.Length];
@@ -45,40 +48,109 @@ namespace Primary.Rendering2.Pass
                 }
             }
 
-            int idx = 0;
-            foreach (ref readonly RenderPassDescription desc in passes)
+            using (new ProfilingScope("FindResources"))
             {
-                ref RPOverview overview = ref _overviews[idx++];
-
-                foreach (ref readonly UsedResourceData resourceData in desc.Resources.Span)
+                int idx = 0;
+                foreach (ref readonly RenderPassDescription desc in passes)
                 {
-                    _referencedResources.Add(resourceData.Resource.Index);
+                    ref RPOverview overview = ref _overviews[idx++];
 
-                    bool isExternal = resourceData.Resource.IsExternal;
-                    overview.ResourceStates.Add(resourceData.Resource.Index, new ResourceState(resourceData.Usage, isExternal));
+                    foreach (ref readonly UsedResourceData resourceData in desc.Resources.Span)
+                    {
+                        _referencedResources.Add(resourceData.Resource.Index);
 
-                    if (isExternal && FlagUtility.HasFlag(resourceData.Usage, FGResourceUsage.Write))
-                        overview.Flags |= ResourceStateFlags.HasExternalWrite;
-                }
+                        bool isExternal = resourceData.Resource.IsExternal;
+                        overview.ResourceStates.Add(resourceData.Resource.Index, new ResourceState(resourceData.Usage, isExternal));
 
-                foreach (ref readonly UsedRenderTargetData renderTargetData in desc.RenderTargets.Span)
-                {
-                    bool isExternal = ((FrameGraphResource)renderTargetData.Target).IsExternal;
+                        if (isExternal && FlagUtility.HasFlag(resourceData.Usage, FGResourceUsage.Write))
+                            overview.Flags |= ResourceStateFlags.HasExternalWrite;
+                    }
 
-                    overview.OutputResources.Add(renderTargetData.Target.Index);
-                    overview.ResourceStates.Add(renderTargetData.Target.Index, new ResourceState(FGResourceUsage.Write, isExternal));
+                    foreach (ref readonly UsedRenderTargetData renderTargetData in desc.RenderTargets.Span)
+                    {
+                        bool isExternal = ((FrameGraphResource)renderTargetData.Target).IsExternal;
 
-                    if (isExternal)
-                        overview.Flags |= ResourceStateFlags.HasExternalWrite;
+                        overview.OutputResources.Add(renderTargetData.Target.Index);
+                        overview.ResourceStates.Add(renderTargetData.Target.Index, new ResourceState(FGResourceUsage.Write, isExternal));
+
+                        if (isExternal)
+                            overview.Flags |= ResourceStateFlags.HasExternalWrite;
+                    }
                 }
             }
 
-            FrameGraphTexture finalOutput;
-
-            for (int i = passes.Length - 1; i >= 0; i--)
+            using (new ProfilingScope("FindRelations"))
             {
-                ref readonly RPOverview overview = ref _overviews[i];
-                
+                for (int i = passes.Length - 1; i >= 0; i--)
+                {
+                    ref readonly RPOverview overview = ref _overviews[i];
+                    ref readonly RenderPassDescription overviewDesc = ref passes[i];
+
+                    for (int j = 0; j < passes.Length; j++)
+                    {
+                        if (i == j)
+                            continue;
+
+                        ref readonly RPOverview pass = ref _overviews[j];
+                        ref readonly RenderPassDescription passDesc = ref passes[j];
+
+                        RPRelation relation = RPRelation.None;
+
+                        if (overviewDesc.Type != passDesc.Type)
+                        {
+                            foreach (var kvp in overview.ResourceStates)
+                            {
+                                if (pass.ResourceStates.TryGetValue(kvp.Key, out ResourceState state) && FlagUtility.HasFlag(kvp.Value.Usage | state.Usage, FGResourceUsage.Write))
+                                {
+                                    relation |= RPRelation.WriteOnSeparateQueue;
+                                    break;
+                                }
+                            }
+                        }
+
+                        foreach (int res in overview.OutputResources)
+                        {
+                            if (pass.OutputResources.Contains(res))
+                            {
+                                relation |= RPRelation.SharedOutput;
+                                break;
+                            }
+                        }
+
+                        overview.Relations[j] = relation;
+                    }
+                }
+            }
+
+            using (new ProfilingScope("Output"))
+            {
+                for (int i = 0; i < passes.Length; i++)
+                {
+                    ref readonly RenderPassDescription desc = ref passes[i];
+                    ref readonly RPOverview overview = ref _overviews[i];
+
+                    RenderPassStateData stateData = stateManager.GetStateData(i);
+
+                    if (desc.Type != RenderPassType.Graphics)
+                        throw new NotImplementedException();
+
+                    foreach (ref readonly UsedRenderTargetData data in desc.RenderTargets.Span)
+                    {
+                        stateData.AddOutput(data.Target.Index, data.Type switch
+                        {
+                            FGRenderTargetType.RenderTarget => FGOutputType.RenderTarget,
+                            FGRenderTargetType.DepthStencil => FGOutputType.DepthStencil,
+                            _ => throw new NotImplementedException()
+                        });
+                    }
+
+                    foreach (ref readonly UsedResourceData data in desc.Resources.Span)
+                    {
+                        stateData.AddResource(data.Resource.Index, new FGResourceStateData(data.Usage));
+                    }
+
+                    timeline.AddRasterEvent(i);
+                }
             }
         }
 
@@ -111,8 +183,8 @@ namespace Primary.Rendering2.Pass
         {
             None = 0,
 
-            MustHappenBefore,
-            MustHappenAfter,
+            WriteOnSeparateQueue = 1 << 0,
+            SharedOutput = 1 << 1
         }
     }
 }

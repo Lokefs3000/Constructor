@@ -7,6 +7,7 @@ using Serilog;
 using SharpGen.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -32,6 +33,9 @@ namespace Editor.Shaders
         private List<StaticSamplerData> _staticSamplers;
 
         private string? _propertySourceTemplate;
+        private string? _processedSource;
+
+        private bool _generatePropertiesInHeader;
 
         private bool _disposedValue;
 
@@ -50,7 +54,10 @@ namespace Editor.Shaders
             _structs = new List<StructData>();
             _staticSamplers = new List<StaticSamplerData>();
 
-            _propertySourceTemplate = null;
+            _propertySourceTemplate = "__HEADER_CB.RAW_$PNAME$";
+            _processedSource = null;
+
+            _generatePropertiesInHeader = true;
         }
 
         private void Dispose(bool disposing)
@@ -77,6 +84,8 @@ namespace Editor.Shaders
             string source = args.InputSource;
             string fileName = args.SourceFileName ?? "hlsl.hlsl";
 
+            string[] includedFiles = Array.Empty<string>();
+
             //1. preprocess source
             {
                 using (ShaderIncludeHandler includeHandler = new ShaderIncludeHandler(args.IncludeDirectories))
@@ -85,7 +94,7 @@ namespace Editor.Shaders
                     string errors = result.GetErrors();
                     if (errors.Length > 0)
                     {
-                        throw new Exception(errors); //temp
+                        throw new ShaderCompileException(errors); //temp
                     }
 
                     using IDxcBlob blob = result.GetResult();
@@ -94,6 +103,8 @@ namespace Editor.Shaders
                         //ANYTHING to avoid using Marshal
                         source = new string((sbyte*)blob.BufferPointer);
                     }
+
+                    includedFiles = includeHandler.GetReadFiles();
                 }
             }
 
@@ -108,7 +119,7 @@ namespace Editor.Shaders
             }
 
             //3. generate final source
-
+            
             SourceAugmenter generator = new SourceAugmenter(this, fileName);
             source = generator.Augment(source)!;
 
@@ -116,6 +127,8 @@ namespace Editor.Shaders
             {
                 return null;
             }
+
+            _processedSource = source;
 
             //4. compile for targets
             ShaderCompileStage stages = CountAllStages();
@@ -139,7 +152,7 @@ namespace Editor.Shaders
                 }
             }
 
-            return new ShaderProcesserResult(MakeBytecodeTarget(args.Targets, stages), bytecodes);
+            return new ShaderProcesserResult(MakeBytecodeTarget(args.Targets, stages), bytecodes, includedFiles);
         }
 
         private bool CompileForTarget(ref string source, string[] initialArgs, ShaderBytecode[] bytecodes, ShaderCompileTarget target, ShaderCompileStage stages, ref int offset)
@@ -239,6 +252,34 @@ namespace Editor.Shaders
             return ref Structs[dataRef.Index];
         }
 
+        public int CalculateSize(ValueDataRef generic)
+        {
+            if (generic.Generic == ValueGeneric.Custom)
+            {
+                ref readonly StructData @struct = ref GetRefSource(generic);
+                Debug.Assert(!Unsafe.IsNullRef(in @struct));
+
+                int size = 0;
+                foreach (ref readonly VariableData variable in @struct.Variables.AsSpan())
+                {
+                    size += CalculateSize(variable.Generic);
+                }
+
+                return size;
+            }
+            else
+            {
+                return generic.Generic switch
+                {
+                    ValueGeneric.Float => sizeof(float),
+                    ValueGeneric.Double => sizeof(double),
+                    ValueGeneric.UInt => sizeof(uint),
+                    ValueGeneric.Int => sizeof(int),
+                    _ => throw new NotSupportedException()
+                } * generic.Rows * generic.Columns;
+            }
+        }
+
         internal ILogger Logger => _logger;
 
         public ReadOnlySpan<FunctionData> Functions => _functions.AsSpan();
@@ -248,6 +289,9 @@ namespace Editor.Shaders
         public ReadOnlySpan<StaticSamplerData> StaticSamplers => _staticSamplers.AsSpan();
 
         public string? PropertySourceTemplate { get => _propertySourceTemplate; internal set => _propertySourceTemplate = value; }
+        public string? ProcessedSource => _processedSource;
+
+        public bool GeneratePropertiesInHeader { get => _generatePropertiesInHeader; internal set => _generatePropertiesInHeader = value; }
 
         private static ushort MakeBytecodeTarget(ShaderCompileTarget target, ShaderCompileStage stage) => (ushort)(((ushort)target) | (((ushort)stage) << 2));
 

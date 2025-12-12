@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Editor.Shaders.Attributes
 {
-    internal sealed class AttributeVertex : AttributeSignature
+    public sealed class AttributeVertex : AttributeSignature
     {
         public AttributeVertex() : base(
             "vertex",

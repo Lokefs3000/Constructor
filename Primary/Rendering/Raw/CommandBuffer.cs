@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using System.Diagnostics;
 using System.Numerics;

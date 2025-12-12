@@ -22,13 +22,26 @@ namespace Primary.Rendering2.Resources
         {
             Width = 0;
             Height = 0;
-            Depth = 0;
+            Depth = 1;
 
             Dimension = FGTextureDimension._2D;
             Format = FGTextureFormat.Undefined;
             Usage = FGTextureUsage.Undefined;
 
             Swizzle = FrameGraphTextureSwizzle.RGBA;
+        }
+
+        public FrameGraphTextureDesc(FrameGraphTextureDesc @base)
+        {
+            Width = @base.Width;
+            Height = @base.Height;
+            Depth = @base.Depth;
+
+            Dimension = @base.Dimension;
+            Format = @base.Format;
+            Usage = @base.Usage;
+
+            Swizzle = @base.Swizzle;
         }
     }
 

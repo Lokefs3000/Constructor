@@ -1,4 +1,4 @@
-﻿namespace Primary.Assets
+﻿namespace Primary.Assets.Types
 {
     public interface IAssetDefinition
     {

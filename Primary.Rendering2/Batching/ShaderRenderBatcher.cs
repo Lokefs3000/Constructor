@@ -2,6 +2,7 @@
 using Collections.Pooled;
 using CommunityToolkit.HighPerformance;
 using Primary.Assets;
+using Primary.Rendering2.Assets;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,7 +15,7 @@ namespace Primary.Rendering2.Batching
 {
     public sealed class ShaderRenderBatcher : IDisposable
     {
-        private ShaderAsset? _activeShader;
+        private ShaderAsset2? _activeShader;
 
         private PooledList<RenderSegment> _segments;
         private UnsafeList<RenderFlag> _flags;
@@ -29,7 +30,7 @@ namespace Primary.Rendering2.Batching
             _flags = new UnsafeList<RenderFlag>(8);
         }
 
-        internal void ClearFrameData(ShaderAsset shader)
+        internal void ClearFrameData(ShaderAsset2 shader)
         {
             _activeShader = shader;
 
@@ -143,7 +144,7 @@ namespace Primary.Rendering2.Batching
             GC.SuppressFinalize(this);
         }
 
-        public ShaderAsset? ActiveShader => _activeShader;
+        public ShaderAsset2? ActiveShader => _activeShader;
 
         public ReadOnlySpan<RenderSegment> Segments => _segments.Span;
         public ReadOnlySpan<RenderFlag> Flags => _flags.AsSpan();

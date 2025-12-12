@@ -2,9 +2,9 @@
 
 namespace Primary
 {
-    internal static class EngLog
+    public static class EngLog
     {
-        internal static readonly ILogger Assets = Create("Assets");
+        public static readonly ILogger Assets = Create("Assets");
         internal static readonly ILogger Systems = Create("Systems");
         internal static readonly ILogger Scene = Create("Scene");
         internal static readonly ILogger Console = Create("Console");

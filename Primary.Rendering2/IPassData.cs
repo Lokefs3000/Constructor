@@ -10,4 +10,9 @@ namespace Primary.Rendering2
     {
         public void Clear();
     }
+
+    public class GenericPassData : IPassData
+    {
+        public void Clear() { }
+    }
 }

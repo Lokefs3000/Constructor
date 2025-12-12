@@ -1,4 +1,5 @@
 ﻿using Primary.Assets;
+using Primary.Assets.Types;
 using System.Text;
 
 namespace Editor.Serialization.Types

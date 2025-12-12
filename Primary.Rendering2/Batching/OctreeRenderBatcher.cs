@@ -5,6 +5,8 @@ using Primary.Assets;
 using Primary.Components;
 using Primary.Profiling;
 using Primary.Rendering.Data;
+using Primary.Rendering2.Assets;
+using Primary.Rendering2.Temporary;
 using Primary.Rendering2.Tree;
 using Primary.Scenes;
 using System;
@@ -23,9 +25,9 @@ namespace Primary.Rendering2.Batching
 
         private Queue<RenderOctant> _octants;
 
-        private Dictionary<ShaderAsset, ushort> _shaderSourceIndices;
+        private Dictionary<ShaderAsset2, ushort> _shaderSourceIndices;
         private Dictionary<IRenderMeshSource, ushort> _meshSourceIndices;
-        private Dictionary<MaterialAsset, uint> _materialSourceIndices;
+        private Dictionary<MaterialAsset2, uint> _materialSourceIndices;
 
         private PooledList<RenderKey> _renderingKeys;
         private PooledList<UnbatchedRenderFlag> _renderingData;
@@ -36,9 +38,9 @@ namespace Primary.Rendering2.Batching
 
             _octants = new Queue<RenderOctant>();
 
-            _shaderSourceIndices = new Dictionary<ShaderAsset, ushort>();
+            _shaderSourceIndices = new Dictionary<ShaderAsset2, ushort>();
             _meshSourceIndices = new Dictionary<IRenderMeshSource, ushort>();
-            _materialSourceIndices = new Dictionary<MaterialAsset, uint>();
+            _materialSourceIndices = new Dictionary<MaterialAsset2, uint>();
 
             _renderingKeys = new PooledList<RenderKey>();
             _renderingData = new PooledList<UnbatchedRenderFlag>();
@@ -80,15 +82,13 @@ namespace Primary.Rendering2.Batching
         {
             World world = Engine.GlobalSingleton.SceneManager.World;
 
-            MaterialAsset defaultMaterial = null!;
-
             ReadOnlySpan<SceneEntity> entities = octant.ChildrenList.AsSpan();
             for (int i = 0; i < entities.Length; i++)
             {
                 ref readonly SceneEntity entity = ref entities[i];
                 ref readonly EntityData rawData = ref world.GetEntityData(entity.WrappedEntity);
 
-                ref readonly MeshRenderer renderer = ref rawData.Get<MeshRenderer>();
+                ref readonly MeshRenderer2 renderer = ref rawData.Get<MeshRenderer2>();
                 //"renderer" SHOULD not be null but a crash will occur if it is
                 if (!Unsafe.IsNullRef(in renderer) && renderer.Mesh != null)
                 {
@@ -102,15 +102,15 @@ namespace Primary.Rendering2.Batching
                         TODO: CULL OBJECT 
                     */
 
-                    MaterialAsset material = renderer.Material ?? defaultMaterial;
-                    ShaderAsset? shader = material.Shader;
+                    MaterialAsset2 material = renderer.Material ?? list.DefaultMaterial!;
+                    ShaderAsset2? shader = material.Shader;
 
                     RawRenderMesh mesh = renderer.Mesh;
 
                     if (shader == null)
                     {
-                        material = defaultMaterial;
-                        shader = defaultMaterial.Shader!;
+                        material = list.DefaultMaterial!;
+                        shader = list.DefaultMaterial!.Shader!;
                     }
 
                     if (!_shaderSourceIndices.TryGetValue(shader, out ushort shaderId))

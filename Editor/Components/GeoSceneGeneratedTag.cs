@@ -1,4 +1,4 @@
-﻿using Primary.Assets;
+﻿using Primary.Assets.Types;
 using Primary.Components;
 using System;
 using System.Collections.Generic;

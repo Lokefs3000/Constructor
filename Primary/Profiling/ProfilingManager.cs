@@ -18,6 +18,8 @@ namespace Primary.Profiling
         private long _startTimestamp;
         private long _lastStartTimestamp;
 
+        private ProfilingOptions _options;
+
         private bool _disposedValue;
 
         internal ProfilingManager()
@@ -99,7 +101,7 @@ namespace Primary.Profiling
                 timestamps.Timestamps.Clear();
                 timestamps.Timestamps.AddRange(kvp.Value.GetTimestamps());
 
-                kvp.Value.ClearTimestamps();
+                kvp.Value.ClearDataForNextFrame();
             }
         }
 
@@ -110,6 +112,8 @@ namespace Primary.Profiling
 
         public static ProfilingManager Instance => NullableUtility.ThrowIfNull(Unsafe.As<ProfilingManager>(s_instance.Target));
         public static bool IncludeStacktrace = false;
+
+        public static ProfilingOptions Options { get => Instance._options; set => Instance._options = value; }
     }
 
     public record struct ThreadProfilingTimestamps
@@ -122,5 +126,12 @@ namespace Primary.Profiling
             ThreadId = 0;
             Timestamps = null;
         }
+    }
+
+    public enum ProfilingOptions : byte
+    {
+        None = 0,
+
+        CollectAllocation = 1 << 0
     }
 }

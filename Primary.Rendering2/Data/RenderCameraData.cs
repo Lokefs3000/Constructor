@@ -12,6 +12,9 @@ namespace Primary.Rendering2.Data
     {
         public SceneEntity CameraEntity { get; internal set; }
 
+        public FrameGraphTexture ColorTexture { get; internal set; }
+        public FrameGraphTexture DepthTexture { get; internal set; }
+
         internal RenderCameraData()
         {
 

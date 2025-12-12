@@ -86,7 +86,7 @@ public class ShaderIncludeHandler : CallbackBase, IDxcIncludeHandler
         return null;
     }
 
-    internal string[] ReadFiles => _sourceFiles.Keys.ToArray();
+    public string[] GetReadFiles() => _sourceFiles.Count == 0 ? Array.Empty<string>() : _sourceFiles.Keys.ToArray();
 
     private class SourceCodeBlob : IDisposable
     {

@@ -3,6 +3,7 @@ using Editor.Gui;
 using Editor.Storage;
 using Hexa.NET.ImGui;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using System.Numerics;
 using System.Runtime.InteropServices;

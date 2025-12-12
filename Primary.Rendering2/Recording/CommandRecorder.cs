@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
+using Primary.Common;
 using Primary.Rendering2.Assets;
 using Primary.Rendering2.Memory;
 using System;
@@ -25,6 +26,8 @@ namespace Primary.Rendering2.Recording
         {
             _allocator = new SequentialLinearAllocator(2048);
             _executionCommandOffsets = new List<int>();
+
+            _currentEffectFlags = RecCommandEffectFlags.None;
         }
 
         private void Dispose(bool disposing)
@@ -52,6 +55,14 @@ namespace Primary.Rendering2.Recording
             _executionCommandOffsets.Clear();
 
             _currentEffectFlags = RecCommandEffectFlags.None;
+        }
+
+        internal void FinishRecording()
+        {
+            if ((_executionCommandOffsets.Count > 0 ? _executionCommandOffsets[_executionCommandOffsets.Count - 1] : 0) < _allocator.CurrentOffset)
+            {
+                AddExecutionCommand(RecCommandType.Dummy, new UCDummy { });
+            }
         }
 
         internal unsafe void AddStateChangeCommand<T>(RecCommandType commandType, RecCommandEffectFlags effectFlags, T command) where T : unmanaged, IStateChangeCommand
@@ -88,8 +99,7 @@ namespace Primary.Rendering2.Recording
 
         internal unsafe void AddSetParameters(PropertyBlock block)
         {
-#if false
-            ShaderAsset? shader = block.Shader;
+            ShaderAsset2? shader = block.Shader;
             if (shader == null)
                 return;
 
@@ -106,32 +116,53 @@ namespace Primary.Rendering2.Recording
 
             foreach (ref readonly ShaderProperty property in properties)
             {
-                if (property.Type == ShaderPropertyType.Texture || property.Type == ShaderPropertyType.Buffer)
+                if (property.Type == ShPropertyType.Texture || property.Type == ShPropertyType.Buffer)
                 {
                     PropertyData data = default;
-                    if (property.Visiblity == ShaderPropertyVisiblity.Public)
+                    if (!FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Global))
                     {
-                        data = block.GetPropertyValue(property.Index);
+                        data = block.GetPropertyValue(property.IndexOrByteOffset);
                     }
                     else if (!globalsManager.TryGetPropertyValue(property.Name, out data))
                     {
                         continue;
                     }
 
+                    bool isExternal = false;
                     nint dataPtr = nint.Zero;
 
                     switch (property.Type)
                     {
-                        case ShaderPropertyType.Buffer: dataPtr = data.Resource.Resource?.Handle ?? data.Resource.Index; break;
-                        case ShaderPropertyType.Texture:
+                        case ShPropertyType.Buffer:
+                            {
+                                if (data.Resource.Resource == null)
+                                    dataPtr = data.Resource.Index;
+                                else
+                                {
+                                    dataPtr = data.Resource.Resource.Handle;
+                                    isExternal = true;
+                                }
+
+                                break;
+                            }
+                        case ShPropertyType.Texture:
                             {
                                 if (data.Aux != null)
                                 {
                                     TextureAsset asset = Unsafe.As<TextureAsset>(data.Aux);
                                     dataPtr = asset.Handle;
+                                    isExternal = true;
                                 }
                                 else
-                                    dataPtr = data.Resource.Resource?.Handle ?? data.Resource.Index;
+                                {
+                                    if (data.Resource.Resource == null)
+                                        dataPtr = data.Resource.Index;
+                                    else
+                                    {
+                                        dataPtr = data.Resource.Resource.Handle;
+                                        isExternal = true;
+                                    }
+                                }
 
                                 break;
                             }
@@ -139,14 +170,17 @@ namespace Primary.Rendering2.Recording
 
                     if (dataPtr == nint.Zero)
                     {
-                        if (property.Type == ShaderPropertyType.Texture)
+                        if (property.Type == ShPropertyType.Texture)
                         {
                             switch (property.Default)
                             {
-                                case Assets.ShaderPropertyDefault.TexWhite: dataPtr = AssetManager.Static.DefaultWhite.Handle; break;
-                                case Assets.ShaderPropertyDefault.TexBlack: dataPtr = AssetManager.Static.DefaultWhite.Handle; break;
-                                case Assets.ShaderPropertyDefault.TexNormal: dataPtr = AssetManager.Static.DefaultNormal.Handle; break;
-                                case Assets.ShaderPropertyDefault.TexMask: dataPtr = AssetManager.Static.DefaultMask.Handle; break;
+                                case ShPropertyDefault.NumOne:
+                                case ShPropertyDefault.NumIdentity:
+                                case ShPropertyDefault.TexWhite: dataPtr = AssetManager.Static.DefaultWhite.Handle; break;
+                                case ShPropertyDefault.NumZero:
+                                case ShPropertyDefault.TexBlack: dataPtr = AssetManager.Static.DefaultWhite.Handle; break;
+                                case ShPropertyDefault.TexNormal: dataPtr = AssetManager.Static.DefaultNormal.Handle; break;
+                                case ShPropertyDefault.TexMask: dataPtr = AssetManager.Static.DefaultMask.Handle; break;
                             }
                         }
                     }
@@ -158,9 +192,10 @@ namespace Primary.Rendering2.Recording
                     {
                         Meta = new PropertyMeta
                         {
-                            Type = (SetPropertyType)((int)(property.Type == ShaderPropertyType.Buffer ? SetPropertyType.Buffer : SetPropertyType.Texture) + (data.Resource.IsExternal ? 2 : 0)),
+                            Type = (SetPropertyType)((int)(property.Type == ShPropertyType.Buffer ? SetPropertyType.Buffer : SetPropertyType.Texture) + (data.Resource.IsExternal ? 2 : 0)),
                             Target = property.Stages
                         },
+                        IsExternal = isExternal,
                         Resource = dataPtr
                     });
                 }
@@ -169,7 +204,6 @@ namespace Primary.Rendering2.Recording
 
                 }
             }
-#endif
         }
 
         internal nint GetPointerAtOffset(int offset)
@@ -183,6 +217,8 @@ namespace Primary.Rendering2.Recording
     internal enum RecCommandType : byte
     {
         Undefined = 0,
+
+        Dummy,
 
         SetRenderTarget,
         SetDepthStencil,
@@ -228,5 +264,7 @@ namespace Primary.Rendering2.Recording
 
         VertexBuffer = 1 << 5,
         IndexBuffer = 1 << 6,
+
+        Properties = 1 << 7
     }
 }

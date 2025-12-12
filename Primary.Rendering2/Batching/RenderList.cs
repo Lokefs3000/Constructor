@@ -1,20 +1,12 @@
-﻿using Arch.LowLevel;
-using Collections.Pooled;
-using CommunityToolkit.HighPerformance;
+﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
 using Primary.Rendering.Data;
-using System;
+using Primary.Rendering2.Assets;
 using System.Buffers;
-using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Rendering2.Batching
 {
@@ -23,12 +15,14 @@ namespace Primary.Rendering2.Batching
         private readonly BatchingManager _manager;
         private bool _disposedValue;
 
-        private Dictionary<ShaderAsset, ShaderRenderBatcher> _shaderBatchers;
-        private Dictionary<ShaderAsset, ShaderKeyRange> _shaderKeyRanges;
+        private MaterialAsset2? _defaultMaterial;
 
-        private ConcurrentDictionary<ShaderAsset, ushort> _shaderIds;
+        private Dictionary<ShaderAsset2, ShaderRenderBatcher> _shaderBatchers;
+        private Dictionary<ShaderAsset2, ShaderKeyRange> _shaderKeyRanges;
+
+        private ConcurrentDictionary<ShaderAsset2, ushort> _shaderIds;
         private ConcurrentDictionary<IRenderMeshSource, ushort> _modelIds;
-        private ConcurrentDictionary<MaterialAsset, uint> _materialIds;
+        private ConcurrentDictionary<MaterialAsset2, uint> _materialIds;
 
         private List<ShaderRenderBatcher> _usedBatchers;
 
@@ -39,12 +33,14 @@ namespace Primary.Rendering2.Batching
         {
             _manager = manager;
 
-            _shaderBatchers = new Dictionary<ShaderAsset, ShaderRenderBatcher>();
-            _shaderKeyRanges = new Dictionary<ShaderAsset, ShaderKeyRange>();
+            _defaultMaterial = AssetManager.LoadAsset<MaterialAsset2>("Engine/Materials/R2DefaultMat.mat2", true);
 
-            _shaderIds = new ConcurrentDictionary<ShaderAsset, ushort>();
+            _shaderBatchers = new Dictionary<ShaderAsset2, ShaderRenderBatcher>();
+            _shaderKeyRanges = new Dictionary<ShaderAsset2, ShaderKeyRange>();
+
+            _shaderIds = new ConcurrentDictionary<ShaderAsset2, ushort>();
             _modelIds = new ConcurrentDictionary<IRenderMeshSource, ushort>();
-            _materialIds = new ConcurrentDictionary<MaterialAsset, uint>();
+            _materialIds = new ConcurrentDictionary<MaterialAsset2, uint>();
 
             _usedBatchers = new List<ShaderRenderBatcher>();
 
@@ -122,7 +118,7 @@ namespace Primary.Rendering2.Batching
             }
         }
 
-        internal void AddRange(ShaderAsset asset, ShaderKeyRange range)
+        internal void AddRange(ShaderAsset2 asset, ShaderKeyRange range)
         {
             _shaderKeyRanges.Add(asset, range);
         }
@@ -146,16 +142,16 @@ namespace Primary.Rendering2.Batching
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ushort GetShaderId(ShaderAsset asset) => _shaderIds.GetOrAdd(asset, (_) => (ushort)_shaderIds.Count);
+        internal ushort GetShaderId(ShaderAsset2 asset) => _shaderIds.GetOrAdd(asset, (_) => (ushort)_shaderIds.Count);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal ushort GetModelId(IRenderMeshSource asset) => _modelIds.GetOrAdd(asset, (_) => (ushort)_modelIds.Count);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal uint GetMaterialId(MaterialAsset asset) => _materialIds.GetOrAdd(asset, (_) => (uint)_materialIds.Count);
+        internal uint GetMaterialId(MaterialAsset2 asset) => _materialIds.GetOrAdd(asset, (_) => (uint)_materialIds.Count);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool GetKeyRangeForShader(ShaderAsset asset, out ShaderKeyRange keyRange) => _shaderKeyRanges.TryGetValue(asset, out keyRange);
+        internal bool GetKeyRangeForShader(ShaderAsset2 asset, out ShaderKeyRange keyRange) => _shaderKeyRanges.TryGetValue(asset, out keyRange);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Span<RenderKey> GetSlicedKeyRange(ShaderKeyRange keyRange)
@@ -163,6 +159,8 @@ namespace Primary.Rendering2.Batching
             Debug.Assert(_rentedKeys != null);
             return _rentedKeys.AsSpan(keyRange.FlagIdxStart, keyRange.FlagIdxEnd - keyRange.FlagIdxStart);
         }
+
+        public MaterialAsset2? DefaultMaterial { get => _defaultMaterial; set => _defaultMaterial = value ?? AssetManager.LoadAsset<MaterialAsset2>("Engine/Materials/R2DefaultMat.mat2", true); }
 
         public int TotalFlagCount => _rentedKeyCount;
         public ReadOnlySpan<ShaderRenderBatcher> ShaderBatchers => _usedBatchers.AsSpan();
@@ -203,7 +201,7 @@ namespace Primary.Rendering2.Batching
         }
     }
 
-    public readonly record struct UnbatchedRenderFlag(MaterialAsset Material, RawRenderMesh Mesh, Matrix4x4 Model);
+    public readonly record struct UnbatchedRenderFlag(MaterialAsset2 Material, RawRenderMesh Mesh, Matrix4x4 Model);
     public readonly record struct ShaderKeyRange(int FlagIdxStart, int FlagIdxEnd);
 
     public ref struct ShaderRenderSection(ShaderAsset Shader, ReadOnlySpan<RenderSegment> Segments, ReadOnlySpan<RenderFlag> Flags)
@@ -214,5 +212,5 @@ namespace Primary.Rendering2.Batching
     }
 
     public readonly record struct RenderFlag(Matrix4x4 Matrix, uint DataId);
-    public readonly record struct RenderSegment(MaterialAsset Material, RawRenderMesh Mesh, int FlagIndexStart, int FlagIndexEnd);
+    public readonly record struct RenderSegment(MaterialAsset2 Material, RawRenderMesh Mesh, int FlagIndexStart, int FlagIndexEnd);
 }

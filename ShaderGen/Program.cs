@@ -438,6 +438,18 @@ namespace ShaderGen
                 }
             }
 
+            {
+                sb.AppendLine();
+                sb.AppendLine();
+
+                sb.Append(processor.ProcessedSource ?? "null");
+
+                sb.AppendLine();
+                sb.Append("Written to file (output.hlsl)..");
+
+                File.WriteAllText("output.hlsl", processor.ProcessedSource);
+            }
+
             Console.WriteLine(sb.ToString());
             Console.ReadLine();
         }

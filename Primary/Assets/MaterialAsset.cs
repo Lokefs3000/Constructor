@@ -1,4 +1,5 @@
-﻿using Primary.Rendering;
+﻿using Primary.Assets.Types;
+using Primary.Rendering;
 using System.Collections.Frozen;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -236,6 +237,10 @@ namespace Primary.Assets
 
         public Type AssetType => typeof(MaterialAsset);
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
+
+        AssetId IInternalAssetData.Id => Id;
+        ResourceStatus IInternalAssetData.Status => Status;
+        string IInternalAssetData.Name => Name;
     }
 
     public record struct MaterialProperty

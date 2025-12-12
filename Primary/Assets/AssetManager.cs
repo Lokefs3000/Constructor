@@ -1,4 +1,5 @@
 ﻿using Primary.Assets.Loaders;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
 using System.Collections.Frozen;
@@ -45,6 +46,7 @@ namespace Primary.Assets
             {
                 return new ImmutableAssets(
                     NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_White.png", true)),
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Black.png", true)),
                     NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Normal.png", true)),
                     NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Mask.png", true)));
             }, LazyThreadSafetyMode.PublicationOnly);
@@ -359,6 +361,7 @@ namespace Primary.Assets
 
     public record class ImmutableAssets(
         TextureAsset DefaultWhite,
+        TextureAsset DefaultBlack,
         TextureAsset DefaultNormal,
         TextureAsset DefaultMask);
 }

@@ -1,7 +1,7 @@
 ﻿using Collections.Pooled;
 using CommunityToolkit.HighPerformance;
 using CommunityToolkit.HighPerformance.Enumerables;
-using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using System.Collections.Concurrent;
 using System.Text;

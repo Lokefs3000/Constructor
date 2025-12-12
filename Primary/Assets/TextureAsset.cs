@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using Primary.Assets.Types;
+using System.Runtime.CompilerServices;
 
 namespace Primary.Assets
 {
@@ -114,5 +115,9 @@ namespace Primary.Assets
 
         public Type AssetType => typeof(TextureAsset);
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
+
+        AssetId IInternalAssetData.Id => Id;
+        ResourceStatus IInternalAssetData.Status => Status;
+        string IInternalAssetData.Name => Name;
     }
 }

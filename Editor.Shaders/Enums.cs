@@ -8,10 +8,14 @@ namespace Editor.Shaders
 {
     public enum PropertyDefault : byte
     {
-        White = 0,
-        Black,
-        Mask,
-        Normal
+        NumOne = 0,
+        NumZero,
+        NumIdentity,
+
+        TexWhite,
+        TexBlack,
+        TexMask,
+        TexNormal
     }
 
     public enum PropertyDisplay : byte
@@ -49,8 +53,8 @@ namespace Editor.Shaders
         Color,
         Normal,
         Tangent,
-        Bitangnet,
-        BlendIndices,
+        //Bitangnet,
+        BlendIndices = Tangent + 2,
         BlendWeight,
         PositionT,
         PSize,

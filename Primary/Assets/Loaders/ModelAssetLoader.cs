@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
 using K4os.Compression.LZ4.Streams;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
 using Primary.Rendering;

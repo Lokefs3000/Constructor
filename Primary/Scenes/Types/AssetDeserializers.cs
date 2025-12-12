@@ -1,4 +1,5 @@
 ﻿using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Serialization.Structural;
 
 namespace Primary.Scenes.Types

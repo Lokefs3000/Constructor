@@ -12,11 +12,16 @@ namespace Primary.Rendering2.Resources
 
         internal FrameGraphTexture(FrameGraphResource resource)
         {
-            _resource = resource;
+            if (resource.ResourceId != FGResourceId.Texture)
+                _resource = FrameGraphResource.Invalid;
+            else
+                _resource = resource;
         }
 
         public FrameGraphTextureDesc Description => _resource.TextureDesc;
         public int Index => _resource.Index;
+
+        public bool IsExternal => _resource.IsExternal;
 
         public static readonly FrameGraphTexture Invalid = new FrameGraphTexture(new FrameGraphResource(-1, default(FrameGraphTextureDesc)));
 

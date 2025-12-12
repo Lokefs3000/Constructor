@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets.Types;
 using Primary.Rendering;
 using Primary.Utility;
 using Serilog;

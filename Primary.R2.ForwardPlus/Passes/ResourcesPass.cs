@@ -17,6 +17,8 @@ namespace Primary.R2.ForwardPlus.Passes
             ForwardPlusRenderPath renderPath = Unsafe.As<ForwardPlusRenderPath>(stateData.Path);
 
             RenderList list = renderPath.PrimaryRenderList!;
+            if (list.TotalFlagCount == 0)
+                return;
 
             GenericResources resources = renderPass.Blackboard.Add<GenericResources>();
 

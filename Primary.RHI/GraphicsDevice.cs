@@ -52,6 +52,9 @@ namespace Primary.RHI
         public abstract void InstallTracker(IObjectTracker tracker);
         /// <summary>Not thread-safe</summary>
         public abstract void UninstallTracker(IObjectTracker tracker);
+
+        //HACK: remove when r2 is integrated fully
+        public static GraphicsDevice? Instance = null;
     }
 
     [Flags]

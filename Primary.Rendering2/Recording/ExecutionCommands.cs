@@ -17,6 +17,11 @@ namespace Primary.Rendering2.Recording
         //public RecCommandEffectFlags Effect;
     }
 
+    internal struct UCDummy : IExecutionCommand
+    {
+
+    }
+
     internal struct UCDrawIndexedInstanced : IExecutionCommand
     {
         public uint IndexCount;

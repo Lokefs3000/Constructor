@@ -3,6 +3,7 @@ using Editor.Assets;
 using Editor.DearImGui.Popups;
 using Hexa.NET.ImGui;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Rendering.Data;
 using System.Numerics;

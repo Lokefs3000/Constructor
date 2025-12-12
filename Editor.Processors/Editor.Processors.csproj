@@ -8,7 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.0" />
-    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.9.1" />
     <PackageReference Include="Silk.NET.Assimp" Version="2.22.0" />
     <PackageReference Include="Tomlyn" Version="0.19.0" />
     <PackageReference Include="Vortice.Direct3D12" Version="3.6.2" />
@@ -18,6 +17,7 @@
     <ProjectReference Include="..\Editor.Interop\Editor.Interop.csproj" />
     <ProjectReference Include="..\Editor.Shaders\Editor.Shaders.csproj" />
     <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
+    <ProjectReference Include="..\Primary.Rendering2\Primary.Rendering2.csproj" />
     <ProjectReference Include="..\Primary.RHI\Primary.RHI.csproj" />
     <ProjectReference Include="..\Primary\Primary.csproj" />
   </ItemGroup>

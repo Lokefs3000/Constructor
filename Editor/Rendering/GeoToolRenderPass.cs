@@ -97,9 +97,14 @@ namespace Editor.Rendering
 
         public void SetupRenderState(RenderPass renderPass)
         {
+            GeoEditorView editor = Editor.GlobalSingleton.GeoEditorView;
+            if (editor.ActiveScene == null)
+                return;
+
             using (RasterPassDescription desc = renderPass.CreateRasterPass())
             {
                 desc.SetThreadingPolicy(RenderPassThreadingPolicy.None);
+                desc.SetDebugName("GeoTool");
                 desc.SetFunction(PassFunction);
             }
         }

@@ -1,5 +1,5 @@
 ﻿using Editor.Geometry;
-using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Rendering;
 using Primary.Rendering.Data;
 using System.Runtime.CompilerServices;
@@ -187,5 +187,11 @@ namespace Editor.Assets.Types
 
         public Type AssetType => typeof(GeoSceneAsset);
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
+
+        AssetId IInternalAssetData.Id => Id;
+
+        ResourceStatus IInternalAssetData.Status => Status;
+
+        string IInternalAssetData.Name => Name;
     }
 }

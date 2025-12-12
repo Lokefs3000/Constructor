@@ -38,6 +38,13 @@ namespace Primary.Rendering2
             _resourceCounter = 0;
         }
 
+        internal IPassData? GetPassData(Type type)
+        {
+            if (_passDataPool.TryGetValue(type, out IPassData? data))
+                return data;
+            return null;
+        }
+
         public RasterPassDescription SetupRasterPass<T>(string name, out T data) where T : class, IPassData, new()
         {
             if (!_passDataPool.TryGetValue(typeof(T), out IPassData? passData))

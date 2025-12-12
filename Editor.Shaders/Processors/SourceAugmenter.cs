@@ -191,9 +191,6 @@ namespace Editor.Shaders.Processors
 
                 foreach (ref readonly RawVariableData varData in span)
                 {
-                    if (varData.Type == RawVariableDataType.Property)
-                        continue;
-
                     sb.Append("    ");
 
                     switch (varData.Usage)
@@ -237,6 +234,14 @@ namespace Editor.Shaders.Processors
                                     case RawVariableDataType.Resource:
                                         {
                                             sb.Append("uint");
+                                            break;
+                                        }
+                                    case RawVariableDataType.Property:
+                                        {
+                                            if (_processor.GeneratePropertiesInHeader)
+                                            {
+                                                SerializeGeneric(sb, varData.Generic, varData.Name);
+                                            }
                                             break;
                                         }
                                 }
@@ -283,7 +288,7 @@ namespace Editor.Shaders.Processors
                         sb.Append("CON_Raw");
                     else
                     {
-                        sb.Append("IDX_");
+                        sb.Append(varData.Usage == RawVariableUsage.Property ? "RAW_" : "IDX_");
                         sb.Append(varData.Name);
                     }
                     sb.AppendLine(";");
@@ -583,6 +588,11 @@ namespace Editor.Shaders.Processors
 
                     copy = copy.Remove(index, subsection.Length + 2);
                     copy = copy.Insert(index, path);
+                }
+                else if (subsection.Equals("PNAME", StringComparison.OrdinalIgnoreCase))
+                {
+                    copy = copy.Remove(index, subsection.Length + 2);
+                    copy = copy.Insert(index, varData.Name);
                 }
             }
 

@@ -1,4 +1,5 @@
-﻿using Primary.Rendering.PostProcessing;
+﻿using Primary.Assets.Types;
+using Primary.Rendering.PostProcessing;
 using Primary.Utility;
 using System;
 using System.Collections.Generic;
@@ -130,5 +131,9 @@ namespace Primary.Assets
 
         public Type AssetType => typeof(PostProcessingVolumeAsset);
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
+
+        AssetId IInternalAssetData.Id => Id;
+        ResourceStatus IInternalAssetData.Status => Status;
+        string IInternalAssetData.Name => Name;
     }
 }

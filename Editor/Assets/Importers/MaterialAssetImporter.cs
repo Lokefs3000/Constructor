@@ -1,5 +1,6 @@
 ﻿using Editor.Storage;
 using Primary.Assets;
+using Primary.Assets.Types;
 
 namespace Editor.Assets.Importers
 {
