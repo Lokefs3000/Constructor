@@ -9,6 +9,8 @@ namespace Editor.Assets
 {
     public sealed class AssetIdentifier : IAssetIdProvider
     {
+        private readonly uint _projectId;
+
         //Key = LocalPath
         private ConcurrentDictionary<string, AssetId> _assets;
         private ConcurrentDictionary<AssetId, string> _assetPaths;
@@ -17,6 +19,8 @@ namespace Editor.Assets
 
         internal AssetIdentifier()
         {
+            _projectId = 222;
+
             _assets = new ConcurrentDictionary<string, AssetId>();
             _assetPaths = new ConcurrentDictionary<AssetId, string>();
 
@@ -44,7 +48,7 @@ namespace Editor.Assets
                 uint localId = uint.Parse(tokenizer.Current.ToString());
 
                 _assets.TryAdd(localFilePath, new AssetId(localId));
-                _assetPaths.TryAdd(new AssetId(localId), localFilePath);
+                _assetPaths.TryAdd(new AssetId(_projectId, localId), localFilePath);
                 _idHashSet.Add(localId);
             }
         }
@@ -61,7 +65,7 @@ namespace Editor.Assets
             {
                 sb.Append(kvp.Key);
                 sb.Append(':');
-                sb.AppendLine(kvp.Value.ToString());
+                sb.AppendLine(kvp.Value.Id.ToString());
             }
 
             sb.Length--;
@@ -85,7 +89,7 @@ namespace Editor.Assets
             {
                 lock (_idHashSet)
                 {
-                    AssetId id = new AssetId(GenerateId());
+                    AssetId id = new AssetId(_projectId, GenerateId());
                     _assetPaths.TryAdd(id, localPath);
                     return id;
                 }
@@ -116,7 +120,7 @@ namespace Editor.Assets
         private uint GenerateId()
         {
             uint id = (uint)Stopwatch.GetTimestamp();
-            while (id == IAssetIdProvider.Invalid || _idHashSet.Contains(id))
+            while (id == IAssetIdProvider.InvalidAssetId || _idHashSet.Contains(id))
             {
                 id++;
             }

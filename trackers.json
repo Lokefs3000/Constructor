@@ -834,7 +834,7 @@
   "Editor": {
     "_files": {
       "D:\\source\\repos\\Constructor\\Editor\\Editor.cs": {
-        "TimeSpent": "07:28:18.5747553"
+        "TimeSpent": "07:28:48.6960696"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Rendering\\Gui\\GuiRenderer.cs": {
         "TimeSpent": "02:10:18.2470658"
@@ -978,7 +978,7 @@
         "TimeSpent": "00:22:01.5184901"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Assets\\AssetPipeline.cs": {
-        "TimeSpent": "06:37:42.0243843"
+        "TimeSpent": "06:38:50.9546837"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Assets\\AssetFilesystemWatcher.cs": {
         "TimeSpent": "01:59:14.3922403"
@@ -1089,7 +1089,7 @@
         "TimeSpent": "00:52:03.3102261"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Assets\\AssetIdentifier.cs": {
-        "TimeSpent": "00:31:16.0158460"
+        "TimeSpent": "00:38:12.6045338"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Assets\\AssetConfiguration.cs": {
         "TimeSpent": "00:12:01.3020265"
@@ -2807,7 +2807,7 @@
         "TimeSpent": "00:00:58.3524489"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\Resources\\FrameGraphTextureDesc.cs": {
-        "TimeSpent": "00:35:26.7098789"
+        "TimeSpent": "00:35:47.8388432"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\Resources\\FrameGraphTexture.cs": {
         "TimeSpent": "00:07:10.1097623"
@@ -3080,7 +3080,7 @@
         "TimeSpent": "00:20:29.7352665"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\GpuDescriptorHeap.cs": {
-        "TimeSpent": "00:25:16.9172577"
+        "TimeSpent": "00:31:37.9428354"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\ResourceUtility.cs": {
         "TimeSpent": "00:06:16.3239458"
@@ -3318,7 +3318,7 @@
         "TimeSpent": "00:34:17.7342642"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\ConversionHelper.cs": {
-        "TimeSpent": "00:34:35.2241923"
+        "TimeSpent": "00:34:49.4984918"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHIBuffer - Copy.cs": {
         "TimeSpent": "00:01:12.5497524"

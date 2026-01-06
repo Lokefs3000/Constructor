@@ -11,6 +11,8 @@ using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 using static TerraFX.Interop.DirectX.D3D12_BUFFER_SRV_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_DESCRIPTOR_HEAP_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_DESCRIPTOR_HEAP_TYPE;
+using Primary.RHI2.Direct3D12;
+using Primary.RHI2;
 
 namespace Primary.Rendering2.D3D12
 {
@@ -129,65 +131,92 @@ namespace Primary.Rendering2.D3D12
             {
                 case NRDResourceId.Texture:
                     {
+                        D3D12_SHADER_RESOURCE_VIEW_DESC desc;
+
                         if (resource.IsExternal)
                         {
-                            RHI.Direct3D12.TextureInternal @internal = Unsafe.As<RHI.Texture>(resource.Resource!);
-                            _device.Device->CopyDescriptorsSimple(1, dstDescriptor, new D3D12_CPU_DESCRIPTOR_HANDLE { ptr = @internal.CpuDescriptorHandle.Ptr }, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                            RHITextureDescription texDesc = ((D3D12RHITextureNative*)resource.Native)->Base.Description;
+
+                            desc = new D3D12_SHADER_RESOURCE_VIEW_DESC
+                            {
+                                ViewDimension = texDesc.Dimension switch
+                                {
+                                    RHIDimension.Texture1D => D3D12_SRV_DIMENSION_TEXTURE1D,
+                                    RHIDimension.Texture2D => D3D12_SRV_DIMENSION_TEXTURE2D,
+                                    RHIDimension.Texture3D => D3D12_SRV_DIMENSION_TEXTURE3D,
+                                    RHIDimension.TextureCube => D3D12_SRV_DIMENSION_TEXTURECUBE,
+                                    _ => throw new NotImplementedException(),
+                                },
+                                Format = texDesc.Format.ToResourceViewFormat(),
+                                Shader4ComponentMapping = ResourceHelper.EncodeShader4ComponentMapping((uint)texDesc.Swizzle.R, (uint)texDesc.Swizzle.G, (uint)texDesc.Swizzle.B, (uint)texDesc.Swizzle.A),
+                            };
                         }
                         else
                         {
-                            ref readonly FrameGraphTextureDesc texDesc = ref resource.TextureDesc;
+                            FrameGraphTexture fg = _device.ResourceManager.FindFGTexture(resource);
+                            ref readonly FrameGraphTextureDesc texDesc = ref fg.Description;
 
-                            D3D12_SHADER_RESOURCE_VIEW_DESC desc = new D3D12_SHADER_RESOURCE_VIEW_DESC
+                            desc = new D3D12_SHADER_RESOURCE_VIEW_DESC
                             {
                                 ViewDimension = texDesc.Dimension switch
                                 {
                                     FGTextureDimension._1D => D3D12_SRV_DIMENSION_TEXTURE1D,
                                     FGTextureDimension._2D => D3D12_SRV_DIMENSION_TEXTURE2D,
                                     FGTextureDimension._3D => D3D12_SRV_DIMENSION_TEXTURE3D,
+                                    FGTextureDimension.Cube => D3D12_SRV_DIMENSION_TEXTURECUBE,
                                     _ => throw new NotImplementedException(),
                                 },
-                                Format = FormatConverter.ToDXGIFormat(texDesc.Format),
+                                Format = texDesc.Format.ToResourceViewFormat(),
                                 Shader4ComponentMapping = DefaultShader4ComponentMapping,
                             };
-
-                            switch (texDesc.Dimension)
-                            {
-                                case FGTextureDimension._1D:
-                                    {
-                                        desc.Texture1D = new D3D12_TEX1D_SRV
-                                        {
-                                            MostDetailedMip = 0,
-                                            MipLevels = 0xffffffff,
-                                            ResourceMinLODClamp = 0.0f
-                                        };
-                                        break;
-                                    }
-                                case FGTextureDimension._2D:
-                                    {
-                                        desc.Texture2D = new D3D12_TEX2D_SRV
-                                        {
-                                            MostDetailedMip = 0,
-                                            PlaneSlice = 0,
-                                            MipLevels = 0xffffffff,
-                                            ResourceMinLODClamp = 0.0f,
-                                        };
-                                        break;
-                                    }
-                                case FGTextureDimension._3D:
-                                    {
-                                        desc.Texture3D = new D3D12_TEX3D_SRV
-                                        {
-                                            MostDetailedMip = 0,
-                                            MipLevels = 0xffffffff,
-                                            ResourceMinLODClamp = 0.0f,
-                                        };
-                                        break;
-                                    }
-                            }
-
-                            _device.Device->CreateShaderResourceView(res, &desc, dstDescriptor);
                         }
+
+                        switch (desc.ViewDimension)
+                        {
+                            case D3D12_SRV_DIMENSION_TEXTURE1D:
+                                {
+                                    desc.Texture1D = new D3D12_TEX1D_SRV
+                                    {
+                                        MostDetailedMip = 0,
+                                        MipLevels = 0xffffffff,
+                                        ResourceMinLODClamp = 0.0f
+                                    };
+                                    break;
+                                }
+                            case D3D12_SRV_DIMENSION_TEXTURE2D:
+                                {
+                                    desc.Texture2D = new D3D12_TEX2D_SRV
+                                    {
+                                        MostDetailedMip = 0,
+                                        PlaneSlice = 0,
+                                        MipLevels = 0xffffffff,
+                                        ResourceMinLODClamp = 0.0f,
+                                    };
+                                    break;
+                                }
+                            case D3D12_SRV_DIMENSION_TEXTURE3D:
+                                {
+                                    desc.Texture3D = new D3D12_TEX3D_SRV
+                                    {
+                                        MostDetailedMip = 0,
+                                        MipLevels = 0xffffffff,
+                                        ResourceMinLODClamp = 0.0f,
+                                    };
+                                    break;
+                                }
+                            case D3D12_SRV_DIMENSION_TEXTURECUBE:
+                                {
+                                    desc.TextureCube = new D3D12_TEXCUBE_SRV
+                                    {
+                                        MostDetailedMip = 0,
+                                        MipLevels = 0xffffffff,
+                                        ResourceMinLODClamp = 0.0f,
+                                    };
+                                    break;
+                                }
+                        }
+
+                        _device.Device->CreateShaderResourceView(res, &desc, dstDescriptor);
 
                         break;
                     }
@@ -195,12 +224,55 @@ namespace Primary.Rendering2.D3D12
                     {
                         if (resource.IsExternal)
                         {
-                            RHI.Direct3D12.BufferInternal @internal = Unsafe.As<RHI.Buffer>(resource.Resource!);
-                            _device.Device->CopyDescriptorsSimple(1, dstDescriptor, new D3D12_CPU_DESCRIPTOR_HANDLE { ptr = @internal.CpuDescriptorHandle.Ptr }, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                            RHIBufferDescription bufDesc = ((D3D12RHIBufferNative*)resource.Native)->Base.Description;
+
+                            if (FlagUtility.HasFlag(bufDesc.Usage, RHIResourceUsage.ConstantBuffer))
+                            {
+                                D3D12_CONSTANT_BUFFER_VIEW_DESC desc = new D3D12_CONSTANT_BUFFER_VIEW_DESC
+                                {
+                                    BufferLocation = res->GetGPUVirtualAddress(),
+                                    SizeInBytes = bufDesc.Width
+                                };
+
+                                _device.Device->CreateConstantBufferView(&desc, dstDescriptor);
+                            }
+                            else if (FlagUtility.HasFlag(bufDesc.Usage, RHIResourceUsage.ShaderResource))
+                            {
+                                D3D12_SHADER_RESOURCE_VIEW_DESC desc = new D3D12_SHADER_RESOURCE_VIEW_DESC
+                                {
+                                    ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+                                    Format = DXGI_FORMAT_UNKNOWN,
+                                    Shader4ComponentMapping = DefaultShader4ComponentMapping,
+                                };
+
+                                if (bufDesc.Mode == RHIBufferMode.Raw)
+                                {
+                                    desc.Buffer = new D3D12_BUFFER_SRV
+                                    {
+                                        FirstElement = bufDesc.FirstElement,
+                                        NumElements = bufDesc.ElementCount > 0 ? (uint)bufDesc.ElementCount : bufDesc.Width,
+                                        StructureByteStride = 1,
+                                        Flags = D3D12_BUFFER_SRV_FLAG_RAW
+                                    };
+                                }
+                                else
+                                {
+                                    desc.Buffer = new D3D12_BUFFER_SRV
+                                    {
+                                        FirstElement = bufDesc.FirstElement,
+                                        NumElements = (uint)(bufDesc.Width / bufDesc.Stride),
+                                        StructureByteStride = (uint)bufDesc.Stride,
+                                        Flags = D3D12_BUFFER_SRV_FLAG_NONE
+                                    };
+                                }
+
+                                _device.Device->CreateShaderResourceView(res, &desc, dstDescriptor);
+                            }
                         }
                         else
                         {
-                            ref readonly FrameGraphBufferDesc bufDesc = ref resource.BufferDesc;
+                            FrameGraphBuffer fg = _device.ResourceManager.FindFGBuffer(resource);
+                            ref readonly FrameGraphBufferDesc bufDesc = ref fg.Description;
 
                             if (FlagUtility.HasFlag(bufDesc.Usage, FGBufferUsage.ConstantBuffer))
                             {
@@ -277,7 +349,7 @@ namespace Primary.Rendering2.D3D12
 
             if (hr.FAILED)
             {
-                _device.RHIDevice.FlushMessageQueue();
+                _device.RHIDevice.FlushPendingMessages();
                 throw new NotImplementedException("Add error message");
             }
 

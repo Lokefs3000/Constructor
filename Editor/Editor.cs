@@ -16,7 +16,6 @@ using Primary.Assets;
 using Primary.Components;
 using Primary.Polling;
 using Primary.Profiling;
-using Primary.R2.ForwardPlus;
 using Primary.Rendering;
 using Primary.Scenes;
 using Primary.Timing;
@@ -134,7 +133,7 @@ namespace Editor
             R2.Assets.RegisterAssetsDefault.RegisterDefault();
             RegisterComponentsDefault.RegisterDefault();
 
-            _r2Renderer = new R2.RenderingManager(RenderingManager.Device);
+            _r2Renderer = new R2.RenderingManager();
 
             _dearImGuiStateManager = new DearImGuiStateManager(this);
             _dearImGuiWindowManager = new DearImGuiWindowManager();

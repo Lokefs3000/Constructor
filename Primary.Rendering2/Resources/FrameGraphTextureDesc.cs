@@ -26,7 +26,7 @@ namespace Primary.Rendering2.Resources
             Depth = 1;
 
             Dimension = FGTextureDimension._2D;
-            Format = FGTextureFormat.Undefined;
+            Format = RHIFormat.Unknown;
             Usage = FGTextureUsage.Undefined;
 
             Swizzle = FrameGraphTextureSwizzle.RGBA;
@@ -72,7 +72,8 @@ namespace Primary.Rendering2.Resources
     {
         _1D = 0,
         _2D,
-        _3D
+        _3D,
+        Cube
     }
 
     public enum FGTextureUsage : byte
