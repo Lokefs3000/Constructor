@@ -1,4 +1,5 @@
 ﻿using Primary.Assets.Types;
+using Primary.Common;
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
@@ -26,7 +27,11 @@ namespace Primary.Rendering2.Assets
         public int PropertyBlockSize => AssetData.PropertyBlockSize;
         public int HeaderBlockSize => AssetData.HeaderBlockSize;
 
+        public ShHeaderFlags HeaderFlags => AssetData.HeaderFlags;
+
         public RHI.GraphicsPipeline? GraphicsPipeline => AssetData.GraphicsPipeline;
+
+        public int ResourceCount => AssetData.ResourceCount;
     }
 
     public sealed class ShaderAsset2Data : BaseInternalAssetData<ShaderAsset2>
@@ -37,7 +42,11 @@ namespace Primary.Rendering2.Assets
         private int _propertyBlockSize;
         private int _headerBlockSize;
 
+        private ShHeaderFlags _headerFlags;
+
         private RHI.GraphicsPipeline? _graphicsPipeline;
+
+        private int _resourceCount;
 
         internal ShaderAsset2Data(AssetId id) : base(id)
         {
@@ -50,7 +59,7 @@ namespace Primary.Rendering2.Assets
             _graphicsPipeline = null;
         }
 
-        public void UpdateAssetData(ShaderAsset2 asset, ShaderProperty[] properties, FrozenDictionary<int, int> remappingTable, int propertyBlockSize, int headerBlockSize, RHI.GraphicsPipeline graphicsPipeline)
+        public void UpdateAssetData(ShaderAsset2 asset, ShaderProperty[] properties, FrozenDictionary<int, int> remappingTable, int propertyBlockSize, int headerBlockSize, ShHeaderFlags headerFlags, RHI.GraphicsPipeline graphicsPipeline)
         {
             UpdateAssetData(asset);
 
@@ -60,7 +69,16 @@ namespace Primary.Rendering2.Assets
             _propertyBlockSize = propertyBlockSize;
             _headerBlockSize = headerBlockSize;
 
+            _headerFlags = headerFlags;
+
             _graphicsPipeline = graphicsPipeline;
+
+            _resourceCount = 0;
+            foreach (ref readonly ShaderProperty property in properties.AsSpan())
+            {
+                if (property.Type == ShPropertyType.Buffer || property.Type == ShPropertyType.Texture || property.Type == ShPropertyType.Sampler)
+                    _resourceCount++;
+            }
         }
 
         internal ReadOnlySpan<ShaderProperty> Properties => _properties;
@@ -69,10 +87,14 @@ namespace Primary.Rendering2.Assets
         internal int PropertyBlockSize => _propertyBlockSize;
         internal int HeaderBlockSize => _headerBlockSize;
 
+        internal ShHeaderFlags HeaderFlags => _headerFlags;
+
         internal RHI.GraphicsPipeline? GraphicsPipeline => _graphicsPipeline;
+
+        internal int ResourceCount => _resourceCount;
     }
 
-    public readonly record struct ShaderProperty(string Name, ushort IndexOrByteOffset, ushort ByteWidth, ShPropertyType Type, ShPropertyDefault Default, ShPropertyStages Stages, ShPropertyFlags Flags, ShPropertyDisplay Display);
+    public readonly record struct ShaderProperty(string Name, ushort IndexOrByteOffset, ushort ByteWidth, ushort ChildIndex, ShPropertyType Type, ShPropertyDefault Default, ShPropertyStages Stages, ShPropertyFlags Flags, ShPropertyDisplay Display);
     public readonly record struct ShaderResource(string Name, ShResourceType Type, ShResourceFlags Flags);
 
     public enum ShPropertyType : byte
@@ -101,8 +123,11 @@ namespace Primary.Rendering2.Assets
     {
         None = 0,
 
-        GenericShader = 1 << 0,
-        PixelShader = 1 << 1
+        VertexShader,
+        PixelShader,
+        ComputeShader,
+        GenericShading,
+        AllShading
     }
 
     public enum ShResourceType : byte
@@ -153,5 +178,13 @@ namespace Primary.Rendering2.Assets
         TexBlack,
         TexMask,
         TexNormal
+    }
+
+    public enum ShHeaderFlags : byte
+    {
+        None = 0,
+
+        ExternalProperties = 1 << 0,
+        HeaderIsBuffer = 1 << 1,
     }
 }

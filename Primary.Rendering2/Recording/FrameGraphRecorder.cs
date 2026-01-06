@@ -8,14 +8,14 @@ namespace Primary.Rendering2.Recording
     public sealed class FrameGraphRecorder : IDisposable
     {
         private DisposableObjectPool<CommandRecorder> _recorders;
-        private List<CommandRecorder> _usedRecorders;
+        private Dictionary<int, CommandRecorder> _usedRecorders;
 
         private bool _disposedValue;
 
-        internal FrameGraphRecorder()
+        internal FrameGraphRecorder(RenderPassManager manager)
         {
-            _recorders = new DisposableObjectPool<CommandRecorder>(new CommandRecorderPolicy());
-            _usedRecorders = new List<CommandRecorder>();
+            _recorders = new DisposableObjectPool<CommandRecorder>(new CommandRecorderPolicy(manager));
+            _usedRecorders = new Dictionary<int, CommandRecorder>();
         }
 
         private void Dispose(bool disposing)
@@ -24,9 +24,9 @@ namespace Primary.Rendering2.Recording
             {
                 if (disposing)
                 {
-                    foreach (CommandRecorder recorder in _usedRecorders)
+                    foreach (var recorder in _usedRecorders)
                     {
-                        recorder.Dispose();
+                        recorder.Value.Dispose();
                     }
 
                     _recorders.Dispose();
@@ -45,25 +45,33 @@ namespace Primary.Rendering2.Recording
 
         internal void ClearForFrame()
         {
-            foreach (CommandRecorder recorder in _usedRecorders)
+            foreach (var recorder in _usedRecorders)
             {
-                _recorders.Return(recorder);
+                _recorders.Return(recorder.Value);
             }
 
             _usedRecorders.Clear();
         }
 
-        internal CommandRecorder GetNewRecorder()
+        internal CommandRecorder GetNewRecorder(int passIndex)
         {
             CommandRecorder recorder = _recorders.Get();
-            _usedRecorders.Add(recorder);
+            _usedRecorders.Add(passIndex, recorder);
 
             return recorder;
         }
 
-        private readonly record struct CommandRecorderPolicy : IObjectPoolPolicy<CommandRecorder>
+        internal CommandRecorder? GetRecorderForPass(int passIndex)
         {
-            public CommandRecorder Create() => new CommandRecorder();
+            if (_usedRecorders.TryGetValue(passIndex, out CommandRecorder? recorder))
+                return recorder;
+
+            return null;
+        }
+
+        private readonly record struct CommandRecorderPolicy(RenderPassManager Manager) : IObjectPoolPolicy<CommandRecorder>
+        {
+            public CommandRecorder Create() => new CommandRecorder(Manager);
 
             public bool Return(ref CommandRecorder obj)
             {

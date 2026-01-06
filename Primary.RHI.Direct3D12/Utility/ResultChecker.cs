@@ -34,7 +34,7 @@ namespace Primary.RHI.Direct3D12.Utility
                 catch (RHIException ex)
                 {
                     GraphicsDeviceImpl.Logger.Error(ex, GetErrorString(result));
-                    device?.DumpMessageQueue();
+                    device?.FlushMessageQueue();
                 }
             }
         }
@@ -109,7 +109,7 @@ namespace Primary.RHI.Direct3D12.Utility
     {
         internal RHIException(string message, int code, GraphicsDeviceImpl? device) : base($"[0x{((uint)code).ToString("x")}]: {message}")
         {
-            device?.DumpMessageQueue();
+            device?.FlushMessageQueue();
         }
     }
 }

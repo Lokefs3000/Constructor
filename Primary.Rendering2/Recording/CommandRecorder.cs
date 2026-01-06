@@ -6,28 +6,38 @@ using Primary.Rendering2.Memory;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using TerraFX.Interop.Windows;
 
 namespace Primary.Rendering2.Recording
 {
-    internal sealed class CommandRecorder : IDisposable
+    public sealed class CommandRecorder : IDisposable
     {
+        private readonly RenderPassManager _manager;
+
         private SequentialLinearAllocator _allocator;
         private List<int> _executionCommandOffsets;
 
         private RecCommandEffectFlags _currentEffectFlags;
 
+        private int _commandCount;
+
         private bool _disposedValue;
 
-        internal CommandRecorder()
+        internal CommandRecorder(RenderPassManager manager)
         {
+            _manager = manager;
+
             _allocator = new SequentialLinearAllocator(2048);
             _executionCommandOffsets = new List<int>();
 
             _currentEffectFlags = RecCommandEffectFlags.None;
+
+            _commandCount = 0;
         }
 
         private void Dispose(bool disposing)
@@ -55,6 +65,8 @@ namespace Primary.Rendering2.Recording
             _executionCommandOffsets.Clear();
 
             _currentEffectFlags = RecCommandEffectFlags.None;
+
+            _commandCount = 0;
         }
 
         internal void FinishRecording()
@@ -72,6 +84,9 @@ namespace Primary.Rendering2.Recording
 
             Unsafe.WriteUnaligned(ptr.ToPointer(), new UnmanagedCommandMeta { Type = commandType });
             Unsafe.WriteUnaligned((ptr + Unsafe.SizeOf<UnmanagedCommandMeta>()).ToPointer(), command);
+
+            if (commandType != RecCommandType.Dummy)
+                _commandCount++;
         }
 
         internal unsafe void AddExecutionCommand<T>(RecCommandType commandType, T command) where T : unmanaged, IExecutionCommand
@@ -81,11 +96,14 @@ namespace Primary.Rendering2.Recording
             int size = Unsafe.SizeOf<T>() + Unsafe.SizeOf<ExecutionCommandMeta>();
             nint ptr = _allocator.Allocate(size);
 
-            Unsafe.WriteUnaligned(ptr.ToPointer(), new ExecutionCommandMeta { Type = commandType });
+            Unsafe.WriteUnaligned(ptr.ToPointer(), new ExecutionCommandMeta { Type = commandType, Effect = _currentEffectFlags });
             Unsafe.WriteUnaligned((ptr + Unsafe.SizeOf<ExecutionCommandMeta>()).ToPointer(), command);
 
             _executionCommandOffsets.Add(currentOffset);
             _currentEffectFlags = RecCommandEffectFlags.None;
+
+            if (commandType != RecCommandType.Dummy)
+                _commandCount++;
         }
 
         internal unsafe void AddModificationCommand<T>(RecCommandType commandType, T command) where T : unmanaged, IModificationCommand
@@ -95,12 +113,15 @@ namespace Primary.Rendering2.Recording
 
             Unsafe.WriteUnaligned(ptr.ToPointer(), new ModificationCommandMeta { Type = commandType });
             Unsafe.WriteUnaligned((ptr + Unsafe.SizeOf<ModificationCommandMeta>()).ToPointer(), command);
+
+            if (commandType != RecCommandType.Dummy)
+                _commandCount++;
         }
 
         internal unsafe void AddSetParameters(PropertyBlock block)
         {
             ShaderAsset2? shader = block.Shader;
-            if (shader == null)
+            if (shader == null || shader.ResourceCount == 0)
                 return;
 
             ShaderGlobalsManager globalsManager = ShaderGlobalsManager.Instance;
@@ -111,12 +132,18 @@ namespace Primary.Rendering2.Recording
                 nint ptr = _allocator.Allocate(size);
 
                 Unsafe.WriteUnaligned(ptr.ToPointer(), new ModificationCommandMeta { Type = RecCommandType.SetProperties });
-                Unsafe.WriteUnaligned((ptr + Unsafe.SizeOf<ModificationCommandMeta>()).ToPointer(), new UCSetProperties { ResourceCount = properties.Length, DataBlockSize = shader.PropertyBlockSize });
+                Unsafe.WriteUnaligned((ptr + Unsafe.SizeOf<ModificationCommandMeta>()).ToPointer(), new UCSetProperties { ResourceCount = shader.ResourceCount, DataBlockSize = block.BlockSize, UseBufferForHeader = FlagUtility.HasFlag(shader.HeaderFlags, ShHeaderFlags.HeaderIsBuffer) });
+            }
+
+            if (block.BlockSize > 0 && block.BlockPointer != nint.Zero)
+            {
+                nint ptr = _allocator.Allocate(block.BlockSize);
+                Unsafe.CopyBlockUnaligned(ptr.ToPointer(), block.BlockPointer.ToPointer(), (uint)block.BlockSize);
             }
 
             foreach (ref readonly ShaderProperty property in properties)
             {
-                if (property.Type == ShPropertyType.Texture || property.Type == ShPropertyType.Buffer)
+                if (property.Type == ShPropertyType.Texture || property.Type == ShPropertyType.Buffer || property.Type == ShPropertyType.Sampler)
                 {
                     PropertyData data = default;
                     if (!FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Global))
@@ -125,11 +152,25 @@ namespace Primary.Rendering2.Recording
                     }
                     else if (!globalsManager.TryGetPropertyValue(property.Name, out data))
                     {
+                        int size2 = Unsafe.SizeOf<UnmanagedPropertyData>();
+                        nint ptr2 = _allocator.Allocate(size2);
+
+                        Unsafe.WriteUnaligned(ptr2.ToPointer(), new UnmanagedPropertyData
+                        {
+                            Meta = new PropertyMeta
+                            {
+                                Type = SetPropertyType.None,
+                                Target = ShPropertyStages.None,
+                            },
+                            IsExternal = false,
+                            Resource = nint.Zero
+                        });
+
                         continue;
                     }
 
                     bool isExternal = false;
-                    nint dataPtr = nint.Zero;
+                    nint dataPtr = -1;
 
                     switch (property.Type)
                     {
@@ -166,9 +207,20 @@ namespace Primary.Rendering2.Recording
 
                                 break;
                             }
+                        case ShPropertyType.Sampler:
+                            {
+                                isExternal = true;
+                                if (data.Aux != null)
+                                {
+                                    RHI.Sampler sampler = Unsafe.As<RHI.Sampler>(data.Aux);
+                                    dataPtr = sampler.Handle;
+                                }
+
+                                break;
+                            }
                     }
 
-                    if (dataPtr == nint.Zero)
+                    if (dataPtr == -1)
                     {
                         if (property.Type == ShPropertyType.Texture)
                         {
@@ -178,43 +230,69 @@ namespace Primary.Rendering2.Recording
                                 case ShPropertyDefault.NumIdentity:
                                 case ShPropertyDefault.TexWhite: dataPtr = AssetManager.Static.DefaultWhite.Handle; break;
                                 case ShPropertyDefault.NumZero:
-                                case ShPropertyDefault.TexBlack: dataPtr = AssetManager.Static.DefaultWhite.Handle; break;
+                                case ShPropertyDefault.TexBlack: dataPtr = AssetManager.Static.DefaultBlack.Handle; break;
                                 case ShPropertyDefault.TexNormal: dataPtr = AssetManager.Static.DefaultNormal.Handle; break;
                                 case ShPropertyDefault.TexMask: dataPtr = AssetManager.Static.DefaultMask.Handle; break;
                             }
+
+                            isExternal = true;
+                        }
+                        else if (property.Type == ShPropertyType.Sampler)
+                        {
+                            dataPtr = _manager.Resources.DefaultSampler.Handle;
                         }
                     }
 
-                    int size = Unsafe.SizeOf<UnamangedPropertyData>();
+                    int size = Unsafe.SizeOf<UnmanagedPropertyData>();
                     nint ptr = _allocator.Allocate(size);
 
-                    Unsafe.WriteUnaligned(ptr.ToPointer(), new UnamangedPropertyData
+                    Unsafe.WriteUnaligned(ptr.ToPointer(), new UnmanagedPropertyData
                     {
                         Meta = new PropertyMeta
                         {
-                            Type = (SetPropertyType)((int)(property.Type == ShPropertyType.Buffer ? SetPropertyType.Buffer : SetPropertyType.Texture) + (data.Resource.IsExternal ? 2 : 0)),
+                            Type = property.Type switch
+                            {
+                                ShPropertyType.Buffer => isExternal ? SetPropertyType.RHIBuffer : SetPropertyType.Buffer,
+                                ShPropertyType.Texture => isExternal ? SetPropertyType.RHITexture : SetPropertyType.Texture,
+                                ShPropertyType.Sampler => isExternal ? SetPropertyType.RHISampler : throw new NotSupportedException(),
+                                _ => throw new NotImplementedException()
+                            },
                             Target = property.Stages
                         },
                         IsExternal = isExternal,
                         Resource = dataPtr
                     });
                 }
-                else
-                {
-
-                }
             }
+
+            _commandCount++;
         }
 
-        internal nint GetPointerAtOffset(int offset)
+        public nint GetPointerAtOffset(int offset)
         {
+            Debug.Assert(offset <= _allocator.CurrentOffset);
             return _allocator.Pointer + offset;
         }
 
-        internal ReadOnlySpan<int> ExecutionCommandOffsets => _executionCommandOffsets.AsSpan();
+        public unsafe RecCommandType GetCommandTypeAtOffset(int offset)
+        {
+            Debug.Assert(offset + Unsafe.SizeOf<RecCommandType>() <= _allocator.CurrentOffset);
+            return Unsafe.ReadUnaligned<RecCommandType>((_allocator.Pointer + offset).ToPointer());
+        }
+
+        public unsafe T GetCommandAtOffset<T>(int offset) where T : unmanaged
+        {
+            Debug.Assert(offset + Unsafe.SizeOf<RecCommandType>() <= _allocator.CurrentOffset);
+            return Unsafe.ReadUnaligned<T>((_allocator.Pointer + offset).ToPointer());
+        }
+
+        public int BufferSize => _allocator.CurrentOffset;
+        public int TotalCommandCount => _commandCount;
+
+        public ReadOnlySpan<int> ExecutionCommandOffsets => _executionCommandOffsets.AsSpan();
     }
 
-    internal enum RecCommandType : byte
+    public enum RecCommandType : byte
     {
         Undefined = 0,
 
@@ -228,8 +306,8 @@ namespace Primary.Rendering2.Recording
         ClearRenderTargetCustom,
         ClearDepthStencilCustom,
 
-        SetViewports,
-        SetScissors,
+        SetViewport,
+        SetScissor,
 
         SetStencilReference,
 
@@ -241,16 +319,23 @@ namespace Primary.Rendering2.Recording
 
         CopyBuffer,
         CopyTexture,
+
+        DrawInstanced,
+        DrawIndexedInstanced,
+
+        SetPipeline,
+
+        PresentOnWindow
     }
 
-    internal enum RecCommandContextType : byte
+    public enum RecCommandContextType : byte
     {
         StateChange = 0,    //Changes the state (Viewports, Buffers, Outputs, etc)
         Execution,          //Flushes the state and executes a command (Draw, Dispatch, etc)
         Modification        //Modifies a resource (Clear, Copy, Barrier, etc)
     }
 
-    internal enum RecCommandEffectFlags : byte
+    public enum RecCommandEffectFlags : ushort
     {
         None = 0,
 
@@ -265,6 +350,8 @@ namespace Primary.Rendering2.Recording
         VertexBuffer = 1 << 5,
         IndexBuffer = 1 << 6,
 
-        Properties = 1 << 7
+        Properties = 1 << 7,
+
+        Pipeline = 1 << 8
     }
 }

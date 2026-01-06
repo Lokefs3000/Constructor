@@ -289,24 +289,27 @@ namespace Editor.DearImGui
             ImGuiContextPtr context = ImGui.GetCurrentContext();
             ref ImGuiIO io = ref context.IO;
 
-            if (io.MouseWheel != 0.0f)
+            if (ImGui.IsWindowHovered() || ImGui.IsWindowFocused())
             {
-                float oldZoom = _viewZoom;
-                _viewZoom *= MathF.Exp(float.Sign(io.MouseWheel) * 0.2f);
+                if (io.MouseWheel != 0.0f)
+                {
+                    float oldZoom = _viewZoom;
+                    _viewZoom *= MathF.Exp(float.Sign(io.MouseWheel) * 0.2f);
 
-                float w = 1.0f * oldZoom;
-                float x = (1.0f - w) * 0.5f + _viewOffset;
-                float originX = ((io.MousePos.X - bb.Min.X) / (bb.Max.X - bb.Min.X)) - x - w * 0.5f;
+                    float w = 1.0f * oldZoom;
+                    float x = (1.0f - w) * 0.5f + _viewOffset;
+                    float originX = ((io.MousePos.X - bb.Min.X) / (bb.Max.X - bb.Min.X)) - x - w * 0.5f;
 
-                float xOrg = originX / oldZoom;
-                float xNew = xOrg * _viewZoom;
-                float xDiff = originX - xNew;
+                    float xOrg = originX / oldZoom;
+                    float xNew = xOrg * _viewZoom;
+                    float xDiff = originX - xNew;
 
-                _viewOffset += xDiff;
-            }
-            else if (ImGui.IsMouseDragging(ImGuiMouseButton.Right))
-            {
-                _viewOffset += (io.MouseDelta.X / (bb.Max.X - bb.Min.X));
+                    _viewOffset += xDiff;
+                }
+                else if (ImGui.IsMouseDragging(ImGuiMouseButton.Right))
+                {
+                    _viewOffset += (io.MouseDelta.X / (bb.Max.X - bb.Min.X));
+                }
             }
         }
 

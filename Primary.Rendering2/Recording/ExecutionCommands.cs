@@ -6,23 +6,23 @@ using System.Threading.Tasks;
 
 namespace Primary.Rendering2.Recording
 {
-    internal interface IExecutionCommand
+    public interface IExecutionCommand
     {
 
     }
 
-    internal struct ExecutionCommandMeta
+    public struct ExecutionCommandMeta
     {
         public RecCommandType Type;
-        //public RecCommandEffectFlags Effect;
+        public RecCommandEffectFlags Effect;
     }
 
-    internal struct UCDummy : IExecutionCommand
+    public struct UCDummy : IExecutionCommand
     {
 
     }
 
-    internal struct UCDrawIndexedInstanced : IExecutionCommand
+    public struct UCDrawIndexedInstanced : IExecutionCommand
     {
         public uint IndexCount;
         public uint InstanceCount;
@@ -31,10 +31,18 @@ namespace Primary.Rendering2.Recording
         public uint StartInstance;
     }
 
-    internal struct UCDrawInstanced : IExecutionCommand
+    public struct UCDrawInstanced : IExecutionCommand
     {
+        public uint VertexCount;
         public uint InstanceCount;
         public uint StartVertex;
         public uint StartInstance;
+    }
+
+    public struct UCPresentOnWindow : IExecutionCommand
+    {
+        public bool IsExternal;
+        public nint Texture;
+        public uint WindowId;
     }
 }

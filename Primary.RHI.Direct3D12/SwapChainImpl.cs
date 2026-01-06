@@ -25,6 +25,8 @@ namespace Primary.RHI.Direct3D12
         private InternalRT _internalRt;
         private ResourceStates _currentBackBufferState;
 
+        private InternalTexture _internalTex;
+
         private Vector2 _clientSize;
 
         private bool _disposedValue;
@@ -78,6 +80,13 @@ namespace Primary.RHI.Direct3D12
             _currentBackBufferState = ResourceStates.Present;
 
             _internalRt = new InternalRT(_backBuffers[_activeBackBuffer])
+            {
+                CpuHandle = _rtvCpuDescriptors[_activeBackBuffer].GetCpuHandle(),
+                BackBufferResourceState = _currentBackBufferState,
+                ClientSize = clientSize
+            };
+
+            _internalTex = new InternalTexture(_backBuffers[_activeBackBuffer])
             {
                 CpuHandle = _rtvCpuDescriptors[_activeBackBuffer].GetCpuHandle(),
                 BackBufferResourceState = _currentBackBufferState,
@@ -191,7 +200,7 @@ namespace Primary.RHI.Direct3D12
 
         private void HandleSwapChainIssue(Result r)
         {
-            _device.DumpMessageQueue();
+            _device.FlushMessageQueue();
             _device.DumpDREDOutput();
             ResultChecker.ThrowIfUnhandled(r);
         }
@@ -199,7 +208,9 @@ namespace Primary.RHI.Direct3D12
         public override Vector2 ClientSize => _clientSize;
         public override RenderTarget BackBuffer => _internalRt;
 
-        private class InternalRT : RenderTarget, ICommandBufferRTView, ICommandBufferRT
+        public override Texture NewFGCompatTexture => _internalTex;
+
+        internal class InternalRT : RenderTarget, ICommandBufferRTView, ICommandBufferRT
         {
             private GCHandle _handle;
             private nint _handlePtr;
@@ -283,5 +294,96 @@ namespace Primary.RHI.Direct3D12
             public bool HasInitialClearCompleted { get => _hasInitialClearCompleted; set => _hasInitialClearCompleted = value; }
             public override string Name { set => throw new NotSupportedException(); }
         }
+
+        private class InternalTexture : Texture, ICommandBufferTexture, ICommandBufferResource
+        {
+            private GCHandle _handle;
+            private nint _handlePtr;
+
+            public ID3D12Resource Resource;
+            public CpuDescriptorHandle CpuHandle = CpuDescriptorHandle.Default;
+            public ResourceStates BackBufferResourceState = ResourceStates.Present;
+            public Vector2 ClientSize;
+
+            public bool _hasInitialClearCompleted;
+
+            internal InternalTexture(ID3D12Resource resource)
+            {
+                _handle = GCHandle.Alloc(this, GCHandleType.Weak);
+                _handlePtr = nint.Zero;
+
+                Resource = resource;
+
+                _hasInitialClearCompleted = false;
+            }
+
+            internal void ReleaseInternal()
+            {
+                _handle.Free();
+                _handlePtr = nint.Zero;
+            }
+
+            public override void Dispose() => throw new NotSupportedException("Cannot dispose swapchain backbuffer!");
+
+            public void EnsureResourceStates(ResourceBarrierManager manager, ResourceStates requiredStates, bool toggle = false)
+            {
+                if (BackBufferResourceState != requiredStates)
+                {
+                    ResourceStates newState = requiredStates;
+                    manager.AddTransition(Resource, BackBufferResourceState, newState, ref BackBufferResourceState);
+
+                    //GraphicsDeviceImpl.Logger.Information("{a} -> {b}", BackBufferResourceState, newState);
+                }
+            }
+
+            public void SetImplicitResourcePromotion(ResourceStates state)
+            {
+                BackBufferResourceState = state;
+            }
+
+            public void TransitionImmediate(ID3D12GraphicsCommandList7 commandList, ResourceStates newState)
+            {
+                if (BackBufferResourceState != newState)
+                    commandList.ResourceBarrierTransition(Resource, BackBufferResourceState, newState);
+                BackBufferResourceState = newState;
+            }
+
+            public override Descriptor AllocateDescriptor(TextureSRDescriptorDescription description)
+            {
+                throw new NotImplementedException();
+            }
+
+            public void CopyTexture(ID3D12GraphicsCommandList7 commandList, ICommandBufferRTView view) => throw new NotSupportedException();
+
+            public override nint Handle => _handlePtr;
+
+            public override ref readonly TextureDescription Description => throw new NotImplementedException("Cannot access description for swapchain back buffer!");
+
+            public CpuDescriptorHandle ViewCpuDescriptor => CpuHandle;
+
+            public bool IsShaderVisible => false;
+            public ResourceType Type => ResourceType.Texture;
+            public string ResourceName => "SwapChain";
+            public CpuDescriptorHandle CpuDescriptor => CpuDescriptorHandle.Default;
+            public ResourceStates GenericState => ResourceStates.Present;
+            public ResourceStates CurrentState => BackBufferResourceState;
+
+            public RenderTargetFormat RTFormat => RenderTargetFormat.RGBA8un;
+            public DepthStencilFormat DSTFormat => DepthStencilFormat.Undefined;
+
+            public Vortice.Mathematics.Viewport Viewport => new Vortice.Mathematics.Viewport(0, 0, ClientSize.X, ClientSize.Y);
+
+            public bool HasInitialClearCompleted { get => _hasInitialClearCompleted; set => _hasInitialClearCompleted = value; }
+            public override string Name { set => throw new NotSupportedException(); }
+        }
+    }
+
+    public readonly record struct SwapChainInternal(SwapChain SwapChain)
+    {
+        public ID3D12Resource ActiveBackBuffer => Unsafe.As<SwapChainImpl.InternalRT>(SwapChain.BackBuffer).Resource;
+
+        public void ForcePresent(PresentParameters parameters) => Unsafe.As<SwapChainImpl>(SwapChain).PresentInternal(parameters);
+
+        public static implicit operator SwapChainInternal(SwapChain swapChain) => new SwapChainInternal(swapChain);
     }
 }

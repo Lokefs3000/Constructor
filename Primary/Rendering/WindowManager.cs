@@ -32,6 +32,8 @@ namespace Primary.Rendering
 
         public void DestroyWindow(Window window)
         {
+            WindowDestroyed?.Invoke(window);
+
             _windows.Remove(window.ID);
 
             window.Dispose();
@@ -74,6 +76,8 @@ namespace Primary.Rendering
         }
 
         public Window? PrimaryWindow => _primaryWindow;
+
+        public event Action<Window>? WindowDestroyed;
 
         private static WindowManager? s_instance;
         public static WindowManager Instance => s_instance!;

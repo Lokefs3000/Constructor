@@ -12,15 +12,28 @@ struct sbRenderFlag
     uint DataId;
 };
 
+struct cbDynamicData
+{
+    uint InstanceOffset;
+};
+
 [global]
 StructuredBuffer<sbRenderFlag> sbFP_RenderFlagBuffer;
 
 [global]
 ByteAddressBuffer baFP_RawDataBuffer;
 
+[global]
+ConstantBuffer<cbDynamicData> cbFP_DynamicData;
+
 sbRenderFlag GetRenderFlag(uint index)
 {
     return sbFP_RenderFlagBuffer[index];
+}
+
+uint GetInstanceOffset()
+{
+    return cbFP_DynamicData.InstanceOffset;
 }
 
 float3 ConvertObjectToModel(float3 objectPosition, uint index)
@@ -30,12 +43,12 @@ float3 ConvertObjectToModel(float3 objectPosition, uint index)
 
 float4 ConvertModelToWorld(float3 modelPosition, uint index)
 {
-    return mul(sbFP_GlobalMatricies.ViewProjection, float4(modelPosition, 1.0));
+    return mul(cbFP_GlobalMatricies.ViewProjection, float4(modelPosition, 1.0));
 }
 
 float4 ConvertObjectToWorld(float3 objectPosition, uint index)
 {
-    return mul(mul(sbFP_GlobalMatricies.ViewProjection, sbFP_RenderFlagBuffer[index].Model), float4(objectPosition, 1.0));
+    return mul(mul(cbFP_GlobalMatricies.ViewProjection, sbFP_RenderFlagBuffer[index].Model), float4(objectPosition, 1.0));
 }
 
 float3 NormalObjectToWorld(float3 normalVector, uint index)

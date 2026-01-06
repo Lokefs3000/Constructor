@@ -13,6 +13,8 @@ namespace Primary.Assets.Types
         private ResourceStatus _status;
         private string _name;
 
+        private int _loadIndex;
+
         protected BaseInternalAssetData(AssetId id)
         {
             _asset = new WeakReference(id);
@@ -20,6 +22,8 @@ namespace Primary.Assets.Types
 
             _status = ResourceStatus.Pending;
             _name = string.Empty;
+
+            _loadIndex = -1;
         }
 
         public void Dispose()
@@ -28,6 +32,8 @@ namespace Primary.Assets.Types
 
             _status = ResourceStatus.Disposed;
             _name = string.Empty;
+
+            _loadIndex = -1;
         }
 
         public virtual void UpdateAssetData(T asset)
@@ -35,6 +41,8 @@ namespace Primary.Assets.Types
             _asset.Target = asset;
 
             _status = ResourceStatus.Success;
+
+            _loadIndex++;
         }
 
         public virtual void UpdateAssetFailed(T asset)
@@ -42,6 +50,8 @@ namespace Primary.Assets.Types
             _asset.Target = asset;
 
             _status = ResourceStatus.Error;
+
+            _loadIndex++;
         }
 
         public virtual void SetAssetInternalName(string name) => _name = name;
@@ -52,6 +62,8 @@ namespace Primary.Assets.Types
 
         public ResourceStatus Status => _status;
         public string Name => _name;
+
+        public int LoadIndex => _loadIndex;
 
         public Type AssetType => typeof(T);
     }

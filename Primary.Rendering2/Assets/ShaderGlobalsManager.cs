@@ -47,24 +47,30 @@ namespace Primary.Rendering2.Assets
 
         internal void SetBuffer(string name, FrameGraphBuffer buffer)
         {
+            if (!FlagUtility.HasFlag(buffer.Description.Usage, FGBufferUsage.Global))
+                return;
+
             _globalProperties[name] = new PropertyData(buffer);
             _transitionalProperties[buffer.Index] = name;
         }
 
         internal void SetBuffer(string name, RHI.Buffer buffer)
         {
-            _globalProperties[name] = new PropertyData(new FrameGraphResource(buffer));
+            _globalProperties[name] = new PropertyData(new FrameGraphResource(buffer, null));
         }
 
         internal void SetTexture(string name, FrameGraphTexture texture)
         {
+            if (!FlagUtility.HasFlag(texture.Description.Usage, FGTextureUsage.Global))
+                return;
+
             _globalProperties[name] = new PropertyData(texture);
             _transitionalProperties[texture.Index] = name;
         }
 
         internal void SetTexture(string name, RHI.Texture texture)
         {
-            _globalProperties[name] = new PropertyData(new FrameGraphResource(texture));
+            _globalProperties[name] = new PropertyData(new FrameGraphResource(texture, null));
         }
 
         internal void SetTexture(string name, TextureAsset texture)
@@ -85,6 +91,9 @@ namespace Primary.Rendering2.Assets
         public static void SetGlobalTexture(string name, RHI.Texture texture) => Instance.SetTexture(name, texture);
         public static void SetGlobalTexture(string name, TextureAsset texture) => Instance.SetTexture(name, texture);
         #endregion
+
+        internal IReadOnlyDictionary<FastStringHash, PropertyData> GlobalProperties => _globalProperties;
+        internal IReadOnlyDictionary<int, FastStringHash> TransitionalProperties => _transitionalProperties;
 
         private static readonly WeakReference s_instance = new WeakReference(null);
         internal static ShaderGlobalsManager Instance => NullableUtility.ThrowIfNull(Unsafe.As<ShaderGlobalsManager>(s_instance.Target));

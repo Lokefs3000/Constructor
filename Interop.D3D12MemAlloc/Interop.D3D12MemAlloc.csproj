@@ -6,7 +6,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="TerraFX.Interop.Windows" Version="10.0.26100.5" />
+    <PackageReference Include="TerraFX.Interop.Windows" Version="10.0.26100.6" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="runtimes\win-x64\native\" />

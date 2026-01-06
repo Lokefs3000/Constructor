@@ -136,8 +136,8 @@ namespace Primary.Rendering2.Resources
             FGTextureFormat.BC5_UNorm => true,
             FGTextureFormat.BC5_SNorm => true,
             FGTextureFormat.BC6H_Typeless => true,
-            FGTextureFormat.BC5H_UFloat16 => true,
-            FGTextureFormat.BC5H_SFloat16 => true,
+            FGTextureFormat.BC6H_UFloat16 => true,
+            FGTextureFormat.BC6H_SFloat16 => true,
             FGTextureFormat.BC7_Typeless => true,
             FGTextureFormat.BC7_UNorm => true,
             _ => false
@@ -213,14 +213,13 @@ namespace Primary.Rendering2.Resources
             FGTextureFormat.BC5_UNorm => true,
             FGTextureFormat.BC5_SNorm => true,
             FGTextureFormat.BC6H_Typeless => true,
-            FGTextureFormat.BC5H_UFloat16 => true,
-            FGTextureFormat.BC5H_SFloat16 => true,
+            FGTextureFormat.BC6H_UFloat16 => true,
+            FGTextureFormat.BC6H_SFloat16 => true,
             FGTextureFormat.BC7_Typeless => true,
             FGTextureFormat.BC7_UNorm => true,
             _ => false
         };
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsTextureFormat(this FGTextureFormat format, FGTextureDimension dimension) => dimension switch
         {
             FGTextureDimension._1D => format.IsTexture1DFormat(),
@@ -287,6 +286,95 @@ namespace Primary.Rendering2.Resources
             FGTextureFormat.R24G8_Typeless => true,
             FGTextureFormat.R16_UNorm => true,
             _ => false
+        };
+
+        public static bool IsBlockCompressed(this FGTextureFormat format) => format switch
+        {
+            FGTextureFormat.BC1_Typeless => true,
+            FGTextureFormat.BC1_UNorm => true,
+            FGTextureFormat.BC1_Unorm_sRGB => true,
+            FGTextureFormat.BC2_Typeless => true,
+            FGTextureFormat.BC2_UNorm => true,
+            FGTextureFormat.BC2_UNorm_sRGB => true,
+            FGTextureFormat.BC3_Typeless => true,
+            FGTextureFormat.BC3_UNorm => true,
+            FGTextureFormat.BC3_UNorm_sRGB => true,
+            FGTextureFormat.BC4_Typeless => true,
+            FGTextureFormat.BC4_UNorm => true,
+            FGTextureFormat.BC4_SNorm => true,
+            FGTextureFormat.BC5_Typeless => true,
+            FGTextureFormat.BC5_UNorm => true,
+            FGTextureFormat.BC5_SNorm => true,
+            FGTextureFormat.BC6H_Typeless => true,
+            FGTextureFormat.BC6H_UFloat16 => true,
+            FGTextureFormat.BC6H_SFloat16 => true,
+            FGTextureFormat.BC7_Typeless => true,
+            FGTextureFormat.BC7_UNorm => true,
+            _ => false
+        };
+
+        /// <summary>NOTE: Block compressed formats always return 0</summary>
+        public static int GetPixelByteSize(this FGTextureFormat format) => format switch
+        {
+            FGTextureFormat.RGBA32_Typeless => 32,
+            FGTextureFormat.RGBA32_Float => 32,
+            FGTextureFormat.RGBA32_UInt => 32,
+            FGTextureFormat.RGBA32_SInt => 32,
+            FGTextureFormat.RGB32_Typeless => 24,
+            FGTextureFormat.RGB32_Float => 24,
+            FGTextureFormat.RGB32_UInt => 24,
+            FGTextureFormat.RGB32_SInt => 24,
+            FGTextureFormat.RGBA16_Typeless => 8,
+            FGTextureFormat.RGBA16_Float => 8,
+            FGTextureFormat.RGBA16_UInt => 8,
+            FGTextureFormat.RGBA16_SInt => 8,
+            FGTextureFormat.RG32_Typeless => 8,
+            FGTextureFormat.RG32_Float => 8,
+            FGTextureFormat.RG32_UInt => 8,
+            FGTextureFormat.RG32_SInt => 8,
+            FGTextureFormat.R32G8X24_Typeless => 12,
+            FGTextureFormat.R32_Float_X8X24_Typeless => 8,
+            FGTextureFormat.X32_Typeless_G8X24_UInt => 8,
+            FGTextureFormat.RGB10A2_Typeless => 4,
+            FGTextureFormat.RGB10A2_UNorm => 4,
+            FGTextureFormat.RGB10A2_UInt => 4,
+            FGTextureFormat.RG11B10_Float => 4,
+            FGTextureFormat.RGBA8_Typeless => 4,
+            FGTextureFormat.RGBA8_UNorm => 4,
+            FGTextureFormat.RGBA8_UNorm_sRGB => 4,
+            FGTextureFormat.RGBA8_UInt => 4,
+            FGTextureFormat.RGBA8_SNorm => 4,
+            FGTextureFormat.RGBA8_SInt => 4,
+            FGTextureFormat.RG16_Typeless => 4,
+            FGTextureFormat.RG16_Float => 4,
+            FGTextureFormat.RG16_UNorm => 4,
+            FGTextureFormat.RG16_UInt => 4,
+            FGTextureFormat.RG16_SNorm => 4,
+            FGTextureFormat.RG16_SInt => 4,
+            FGTextureFormat.R32_Typeless => 4,
+            FGTextureFormat.R32_Float => 4,
+            FGTextureFormat.R32_UInt => 4,
+            FGTextureFormat.R32_SInt => 4,
+            FGTextureFormat.R24G8_Typeless => 4,
+            FGTextureFormat.R24_UNorm_X8_Typeless => 4,
+            FGTextureFormat.X24_Typeless_G8_UInt => 4,
+            FGTextureFormat.R8_Typeless => 1,
+            FGTextureFormat.R8_UNorm => 1,
+            FGTextureFormat.R8_UInt => 1,
+            FGTextureFormat.R8_SNorm => 1,
+            FGTextureFormat.R8_SInt => 1,
+            FGTextureFormat.A8_UNorm => 1,
+            FGTextureFormat.R16_Typeless => 2,
+            FGTextureFormat.R16_Float => 2,
+            FGTextureFormat.R16_UNorm => 2,
+            FGTextureFormat.R16_UInt => 2,
+            FGTextureFormat.R16_SNorm => 2,
+            FGTextureFormat.R16_SInt => 2,
+            FGTextureFormat.RG8_UNorm => 2,
+            FGTextureFormat.RG8_UInt => 2,
+            FGTextureFormat.RG8_SNorm => 2,
+            FGTextureFormat.RG8_SInt => 2,
+            _ => 0,
         };
     }
 }

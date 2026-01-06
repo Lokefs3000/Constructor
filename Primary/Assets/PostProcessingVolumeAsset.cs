@@ -127,6 +127,8 @@ namespace Primary.Assets
         internal AssetId Id => _id;
         internal string Name => _name;
 
+        public int LoadIndex => 0;
+
         internal List<IPostProcessingData> Effects => _effectData;
 
         public Type AssetType => typeof(PostProcessingVolumeAsset);

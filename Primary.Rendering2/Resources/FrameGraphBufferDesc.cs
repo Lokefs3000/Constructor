@@ -33,6 +33,9 @@ namespace Primary.Rendering2.Resources
         VertexBuffer = 1 << 3,
         IndexBuffer = 1 << 4,
 
-        Structured = 1 << 5
+        Structured = 1 << 5,
+        Raw = 1 << 7,
+
+        Global = 1 << 6
     }
 }

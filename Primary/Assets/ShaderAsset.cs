@@ -180,6 +180,8 @@ namespace Primary.Assets
         internal AssetId Id => _id;
         internal string Name => _name;
 
+        public int LoadIndex => 0;
+
         internal FrozenDictionary<string, ShaderVariable> Variables => _variables;
 
         public Type AssetType => typeof(ShaderAsset);

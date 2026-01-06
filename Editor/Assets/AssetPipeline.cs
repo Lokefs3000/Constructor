@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Editor.Assets.Importers;
 using Editor.Platform.Windows;
+using Primary;
 using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Common;
@@ -418,6 +419,8 @@ namespace Editor.Assets
 
                 Editor.GlobalSingleton.AssetDatabase.PurgeDatabase();
 
+                bool showImports = AppArguments.HasArgument("--s-show-imports");
+
                 foreach (var kvp in _importedAssets)
                 {
                     string? path = _identifier.RetrievePathForId(kvp.Key);
@@ -465,6 +468,9 @@ namespace Editor.Assets
 
                             if (ImportNewFile(id) != null)
                             {
+                                if (showImports)
+                                    EdLog.Assets.Information("[{idx}]: Importing new asset with local path: {lc} (id: {id})", filesImported + 1, localPath, id.Value);
+
                                 foundImportableFile = true;
                                 filesImported++;
                             }

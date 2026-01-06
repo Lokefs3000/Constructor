@@ -164,7 +164,7 @@ namespace Primary.RHI.Direct3D12
                     _stencilView = new RenderTextureViewStencilImpl(device, _dstView, _depthStencilTexture, resDesc.Format, ResourceStates.DepthWrite, FlagUtility.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Stencil));
             }
 
-            _device.DumpMessageQueue();
+            _device.FlushMessageQueue();
 
             device.InvokeObjectCreationTracking(this);
             if (_renderTexture != null || _depthStencilTexture != null)

@@ -28,7 +28,7 @@ namespace Primary.Utility
             _timer = 0.0f;
         }
 
-        public void Sample(T value, float delta)
+        public bool Sample(T value, float delta)
         {
             if ((_timer += delta) >= _timeout)
             {
@@ -38,7 +38,11 @@ namespace Primary.Utility
                 if (_head == 0)
                     _isValid = true;
                 _values[_head] = value;
+
+                return true;
             }
+
+            return false;
         }
 
         public T Calculate()

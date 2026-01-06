@@ -7,6 +7,8 @@ namespace Primary.RHI
         public abstract Vector2 ClientSize { get; }
         public abstract RenderTarget BackBuffer { get; }
 
+        public abstract Texture NewFGCompatTexture { get; }
+
         public abstract void Dispose();
 
         public abstract void Present(PresentParameters parameters);

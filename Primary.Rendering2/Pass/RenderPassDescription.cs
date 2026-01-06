@@ -6,9 +6,9 @@ using System.Text;
 
 namespace Primary.Rendering2.Pass
 {
-    internal readonly record struct RenderPassDescription(string Name, RenderPassType Type, PooledList<UsedResourceData> Resources, PooledList<UsedRenderTargetData> RenderTargets, Type? PassDataType, Action<RasterPassContext, IPassData>? Function);
+    public readonly record struct RenderPassDescription(string Name, RenderPassType Type, PooledList<UsedResourceData> Resources, PooledList<UsedRenderTargetData> RenderTargets, Type? PassDataType, Action<RasterPassContext, IPassData>? Function, bool AllowCulling);
     
-    internal enum RenderPassType : byte
+    public enum RenderPassType : byte
     {
         Graphics = 0,
         Compute

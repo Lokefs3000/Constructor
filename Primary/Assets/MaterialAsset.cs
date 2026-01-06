@@ -228,6 +228,8 @@ namespace Primary.Assets
         internal AssetId Id => _id;
         internal string Name => _name;
 
+        public int LoadIndex => 0;
+
         internal ShaderAsset? TargetShader => _targetShader;
         internal IReadOnlyDictionary<string, MaterialProperty> Properties => _properties;
 

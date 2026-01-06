@@ -8,54 +8,62 @@ using System.Threading.Tasks;
 
 namespace Primary.Rendering2.Recording
 {
-    internal interface IStateChangeCommand
+    public interface IStateChangeCommand
     {
 
     }
 
-    internal struct UnmanagedCommandMeta
+    public struct UnmanagedCommandMeta
     {
         public RecCommandType Type;
     }
 
-    internal struct UCSetRenderTarget : IStateChangeCommand
+    public struct UCSetRenderTarget : IStateChangeCommand
     {
-        public byte Slot;
         public int RenderTarget;
+        public byte Slot;
     }
 
-    internal struct UCSetDepthStencil : IStateChangeCommand
+    public struct UCSetDepthStencil : IStateChangeCommand
     {
         public int DepthStencil;
     }
 
-    internal struct UCSetViewports : IStateChangeCommand
+    public struct UCSetViewport : IStateChangeCommand
     {
         public int Slot;
         public FGViewport? Viewport;
     }
 
-    internal struct UCSetScissor : IStateChangeCommand
+    public struct UCSetScissor : IStateChangeCommand
     {
         public int Slot;
         public FGRect? Scissor;
     }
 
-    internal struct UCSetStencilRef : IStateChangeCommand
+    public struct UCSetStencilRef : IStateChangeCommand
     {
         public uint StencilRef;
     }
 
-    internal struct UCSetBuffer : IStateChangeCommand
+    public struct UCSetBuffer : IStateChangeCommand
     {
-        public int Buffer;
+        public bool IsExternal;
+        public nint Buffer;
         public FGSetBufferLocation Location;
         public int Stride;
     }
 
-    internal struct UCSetProperties : IStateChangeCommand
+    public struct UCSetProperties : IStateChangeCommand
     {
         public int ResourceCount;
         public int DataBlockSize;
+
+        public bool UseBufferForHeader;
+    }
+
+    public struct UCSetPipeline : IStateChangeCommand
+    {
+        public nint Pipeline;
     }
 }

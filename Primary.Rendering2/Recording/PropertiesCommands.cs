@@ -8,27 +8,29 @@ using System.Threading.Tasks;
 
 namespace Primary.Rendering2.Recording
 {
-    internal enum SetPropertyType : byte
+    public enum SetPropertyType : byte
     {
-        Buffer = 0,
+        None = 0,
+        Buffer,
         Texture,
         RHIBuffer,
-        RHITexture
+        RHITexture,
+        RHISampler
     }
 
-    internal enum SetPropertyTarget : byte
+    public enum SetPropertyTarget : byte
     {
         GenericShader = 0,
         PixelShader
     }
 
-    internal struct PropertyMeta
+    public struct PropertyMeta
     {
         public SetPropertyType Type;
         public ShPropertyStages Target;
     }
 
-    internal struct UnamangedPropertyData
+    public struct UnmanagedPropertyData
     {
         public PropertyMeta Meta;
         public bool IsExternal;

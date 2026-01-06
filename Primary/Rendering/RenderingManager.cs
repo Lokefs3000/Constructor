@@ -50,7 +50,7 @@ namespace Primary.Rendering
 
         public RenderingManager()
         {
-            _graphicsDevice = GraphicsDeviceFactory.Create(GraphicsAPI.Direct3D12, new LoggerConfiguration().MinimumLevel.Debug().WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [RHI] {Message:lj}{NewLine}{Exception}").CreateLogger());
+            _graphicsDevice = GraphicsDeviceFactory.Create(GraphicsAPI.Direct3D12, new LoggerConfiguration().MinimumLevel.Debug().WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [RHI] {Message:lj}{NewLine}{Exception}").CreateLogger(), new GraphicsDeviceDescription { BreakOnSeverity = AppArguments.HasArgument("--dx12-dbg-break") });
             s_gd.Target = _graphicsDevice;
 
             _swapChainCache = new SwapChainCache(_graphicsDevice);

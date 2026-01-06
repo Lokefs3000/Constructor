@@ -6,6 +6,8 @@
         public abstract ref readonly GraphicsPipelineBytecode Bytecode { get; }
         public abstract string Name { set; }
 
+        public abstract nint Handle { get; }
+
         public abstract void Dispose();
     }
 
@@ -254,7 +256,7 @@
         MinLinearMagPointMipLinear,
         MinMagLinearMipPoint,
         Linear,
-        MinMagAnisotropicMipPoint,
+        Anisotropic,
     }
 
     public enum TextureAddressMode : byte

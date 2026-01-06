@@ -36,6 +36,8 @@ namespace Primary.R2.ForwardPlus
             manager.RenderPassManager.AddRenderPass<ResourcesPass>();
             manager.RenderPassManager.AddRenderPass<DepthPrePass>();
             manager.RenderPassManager.AddRenderPass<OpaquePass>();
+
+            //manager.RenderPassManager.AddRenderPass<TestPass>();
         }
 
         public void Uinstall(RenderingManager manager)

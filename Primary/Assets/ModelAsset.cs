@@ -140,6 +140,8 @@ namespace Primary.Assets
         internal AssetId Id => _id;
         internal string Name => _name;
 
+        public int LoadIndex => 0;
+
         public Type AssetType => typeof(ModelAsset);
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
 

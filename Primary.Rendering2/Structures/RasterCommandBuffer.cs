@@ -1,6 +1,8 @@
 ﻿using Primary.Common;
+using Primary.Rendering;
 using Primary.Rendering2.Assets;
 using Primary.Rendering2.Memory;
+using Primary.Rendering2.Pass;
 using Primary.Rendering2.Recording;
 using Primary.Rendering2.Resources;
 using Primary.RHI;
@@ -15,26 +17,28 @@ namespace Primary.Rendering2.Structures
         private readonly RenderPassStateData _stateData;
         private readonly CommandRecorder _recorder;
         private readonly SequentialLinearAllocator _intermediateAllocator;
+        private readonly FrameGraphResources _resources;
 
-        internal RasterCommandBuffer(RenderPassErrorReporter errorReporter, RenderPassStateData stateData, CommandRecorder recorder, SequentialLinearAllocator intermediateAllocator)
+        internal RasterCommandBuffer(RenderPassErrorReporter errorReporter, RenderPassStateData stateData, CommandRecorder recorder, SequentialLinearAllocator intermediateAllocator, FrameGraphResources resources)
         {
             _errorReporter = errorReporter;
             _stateData = stateData;
             _recorder = recorder;
             _intermediateAllocator = intermediateAllocator;
+            _resources = resources;
         }
 
         public void SetRenderTarget(int slot, FrameGraphTexture renderTarget)
         {
-            if (!renderTarget.IsExternal && !_stateData.ContainsOutput(renderTarget, FGOutputType.RenderTarget))
+            if (!renderTarget.IsExternal && !_stateData.ContainsOutput(renderTarget, FGRenderTargetType.RenderTarget))
             {
-                _errorReporter.ReportError(RPErrorSource.SetRenderTarget, RPErrorType.InvalidOutput);
+                _errorReporter.ReportError(RPErrorSource.SetRenderTarget, RPErrorType.InvalidOutput, renderTarget.ToString());
                 return;
             }
 
             if ((uint)slot > 7)
             {
-                _errorReporter.ReportError(RPErrorSource.SetRenderTarget, RPErrorType.SlotOutOfRange);
+                _errorReporter.ReportError(RPErrorSource.SetRenderTarget, RPErrorType.SlotOutOfRange, renderTarget.ToString());
                 return;
             }
 
@@ -47,9 +51,9 @@ namespace Primary.Rendering2.Structures
 
         public void SetDepthStencil(FrameGraphTexture depthStencil)
         {
-            if (!depthStencil.IsExternal && !_stateData.ContainsOutput(depthStencil, FGOutputType.DepthStencil))
+            if (!depthStencil.IsExternal && !_stateData.ContainsOutput(depthStencil, FGRenderTargetType.DepthStencil))
             {
-                _errorReporter.ReportError(RPErrorSource.SetRenderTarget, RPErrorType.InvalidOutput);
+                _errorReporter.ReportError(RPErrorSource.SetRenderTarget, RPErrorType.InvalidOutput, depthStencil.ToString());
                 return;
             }
 
@@ -61,9 +65,9 @@ namespace Primary.Rendering2.Structures
 
         public void ClearRenderTarget(FrameGraphTexture renderTarget, FGRect? rect = null)
         {
-            if (!renderTarget.IsExternal && !_stateData.ContainsOutput(renderTarget, FGOutputType.RenderTarget))
+            if (!renderTarget.IsExternal && !_stateData.ContainsOutput(renderTarget, FGRenderTargetType.RenderTarget))
             {
-                _errorReporter.ReportError(RPErrorSource.ClearRenderTarget, RPErrorType.InvalidOutput);
+                _errorReporter.ReportError(RPErrorSource.ClearRenderTarget, RPErrorType.InvalidOutput, renderTarget.ToString());
                 return;
             }
 
@@ -86,9 +90,9 @@ namespace Primary.Rendering2.Structures
 
         public void ClearDepthStencil(FrameGraphTexture depthStencil, FGClearFlags clearFlags, FGRect? rect = null)
         {
-            if (!depthStencil.IsExternal && !_stateData.ContainsOutput(depthStencil, FGOutputType.DepthStencil))
+            if (!depthStencil.IsExternal && !_stateData.ContainsOutput(depthStencil, FGRenderTargetType.DepthStencil))
             {
-                _errorReporter.ReportError(RPErrorSource.ClearDepthStencil, RPErrorType.InvalidOutput);
+                _errorReporter.ReportError(RPErrorSource.ClearDepthStencil, RPErrorType.InvalidOutput, depthStencil.ToString());
                 return;
             }
 
@@ -112,9 +116,9 @@ namespace Primary.Rendering2.Structures
 
         public void ClearRenderTarget(FrameGraphTexture renderTarget, Color color, FGRect? rect = null)
         {
-            if (!renderTarget.IsExternal && !_stateData.ContainsOutput(renderTarget, FGOutputType.RenderTarget))
+            if (!renderTarget.IsExternal && !_stateData.ContainsOutput(renderTarget, FGRenderTargetType.RenderTarget))
             {
-                _errorReporter.ReportError(RPErrorSource.ClearRenderTarget, RPErrorType.InvalidOutput);
+                _errorReporter.ReportError(RPErrorSource.ClearRenderTarget, RPErrorType.InvalidOutput, renderTarget.ToString());
                 return;
             }
 
@@ -138,9 +142,9 @@ namespace Primary.Rendering2.Structures
 
         public void ClearDepthStencil(FrameGraphTexture depthStencil, FGClearFlags clearFlags, float depth = 1.0f, byte stencil = 0xff, FGRect? rect = null)
         {
-            if (!depthStencil.IsExternal && !_stateData.ContainsOutput(depthStencil, FGOutputType.DepthStencil))
+            if (!depthStencil.IsExternal && !_stateData.ContainsOutput(depthStencil, FGRenderTargetType.DepthStencil))
             {
-                _errorReporter.ReportError(RPErrorSource.ClearDepthStencil, RPErrorType.InvalidOutput);
+                _errorReporter.ReportError(RPErrorSource.ClearDepthStencil, RPErrorType.InvalidOutput, depthStencil.ToString());
                 return;
             }
 
@@ -166,7 +170,7 @@ namespace Primary.Rendering2.Structures
 
         public void SetViewport(int slot, FGViewport? viewport)
         {
-            _recorder.AddStateChangeCommand(RecCommandType.SetViewports, RecCommandEffectFlags.Viewport, new UCSetViewports
+            _recorder.AddStateChangeCommand(RecCommandType.SetViewport, RecCommandEffectFlags.Viewport, new UCSetViewport
             {
                 Slot = slot,
                 Viewport = viewport
@@ -175,7 +179,7 @@ namespace Primary.Rendering2.Structures
 
         public void SetScissor(int slot, FGRect? scissor)
         {
-            _recorder.AddStateChangeCommand(RecCommandType.SetScissors, RecCommandEffectFlags.Scissor, new UCSetScissor
+            _recorder.AddStateChangeCommand(RecCommandType.SetScissor, RecCommandEffectFlags.Scissor, new UCSetScissor
             {
                 Slot = slot,
                 Scissor = scissor
@@ -194,13 +198,14 @@ namespace Primary.Rendering2.Structures
         {
             if (!desc.Buffer.IsExternal && !_stateData.ContainsResource(desc.Buffer, FGResourceUsage.Read))
             {
-                _errorReporter.ReportError(RPErrorSource.SetVertexBuffer, RPErrorType.NoShaderAccess);
+                _errorReporter.ReportError(RPErrorSource.SetVertexBuffer, RPErrorType.NoShaderAccess, desc.Buffer.ToString());
                 return;
             }
 
             _recorder.AddStateChangeCommand(RecCommandType.SetBuffer, RecCommandEffectFlags.VertexBuffer, new UCSetBuffer
             {
-                Buffer = desc.Buffer.Index,
+                IsExternal = desc.Buffer.IsExternal,
+                Buffer = desc.Buffer.IsExternal ? desc.Buffer.Resource!.Handle : desc.Buffer.Index,
                 Location = FGSetBufferLocation.VertexBuffer,
                 Stride = desc.Stride
             });
@@ -210,13 +215,14 @@ namespace Primary.Rendering2.Structures
         {
             if (!desc.Buffer.IsExternal && !_stateData.ContainsResource(desc.Buffer, FGResourceUsage.Read))
             {
-                _errorReporter.ReportError(RPErrorSource.SetIndexBuffer, RPErrorType.NoShaderAccess);
+                _errorReporter.ReportError(RPErrorSource.SetIndexBuffer, RPErrorType.NoShaderAccess, desc.Buffer.ToString());
                 return;
             }
 
             _recorder.AddStateChangeCommand(RecCommandType.SetBuffer, RecCommandEffectFlags.IndexBuffer, new UCSetBuffer
             {
-                Buffer = desc.Buffer.Index,
+                IsExternal = desc.Buffer.IsExternal,
+                Buffer = desc.Buffer.IsExternal ? desc.Buffer.Resource!.Handle : desc.Buffer.Index,
                 Location = FGSetBufferLocation.IndexBuffer,
                 Stride = desc.Stride
             });
@@ -224,11 +230,17 @@ namespace Primary.Rendering2.Structures
 
         public void SetPipeline(GraphicsPipeline pipeline)
         {
-
+            _recorder.AddStateChangeCommand(RecCommandType.SetPipeline, RecCommandEffectFlags.Pipeline, new UCSetPipeline
+            {
+                Pipeline = pipeline.Handle
+            });
         }
 
         public void SetProperties(PropertyBlock block)
         {
+            if (block.IsOutOfDate)
+                block.Reload();
+
             _recorder.AddSetParameters(block);
         }
 
@@ -240,12 +252,25 @@ namespace Primary.Rendering2.Structures
 
         public void DrawInstanced(FGDrawInstancedDesc desc)
         {
-
+            _recorder.AddExecutionCommand(RecCommandType.DrawInstanced, new UCDrawInstanced
+            {
+                VertexCount = desc.VertexCountPerInstance,
+                InstanceCount = desc.InstanceCount,
+                StartVertex = desc.StartVertexLocation,
+                StartInstance = desc.StartInstanceLocation
+            });
         }
 
         public void DrawIndexedInstanced(FGDrawIndexedInstancedDesc desc)
         {
-
+            _recorder.AddExecutionCommand(RecCommandType.DrawIndexedInstanced, new UCDrawIndexedInstanced
+            {
+                IndexCount = desc.IndexCountPerInstance,
+                InstanceCount = desc.InstanceCount,
+                StartIndex = desc.StartIndexLocation,
+                BaseVertex = desc.BaseVertexLocation,
+                StartInstance = desc.StartInstanceLocation
+            });
         }
 
         public void Upload<T>(FGBufferUploadDesc desc, Span<T> data) where T : unmanaged
@@ -253,9 +278,37 @@ namespace Primary.Rendering2.Structures
 
         }
 
+        public unsafe void Upload<T>(FrameGraphBuffer buffer, T data) where T : unmanaged
+        {
+            if (!buffer.IsExternal && !_stateData.ContainsResource(buffer, FGResourceUsage.Write))
+            {
+                _errorReporter.ReportError(RPErrorSource.UploadBuffer, RPErrorType.NoResourceAccess, buffer.ToString());
+                return;
+            }
+
+            if (buffer.Description.Width < Unsafe.SizeOf<T>())
+            {
+                _errorReporter.ReportError(RPErrorSource.UploadBuffer, RPErrorType.ResourceTooSmall, buffer.ToString());
+                return;
+            }
+
+            nint ptr = _intermediateAllocator.Allocate(Unsafe.SizeOf<T>());
+            *(T*)ptr.ToPointer() = data;
+
+            int index = _resources.AddBufferUpload(buffer, 0, Unsafe.SizeOf<T>());
+
+            _recorder.AddModificationCommand(RecCommandType.UploadBuffer, new UCUploadBuffer
+            {
+                BufferUploadIndex = index,
+                DataPointer = ptr,
+                DataSize = (uint)Unsafe.SizeOf<T>(),
+                BufferOffset = 0
+            });
+        }
+
         public void Upload<T>(FGTextureUploadDesc desc, Span<T> data) where T : unmanaged
         {
-
+           
         }
 
         public void Copy<T>(FGBufferCopyDesc desc) where T : unmanaged
@@ -272,7 +325,7 @@ namespace Primary.Rendering2.Structures
         {
             if (!desc.Buffer.IsExternal && !_stateData.ContainsResource(desc.Buffer, FGResourceUsage.Write))
             {
-                _errorReporter.ReportError(RPErrorSource.MapBuffer, RPErrorType.NoResourceAccess);
+                _errorReporter.ReportError(RPErrorSource.MapBuffer, RPErrorType.NoResourceAccess, desc.Buffer.ToString());
                 return new FGMappedSubresource<T>(this, desc, nint.Zero, Span<T>.Empty);
             }
 
@@ -282,7 +335,7 @@ namespace Primary.Rendering2.Structures
 
             if ((desc.ElementCount == 0 ? actualBufferSize : desc.ElementCount) + desc.Offset > actualBufferSize)
             {
-                _errorReporter.ReportError(RPErrorSource.MapBuffer, RPErrorType.OutOfRange);
+                _errorReporter.ReportError(RPErrorSource.MapBuffer, RPErrorType.OutOfRange, desc.Buffer.ToString());
                 return new FGMappedSubresource<T>(this, desc, nint.Zero, Span<T>.Empty);
             }
 
@@ -297,12 +350,30 @@ namespace Primary.Rendering2.Structures
 
         internal void Unmap(nint rawPtr, uint dataSize, FGMapBufferDesc desc)
         {
+            int index = _resources.AddBufferUpload(desc.Buffer, (int)desc.Offset, (int)dataSize);
+
             _recorder.AddModificationCommand(RecCommandType.UploadBuffer, new UCUploadBuffer
             {
-                Buffer = desc.Buffer.Index,
-                Offset = desc.Offset,
+                BufferUploadIndex = index,
                 DataPointer = rawPtr,
-                DataSize = dataSize
+                DataSize = dataSize,
+                BufferOffset = desc.Offset
+            });
+        }
+
+        internal void PresentOnWindow(Window window, FrameGraphTexture texture)
+        {
+            if (!_stateData.ContainsResource(texture, FGResourceUsage.Read | FGResourceUsage.NoShaderAccess))
+            {
+                _errorReporter.ReportError(RPErrorSource.PresentOnWindow, RPErrorType.NoResourceAccess, texture.ToString());
+                return;
+            }
+
+            _recorder.AddExecutionCommand(RecCommandType.PresentOnWindow, new UCPresentOnWindow
+            {
+                IsExternal = texture.IsExternal,
+                Texture = texture.IsExternal ? texture.Resource!.Handle : texture.Index,
+                WindowId = window.WindowId
             });
         }
 
@@ -384,6 +455,11 @@ namespace Primary.Rendering2.Structures
     public readonly record struct FGMapBufferDesc(FrameGraphBuffer Buffer, uint Offset, uint ElementCount)
     {
         public static implicit operator FGMapBufferDesc(FrameGraphBuffer buffer) => new FGMapBufferDesc(buffer, 0, 0);
+    }
+
+    public readonly record struct FGMapTextureDesc(FrameGraphTexture Texture, FGBox? Box)
+    {
+        public static implicit operator FGMapTextureDesc(FrameGraphTexture texture) => new FGMapTextureDesc(texture, null);
     }
 
     public readonly ref struct FGMappedSubresource<T> : IDisposable where T : unmanaged

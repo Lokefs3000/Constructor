@@ -34,19 +34,26 @@ namespace Editor.Shaders.Processors
 
             HeaderFeatures features = HeaderFeatures.None;
             bool areConstantsSolo = false;
+            int headerBytesize = 0;
 
             int variableCount = CountTotalVariablesUsed();
             using RentedArray<RawVariableData> variableDatas = RentedArray<RawVariableData>.Rent(variableCount);
+
             FillAndSortVariables(variableDatas.Span, out features);
+            CalculateHeaderBinding(variableDatas.Span, out headerBytesize, out areConstantsSolo);
 
             StringBuilder sb = new StringBuilder();
 
             RemoveOldDirectives(augment.Span);
             RegenerateStructs(sb);
-            GenerateNewHeader(sb, features, areConstantsSolo, variableDatas.Span, out int additionalOffset);
+            RegenerateStaticSamplers(sb);
+            GenerateNewHeader(sb, features, headerBytesize, areConstantsSolo, variableDatas.Span, out int additionalOffset);
 
             sb.Append(augment.Span);
             string str = AppendBindlessResources(sb, sb.ToString(), additionalOffset, areConstantsSolo, variableDatas.Span);
+
+            _processor.AreConstantsSeparated = areConstantsSolo;
+            _processor.HeaderBytesize = headerBytesize;
 
             return _encounteredErrors ? null : str;
         }
@@ -121,19 +128,25 @@ namespace Editor.Shaders.Processors
 
             foreach (ref readonly StaticSamplerData staticSampler in _processor.StaticSamplers)
             {
-                bool doClear = false;
+                //bool doClear = false;
+                //for (int i = staticSampler.DeclerationRange.Start; i < staticSampler.DeclerationRange.End; i++)
+                //{
+                //    if (doClear)
+                //    {
+                //        if (!char.IsWhiteSpace(source[i]))
+                //            source[i] = ' ';
+                //    }
+                //    else if (source[i] == ':' || source[i] == '{')
+                //    {
+                //        doClear = true;
+                //        i--;
+                //    }
+                //}
+
                 for (int i = staticSampler.DeclerationRange.Start; i < staticSampler.DeclerationRange.End; i++)
                 {
-                    if (doClear)
-                    {
-                        if (!char.IsWhiteSpace(source[i]))
-                            source[i] = ' ';
-                    }
-                    else if (source[i] == ':' || source[i] == '{')
-                    {
-                        doClear = true;
-                        i--;
-                    }
+                    if (!char.IsWhiteSpace(source[i]))
+                        source[i] = ' ';
                 }
 
                 foreach (ref readonly AttributeData attribute in staticSampler.Attributes.AsSpan())
@@ -181,7 +194,22 @@ namespace Editor.Shaders.Processors
             }
         }
 
-        private void GenerateNewHeader(StringBuilder sb, HeaderFeatures features, bool areConstantsSolo, Span<RawVariableData> span, out int additionalOffset)
+        private void RegenerateStaticSamplers(StringBuilder sb)
+        {
+            int i = 0;
+            foreach (ref readonly StaticSamplerData staticSampler in _processor.StaticSamplers)
+            {
+                sb.Append("SamplerState ");
+                sb.Append(staticSampler.Name);
+                sb.Append(" : register(s");
+                sb.Append(i++);
+                sb.AppendLine(");");
+            }
+
+            sb.AppendLine();
+        }
+
+        private void GenerateNewHeader(StringBuilder sb, HeaderFeatures features, int headerBytesize, bool areConstantsSolo, Span<RawVariableData> span, out int additionalOffset)
         {
             additionalOffset = -1;
 
@@ -431,7 +459,7 @@ namespace Editor.Shaders.Processors
                                 SerializeGeneric(sb, varData.Generic, varData.Name);
                                 sb.Append('>');
                             }
-                            sb.Append(")ResourceDescriptorHeap[__HEADER_CB.IDX_");
+                            sb.Append(resourceData.Type == ResourceType.SamplerState ? ")SamplerDescriptorHeap[__HEADER_CB.IDX_" : ")ResourceDescriptorHeap[__HEADER_CB.IDX_");
                             sb.Append(varData.Name);
                             sb.Append("];");
                         }
@@ -553,6 +581,46 @@ namespace Editor.Shaders.Processors
             }
 
             variableDatas.Sort();
+        }
+
+        private void CalculateHeaderBinding(Span<RawVariableData> variableDatas, out int headerBytesize, out bool areConstantsSolo)
+        {
+            headerBytesize = 0;
+            areConstantsSolo = false;
+
+            int constantsSize = 0;
+
+            foreach (ref readonly ResourceData resource in _processor.Resources)
+            {
+                AttributeData data = Array.Find(resource.Attributes, (x) => x.Signature is AttributeConstants);
+                if (data != default)
+                {
+                    constantsSize += _processor.CalculateSize(resource.Value);
+                }
+                else
+                {
+                    headerBytesize += sizeof(uint);
+                }
+            }
+
+            if (_processor.GeneratePropertiesInHeader)
+            {
+                foreach (ref readonly PropertyData property in _processor.Properties)
+                {
+                    headerBytesize += _processor.CalculateSize(property.Generic);
+                }
+            }
+
+            //a separate buffer costs 4 bytes i believe
+            if (headerBytesize + constantsSize > ShaderProcessor.MaxConstantsBufferSize - 4)
+            {
+                areConstantsSolo = true;
+            }
+            else
+            {
+                headerBytesize += constantsSize;
+                areConstantsSolo = false;
+            }
         }
 
         private string ResolvePropertyTemplate(string template, ref readonly RawVariableData varData, ref readonly FunctionData function)

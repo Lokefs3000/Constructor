@@ -19,5 +19,7 @@ namespace Primary.Assets.Types
         public AssetId Id => _assetData.Id;
         public ResourceStatus Status => _assetData.Status;
         public string Name => _assetData.Name;
+
+        public int LoadIndex => _assetData.LoadIndex;
     }
 }

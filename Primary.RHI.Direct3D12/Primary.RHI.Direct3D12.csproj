@@ -12,7 +12,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Serilog" Version="4.3.0" />
-    <PackageReference Include="Vortice.Direct3D12" Version="3.6.2" />
+    <PackageReference Include="Vortice.Direct3D12" Version="3.8.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Interop.D3D12MemAlloc\Interop.D3D12MemAlloc.csproj" />

@@ -23,15 +23,20 @@ namespace Primary.R2.ForwardPlus.Passes
             RenderCameraData cameraData = context.Get<RenderCameraData>()!;
 
             ForwardPlusRenderPath renderPath = Unsafe.As<ForwardPlusRenderPath>(stateData.Path);
+            GenericResources resources = renderPass.Blackboard.Get<GenericResources>()!;
 
-            using (RasterPassDescription desc = renderPass.SetupRasterPass("Opaque", out PassData data))
+            using (RasterPassDescription desc = renderPass.SetupRasterPass("FP-Opaque", out PassData data))
             {
                 {
                     data.RtColor = cameraData.ColorTexture;
                     data.DsDepth = cameraData.DepthTexture;
 
+                    data.DynamicDataBuffer = resources.DynamicDataBuffer;
+
                     data.RenderList = renderPath.PrimaryRenderList;
                 }
+
+                desc.UseResource(FGResourceUsage.ReadWrite, resources.DynamicDataBuffer);
 
                 desc.UseRenderTarget(cameraData.ColorTexture);
                 desc.UseDepthStencil(cameraData.DepthTexture);
@@ -70,10 +75,12 @@ namespace Primary.R2.ForwardPlus.Passes
                         cmd.SetIndexBuffer(new FGSetBufferDesc(lastRenderMeshSource.IndexBuffer!));
                     }
 
+                    cmd.Upload(data.DynamicDataBuffer, new DynamicDataData((uint)segment.FlagIndexStart));
+
                     RawRenderMesh renderMesh = segment.Mesh;
                     cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc(
                         renderMesh.IndexCount,
-                        (uint)(segment.FlagIndexStart - segment.FlagIndexEnd),
+                        (uint)(segment.FlagIndexEnd - segment.FlagIndexStart),
                         renderMesh.IndexOffset,
                         (int)renderMesh.VertexOffset));
                 }
@@ -85,12 +92,16 @@ namespace Primary.R2.ForwardPlus.Passes
             public FrameGraphTexture RtColor;
             public FrameGraphTexture DsDepth;
 
+            public FrameGraphBuffer DynamicDataBuffer;
+
             public RenderList? RenderList;
 
             public void Clear()
             {
                 RtColor = FrameGraphTexture.Invalid;
                 DsDepth = FrameGraphTexture.Invalid;
+
+                DynamicDataBuffer = FrameGraphBuffer.Invalid;
 
                 RenderList = null;
             }

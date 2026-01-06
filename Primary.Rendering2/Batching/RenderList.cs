@@ -164,6 +164,10 @@ namespace Primary.Rendering2.Batching
 
         public int TotalFlagCount => _rentedKeyCount;
         public ReadOnlySpan<ShaderRenderBatcher> ShaderBatchers => _usedBatchers.AsSpan();
+
+        public IReadOnlyDictionary<ShaderAsset2, ushort> ShaderIds => _shaderIds;
+        public IReadOnlyDictionary<IRenderMeshSource, ushort> ModelIds => _modelIds;
+        public IReadOnlyDictionary<MaterialAsset2, uint> MaterialIds => _materialIds;
     }
 
     /*
@@ -185,7 +189,7 @@ namespace Primary.Rendering2.Batching
         public uint MaterialId => (uint)((Key >> 15) & 0x1ffffu);
         public ushort MeshId => (ushort)((Key >> 5) & 0x400u);
 
-        public int Index => (int)((ListIndex) & 0x80000000u);
+        public int Index => (int)((ListIndex) & 0x1ffffffu);
         public int Batcher => (byte)((ListIndex >> 31) & 0x1u);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -197,7 +201,7 @@ namespace Primary.Rendering2.Batching
 
         public static ulong Create(ushort shaderId, ushort modelId, uint materialId, ushort meshId)
         {
-            return (((uint)shaderId) << 48) | (((uint)modelId) << 32) | ((materialId) << 15) | (((uint)meshId) << 5);
+            return (((ulong)shaderId) << 48) | (((ulong)modelId) << 32) | (((ulong)materialId) << 15) | (((ulong)meshId) << 5);
         }
     }
 

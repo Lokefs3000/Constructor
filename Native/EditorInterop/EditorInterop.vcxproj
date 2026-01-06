@@ -27,15 +27,16 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="bc7enc_rdo\bc7enc.cpp" />
+    <ClCompile Include="bc7enc_rdo\rgbcx.cpp" />
     <ClCompile Include="BCInterop.cpp" />
-    <ClCompile Include="BC\bc7enc.cpp" />
-    <ClCompile Include="BC\rgbcx.cpp" />
     <ClCompile Include="SPIRVInterop.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BC\bc7enc.h" />
-    <ClInclude Include="BC\rgbcx.h" />
-    <ClInclude Include="BC\rgbcx_table4.h" />
+    <ClInclude Include="bc7enc_rdo\bc7enc.h" />
+    <ClInclude Include="bc7enc_rdo\rgbcx.h" />
+    <ClInclude Include="bc7enc_rdo\rgbcx_table4.h" />
+    <ClInclude Include="bc7enc_rdo\rgbcx_table4_small.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

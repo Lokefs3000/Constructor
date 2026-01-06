@@ -8,6 +8,8 @@
         public ResourceStatus Status { get; }
         public string Name { get; }
 
+        public int LoadIndex { get; }
+
         public Type AssetType { get; }
 
         /// <summary>Thread-safe</summary>

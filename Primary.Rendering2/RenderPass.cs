@@ -1,8 +1,11 @@
-﻿using CommunityToolkit.HighPerformance;
+﻿using Collections.Pooled;
+using CommunityToolkit.HighPerformance;
+using Primary.Rendering2.Assets;
 using Primary.Rendering2.Pass;
 using Primary.Rendering2.Resources;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -12,6 +15,8 @@ namespace Primary.Rendering2
 {
     public sealed class RenderPass
     {
+        private readonly RenderPassManager _manager;
+
         private RenderPassErrorReporter _errorReporter;
         private RenderPassBlackboard _blackboard;
 
@@ -20,8 +25,10 @@ namespace Primary.Rendering2
 
         private int _resourceCounter;
 
-        internal RenderPass()
+        internal RenderPass(RenderPassManager manager)
         {
+            _manager = manager;
+
             _errorReporter = new RenderPassErrorReporter();
             _blackboard = new RenderPassBlackboard();
 
@@ -62,10 +69,38 @@ namespace Primary.Rendering2
 
         internal void AddNewRenderPass(RenderPassDescription desc) => _passes.Add(desc);
 
-        internal void ReportError(RPErrorSource source, RPErrorType type) => _errorReporter.ReportError(source, type);
+        internal void ReportError(RPErrorSource source, RPErrorType type, string? resourceName) => _errorReporter.ReportError(source, type, resourceName);
 
+        public RenderPassManager Manager => _manager;
         public RenderPassBlackboard Blackboard => _blackboard;
 
         internal ReadOnlySpan<RenderPassDescription> Passes => _passes.AsSpan();
+
+        internal static void AddGlobalResources(PooledList<UsedResourceData> resources, PooledList<UsedRenderTargetData> renderTargets)
+        {
+            _globalResourceHash.Clear();
+
+            foreach (UsedResourceData data in resources)
+            {
+                Debug.Assert(data.Resource.IsValidAndRenderGraph);
+                _globalResourceHash.Add(data.Resource.Index);
+            }
+
+            foreach (UsedRenderTargetData data in renderTargets)
+            {
+                Debug.Assert(((FrameGraphResource)data.Target).IsValidAndRenderGraph);
+                _globalResourceHash.Add(data.Target.Index);
+            }
+
+            ShaderGlobalsManager instance = ShaderGlobalsManager.Instance;
+            foreach (var kvp in instance.TransitionalProperties)
+            {
+                if (!_globalResourceHash.Contains(kvp.Key) && instance.TryGetPropertyValue(kvp.Value.String, out PropertyData data))
+                    resources.Add(new UsedResourceData(FGResourceUsage.Read, data.Resource));
+            }
+        }
+
+        [ThreadStatic]
+        private static HashSet<int> _globalResourceHash = new HashSet<int>();
     }
 }

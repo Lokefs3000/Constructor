@@ -155,7 +155,7 @@ namespace Primary.RHI.Direct3D12.Memory
         {
             (ID3D12Resource srcRes, uint srcOffset) = UploadToInternalAllocation(dataPointer, dataSize);
 
-            using ID3D12CommandAllocator commandAllocator = _device.D3D12Device.CreateCommandAllocator(CommandListType.Copy);
+            ID3D12CommandAllocator commandAllocator = _device.D3D12Device.CreateCommandAllocator(CommandListType.Copy);
             using ID3D12GraphicsCommandList commandList = _device.D3D12Device.CreateCommandList<ID3D12GraphicsCommandList>(CommandListType.Copy, commandAllocator);
 
             commandList.CopyBufferRegion(resource, 0, srcRes, srcOffset, dataSize);
@@ -166,6 +166,12 @@ namespace Primary.RHI.Direct3D12.Memory
             //pov: killing all performance and parallel lmao
             _device.CopyCommandQueue.ExecuteCommandList(commandList);
             _device.SynchronizeDevice(SynchronizeDeviceTargets.Copy);
+
+            _device.EnqueueDataFree(() =>
+            {
+                commandList.Dispose();
+                commandAllocator.Dispose();
+            });
         }
 
         //TODO: refer above
@@ -187,10 +193,25 @@ namespace Primary.RHI.Direct3D12.Memory
             ResourceAllocationInfo allocationInfo = _device.D3D12Device.GetResourceAllocationInfo(desc);
             uint mask = (uint)(allocationInfo.Alignment - 1);
 
+            ResourceDescription1 desc1 = new ResourceDescription1
+            {
+                Dimension = desc.Dimension,
+                Alignment = desc.Alignment,
+                Width = desc.Width,
+                Height = desc.Height,
+                DepthOrArraySize = desc.DepthOrArraySize,
+                MipLevels = desc.MipLevels,
+                Format = desc.Format,
+                SampleDescription = desc.SampleDescription,
+                Layout = desc.Layout,
+                Flags = desc.Flags,
+                SamplerFeedbackMipRegion = default,
+            };
+
             PlacedSubresourceFootPrint[] dstLayouts = new PlacedSubresourceFootPrint[dataSlices.Length];
             uint[] dstRows = new uint[dataSlices.Length];
             ulong[] dstRowSizeInBytes = new ulong[dataSlices.Length];
-            _device.D3D12Device.GetCopyableFootprints(resource.Description, 0, (uint)dataSlices.Length, 0, dstLayouts.AsSpan(), dstRows.AsSpan(), dstRowSizeInBytes.AsSpan(), out ulong totalBytes);
+            _device.D3D12Device.GetCopyableFootprints1(ref desc1, 0, (uint)dataSlices.Length, 0, dstLayouts, dstRows, dstRowSizeInBytes, out ulong totalBytes);
 
             uint* dataSizes = stackalloc uint[dataSlices.Length];
             for (int i = 0; i < dataSlices.Length; i++)
@@ -206,7 +227,7 @@ namespace Primary.RHI.Direct3D12.Memory
 
             (ID3D12Resource srcRes, uint srcOffset) = UploadToInternalAllocationSliced(dataSlices, dstLayouts, dstRows, dstRowSizeInBytes, totalBytes, info);
 
-            using ID3D12CommandAllocator commandAllocator = _device.D3D12Device.CreateCommandAllocator(CommandListType.Copy);
+            ID3D12CommandAllocator commandAllocator = _device.D3D12Device.CreateCommandAllocator(CommandListType.Copy);
             using ID3D12GraphicsCommandList commandList = _device.D3D12Device.CreateCommandList<ID3D12GraphicsCommandList>(CommandListType.Copy, commandAllocator);
 
             uint totalDataOffset = srcOffset;
@@ -223,6 +244,12 @@ namespace Primary.RHI.Direct3D12.Memory
             //pov: killing all performance and parallel lmao
             _device.CopyCommandQueue.ExecuteCommandList(commandList);
             _device.SynchronizeDevice(SynchronizeDeviceTargets.Copy);
+
+            _device.EnqueueDataFree(() =>
+            {
+                commandList.Dispose();
+                commandAllocator.Dispose();
+            });
         }
 
         private void UploadToTexture_Fallback(ID3D12Resource resource, ResourceStates currentState, FormatInfo info, Span<nint> dataSlices, uint dataSize, ref ResourceDescription desc)
@@ -249,7 +276,7 @@ namespace Primary.RHI.Direct3D12.Memory
 
             (ID3D12Resource srcRes, uint srcOffset) = UploadToInternalAllocationSliced(dataSlices, dstLayouts, dstRows, dstRowSizeInBytes, totalBytes, info);
 
-            using ID3D12CommandAllocator commandAllocator = _device.D3D12Device.CreateCommandAllocator(CommandListType.Copy);
+            ID3D12CommandAllocator commandAllocator = _device.D3D12Device.CreateCommandAllocator(CommandListType.Copy);
             using ID3D12GraphicsCommandList commandList = _device.D3D12Device.CreateCommandList<ID3D12GraphicsCommandList>(CommandListType.Copy, commandAllocator);
 
             uint totalDataOffset = srcOffset;
@@ -266,6 +293,12 @@ namespace Primary.RHI.Direct3D12.Memory
             //pov: killing all performance and parallel lmao
             _device.CopyCommandQueue.ExecuteCommandList(commandList);
             _device.SynchronizeDevice(SynchronizeDeviceTargets.Copy);
+
+            _device.EnqueueDataFree(() =>
+            {
+                commandList.Dispose();
+                commandAllocator.Dispose();
+            });
         }
     }
 
@@ -327,6 +360,9 @@ namespace Primary.RHI.Direct3D12.Memory
         {
             if (!_disposedValue)
             {
+                while (_allocations.TryPop(out D3D12MemAlloc.VirtualAllocation allocation))
+                    D3D12MemAlloc.VirtualBlock.FreeAllocation(_virtualBlock, allocation);
+
                 if (_dataPointer != nint.Zero)
                     _resource.Unmap(0);
                 _resource?.Dispose();

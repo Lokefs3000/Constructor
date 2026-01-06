@@ -1,4 +1,5 @@
 ﻿using Primary.Common;
+using Primary.Rendering2.Pass;
 using Primary.Rendering2.Resources;
 using Primary.RHI;
 using System;
@@ -13,13 +14,13 @@ namespace Primary.Rendering2.Recording
 {
     internal sealed class RenderPassStateData
     {
-        private Dictionary<int, FGOutputType> _outputDict;
-        private Dictionary<int, FGResourceStateData> _resourceDict;
+        private Dictionary<FrameGraphTexture, FGRenderTargetType> _outputDict;
+        private Dictionary<FrameGraphResource, FGResourceStateData> _resourceDict;
 
         internal RenderPassStateData()
         {
-            _outputDict = new Dictionary<int, FGOutputType>();
-            _resourceDict = new Dictionary<int, FGResourceStateData>();
+            _outputDict = new Dictionary<FrameGraphTexture, FGRenderTargetType>();
+            _resourceDict = new Dictionary<FrameGraphResource, FGResourceStateData>();
         }
 
         internal void Reset()
@@ -28,12 +29,31 @@ namespace Primary.Rendering2.Recording
             _resourceDict.Clear();
         }
 
-        internal void AddOutput(int idx, FGOutputType type) => _outputDict[idx] = type;
-        internal void AddResource(int idx, FGResourceStateData data) => _resourceDict[idx] = data;
+        internal void AddOutput(FrameGraphTexture idx, FGRenderTargetType type) => _outputDict[idx] = type;
+        internal void AddResource(FrameGraphResource idx, FGResourceStateData data) => _resourceDict[idx] = data;
 
-        internal bool ContainsOutput(FrameGraphTexture texture, FGOutputType outputType)
+        internal void SetupState(ref readonly RenderPassDescription desc)
         {
-            ref FGOutputType val = ref CollectionsMarshal.GetValueRefOrNullRef(_outputDict, texture.Index);
+            foreach (ref readonly UsedResourceData data in desc.Resources.Span)
+            {
+                if (data.Resource.ResourceId != FGResourceId.Global)
+                {
+                    AddResource(data.Resource, new FGResourceStateData(data.Usage));
+                }
+            }
+
+            foreach (ref readonly UsedRenderTargetData data in desc.RenderTargets.Span)
+            {
+                if (((FrameGraphResource)data.Target).ResourceId != FGResourceId.Global)
+                {
+                    AddOutput(data.Target, data.Type);
+                }
+            }
+        }
+
+        internal bool ContainsOutput(FrameGraphTexture texture, FGRenderTargetType outputType)
+        {
+            ref FGRenderTargetType val = ref CollectionsMarshal.GetValueRefOrNullRef(_outputDict, texture);
             if (Unsafe.IsNullRef(ref val))
                 return false;
 
@@ -42,11 +62,11 @@ namespace Primary.Rendering2.Recording
 
         internal bool ContainsResource(FrameGraphResource resource, FGResourceUsage resourceAccess)
         {
-            ref FGResourceStateData val = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceDict, resource.Index);
+            ref FGResourceStateData val = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceDict, resource);
             if (Unsafe.IsNullRef(ref val))
                 return false;
 
-            return val.Usage == resourceAccess;
+            return FlagUtility.HasFlag(val.Usage, resourceAccess);
         }
     }
 

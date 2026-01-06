@@ -1,190 +1,267 @@
 ﻿using Primary.Common;
-using Primary.Profiling;
+using Primary.Pooling;
 using Primary.Rendering2.Recording;
 using Primary.Rendering2.Resources;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace Primary.Rendering2.Pass
 {
     internal sealed class RenderPassCompiler
     {
-        private RPOverview[] _overviews;
-        private HashSet<int> _referencedResources;
+        private readonly bool _noPassCulling;
 
-        private RenderPassType _currentPassType;
-        private List<int> _currentPassList;
+        private ObjectPool<RenderPassContainer> _passContainerPool;
+
+        private HashSet<int> _dependencySet;
+        private Dictionary<int, IndexRange> _dependencyDict;
+
+        private int[] _pooledDependencyArray;
+
+        private Dictionary<FrameGraphResource, IndexRange> _resourceLifetimeDict;
 
         internal RenderPassCompiler()
         {
-            _overviews = Array.Empty<RPOverview>();
-            _referencedResources = new HashSet<int>();
+            _noPassCulling = AppArguments.HasArgument("--fg-nocull");
 
-            _currentPassType = RenderPassType.Graphics;
-            _currentPassList = new List<int>();
+            _passContainerPool = new ObjectPool<RenderPassContainer>(new RenderPassContainer.PoolingPolicy());
+
+            _dependencySet = new HashSet<int>();
+            _dependencyDict = new Dictionary<int, IndexRange>();
+
+            _pooledDependencyArray = new int[16];
+
+            _resourceLifetimeDict = new Dictionary<FrameGraphResource, IndexRange>();
         }
 
-        internal void Compile(FrameGraphTexture finalTexture, ReadOnlySpan<RenderPassDescription> passes, FrameGraphTimeline timeline, FrameGraphState stateManager)
+        internal void Compile(FrameGraphTexture finalTexture, ReadOnlySpan<RenderPassDescription> passes, FrameGraphTimeline timeline, FrameGraphResources resources, FrameGraphState stateManager)
         {
             timeline.ClearTimeline();
+            resources.ClearResources();
 
-            if (_overviews.Length < passes.Length)
+            if (passes.IsEmpty)
+                return;
+
+            _dependencySet.Clear();
+            _dependencyDict.Clear();
+            _resourceLifetimeDict.Clear();
+
+            using RentedArray<RenderPassContainer> containers = RentedArray<RenderPassContainer>.Rent(passes.Length, true);
+            for (int j = 0; j < passes.Length; j++)
             {
-                _overviews = new RPOverview[passes.Length];
+                ref readonly RenderPassDescription currentPass = ref passes[j];
 
-                for (int i = 0; i < passes.Length; i++)
-                {
-                    _overviews[i] = new RPOverview(new Dictionary<int, ResourceState>(), new HashSet<int>(), new Dictionary<int, RPRelation>(), ResourceStateFlags.None);
-                }
-            }
-            else
-            {
-                foreach (ref readonly RPOverview overview in _overviews.AsSpan())
-                {
-                    overview.Clear();
-                }
-            }
+                RenderPassContainer container = _passContainerPool.Get();
+                container.Initialize(in currentPass);
 
-            using (new ProfilingScope("FindResources"))
-            {
-                int idx = 0;
-                foreach (ref readonly RenderPassDescription desc in passes)
-                {
-                    ref RPOverview overview = ref _overviews[idx++];
-
-                    foreach (ref readonly UsedResourceData resourceData in desc.Resources.Span)
-                    {
-                        _referencedResources.Add(resourceData.Resource.Index);
-
-                        bool isExternal = resourceData.Resource.IsExternal;
-                        overview.ResourceStates.Add(resourceData.Resource.Index, new ResourceState(resourceData.Usage, isExternal));
-
-                        if (isExternal && FlagUtility.HasFlag(resourceData.Usage, FGResourceUsage.Write))
-                            overview.Flags |= ResourceStateFlags.HasExternalWrite;
-                    }
-
-                    foreach (ref readonly UsedRenderTargetData renderTargetData in desc.RenderTargets.Span)
-                    {
-                        bool isExternal = ((FrameGraphResource)renderTargetData.Target).IsExternal;
-
-                        overview.OutputResources.Add(renderTargetData.Target.Index);
-                        overview.ResourceStates.Add(renderTargetData.Target.Index, new ResourceState(FGResourceUsage.Write, isExternal));
-
-                        if (isExternal)
-                            overview.Flags |= ResourceStateFlags.HasExternalWrite;
-                    }
-                }
+                containers[j] = container;
             }
 
-            using (new ProfilingScope("FindRelations"))
+            int i = passes.Length - 1;
+            int dependencyIndex = 0;
+
+            while (i >= 0)
             {
-                for (int i = passes.Length - 1; i >= 0; i--)
+                ref readonly RenderPassDescription currentPassDesc = ref passes[i];
+                RenderPassContainer currentPass = containers[i];
+
+                if (currentPassDesc.Type != RenderPassType.Graphics)
+                    continue;
+
+                //TODO: cull passes with only state setting commands
+                if (!_noPassCulling && currentPassDesc.AllowCulling && i == passes.Length - 1 && !currentPass.HasOutput(finalTexture))
                 {
-                    ref readonly RPOverview overview = ref _overviews[i];
-                    ref readonly RenderPassDescription overviewDesc = ref passes[i];
+                    i--;
+                    continue;
+                }
 
-                    for (int j = 0; j < passes.Length; j++)
+                int startDependencyIndex = dependencyIndex;
+                for (int j = i - 1; j >= 0; j--)
+                {
+                    ref readonly RenderPassDescription previousPassDesc = ref passes[j];
+                    RenderPassContainer previousPass = containers[j];
+
+                    if (DoesPassModifyRequiredState(currentPass, previousPass))
                     {
-                        if (i == j)
-                            continue;
+                        _dependencySet.Add((i << 16) | j);
+                        _pooledDependencyArray[dependencyIndex++] = j;
 
-                        ref readonly RPOverview pass = ref _overviews[j];
-                        ref readonly RenderPassDescription passDesc = ref passes[j];
-
-                        RPRelation relation = RPRelation.None;
-
-                        if (overviewDesc.Type != passDesc.Type)
+                        if (_pooledDependencyArray.Length < dependencyIndex)
                         {
-                            foreach (var kvp in overview.ResourceStates)
-                            {
-                                if (pass.ResourceStates.TryGetValue(kvp.Key, out ResourceState state) && FlagUtility.HasFlag(kvp.Value.Usage | state.Usage, FGResourceUsage.Write))
-                                {
-                                    relation |= RPRelation.WriteOnSeparateQueue;
-                                    break;
-                                }
-                            }
+                            Array.Resize(ref _pooledDependencyArray, _pooledDependencyArray.Length * 2);
                         }
-
-                        foreach (int res in overview.OutputResources)
-                        {
-                            if (pass.OutputResources.Contains(res))
-                            {
-                                relation |= RPRelation.SharedOutput;
-                                break;
-                            }
-                        }
-
-                        overview.Relations[j] = relation;
                     }
                 }
+
+                if (dependencyIndex != startDependencyIndex)
+                    _dependencyDict[i] = new IndexRange(startDependencyIndex, dependencyIndex);
+
+                i--;
             }
 
-            using (new ProfilingScope("Output"))
+            CreateTimelineUntilBarrier(timeline, passes, containers.Span, 0, passes[0].Type);
+            AddResourceEventsToTimeline(resources);
+
+            _resourceLifetimeDict.Clear();
+            foreach (RenderPassContainer pass in containers)
+                _passContainerPool.Return(pass);
+        }
+
+        private void CreateTimelineUntilBarrier(FrameGraphTimeline timeline, ReadOnlySpan<RenderPassDescription> descriptions, ReadOnlySpan<RenderPassContainer> containers, int startPassIndex, RenderPassType type)
+        {
+            int rasterIndex = 0;
+            int computeIndex = 0;
+
+            for (int i = startPassIndex; i < descriptions.Length; i++)
             {
-                for (int i = 0; i < passes.Length; i++)
+                ref readonly RenderPassDescription desc = ref descriptions[i];
+                RenderPassContainer pass = containers[i];
+
+                if (!timeline.IsEmpty && _dependencyDict.TryGetValue(i, out IndexRange range))
                 {
-                    ref readonly RenderPassDescription desc = ref passes[i];
-                    ref readonly RPOverview overview = ref _overviews[i];
-
-                    RenderPassStateData stateData = stateManager.GetStateData(i);
-
-                    if (desc.Type != RenderPassType.Graphics)
-                        throw new NotImplementedException();
-
-                    foreach (ref readonly UsedRenderTargetData data in desc.RenderTargets.Span)
+                    ReadOnlySpan<int> rangeSpan = _pooledDependencyArray.AsSpan(range);
+                    for (int j = 0; j < rangeSpan.Length; j++)
                     {
-                        stateData.AddOutput(data.Target.Index, data.Type switch
+                        ref readonly RenderPassDescription dependencyDesc = ref descriptions[i];
+                        if (dependencyDesc.Type != type)
                         {
-                            FGRenderTargetType.RenderTarget => FGOutputType.RenderTarget,
-                            FGRenderTargetType.DepthStencil => FGOutputType.DepthStencil,
-                            _ => throw new NotImplementedException()
-                        });
+                            timeline.AddFenceEvent(GetQueueFromType(desc.Type), GetQueueFromType(dependencyDesc.Type));
+                            //break;
+                        }
                     }
+                }
 
-                    foreach (ref readonly UsedResourceData data in desc.Resources.Span)
+                WeakRef<int> lifetimeIndex = desc.Type switch
+                {
+                    RenderPassType.Graphics => new WeakRef<int>(ref rasterIndex),
+                    RenderPassType.Compute => new WeakRef<int>(ref computeIndex),
+                    _ => throw new NotSupportedException()
+                };
+
+                foreach (var kvp in pass.Resources)
+                {
+                    if (kvp.Key.IsExternal)
+                        continue;
+
+                    if (_resourceLifetimeDict.TryGetValue(kvp.Key, out range))
                     {
-                        stateData.AddResource(data.Resource.Index, new FGResourceStateData(data.Usage));
+                        if (lifetimeIndex.Ref < range.Start)
+                        {
+                            Debug.Assert(range.End >= lifetimeIndex.Ref);
+                            _resourceLifetimeDict[kvp.Key] = new IndexRange(lifetimeIndex.Ref, range.End);
+                        }
+                        else if (range.End < lifetimeIndex.Ref)
+                        {
+                            Debug.Assert(range.Start <= lifetimeIndex.Ref);
+                            _resourceLifetimeDict[kvp.Key] = new IndexRange(range.Start, lifetimeIndex.Ref);
+                        }
                     }
+                    else
+                    {
+                        _resourceLifetimeDict.Add(kvp.Key, new IndexRange(lifetimeIndex.Ref, lifetimeIndex.Ref));
+                    }
+                }
 
-                    timeline.AddRasterEvent(i);
+                switch (desc.Type)
+                {
+                    case RenderPassType.Graphics: timeline.AddRasterEvent(i); break;
+                    case RenderPassType.Compute: timeline.AddComputeEvent(i); break;
+                }
+
+                lifetimeIndex.Ref++;
+            }
+
+            static TimelineFenceQueue GetQueueFromType(RenderPassType type) => type switch
+            {
+                RenderPassType.Graphics => TimelineFenceQueue.Graphics,
+                RenderPassType.Compute => TimelineFenceQueue.Compute,
+                _ => throw new NotSupportedException()
+            };
+        }
+
+        private void AddResourceEventsToTimeline(FrameGraphResources resources)
+        {
+            foreach (var kvp in _resourceLifetimeDict)
+            {
+                resources.AddResourceWithLifetime(kvp.Key, kvp.Value);
+            }
+
+            resources.SortAndFinish();
+        }
+
+        private static bool DoesPassModifyRequiredState(RenderPassContainer currentPass, RenderPassContainer passToCheck)
+        {
+            foreach (var kvp in currentPass.Resources)
+            {
+                if (!FlagUtility.HasFlag(kvp.Value, FGResourceUsage.Read))
+                {
+                    if (passToCheck.HasResourceWithUsage(kvp.Key, FGResourceUsage.Write))
+                    {
+                        return true;
+                    }
                 }
             }
+
+            return false;
         }
 
-        private readonly record struct ResourceState(FGResourceUsage Usage, bool IsExternal);
-        private record struct RefResourceMeta(int Lifetime);
-
-        private record struct RPOverview(
-            Dictionary<int, ResourceState> ResourceStates,
-            HashSet<int> OutputResources,
-            Dictionary<int, RPRelation> Relations, 
-            ResourceStateFlags Flags)
+        private class RenderPassContainer
         {
-            public void Clear()
+            private HashSet<FrameGraphTexture> _outputs;
+            private Dictionary<FrameGraphResource, FGResourceUsage> _resources;
+
+            internal RenderPassContainer()
             {
-                ResourceStates.Clear();
-                OutputResources.Clear();
-                Relations.Clear();
-                Flags = ResourceStateFlags.None;
+                _outputs = new HashSet<FrameGraphTexture>();
+                _resources = new Dictionary<FrameGraphResource, FGResourceUsage>();
             }
-        }
 
-        private enum ResourceStateFlags : byte
-        {
-            None = 0,
+            internal void Initialize(ref readonly RenderPassDescription desc)
+            {
+                foreach (ref readonly UsedResourceData resourceData in desc.Resources.Span)
+                {
+                    _resources[resourceData.Resource] = resourceData.Usage;
+                }
 
-            HasExternalWrite = 1 << 0
-        }
+                foreach (ref readonly UsedRenderTargetData renderTargetData in desc.RenderTargets.Span)
+                {
+                    _outputs.Add(renderTargetData.Target);
 
-        private enum RPRelation : byte
-        {
-            None = 0,
+                    if (_resources.TryGetValue(renderTargetData.Target, out FGResourceUsage usage))
+                        _resources[renderTargetData.Target] = usage | FGResourceUsage.Write;
+                    else
+                        _resources[renderTargetData.Target] = FGResourceUsage.Write;
+                }
+            }
 
-            WriteOnSeparateQueue = 1 << 0,
-            SharedOutput = 1 << 1
+            internal void Clear()
+            {
+                _outputs.Clear();
+                _resources.Clear();
+            }
+
+            internal bool HasOutput(FrameGraphTexture texture) => _outputs.Contains(texture);
+            internal bool HasResource(FrameGraphResource resource) => _resources.ContainsKey(resource);
+
+            internal bool HasResourceWithUsage(FrameGraphResource resource, FGResourceUsage usage)
+            {
+                if (_resources.TryGetValue(resource, out FGResourceUsage resUsage))
+                    return FlagUtility.HasEither(resUsage, usage);
+
+                return false;
+            }
+
+            internal IReadOnlyDictionary<FrameGraphResource, FGResourceUsage> Resources => _resources;
+
+            internal readonly record struct PoolingPolicy : IObjectPoolPolicy<RenderPassContainer>
+            {
+                RenderPassContainer IObjectPoolPolicy<RenderPassContainer>.Create() => new RenderPassContainer();
+
+                bool IObjectPoolPolicy<RenderPassContainer>.Return(ref RenderPassContainer obj)
+                {
+                    obj.Clear();
+                    return true;
+                }
+            }
         }
     }
 }

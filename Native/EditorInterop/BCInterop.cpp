@@ -1,9 +1,7 @@
 #define RGBCX_IMPLEMENTATION
 
-#include "BC/rgbcx.h"
-#include "BC/bc7enc.h"
-
-typedef void* (*SPIRV_OptimizeAlloc)(size_t size);
+#include "bc7enc_rdo/rgbcx.h"
+#include "bc7enc_rdo/bc7enc.h"
 
 #pragma pack(1)
 enum class BC_Format : uint8_t
@@ -18,17 +16,6 @@ enum class BC_Format : uint8_t
 	BC6s,
 	BC6u,
 	BC7
-};
-
-struct SPIRV_OptimizeOut
-{
-	SPIRV_OptimizeAlloc Alloc;
-
-	uint32_t* InBinary;
-	size_t InSize;
-
-	uint32_t* OutBinary;
-	size_t OutSize;
 };
 #pragma pack(pop)
 

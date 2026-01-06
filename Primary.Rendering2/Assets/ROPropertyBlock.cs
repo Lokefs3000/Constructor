@@ -20,7 +20,10 @@ namespace Primary.Rendering2.Assets
         public RHI.Texture? GetRHITexture(int id) => _block?.GetRHITexture(id);
         public TextureAsset? GetTextureAsset(int id) => _block?.GetTextureAsset(id);
 
+        public void CopyBlockDataTo(nint nativePtr) => _block?.CopyBlockDataTo(nativePtr);
+
         public ShaderAsset2? Shader => _block?.Shader;
+        public int BlockSize => _block?.BlockSize ?? 0;
 
         public bool IsNull => _block == null;
 

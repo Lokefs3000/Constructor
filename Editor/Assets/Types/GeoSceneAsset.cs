@@ -185,6 +185,8 @@ namespace Editor.Assets.Types
         internal AssetId Id => _id;
         internal string Name => _name;
 
+        public int LoadIndex => 0;
+
         public Type AssetType => typeof(GeoSceneAsset);
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
 

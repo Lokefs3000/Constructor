@@ -79,7 +79,10 @@ namespace Primary.Rendering2.Pass
             Unsafe.WriteUnaligned(ptr.ToPointer(), new TimelineFenceEvent(TimelineEventType.Fence, queueToWait, queueToSignal));
         }
 
+        internal ReadOnlySpan<nint> Events => _events.AsSpan();
         internal ReadOnlySpan<int> Passes => _passes.AsSpan();
+
+        public bool IsEmpty => _events.Count == 0 && _passes.Count == 0;
     }
 
     public enum TimelineEventType : byte

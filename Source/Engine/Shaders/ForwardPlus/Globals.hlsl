@@ -7,7 +7,7 @@ struct cbGlobalMatricies
 };
 
 [global]
-ConstantBuffer<cbGlobalMatricies> sbFP_GlobalMatricies;
+ConstantBuffer<cbGlobalMatricies> cbFP_GlobalMatricies;
 
 #undef __CURR_BINDGROUP
 #endif

@@ -8,37 +8,37 @@ using System.Threading.Tasks;
 
 namespace Primary.Rendering2.Recording
 {
-    internal interface IModificationCommand
+    public interface IModificationCommand
     {
 
     }
 
-    internal struct ModificationCommandMeta
+    public struct ModificationCommandMeta
     {
         public RecCommandType Type;
     }
 
-    internal struct UCClearRenderTarget : IModificationCommand
+    public struct UCClearRenderTarget : IModificationCommand
     {
         public int RenderTarget;
         public FGRect? Rect;
     }
 
-    internal struct UCClearDepthStencil : IModificationCommand
+    public struct UCClearDepthStencil : IModificationCommand
     {
         public int DepthStencil;
         public FGClearFlags ClearFlags;
         public FGRect? Rect;
     }
 
-    internal struct UCClearRenderTargetCustom : IModificationCommand
+    public struct UCClearRenderTargetCustom : IModificationCommand
     {
         public int RenderTarget;
         public FGRect? Rect;
         public Color Color;
     }
 
-    internal struct UCClearDepthStencilCustom : IModificationCommand
+    public struct UCClearDepthStencilCustom : IModificationCommand
     {
         public int DepthStencil;
         public FGClearFlags ClearFlags;
@@ -47,17 +47,18 @@ namespace Primary.Rendering2.Recording
         public byte Stencil;
     }
 
-    internal struct UCUploadBuffer : IModificationCommand
+    public struct UCUploadBuffer : IModificationCommand
     {
-        public int Buffer;
-        public uint Offset;
+        public int BufferUploadIndex;
         public nint DataPointer;
         public uint DataSize;
+        public uint BufferOffset;
     }
 
-    internal struct UCUploadTexture : IModificationCommand
+    public struct UCUploadTexture : IModificationCommand
     {
-        public int Texture;
+        public bool IsExternal;
+        public nint Texture;
         public FGBox? DestinationBox;
         public int SubresourceIndex;
         public nint DataPointer;

@@ -1,54 +1,563 @@
 ﻿using Primary.Common;
+using Primary.Profiling;
 using Primary.Rendering2.NRD;
 using Primary.Rendering2.Pass;
 using Primary.Rendering2.Recording;
-using Primary.RHI;
+using Primary.Rendering2.Resources;
 using Primary.RHI.Direct3D12;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Vortice.Direct3D12;
-using Vortice.DXGI;
+using Serilog;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+using TerraFX.Interop.DirectX;
+using TerraFX.Interop.Windows;
+
+using static TerraFX.Interop.DirectX.D3D12_COMMAND_LIST_FLAGS;
+using static TerraFX.Interop.DirectX.D3D12_COMMAND_LIST_TYPE;
+using static TerraFX.Interop.DirectX.D3D12_DESCRIPTOR_HEAP_TYPE;
+using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
+using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
+using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
 
 using D3D12MemAlloc = Interop.D3D12MemAlloc;
+using Primary.Rendering;
 
 namespace Primary.Rendering2.D3D12
 {
+    [SupportedOSPlatform("windows")]
     internal unsafe sealed class NRDDevice : INativeRenderDispatcher
     {
-        private readonly IDXGIAdapter4 _adapter;
-        private readonly ID3D12Device14 _device;
+        private readonly RenderingManager _manager;
+        private readonly RHI.GraphicsDevice _gd;
 
-        private readonly Ptr<D3D12MemAlloc.Allocator> _allocator;
+        private readonly IDXGIAdapter4* _adapter;
+        private readonly ID3D12Device14* _device;
 
-        private readonly ID3D12CommandQueue _graphicsQueue;
-        private readonly ID3D12CommandQueue _computeQueue;
-        private readonly ID3D12CommandQueue _copyQueue;
+        private readonly D3D12MemAlloc.Allocator* _allocator;
 
-        private Queue<ID3D12CommandAllocator> _allocatorQueue1;
-        private Queue<ID3D12CommandAllocator> _allocatorQueue2;
+        private readonly ID3D12CommandQueue* _graphicsQueue;
+        private readonly ID3D12CommandQueue* _computeQueue;
+        private readonly ID3D12CommandQueue* _copyQueue;
+
+        private Queue<CmdListData>[] _allocatorQueue1;
+        private Queue<CmdListData>[] _allocatorQueue2;
 
         private bool _drawCycle;
 
-        internal NRDDevice(GraphicsDevice device)
+        private RasterState _rasterState;
+        private ResourceManager _resourceManager;
+        private ResourceUploader _resourceUploader;
+        private BarrierManager _barrierManager;
+
+        private CpuDescriptorHeap _rtvHeap;
+        private CpuDescriptorHeap _dsvHeap;
+
+        private GpuDescriptorHeap _gpuHeap;
+        private SamplerDescriptorHeap _samplerHeap;
+
+        private QueueFence _directFence;
+        private QueueFence _computeFence;
+        private QueueFence _copyFence;
+
+        private byte _freeRunningQueues;
+
+        private int _rasterIndex;
+        private int _computeIndex;
+
+        private Queue<RHI.Direct3D12.SwapChainInternal> _awaitingPresents;
+
+        internal NRDDevice(RenderingManager manager, RHI.GraphicsDevice device)
         {
             GraphicsDeviceInternal @internal = GraphicsDeviceInternal.CreateFrom(device);
 
-            _adapter = @internal.Adapter;
-            _device = @internal.Device;
+            _manager = manager;
+            _gd = device;
 
-            _allocator = @internal.Allocator;
+            _adapter = (IDXGIAdapter4*)@internal.Adapter.NativePointer;
+            _device = (ID3D12Device14*)@internal.Device.NativePointer;
 
-            _graphicsQueue = @internal.GraphicsQueue;
-            _computeQueue = @internal.ComputeQueue;
-            _copyQueue = @internal.CopyQueue;
+            _allocator = @internal.Allocator.Pointer;
+
+            _graphicsQueue = (ID3D12CommandQueue*)@internal.GraphicsQueue.NativePointer;
+            _computeQueue = (ID3D12CommandQueue*)@internal.ComputeQueue.NativePointer;
+            _copyQueue = (ID3D12CommandQueue*)@internal.CopyQueue.NativePointer;
+
+            _allocatorQueue1 = [
+                new Queue<CmdListData>(),
+                new Queue<CmdListData>(),
+                new Queue<CmdListData>()];
+            _allocatorQueue2 = [
+                new Queue<CmdListData>(),
+                new Queue<CmdListData>(),
+                new Queue<CmdListData>()];
+
+            _drawCycle = false;
+
+            _rasterState = new RasterState(this);
+            _resourceManager = new ResourceManager(this);
+            _resourceUploader = new ResourceUploader(this);
+            _barrierManager = new BarrierManager(this);
+
+            _rtvHeap = new CpuDescriptorHeap(this, 128, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+            _dsvHeap = new CpuDescriptorHeap(this, 256, D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+
+            _gpuHeap = new GpuDescriptorHeap(this, 2048, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            _samplerHeap = new SamplerDescriptorHeap(this, 2048);
+
+            _directFence = new QueueFence(this);
+            _computeFence = new QueueFence(this);
+            _copyFence = new QueueFence(this);
+
+            _freeRunningQueues = 0;
+
+            _awaitingPresents = new Queue<SwapChainInternal>();
         }
 
-        public void Dispatch(FrameGraphTimeline timeline, FrameGraphRecorder recorder)
+        public void Dispatch(RenderPassManager manager)
+        {
+            FrameGraphTimeline timeline = manager.Timeline;
+            FrameGraphResources resources = manager.Resources;
+            FrameGraphRecorder recorder = manager.Recorder;
+            FrameGraphSetup setup = manager.Setup;
+
+            _gd.BeginFrame();
+
+            if ((_freeRunningQueues & 0x1) > 0)
+                _directFence.Wait();
+            if ((_freeRunningQueues & 0x2) > 0)
+                _computeFence.Wait();
+            if ((_freeRunningQueues & 0x4) > 0)
+                _copyFence.Wait();
+
+            _freeRunningQueues = 0;
+
+            using (new ProfilingScope("Init"))
+            {
+                _resourceManager.PrepareForExecution(resources);
+                _resourceUploader.PrepareUploadBuffers(resources);
+                _barrierManager.ClearInternal();
+
+                _rtvHeap.ResetForNewFrame();
+                _dsvHeap.ResetForNewFrame();
+
+                _gpuHeap.ResetForNewFrame();
+                _samplerHeap.ResetForNewFrame();
+
+                _awaitingPresents.Clear();
+            }
+
+            using (new ProfilingScope("Execute"))
+            {
+                foreach (nint eventPtr in timeline.Events)
+                {
+                    TimelineEventType eventType = Unsafe.ReadUnaligned<TimelineEventType>(eventPtr.ToPointer());
+                    switch (eventType)
+                    {
+                        case TimelineEventType.Raster: DispatchRaster(Unsafe.ReadUnaligned<TimelineRasterEvent>(eventPtr.ToPointer()), timeline, resources, recorder); break;
+                        case TimelineEventType.Compute: DispatchCompute(Unsafe.ReadUnaligned<TimelineComputeEvent>(eventPtr.ToPointer()), timeline, resources, recorder); break;
+                        case TimelineEventType.Fence: DispatchFence(Unsafe.ReadUnaligned<TimelineFenceEvent>(eventPtr.ToPointer()), timeline, recorder); break;
+                    }
+                }
+
+                CopyAndPresentOutput(setup, Unsafe.ReadUnaligned<TimelineEventType>(timeline.Events[timeline.Events.Length - 1].ToPointer()));
+            }
+
+            using (new ProfilingScope("Cleanup"))
+            {
+                _rasterState.ResetInternal();
+            }
+
+            if ((_freeRunningQueues & 0x1) > 0)
+                _directFence.Signal(_graphicsQueue);
+            if ((_freeRunningQueues & 0x2) > 0)
+                _computeFence.Signal(_computeQueue);
+            if ((_freeRunningQueues & 0x4) > 0)
+                _copyFence.Signal(_copyQueue);
+
+            _drawCycle = !_drawCycle;
+
+            while (_awaitingPresents.TryDequeue(out SwapChainInternal @internal))
+                @internal.ForcePresent(RHI.PresentParameters.None);
+
+            _gd.FinishFrame();
+            _gd.FlushMessageQueue();
+        }
+
+        private void DispatchRaster(TimelineRasterEvent rasterEvent, FrameGraphTimeline timeline, FrameGraphResources resources, FrameGraphRecorder graphRecorder)
+        {
+            _rasterState.ResetInternal();
+            _barrierManager.ClearPreviousBarriers();
+
+            CommandRecorder recorder = graphRecorder.GetRecorderForPass(rasterEvent.PassIndex)!;
+
+            CmdListData cmdData = GetCommandListData(D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+            {
+                SetHeapBundle bundle = new SetHeapBundle(_gpuHeap.GetActiveHeapOrCreateNew(), _samplerHeap.GetActiveHeapOrCreateNew());
+                cmdData.CmdList.Pointer->SetDescriptorHeaps(2, (ID3D12DescriptorHeap**)&bundle);
+            }
+
+            //EngLog.NRD.Information("{x}", rasterEvent.PassIndex);
+
+            int offset = 0;
+            while (offset < recorder.BufferSize)
+            {
+                RecCommandType commandType = recorder.GetCommandTypeAtOffset(offset);
+                offset += Unsafe.SizeOf<RecCommandType>();
+
+                //EngLog.NRD.Information("{x}", commandType);
+
+                switch (commandType)
+                {
+                    case RecCommandType.Dummy:
+                        {
+                            offset -= Unsafe.SizeOf<RecCommandType>();
+
+                            ExecutionCommandMeta meta = recorder.GetCommandAtOffset<ExecutionCommandMeta>(offset);
+                            offset += Unsafe.SizeOf<ExecutionCommandMeta>();
+
+                            UCDummy dummy = recorder.GetCommandAtOffset<UCDummy>(offset);
+                            offset = int.MaxValue;
+
+                            break;
+                        }
+                    case RecCommandType.SetRenderTarget:
+                        {
+                            UCSetRenderTarget cmd = recorder.GetCommandAtOffset<UCSetRenderTarget>(offset);
+                            offset += Unsafe.SizeOf<UCSetRenderTarget>();
+
+                            _rasterState.SetRenderTarget(cmd.Slot, resources.FindFGTexture(cmd.RenderTarget));
+                            break;
+                        }
+                    case RecCommandType.SetDepthStencil:
+                        {
+                            UCSetDepthStencil cmd = recorder.GetCommandAtOffset<UCSetDepthStencil>(offset);
+                            offset += Unsafe.SizeOf<UCSetDepthStencil>();
+
+                            _rasterState.SetDepthStencil(resources.FindFGTexture(cmd.DepthStencil));
+                            break;
+                        }
+                    case RecCommandType.ClearRenderTarget:
+                        {
+                            UCClearRenderTarget cmd = recorder.GetCommandAtOffset<UCClearRenderTarget>(offset);
+                            offset += Unsafe.SizeOf<UCClearRenderTarget>();
+
+                            FrameGraphResource resource = resources.FindFGTexture(cmd.RenderTarget);
+
+                            _barrierManager.AddTextureBarrier(resource.AsTexture(), D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+                            _barrierManager.FlushBarriers(cmdData.CmdList.Pointer, BarrierFlushTypes.Texture);
+
+                            if (cmd.Rect.HasValue)
+                            {
+                                RECT rect = new RECT(cmd.Rect.Value.Left, cmd.Rect.Value.Top, cmd.Rect.Value.Right, cmd.Rect.Value.Bottom);
+                                cmdData.CmdList.Pointer->ClearRenderTargetView(_rtvHeap.GetDescriptorHandle(resource), null, 1, &rect);
+                            }
+                            else
+                                cmdData.CmdList.Pointer->ClearRenderTargetView(_rtvHeap.GetDescriptorHandle(resource), null, 0, null);
+
+                            _resourceManager.SetAsInitialized(resource);
+                            break;
+                        }
+                    case RecCommandType.ClearDepthStencil:
+                        {
+                            UCClearDepthStencil cmd = recorder.GetCommandAtOffset<UCClearDepthStencil>(offset);
+                            offset += Unsafe.SizeOf<UCClearDepthStencil>();
+
+                            FrameGraphResource resource = resources.FindFGTexture(cmd.DepthStencil);
+
+                            _barrierManager.AddTextureBarrier(resource.AsTexture(), D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+                            _barrierManager.FlushBarriers(cmdData.CmdList.Pointer, BarrierFlushTypes.Texture);
+
+                            if (cmd.Rect.HasValue)
+                            {
+                                RECT rect = new RECT(cmd.Rect.Value.Left, cmd.Rect.Value.Top, cmd.Rect.Value.Right, cmd.Rect.Value.Bottom);
+                                cmdData.CmdList.Pointer->ClearDepthStencilView(_dsvHeap.GetDescriptorHandle(resource), (D3D12_CLEAR_FLAGS)cmd.ClearFlags, 1.0f, 0xff, 1, &rect);
+                            }
+                            else
+                                cmdData.CmdList.Pointer->ClearDepthStencilView(_dsvHeap.GetDescriptorHandle(resource), (D3D12_CLEAR_FLAGS)cmd.ClearFlags, 1.0f, 0xff, 0, null);
+
+                            _resourceManager.SetAsInitialized(resource);
+                            break;
+                        }
+                    case RecCommandType.ClearRenderTargetCustom: throw new NotImplementedException();
+                    case RecCommandType.ClearDepthStencilCustom: throw new NotImplementedException();
+                    case RecCommandType.SetViewport:
+                        {
+                            UCSetViewport cmd = recorder.GetCommandAtOffset<UCSetViewport>(offset);
+                            offset += Unsafe.SizeOf<UCSetViewport>();
+
+                            _rasterState.SetViewport(cmd.Slot, cmd.Viewport);
+                            break;
+                        }
+                    case RecCommandType.SetScissor:
+                        {
+                            UCSetScissor cmd = recorder.GetCommandAtOffset<UCSetScissor>(offset);
+                            offset += Unsafe.SizeOf<UCSetScissor>();
+
+                            _rasterState.SetScissor(cmd.Slot, cmd.Scissor);
+                            break;
+                        }
+                    case RecCommandType.SetStencilReference:
+                        {
+                            UCSetStencilRef cmd = recorder.GetCommandAtOffset<UCSetStencilRef>(offset);
+                            offset += Unsafe.SizeOf<UCSetStencilRef>();
+
+                            _rasterState.SetStencilRef(cmd.StencilRef);
+                            break;
+                        }
+                    case RecCommandType.SetBuffer:
+                        {
+                            UCSetBuffer cmd = recorder.GetCommandAtOffset<UCSetBuffer>(offset);
+                            offset += Unsafe.SizeOf<UCSetBuffer>();
+
+                            FrameGraphBuffer buffer = (cmd.IsExternal ?
+                                new FrameGraphResource(Unsafe.As<RHI.Buffer>(RHI.Buffer.FromIntPtr(cmd.Buffer)!), null).AsBuffer() :
+                                resources.FindFGBuffer((int)cmd.Buffer));
+
+                            switch (cmd.Location)
+                            {
+                                case Structures.FGSetBufferLocation.VertexBuffer: _rasterState.SetVertexBuffer(buffer, cmd.Stride); break;
+                                case Structures.FGSetBufferLocation.IndexBuffer: _rasterState.SetIndexBuffer(buffer, cmd.Stride); break;
+                            }
+                            break;
+                        }
+                    case RecCommandType.SetProperties:
+                        {
+                            UCSetProperties cmd = recorder.GetCommandAtOffset<UCSetProperties>(offset);
+                            offset += Unsafe.SizeOf<UCSetProperties>();
+
+                            _rasterState.ClearPropertyData(cmd.ResourceCount, cmd.UseBufferForHeader);
+
+                            if (cmd.DataBlockSize > 0)
+                            {
+                                _rasterState.SetPropertyRawData(recorder.GetPointerAtOffset(offset), cmd.DataBlockSize);
+                                offset += cmd.DataBlockSize;
+                            }
+
+                            for (int i = 0; i < cmd.ResourceCount; i++)
+                            {
+                                UnmanagedPropertyData data = recorder.GetCommandAtOffset<UnmanagedPropertyData>(offset);
+                                offset += Unsafe.SizeOf<UnmanagedPropertyData>();
+
+                                switch (data.Meta.Type)
+                                {
+                                    case SetPropertyType.Buffer: _rasterState.SetPropertyResource(i, resources.FindFGBuffer((int)data.Resource), data.Meta.Target); break;
+                                    case SetPropertyType.Texture: _rasterState.SetPropertyResource(i, resources.FindFGTexture((int)data.Resource), data.Meta.Target); break;
+                                    case SetPropertyType.RHIBuffer: _rasterState.SetPropertyResource(i, new FrameGraphResource(Unsafe.As<RHI.Buffer>(RHI.Resource.FromIntPtr(data.Resource)!), null).AsBuffer(), data.Meta.Target); break;
+                                    case SetPropertyType.RHITexture: _rasterState.SetPropertyResource(i, new FrameGraphResource(Unsafe.As<RHI.Texture>(RHI.Resource.FromIntPtr(data.Resource)!), null).AsTexture(), data.Meta.Target); break;
+                                    case SetPropertyType.RHISampler: _rasterState.SetPropertyResource(i, Unsafe.As<RHI.Sampler>(RHI.Resource.FromIntPtr(data.Resource)!), data.Meta.Target); break;
+                                }
+                            }
+
+                            break;
+                        }
+                    case RecCommandType.UploadBuffer:
+                        {
+                            UCUploadBuffer cmd = recorder.GetCommandAtOffset<UCUploadBuffer>(offset);
+                            offset += Unsafe.SizeOf<UCUploadBuffer>();
+
+                            _resourceUploader.UploadBuffer(cmdData.CmdList.Pointer, resources, cmd.BufferUploadIndex, cmd.DataPointer, (int)cmd.DataSize, (int)cmd.BufferOffset);
+                            break;
+                        }
+                    case RecCommandType.UploadTexture: throw new NotImplementedException();
+                    case RecCommandType.CopyBuffer: throw new NotImplementedException();
+                    case RecCommandType.CopyTexture: throw new NotImplementedException();
+                    case RecCommandType.DrawInstanced:
+                        {
+                            offset -= Unsafe.SizeOf<RecCommandType>();
+
+                            ExecutionCommandMeta meta = recorder.GetCommandAtOffset<ExecutionCommandMeta>(offset);
+                            offset += Unsafe.SizeOf<ExecutionCommandMeta>();
+
+                            UCDrawInstanced cmd = recorder.GetCommandAtOffset<UCDrawInstanced>(offset);
+                            offset += Unsafe.SizeOf<UCDrawInstanced>();
+
+                            if (_rasterState.FlushState(cmdData.CmdList.Pointer))
+                                cmdData.CmdList.Pointer->DrawInstanced(cmd.VertexCount, cmd.InstanceCount, cmd.StartVertex, cmd.StartInstance);
+         
+                            break;
+                        }
+                    case RecCommandType.DrawIndexedInstanced:
+                        {
+                            offset -= Unsafe.SizeOf<RecCommandType>();
+
+                            ExecutionCommandMeta meta = recorder.GetCommandAtOffset<ExecutionCommandMeta>(offset);
+                            offset += Unsafe.SizeOf<ExecutionCommandMeta>();
+
+                            UCDrawIndexedInstanced cmd = recorder.GetCommandAtOffset<UCDrawIndexedInstanced>(offset);
+                            offset += Unsafe.SizeOf<UCDrawIndexedInstanced>();
+
+                            if (_rasterState.FlushState(cmdData.CmdList.Pointer))
+                                cmdData.CmdList.Pointer->DrawIndexedInstanced(cmd.IndexCount, cmd.InstanceCount, cmd.StartIndex, cmd.BaseVertex, cmd.StartInstance);
+
+                            break;
+                        }
+                    case RecCommandType.SetPipeline:
+                        {
+                            UCSetPipeline cmd = recorder.GetCommandAtOffset<UCSetPipeline>(offset);
+                            offset += Unsafe.SizeOf<UCSetPipeline>();
+
+                            _rasterState.SetPipeline(cmd.Pipeline == nint.Zero ? null : Unsafe.As<RHI.GraphicsPipeline>(GCHandle.FromIntPtr(cmd.Pipeline).Target));
+                            break;
+                        }
+                    case RecCommandType.PresentOnWindow:
+                        {
+                            offset -= Unsafe.SizeOf<RecCommandType>();
+
+                            ExecutionCommandMeta meta = recorder.GetCommandAtOffset<ExecutionCommandMeta>(offset);
+                            offset += Unsafe.SizeOf<ExecutionCommandMeta>();
+
+                            UCPresentOnWindow cmd = recorder.GetCommandAtOffset<UCPresentOnWindow>(offset);
+                            offset += Unsafe.SizeOf<UCPresentOnWindow>();
+
+                            Window? window = WindowManager.Instance.FindWindow((SDL.SDL_WindowID)cmd.WindowId);
+                            if (window != null)
+                            {
+                                RHI.SwapChain swapChain = _manager.SwapChainCache.GetForWindow(window);
+                                RHI.Direct3D12.SwapChainInternal @internal = swapChain;
+
+                                FrameGraphTexture texture = ResourceUtility.GetFGTexture(cmd.Texture, cmd.IsExternal);
+
+                                _barrierManager.AddTextureBarrier((ID3D12Resource*)@internal.ActiveBackBuffer.NativePointer.ToPointer(), D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_DEST, D3D12_BARRIER_LAYOUT_COPY_DEST);
+                                _barrierManager.AddTextureBarrier(texture, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_SOURCE, D3D12_BARRIER_LAYOUT_COPY_SOURCE);
+                                _barrierManager.FlushBarriers(cmdData.CmdList.Pointer, BarrierFlushTypes.Texture);
+
+                                D3D12_TEXTURE_COPY_LOCATION dst = new D3D12_TEXTURE_COPY_LOCATION((ID3D12Resource*)@internal.ActiveBackBuffer.NativePointer.ToPointer());
+                                D3D12_TEXTURE_COPY_LOCATION src = new D3D12_TEXTURE_COPY_LOCATION(ResourceUtility.GetResource(_resourceManager, texture));
+
+                                cmdData.CmdList.Pointer->CopyTextureRegion(&dst, 0, 0, 0, &src, null);
+
+                                _barrierManager.AddTextureBarrier((ID3D12Resource*)@internal.ActiveBackBuffer.NativePointer.ToPointer(), D3D12_BARRIER_SYNC_ALL, D3D12_BARRIER_ACCESS_COMMON, D3D12_BARRIER_LAYOUT_PRESENT);
+                                _barrierManager.FlushBarriers(cmdData.CmdList.Pointer, BarrierFlushTypes.Texture);
+
+                                _awaitingPresents.Enqueue(@internal);
+                            }
+
+                            break;
+                        }
+                    default: throw new Exception("Unrecognized command: {c}" + commandType);
+                }
+            }
+
+            ExecuteCommandListData(D3D12_COMMAND_LIST_TYPE_DIRECT, cmdData);
+            _freeRunningQueues |= 0x1;
+        }
+
+        private void DispatchCompute(TimelineComputeEvent computeEvent, FrameGraphTimeline timeline, FrameGraphResources resources, FrameGraphRecorder graphRecorder)
         {
 
+        }
+
+        private void DispatchFence(TimelineFenceEvent fenceEvent, FrameGraphTimeline timeline, FrameGraphRecorder graphRecorder)
+        {
+
+        }
+
+        private void CopyAndPresentOutput(FrameGraphSetup setup, TimelineEventType lastEventType)
+        {
+            
+        }
+
+        public NRDResourceInfo QueryResourceInfo(FrameGraphResource resource)
+        {
+            D3D12_RESOURCE_DESC1 desc = ResourceManager.GetResourceDescription(resource);
+            D3D12_RESOURCE_ALLOCATION_INFO allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);
+
+            return new NRDResourceInfo((int)allocInfo.SizeInBytes, (int)allocInfo.Alignment);
+        }
+
+        public NRDResourceInfo QueryBufferInfo(FrameGraphBuffer buffer, int offset, int size)
+        {
+            D3D12_RESOURCE_DESC1 desc = ResourceManager.GetBufferDescription(size);
+            D3D12_RESOURCE_ALLOCATION_INFO allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);
+
+            return new NRDResourceInfo((int)allocInfo.SizeInBytes, (int)allocInfo.Alignment);
+        }
+
+        private CmdListData GetCommandListData(D3D12_COMMAND_LIST_TYPE listType)
+        {
+            int idx = listType switch
+            {
+                D3D12_COMMAND_LIST_TYPE_DIRECT => 0,
+                D3D12_COMMAND_LIST_TYPE_COPY => 1,
+                D3D12_COMMAND_LIST_TYPE_COMPUTE => 2,
+            };
+
+            Queue<CmdListData> queue = _drawCycle ? _allocatorQueue1[idx] : _allocatorQueue2[idx];
+            if (!queue.TryDequeue(out CmdListData data))
+            {
+                ID3D12GraphicsCommandList10* ptr = null;
+                HRESULT hr = _device->CreateCommandList1(0, listType, D3D12_COMMAND_LIST_FLAG_NONE, UuidOf.Get<ID3D12GraphicsCommandList10>(), (void**)&ptr);
+         
+                if (hr.FAILED)
+                {
+                    _gd.FlushMessageQueue();
+                    throw new NotImplementedException("Add error message");
+                }
+
+                ID3D12CommandAllocator* ptr2 = null;
+                hr = _device->CreateCommandAllocator(listType, UuidOf.Get<ID3D12CommandAllocator>(), (void**)&ptr2);
+
+                if (hr.FAILED)
+                {
+                    _gd.FlushMessageQueue();
+                    throw new NotImplementedException("Add error message");
+                }
+
+                data = new CmdListData(ptr, ptr2);
+            }
+
+            data.Allocator.Pointer->Reset();
+            data.CmdList.Pointer->Reset(data.Allocator.Pointer, null);
+
+            return data;
+        }
+
+        private void ExecuteCommandListData(D3D12_COMMAND_LIST_TYPE listType, CmdListData data)
+        {
+            data.CmdList.Pointer->Close();
+
+            int idx = listType switch
+            {
+                D3D12_COMMAND_LIST_TYPE_DIRECT => 0,
+                D3D12_COMMAND_LIST_TYPE_COPY => 1,
+                D3D12_COMMAND_LIST_TYPE_COMPUTE => 2,
+            };
+
+            Queue<CmdListData> queue = !_drawCycle ? _allocatorQueue1[idx] : _allocatorQueue2[idx];
+            queue.Enqueue(data);
+
+            ID3D12GraphicsCommandList10* ptr = data.CmdList.Pointer;
+            switch (listType)
+            {
+                case D3D12_COMMAND_LIST_TYPE_DIRECT: _graphicsQueue->ExecuteCommandLists(1, (ID3D12CommandList**)&ptr); break;
+                case D3D12_COMMAND_LIST_TYPE_COMPUTE: _computeQueue->ExecuteCommandLists(1, (ID3D12CommandList**)&ptr); break;
+                case D3D12_COMMAND_LIST_TYPE_COPY: _copyQueue->ExecuteCommandLists(1, (ID3D12CommandList**)&ptr); break;
+            }
+        }
+
+        internal RHI.GraphicsDevice RHIDevice => _gd;
+
+        internal ID3D12Device14* Device => _device;
+
+        internal D3D12MemAlloc.Allocator* Allocator => _allocator;
+
+        internal ResourceManager ResourceManager => _resourceManager;
+        internal BarrierManager BarrierManager => _barrierManager;
+
+        internal CpuDescriptorHeap RTVDescriptorHeap => _rtvHeap;
+        internal CpuDescriptorHeap DSVDescriptorHeap => _dsvHeap;
+
+        internal GpuDescriptorHeap GPUDescriptorHeap => _gpuHeap;
+        internal SamplerDescriptorHeap SamplerDescriptorHeap => _samplerHeap;
+
+        private readonly record struct CmdListData(Ptr<ID3D12GraphicsCommandList10> CmdList, Ptr<ID3D12CommandAllocator> Allocator) : IDisposable
+        {
+            public void Dispose()
+            {
+                CmdList.Pointer->Release();
+                Allocator.Pointer->Release();
+            }
         }
     }
 }

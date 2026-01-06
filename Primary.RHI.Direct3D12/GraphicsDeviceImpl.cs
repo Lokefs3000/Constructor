@@ -24,13 +24,14 @@ namespace Primary.RHI.Direct3D12
         private static ILogger? s_int_logger = null;
 
         private readonly bool _cmdBufferValidation = true;
+        private readonly bool _useCompatibilityDeviceCreation = true;
 
         private bool _isPixEnabled = false;
 
         private IDXGIFactory7 _factory;
         private IDXGIAdapter4 _adapter;
-        private ID3D12SDKConfiguration1 _sdkConfiguration;
-        private ID3D12DeviceFactory _deviceFactory;
+        private ID3D12SDKConfiguration1? _sdkConfiguration;
+        private ID3D12DeviceFactory? _deviceFactory;
         private ID3D12Debug6? _debug;
         private ID3D12InfoQueue? _infoQueue;
         private ID3D12DeviceRemovedExtendedDataSettings1? _dredSettings;
@@ -71,10 +72,13 @@ namespace Primary.RHI.Direct3D12
 
         private bool _disposedValue;
 
-        internal GraphicsDeviceImpl(ILogger logger)
+        internal GraphicsDeviceImpl(ILogger logger, GraphicsDeviceDescription description)
         {
             s_int_logger = logger;
             Instance = this;
+
+            _cmdBufferValidation = true;//CommandLine.HasOption("--dx12-cmd-validate");
+            _useCompatibilityDeviceCreation = true;//CommandLine.HasOption("--dx12-compat-device-create");
 
             _commandAllocators = new AllocatorStack[6];
 
@@ -108,12 +112,17 @@ namespace Primary.RHI.Direct3D12
                     ResultChecker.ThrowIfUnhandled(_factory.EnumAdapters1(0, out IDXGIAdapter1 adapter1));
                     ResultChecker.ThrowIfUnhandled(adapter1.QueryInterface(out _adapter!));
                 }
+                if (!_useCompatibilityDeviceCreation)
                 {
                     ResultChecker.ThrowIfUnhandled(D3D12.D3D12GetInterface(D3D12.D3D12SDKConfigurationClsId, out _sdkConfiguration!));
                     ResultChecker.ThrowIfUnhandled(_sdkConfiguration.CreateDeviceFactory(618, "./D3D12/", out _deviceFactory!));
                 }
                 {
-                    _deviceFactory.GetConfigurationInterface(D3D12.D3D12DebugClsId, out _debug);
+                    if (_useCompatibilityDeviceCreation)
+                        ResultChecker.PrintIfUnhandled(D3D12.D3D12GetDebugInterface(out _debug));
+                    else
+                        _deviceFactory!.GetConfigurationInterface(D3D12.D3D12DebugClsId, out _debug);
+
                     if (_debug != null)
                     {
                         Logger.Information("Debug layer enabled successfully!");
@@ -129,7 +138,11 @@ namespace Primary.RHI.Direct3D12
                     }
                 }
                 {
-                    _deviceFactory.GetConfigurationInterface(D3D12.D3D12DeviceRemovedExtendedDataClsId, out _dredSettings);
+                    if (_useCompatibilityDeviceCreation)
+                        ResultChecker.PrintIfUnhandled(D3D12.D3D12GetInterface(D3D12.D3D12DeviceRemovedExtendedDataClsId, out _dredSettings));
+                    else
+                        _deviceFactory!.GetConfigurationInterface(D3D12.D3D12DeviceRemovedExtendedDataClsId, out _dredSettings);
+
                     if (_dredSettings != null)
                     {
                         Logger.Information("DRED successfully retrieved!");
@@ -140,7 +153,10 @@ namespace Primary.RHI.Direct3D12
                     }
                 }
                 {
-                    ResultChecker.ThrowIfUnhandled(_deviceFactory.CreateDevice(_adapter, FeatureLevel.Level_12_0, out _device!));
+                    if (_useCompatibilityDeviceCreation)
+                        ResultChecker.ThrowIfUnhandled(D3D12.D3D12CreateDevice(_adapter, FeatureLevel.Level_12_0, out _device!));
+                    else
+                        ResultChecker.ThrowIfUnhandled(_deviceFactory!.CreateDevice(_adapter, FeatureLevel.Level_12_0, out _device!));
                 }
                 {
                     if (_debug != null)
@@ -159,10 +175,17 @@ namespace Primary.RHI.Direct3D12
                                 },
                                 DenyList = new InfoQueueFilterDescription
                                 {
-                                    Categories = [MessageCategory.StateCreation],
                                     Ids = _ignoredIds.ToArray()
                                 }
                             });
+
+                            if (description.BreakOnSeverity)
+                            {
+                                Logger.Information("Prepare your native debugger, were going to break land!");
+
+                                _infoQueue.SetBreakOnSeverity(MessageSeverity.Error, true);
+                                _infoQueue.SetBreakOnSeverity(MessageSeverity.Corruption, true);
+                            }
 
                             //_infoQueue.SetBreakOnSeverity(MessageSeverity.Error | MessageSeverity.Corruption, true);
                         }
@@ -174,7 +197,7 @@ namespace Primary.RHI.Direct3D12
                 {
                     D3D12MemAlloc.ALLOCATOR_DESC desc = new()
                     {
-                        Flags = D3D12MemAlloc.ALLOCATOR_FLAGS.ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT,
+                        Flags = /*D3D12MemAlloc.ALLOCATOR_FLAGS.ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT*/D3D12MemAlloc.ALLOCATOR_FLAGS.ALLOCATOR_FLAG_NONE,
                         pDevice = (Terra.ID3D12Device*)_device.NativePointer.ToPointer(),
                         PreferredBlockSize = 0,
                         pAllocationCallbacks = null,
@@ -193,6 +216,8 @@ namespace Primary.RHI.Direct3D12
                 }
                 {
                     const Feature Feature_TightAlignment = (Feature)54;
+
+                    Checking.FatalAssert(_device.Options.ResourceHeapTier >= ResourceHeapTier.Tier2);
 
                     _caps = new DeviceCaps(
                         HasTightAlignment: _device.CheckFeatureSupport<FeatureDataD3D12TightAlignment>(Feature_TightAlignment).SupportTier >= TightAlignmentTier.Tier1);
@@ -233,7 +258,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -372,7 +397,7 @@ namespace Primary.RHI.Direct3D12
                     stack.Ready.Push(allocator);
             }
 
-            DumpMessageQueue();
+            FlushMessageQueue();
         }
 
         public override void Submit(CommandBuffer commandBuffer)
@@ -409,7 +434,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -422,7 +447,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -435,7 +460,20 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
+                throw;
+            }
+        }
+
+        public override Sampler CreateSampler(SamplerDescription description)
+        {
+            try
+            {
+                return new SamplerImpl(this, description);
+            }
+            catch (Exception)
+            {
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -448,7 +486,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -461,7 +499,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -474,7 +512,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -487,7 +525,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -500,7 +538,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -513,7 +551,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -703,10 +741,10 @@ namespace Primary.RHI.Direct3D12
             MessageId.ClearDepthStencilViewMismatchingClearValue,
             MessageId.ClearRenderTargetViewMismatchingClearValue,
             MessageId.CreateGraphicsPipelineStateDepthStencilViewNotSet,
-            MessageId.CreateGraphicsPipelineStateRenderTargetViewNotSet
+            MessageId.CreateGraphicsPipelineStateRenderTargetViewNotSet,
             ];
 
-        internal void DumpMessageQueue()
+        public override void FlushMessageQueue()
         {
             if (_infoQueue != null)
             {
@@ -730,6 +768,17 @@ namespace Primary.RHI.Direct3D12
                 }
 
                 _infoQueue.ClearStoredMessages();
+            }
+        }
+
+        public override void ReviewError(int code)
+        {
+            if (code == ResultChecker.DXGIDeviceHung ||
+                code == ResultChecker.DXGIDeviceRemoved ||
+                code == ResultChecker.DXGIDeviceReset)
+            {
+                FlushMessageQueue();
+                DumpDREDOutput();
             }
         }
 
@@ -824,6 +873,7 @@ namespace Primary.RHI.Direct3D12
         }
 
         internal bool CmdBufferValidation => _cmdBufferValidation;
+        internal bool UseGlobalRootSignatureSerializer => _useCompatibilityDeviceCreation;
         internal bool IsPixEnabled => _isPixEnabled;
 
         internal IDXGIFactory7 DXGIFactory => _factory;

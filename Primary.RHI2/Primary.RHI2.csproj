@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.0" />
+    <PackageReference Include="Serilog" Version="4.3.0" />
+    <PackageReference Include="TerraFX.Interop.Windows" Version="10.0.26100.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Interop.D3D12MemAlloc\Interop.D3D12MemAlloc.csproj" />
+    <ProjectReference Include="..\Interop.NVAftermath\Interop.NVAftermath.csproj" />
+    <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
+  </ItemGroup>
+
+</Project>

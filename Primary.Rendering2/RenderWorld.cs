@@ -2,11 +2,12 @@
 using CommunityToolkit.HighPerformance;
 using Primary.Components;
 using Primary.Profiling;
+using Primary.Rendering;
 using Primary.Scenes;
 
 namespace Primary.Rendering2
 {
-    internal sealed class RenderWorld
+    public sealed class RenderWorld
     {
         private List<RenderOutputData> _outputs;
 
@@ -37,7 +38,7 @@ namespace Primary.Rendering2
             {
                 if (enabled.Enabled)
                 {
-                    World._outputs.Add(new RenderOutputData(entity, camera, projectionData));
+                    World._outputs.Add(new RenderOutputData(entity, camera, projectionData, WindowManager.Instance.PrimaryWindow!));
                 }
             }
 
@@ -45,5 +46,5 @@ namespace Primary.Rendering2
         }
     }
 
-    internal readonly record struct RenderOutputData(SceneEntity Entity, Camera Camera, CameraProjectionData ProjectionData);
+    internal readonly record struct RenderOutputData(SceneEntity Entity, Camera Camera, CameraProjectionData ProjectionData, Window Window);
 }

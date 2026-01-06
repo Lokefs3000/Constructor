@@ -37,6 +37,9 @@ namespace Editor.Shaders
 
         private bool _generatePropertiesInHeader;
 
+        private bool _areConstantsSeparated;
+        private int _headerBytesize;
+
         private bool _disposedValue;
 
         public ShaderProcessor(ILogger logger, ShaderAttributeSettings settings)
@@ -58,6 +61,9 @@ namespace Editor.Shaders
             _processedSource = null;
 
             _generatePropertiesInHeader = true;
+
+            _areConstantsSeparated = false;
+            _headerBytesize = 0;
         }
 
         private void Dispose(bool disposing)
@@ -293,6 +299,9 @@ namespace Editor.Shaders
 
         public bool GeneratePropertiesInHeader { get => _generatePropertiesInHeader; internal set => _generatePropertiesInHeader = value; }
 
+        public bool AreConstantsSeparated { get => _areConstantsSeparated; internal set => _areConstantsSeparated = value; }
+        public int HeaderBytesize { get => _headerBytesize; internal set => _headerBytesize = value; }
+
         private static ushort MakeBytecodeTarget(ShaderCompileTarget target, ShaderCompileStage stage) => (ushort)(((ushort)target) | (((ushort)stage) << 2));
 
         private static string[] s_preprocessPreset = [
@@ -323,5 +332,7 @@ namespace Editor.Shaders
 #endif
             "-O3"
         ];
+
+        public const int MaxConstantsBufferSize = 128; //Vulkan enforced limit
     }
 }

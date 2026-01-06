@@ -1,8 +1,11 @@
-﻿using Primary.Common.Streams;
+﻿using Primary;
+using Primary.Common.Streams;
 using SDL;
 using StbImageSharp;
+using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
@@ -18,6 +21,7 @@ namespace Editor.Platform.Windows
 
         private SDL_Texture* _splashTexture;
         private SDL_Texture* _glyphTexture;
+        private SDL_Texture* _hourglassTexture;
 
         private GlyphData[] _glyphs;
 
@@ -30,10 +34,13 @@ namespace Editor.Platform.Windows
         private Stack<LoadingStep> _activeSteps;
         private Stack<BackupStep> _progressStack;
 
+        private int _idleHourglassTime;
+
         private string _currentDescription;
         private float _currentProgress;
 
         private DateTime _startTime;
+        private long _lastTickTime;
 
         private bool _disposedValue;
 
@@ -43,6 +50,7 @@ namespace Editor.Platform.Windows
             _renderer = SDL_CreateRenderer(_window, "software");
 
             SDL_SetWindowHitTest(_window, &HitTest, nint.Zero);
+            SDL_SetWindowProgressState(_window, SDL_ProgressState.SDL_PROGRESS_STATE_NORMAL);
 
             using BundleReader reader = new BundleReader(File.OpenRead("SplashData.bundle")!, true);
 
@@ -69,6 +77,16 @@ namespace Editor.Platform.Windows
                 }
 
                 _glyphTexture = SDL_CreateTextureFromSurface(_renderer, surface);
+
+                SDL_DestroySurface(surface);
+            }
+
+            //Hourglass icon
+            {
+                using ImageResult result = ImageResult.FromMemory(reader.ReadBytes("Hourglass")!, ColorComponents.RedGreenBlueAlpha);
+
+                SDL_Surface* surface = SDL_CreateSurfaceFrom(result.Width, result.Height, SDL_PixelFormat.SDL_PIXELFORMAT_ABGR8888, (nint)result.DataPtr, result.Width * 4);
+                _hourglassTexture = SDL_CreateTextureFromSurface(_renderer, surface);
 
                 SDL_DestroySurface(surface);
             }
@@ -116,10 +134,13 @@ namespace Editor.Platform.Windows
             _activeSteps = new Stack<LoadingStep>();
             _progressStack = new Stack<BackupStep>();
 
+            _idleHourglassTime = 0;
+
             _currentDescription = string.Empty;
             _currentProgress = 0.0f;
 
             _startTime = DateTime.UtcNow;
+            _lastTickTime = long.MinValue;
 
             DrawInitial();
         }
@@ -133,6 +154,8 @@ namespace Editor.Platform.Windows
 
                 }
 
+                SDL_DestroyTexture(_hourglassTexture);
+                SDL_DestroyTexture(_glyphTexture);
                 SDL_DestroyTexture(_splashTexture);
                 SDL_DestroyRenderer(_renderer);
                 SDL_DestroyWindow(_window);
@@ -154,14 +177,19 @@ namespace Editor.Platform.Windows
 
         internal void Poll()
         {
-            SDL_WaitEventTimeout(null, 100);
-            
-            SDL_Event @event = new SDL_Event();
-            while (SDL_PollEvent(&@event)) ;
+            SDL_WaitEventTimeout(null, 48);
+            SDL_FlushEvents(SDL_EventType.SDL_EVENT_FIRST, SDL_EventType.SDL_EVENT_LAST);
         }
 
         internal void Draw()
         {
+            if (Stopwatch.GetTimestamp() >= _lastTickTime)
+                _lastTickTime = Stopwatch.GetTimestamp() + s_tickMaxDifference;
+            else
+                return;
+
+            _idleHourglassTime = (_idleHourglassTime + 1) % s_hourglassFrameOffsets.Length;
+
             lock (_updateLock)
             {
                 if (_progressHasChanged)
@@ -174,7 +202,7 @@ namespace Editor.Platform.Windows
                         ResetForStepChange();
                     }
 
-                    SDL_FRect srcRect = new SDL_FRect { x = 11, y = 254, w = 200 - 11, h = 14 };
+                    SDL_FRect srcRect = new SDL_FRect { x = 11, y = 254, w = 230 - 11, h = 14 };
                     SDL_RenderTexture(_renderer, _splashTexture, &srcRect, &srcRect);
 
                     SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
@@ -185,7 +213,17 @@ namespace Editor.Platform.Windows
                     SDL_SetRenderDrawColor(_renderer, 184, 118, 51, 255);
                     SDL_RenderFillRect(_renderer, &barRect);
 
+                    if (((int)_idleHourglassTime) != ((int)((_idleHourglassTime + 1) % s_hourglassFrameOffsets.Length)))
+                    {
+                        SDL_FRect hourglassSrcRect = new SDL_FRect { x = s_hourglassFrameOffsets[(int)_idleHourglassTime].X, y = s_hourglassFrameOffsets[(int)_idleHourglassTime].Y, w = 22, h = 22 };
+                        SDL_FRect hourglassDstRect = new SDL_FRect { x = 370, y = 270, w = 22, h = 22 };
+
+                        SDL_RenderTexture(_renderer, _splashTexture, &hourglassDstRect, &hourglassDstRect);
+                        SDL_RenderTexture(_renderer, _hourglassTexture, &hourglassSrcRect, &hourglassDstRect);
+                    }
+
                     SDL_RenderPresent(_renderer);
+                    SDL_SetWindowProgressValue(_window, _currentProgress);
                 }
             }
         }
@@ -204,6 +242,8 @@ namespace Editor.Platform.Windows
 
             DrawText(new Vector2(10.0f, 248.0f), 24.0f, "???");
             //DrawText(new Vector2(10.0f, 266.0f), 14.0f, $"{_completed}/{_total} - {(DateTime.UtcNow - _startTime).ToString(@"hh\.mm\:ss\:ff", CultureInfo.InvariantCulture)}");
+            DrawText(new Vector2(10.0f, 20.0f), 16.0f, typeof(Editor).Assembly.GetName().Version!.ToString());
+            DrawText(new Vector2(10.0f, 40.0f), 16.0f, typeof(Engine).Assembly.GetName().Version!.ToString());
 
             SDL_SetRenderDrawBlendMode(_renderer, SDL_BlendMode.SDL_BLENDMODE_NONE);
 
@@ -339,6 +379,34 @@ namespace Editor.Platform.Windows
         {
             return SDL_HitTestResult.SDL_HITTEST_DRAGGABLE;
         }
+
+        private static readonly Vector2[] s_hourglassFrameOffsets = [
+            new Vector2(0.0f, 0.0f),
+            new Vector2(22.0f, 0.0f),
+            new Vector2(44.0f, 0.0f),
+            new Vector2(88.0f, 0.0f),
+
+            new Vector2(0.0f, 22.0f),
+            new Vector2(22.0f, 22.0f),
+            new Vector2(44.0f, 22.0f),
+            new Vector2(88.0f, 22.0f),
+
+            new Vector2(0.0f, 44.0f),
+            new Vector2(22.0f, 44.0f),
+            new Vector2(44.0f, 44.0f),
+            new Vector2(88.0f, 44.0f),
+
+            new Vector2(0.0f, 66.0f),
+            new Vector2(22.0f, 66.0f),
+            new Vector2(44.0f, 66.0f),
+            new Vector2(88.0f, 66.0f),
+
+            new Vector2(0.0f, 88.0f),
+            new Vector2(22.0f, 88.0f),
+            new Vector2(44.0f, 88.0f),
+            ];
+
+        private static long s_tickMaxDifference = (long)(0.1 * Stopwatch.Frequency);
 
         private readonly record struct GlyphData(bool IsDrawable, Vector4 Boundaries, SDL_FRect Source, float Advance);
         private readonly record struct LoadingStep(string Title);

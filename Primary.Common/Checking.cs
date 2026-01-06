@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Common
 {
@@ -14,6 +9,13 @@ namespace Primary.Common
     {
         [StackTraceHidden]
         public static void Assert([DoesNotReturnIf(false)] bool condition, [CallerArgumentExpression(nameof(condition))] in string? message = null) //should be inlined
+        {
+            if (!condition)
+                throw new AssertFailedException(message);
+        }
+
+        [StackTraceHidden]
+        public static void FatalAssert([DoesNotReturnIf(false)] bool condition, [CallerArgumentExpression(nameof(condition))] in string? message = null) //should be inlined
         {
             if (!condition)
                 throw new AssertFailedException(message);

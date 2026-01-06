@@ -11,7 +11,7 @@ namespace Primary.RHI
         /// </summary>
         /// <param name="api">API assembly to use.</param>
         /// <returns>A graphics device interface from the specified API</returns>
-        public static GraphicsDevice Create(GraphicsAPI api, ILogger logger)
+        public static GraphicsDevice Create(GraphicsAPI api, ILogger logger, GraphicsDeviceDescription description)
         {
             string libName = $"Primary.RHI.{api}.dll";
 
@@ -25,11 +25,11 @@ namespace Primary.RHI
             MethodInfo method = factory.GetMethod("Create", BindingFlags.Static | BindingFlags.Public)!;
             GraphicsDeviceFactoryCreateImpl impl = method.CreateDelegate<GraphicsDeviceFactoryCreateImpl>();
 
-            return impl(logger);
+            return impl(logger, description);
         }
     }
 
-    public delegate GraphicsDevice GraphicsDeviceFactoryCreateImpl(ILogger logger);
+    public delegate GraphicsDevice GraphicsDeviceFactoryCreateImpl(ILogger logger, GraphicsDeviceDescription description);
 
     public enum GraphicsAPI : byte
     {

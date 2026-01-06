@@ -81,6 +81,7 @@ namespace Primary.Assets.Loaders
                     dimension = RHI.TextureDimension.TextureCube;
 
                 RHI.Texture? rhiTexture = null;
+                RHI.Sampler? rhiSampler = null;
 
                 //TODO: use an ArrayPool instead to avoid memalloc
                 nint[] planeSlices = new nint[header.ArraySize * header.MipLevels];
@@ -165,6 +166,24 @@ namespace Primary.Assets.Loaders
                     }, planeSlices.AsSpan());
 
                     rhiTexture.Name = sourcePath;
+
+                    rhiSampler = RenderingManager.Device.CreateSampler(new RHI.SamplerDescription
+                    {
+                        Filter = RHI.TextureFilter.Linear,
+
+                        AddressModeU = RHI.TextureAddressMode.Repeat,
+                        AddressModeV = RHI.TextureAddressMode.Repeat,
+                        AddressModeW = RHI.TextureAddressMode.Repeat,
+
+                        ComparisonFunc = RHI.ComparisonFunc.None,
+
+                        BorderColor = null,
+
+                        MipLODBias = 1.0f,
+                        MinLOD = 0.0f,
+                        MaxLOD = float.MaxValue,
+                        MaxAnisotropy = 1
+                    });
                 }
                 finally
                 {
@@ -177,7 +196,7 @@ namespace Primary.Assets.Loaders
                     }
                 }
 
-                textureData.UpdateAssetData(texture, rhiTexture);
+                textureData.UpdateAssetData(texture, rhiTexture, rhiSampler);
 #if false
                     ExceptionUtility.Assert(br.ReadUInt32() == DDSMagicNumber);
 

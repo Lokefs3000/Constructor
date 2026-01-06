@@ -8,9 +8,10 @@ namespace Primary.Rendering2
 {
     internal sealed class RenderPassErrorReporter
     {
-        internal void ReportError(RPErrorSource source, RPErrorType type)
+        internal void ReportError(RPErrorSource source, RPErrorType type, string? resourceName)
         {
-
+            EngLog.Render.Error("[{src}]: {type} - {res}", source, type, resourceName);
+            throw new Exception();
         }
     }
 
@@ -35,7 +36,12 @@ namespace Primary.Rendering2
         SetIndexBuffer,
 
         MapBuffer,
-        MapTexture
+        MapTexture,
+
+        UploadBuffer,
+        UploadTexture,
+
+        PresentOnWindow
     }
 
     public enum RPErrorType : byte
@@ -54,6 +60,7 @@ namespace Primary.Rendering2
         InvalidOutput,
         SlotOutOfRange,
         NoResourceAccess,
-        OutOfRange
+        OutOfRange,
+        ResourceTooSmall
     }
 }

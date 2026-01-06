@@ -46,11 +46,13 @@ Content/Textures/Tiles132A/Tiles132.texcomp:206671209
 Content/Textures/Bricks097/Bricks097_1K-JPG_Color.jpg:3848967599
 Editor/Shaders/OutlineSampleDepth.hlsl:947418754
 Content/Unconfirmed 142078.crdownload:2813248717
+Engine/Textures/DefaultTex_Black.png:3787629576
 Content/Testing.hlsl2:1409811089
 Editor/Textures/ToolNumerical.toml:947420818
 /Shaders/TextureUtil.hlsl:3738737405
 Engine/Textures/MissingTex.png:947408957
 Editor/Textures/NoPreview.toml:947420685
+Engine/Shaders/FinalBlitSwapChain.hlsl2:2892810625
 Engine/Shaders/Implicit.hlsl:2947781281
 Engine/Textures/DefaultArchitecture1M1.png:1370406865
 Engine/Shaders/Debug/Wireframe.hlsl:947410019
@@ -82,14 +84,17 @@ Content/Textures/Facade018A/Facade018A_1K-JPG_Emission.jpg:3976829752
 Editor/Schemes/ToolScheme.json:947417950
 Content/Cubemap/nz.jpg:879715493
 Engine/Textures/DefaultTex_Mask.png:2759279429
+Engine/Materials/FinalBlitSwapChain.mat:2892802828
 Engine/Models/Cone.fbx:947386782
 Engine/Materials/ForwardPlus/MissingDefMat.mat2:3448349599
+Engine/Shaders/ForwardPlus/Test.hlsl2:3367318929
 Editor/Textures/Icons/FileShader.png:947421822
 Editor/Shaders/GeoBillboard.toml:947418304
 Engine/Shaders/Debug/Wireframe.toml:947410068
 Editor/Shaders/SceneGrid.toml:947419037
 Engine/Models/Icosphere.fbx:947398959
 Editor/Textures/GuiProfiler/ZoomOut.svg:4253772994
+Engine/Shaders/ForwardPlus/Test.toml:3367321669
 Editor/Textures/Icons/InputIcons.svg.2025_09_14_15_59_24.0.svg:947422354
 Engine/Shaders/ForwardPlus/MissingDefault.toml:3448351915
 Editor/Shaders/DearImGui.toml:947418186
@@ -114,8 +119,8 @@ Engine/Shaders/Blit.hlsl:947405389
 Content/Textures/Rock029/Rock029.mat:283232127
 Editor/Textures/Icons/FileUnknown.png:947422028
 Editor/Textures/Icons/FileModel.png:947421755
-Content/Textures/Bricks097/Bricks097_1K-JPG_NormalGL.jpg:3848694876
 Content/Textures/Tiles132A/Tiles132A_1K-JPG_AmbientOcclusion.jpg:206675915
+Content/Textures/Bricks097/Bricks097_1K-JPG_NormalGL.jpg:3848694876
 Editor/Textures/Icons/WgGridSnapIcon.png:947422723
 Editor/Shaders/ToolsNumerics.toml:947419915
 Editor/Textures/Icons/EyeHidden.png:947421500
@@ -142,6 +147,7 @@ Content/Textures/Rock029/Rock029_1K-JPG_Roughness.jpg:4165256658
 Editor/Textures/GuiProfiler/ZoomIn.png:4253764040
 Content/Textures/test/Metal053C_Mask.texcomp:1186554065
 Editor/Textures/FloatingIcons.toml:947420398
+Engine/Textures/DefaultTex_Black.toml:3787632423
 Content/Textures/test/New Text Document.txt:188609762
 Content/Textures/Rock029/Rock029_1K-JPG_NormalGL.jpg:4164994260
 Editor/Textures/Icons/Icons.svg:947422246
@@ -156,6 +162,7 @@ Editor/Textures/Icons/WgTranslateIcon.png:947422985
 Content/Cubemap/nx.jpg:879712758
 Editor/Textures/Icons/InputIcon_IcVector2.png:947422620
 Content/Textures/Metal055A/Metal055A_1K-JPG_NormalGL.jpg:947328737
+Engine/Shaders/FinalBlitSwapChain.toml:2892810768
 Content/Textures/Metal002/Metal002_1K-JPG_Roughness.jpg:4068051664
 Content/Textures/Metal055A/Metal055A_1K-JPG_Metalness.jpg:947328652
 Content/DayEnvironmentHDRI008_2K-TONEMAPPED.jpg:2813658181

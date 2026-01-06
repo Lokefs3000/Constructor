@@ -1,9 +1,15 @@
-﻿using Primary.Profiling;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets;
+using Primary.Profiling;
+using Primary.Rendering;
 using Primary.Rendering2.Assets;
 using Primary.Rendering2.Batching;
 using Primary.Rendering2.Data;
 using Primary.Rendering2.Debuggable;
+using Primary.Rendering2.NRD;
+using Primary.Rendering2.Recording;
 using Primary.Rendering2.Resources;
+using Primary.Rendering2.Structures;
 using Primary.Rendering2.Tree;
 using System.Diagnostics;
 
@@ -11,25 +17,39 @@ namespace Primary.Rendering2
 {
     public class RenderingManager
     {
-        private OctreeManager _octreeManager;
-        private RenderWorld _renderWorld;
-        private RenderContextContainer _contextContainer;
-        private RenderPassManager _renderPassManager;
-        private BatchingManager _batchingManager;
-        private ShaderGlobalsManager _globalsManager;
+        private readonly RHI.GraphicsDevice _graphicsDevice;
+
+        private readonly OctreeManager _octreeManager;
+        private readonly RenderWorld _renderWorld;
+        private readonly RenderContextContainer _contextContainer;
+        private readonly RenderPassManager _renderPassManager;
+        private readonly BatchingManager _batchingManager;
+        private readonly ShaderGlobalsManager _globalsManager;
+        private readonly SwapChainCache _swapChainCache;
+        private readonly INativeRenderDispatcher _nrdDevice;
 
         private IRenderPath? _currentPath;
 
-        public RenderingManager()
+        private ShaderAsset2 _finalBlitSwapChain;
+        private PropertyBlock _finalBlitSwapChainPB;
+
+        public RenderingManager(RHI.GraphicsDevice device)
         {
+            _graphicsDevice = device;
+
             _octreeManager = new OctreeManager();
             _renderWorld = new RenderWorld();
             _contextContainer = new RenderContextContainer();
-            _renderPassManager = new RenderPassManager();
+            _renderPassManager = new RenderPassManager(this);
             _batchingManager = new BatchingManager();
             _globalsManager = new ShaderGlobalsManager();
+            _swapChainCache = new SwapChainCache(this);
+            _nrdDevice = NRDFactory.Create(this, device);
 
             _currentPath = null;
+
+            _finalBlitSwapChain = AssetManager.LoadAsset<ShaderAsset2>("Engine/Shaders/FinalBlitSwapChain.hlsl2", true);
+            _finalBlitSwapChainPB = new PropertyBlock(_finalBlitSwapChain);
         }
 
         /// <summary>Not thread-safe</summary>
@@ -59,12 +79,23 @@ namespace Primary.Rendering2
                             _renderPassManager.ClearInternals();
 
                             SetupContextForOutput(outputData);
-
                             _currentPath?.PreRenderPassSetup(this);
+                            SubmitTransitionalPasses?.Invoke();
+
+                            _renderPassManager.SetWindowOutput(
+                                _swapChainCache.GetForWindow(outputData.Window),
+                                _contextContainer.Get<RenderCameraData>()!.ColorTexture);
 
                             _renderPassManager.SetupPasses(_contextContainer);
+                            SetupPresentForOutput(outputData);
+
                             _renderPassManager.CompilePasses(_contextContainer);
                             _renderPassManager.ExecutePasses(_contextContainer);
+
+                            using (new ProfilingScope("NRD-Dispatch"))
+                            {
+                                _nrdDevice.Dispatch(_renderPassManager);
+                            }
                         }
                     }
                 }
@@ -100,21 +131,102 @@ namespace Primary.Rendering2
                     };
 
                     cameraData.CameraEntity = outputData.Entity;
-                    cameraData.ColorTexture = desc.CreateTexture(new FrameGraphTextureDesc(baseDesc) { Format = FGTextureFormat.RGB10A2_UNorm, Usage = FGTextureUsage.RenderTarget });
-                    cameraData.DepthTexture = desc.CreateTexture(new FrameGraphTextureDesc(baseDesc) { Format = FGTextureFormat.D24_UNorm_S8_UInt, Usage = FGTextureUsage.DepthStencil });
+                    cameraData.ColorTexture = desc.CreateTexture(new FrameGraphTextureDesc(baseDesc) { Format = FGTextureFormat.RGB10A2_UNorm, Usage = FGTextureUsage.RenderTarget | FGTextureUsage.ShaderResource | FGTextureUsage.PixelShader }, "CamColor");
+                    cameraData.DepthTexture = desc.CreateTexture(new FrameGraphTextureDesc(baseDesc) { Format = FGTextureFormat.D24_UNorm_S8_UInt, Usage = FGTextureUsage.DepthStencil }, "CamDepth");
+
+                    cameraData.Setup(outputData);
                 }
             }
         }
 
-        public void RenderDebug(IDebugRenderer renderer)
+        private void SetupPresentForOutput(RenderOutputData outputData)
+        {
+            RenderPass renderPass = _renderPassManager.RenderPass;
+            using (RasterPassDescription desc = renderPass.SetupRasterPass("CorePresent", out PresentForOutputData passData))
+            {
+                RenderCameraData cameraData = _contextContainer.Get<RenderCameraData>()!;
+
+                FrameGraphTexture source = desc.CreateTexture(new FrameGraphTextureDesc(cameraData.ColorTexture.Description)
+                {
+                    Format = FGTextureFormat.RGBA8_UNorm,
+                    Usage = FGTextureUsage.RenderTarget
+                }, "Source");
+
+                {
+                    passData.Shader = _finalBlitSwapChain;
+                    passData.Block = _finalBlitSwapChainPB;
+
+                    passData.PresentWindow = outputData.Window;
+                    passData.Texture = cameraData.ColorTexture;
+                    passData.Source = source;
+                }
+
+                desc.UseResource(FGResourceUsage.Read, cameraData.ColorTexture);
+                desc.UseResource(FGResourceUsage.Read | FGResourceUsage.NoShaderAccess, source);
+
+                desc.UseRenderTarget(source);
+                desc.AllowPassCulling(false);
+
+                desc.SetRenderFunction<PresentForOutputData>(PassFunction);
+            }
+
+            static void PassFunction(RasterPassContext context, PresentForOutputData passData)
+            {
+                RasterCommandBuffer cmd = context.CommandBuffer;
+
+                //blit compatible format
+                {
+                    passData.Block!.SetResource(PropertyBlock.GetID("txFinalTexture"), passData.Texture);
+       
+                    cmd.SetRenderTarget(0, passData.Source);
+                    cmd.SetPipeline(passData.Shader!.GraphicsPipeline!);
+                    cmd.SetProperties(passData.Block!);
+                    cmd.DrawInstanced(new FGDrawInstancedDesc(3));
+                }
+
+                cmd.PresentOnWindow(passData.PresentWindow!, passData.Source);
+            }
+        }
+
+        private sealed class PresentForOutputData : IPassData
+        {
+            public ShaderAsset2? Shader;
+            public PropertyBlock? Block;
+
+            public Window? PresentWindow;
+            public FrameGraphTexture Texture;
+            public FrameGraphTexture Source;
+
+            public void Clear()
+            {
+                Shader = null;
+                Block = null;
+
+                PresentWindow = null;
+                Texture = FrameGraphTexture.Invalid;
+                Source = FrameGraphTexture.Invalid;
+            }
+        }
+
+        public void RenderDebug(Debuggable.IDebugRenderer renderer)
         {
             OctreeVisualizer.Visualize(_octreeManager, renderer);
         }
 
+        public RHI.GraphicsDevice GraphicsDevice => _graphicsDevice;
+
         public OctreeManager OctreeManager => _octreeManager;
-        //public RenderWorld RenderWorld => _renderWorld;
-        //public RenderContextContainer ContextContainer => _contextContainer;
+        public RenderWorld RenderWorld => _renderWorld;
+        public RenderContextContainer ContextContainer => _contextContainer;
         public RenderPassManager RenderPassManager => _renderPassManager;
         public BatchingManager BatchingManager => _batchingManager;
+        public ShaderGlobalsManager GlobalsManager => _globalsManager;
+        public SwapChainCache SwapChainCache => _swapChainCache;
+        public INativeRenderDispatcher NRDDevice => _nrdDevice;
+
+        public IRenderPath? CurrentRenderPath => _currentPath;
+
+        ///<summary>Not thread-safe</summary>
+        public Action? SubmitTransitionalPasses;
     }
 }

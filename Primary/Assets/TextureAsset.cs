@@ -13,7 +13,9 @@ namespace Primary.Assets
         }
 
         internal TextureAssetData AssetData => _assetData;
+
         public RHI.Texture? RawRHITexture => _assetData.Texture;
+        public RHI.Sampler? RawRHISampler => _assetData.Sampler;
 
         public ResourceStatus Status => _assetData.Status;
 
@@ -37,6 +39,7 @@ namespace Primary.Assets
         private string _name;
 
         private RHI.Texture? _texture;
+        private RHI.Sampler? _sampler;
 
         private int _width;
         private int _height;
@@ -52,6 +55,7 @@ namespace Primary.Assets
             _name = string.Empty;
 
             _texture = null;
+            _sampler = null;
 
             _width = 0;
             _height = 0;
@@ -66,6 +70,9 @@ namespace Primary.Assets
 
             _texture?.Dispose();
             _texture = null;
+
+            _sampler?.Dispose();
+            _sampler = null;
 
             _width = 0;
             _height = 0;
@@ -82,13 +89,14 @@ namespace Primary.Assets
             _name = name;
         }
 
-        internal void UpdateAssetData(TextureAsset asset, RHI.Texture texture)
+        internal void UpdateAssetData(TextureAsset asset, RHI.Texture texture, RHI.Sampler sampler)
         {
             _asset.Target = asset;
 
             _status = ResourceStatus.Success;
 
             _texture = texture;
+            _sampler = sampler;
 
             _width = (int)texture.Description.Width;
             _height = (int)texture.Description.Height;
@@ -107,7 +115,10 @@ namespace Primary.Assets
         internal AssetId Id => _id;
         internal string Name => _name;
 
+        public int LoadIndex => 0;
+
         internal RHI.Texture? Texture => _texture;
+        internal RHI.Sampler? Sampler => _sampler;
 
         internal int Width => _width;
         internal int Height => _height;

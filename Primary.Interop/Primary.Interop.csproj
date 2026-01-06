@@ -11,6 +11,6 @@
     <Optimize>True</Optimize>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Vortice.Direct3D12" Version="3.6.2" />
+    <PackageReference Include="Vortice.Direct3D12" Version="3.8.1" />
   </ItemGroup>
 </Project>

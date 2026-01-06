@@ -10,7 +10,7 @@ namespace Editor.Shaders.Attributes
     {
         public AttributeProperty() : base(
             "property",
-            AttributeUsage.GenericTexture,
+            AttributeUsage.GenericTexture | AttributeUsage.Property,
             Array.Empty<AttributeRelation>(),
             s_variables)
         {

@@ -29,6 +29,8 @@ namespace Primary.RHI
         /// <summary>Thread-safe</summary>
         public abstract Texture CreateTexture(TextureDescription description, Span<nint> textureData);
         /// <summary>Thread-safe</summary>
+        public abstract Sampler CreateSampler(SamplerDescription description);
+        /// <summary>Thread-safe</summary>
         public abstract PipelineLibrary CreatePipelineLibrary(Span<byte> initialData);
         /// <summary>Thread-safe</summary>
         public abstract GraphicsPipeline CreateGraphicsPipeline(GraphicsPipelineDescription description, GraphicsPipelineBytecode bytecode);
@@ -53,6 +55,11 @@ namespace Primary.RHI
         /// <summary>Not thread-safe</summary>
         public abstract void UninstallTracker(IObjectTracker tracker);
 
+        /// <summary>Thread-safe</summary>
+        public abstract void FlushMessageQueue();
+        /// <summary>Not thread-safe</summary>
+        public abstract void ReviewError(int code);
+
         //HACK: remove when r2 is integrated fully
         public static GraphicsDevice? Instance = null;
     }
@@ -66,5 +73,10 @@ namespace Primary.RHI
         Copy = 1 << 2,
 
         All = Graphics | Compute | Copy
+    }
+
+    public struct GraphicsDeviceDescription
+    {
+        public bool BreakOnSeverity;
     }
 }

@@ -34,6 +34,8 @@ namespace Editor
     {
         private readonly string _baseProjectPath;
 
+        private DateTime _startTime;
+
         private ProjectSubFilesystem _projectSubFilesystem;
         private ProjectShaderLibrary _projectShaderLibrary;
 
@@ -71,7 +73,7 @@ namespace Editor
         private ConsoleView _consoleView;
         private CubemapTool _cubemapTool;
 
-        internal Editor(string baseProjectPath) : base()
+        internal Editor(string baseProjectPath, string[] args) : base(args.Length > 1 ? args.AsSpan(1) : Span<string>.Empty)
         {
             using StartupDisplayUI ui = new StartupDisplayUI();
   
@@ -84,6 +86,22 @@ namespace Editor
                     ui.Draw();
                 }
             });
+
+            if (AppArguments.HasArgument("--inf-splash"))
+            {
+                ui.PushStep("Hello, world!", "Hi, im a description!");
+                Task.Factory.StartNew(() =>
+                {
+                    while (true)
+                    {
+                        ui.Progress = (ui.Progress + 0.01f) % 1.0f;
+                        Thread.Sleep(10);
+                    }
+                });
+
+                Console.ReadLine();
+                Environment.Exit(0);
+            }
 
             if (!baseProjectPath.EndsWith(Path.DirectorySeparatorChar))
                 baseProjectPath += Path.DirectorySeparatorChar;
@@ -116,7 +134,7 @@ namespace Editor
             R2.Assets.RegisterAssetsDefault.RegisterDefault();
             RegisterComponentsDefault.RegisterDefault();
 
-            _r2Renderer = new R2.RenderingManager();
+            _r2Renderer = new R2.RenderingManager(RenderingManager.Device);
 
             _dearImGuiStateManager = new DearImGuiStateManager(this);
             _dearImGuiWindowManager = new DearImGuiWindowManager();
@@ -186,11 +204,12 @@ namespace Editor
             RenderingManager.DefaultWindow = window;
             RenderingManager.PostRender += _editorRenderManager.SetupPasses;
 
-            _r2Renderer.SetNewRenderPath(new ForwardPlusRenderPath());
+            _r2Renderer.SetNewRenderPath(new EditorRenderPath());
 
             _dearImGuiStateManager.InitWindow(window);
 
             _dearImGuiWindowManager.Open<FrameGraphViewer>();
+            _dearImGuiWindowManager.Open<RenderPassInspector>();
 
             _guiAtlasManager.TriggerRebuild();
 
@@ -212,6 +231,8 @@ namespace Editor
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
+
+            _startTime = DateTime.Now;
 
             while (!window.IsClosed)
             {
@@ -238,9 +259,10 @@ namespace Editor
             InputSystem.UpdatePending();
             EventManager.PollEvents();
             SystemManager.RunSystems();
+            //RenderingManager.SwapChainCache.GetOrAddDefault(RenderingManager.DefaultWindow!)?.Present(Primary.RHI.PresentParameters.VSync);
             _r2Renderer.Render();
-            _r2Renderer.RenderDebug(Gizmos.R2);
-            RenderingManager.ExecuteRender();
+            //_r2Renderer.RenderDebug(Gizmos.R2);
+            //RenderingManager.ExecuteRender();
         }
 
         private void DrawDearImgui()
@@ -294,6 +316,8 @@ namespace Editor
                 _cubemapTool.Render();
                 _dearImGuiWindowManager.RenderOpenWindows();
 
+                //ImGui.Text($"Runtime: {(DateTime.Now - _startTime).TotalSeconds}s");
+
                 //GCMemoryInfo memoryInfo = GC.GetGCMemoryInfo();
                 //
                 //ImDrawListPtr drawList = ImGui.GetForegroundDrawList();
@@ -310,11 +334,19 @@ namespace Editor
                     _process.Refresh();
                     _timer = 0.0f;
                 }
+
+                //_timer2 += Time.DeltaTime;
+                //if (_timer2 > 10.0f)
+                //{
+                //    EdLog.Core.Information("Runtime: {secs}s", (DateTime.Now - _startTime).TotalSeconds);
+                //    _timer2 = 0.0f;
+                //}
             }
         }
 
         private readonly Process _process = Process.GetCurrentProcess();
         private float _timer = 0.0f;
+        private float _timer2 = 0.0f;
 
         protected override void SetupAssetFilesystem()
         {
@@ -341,6 +373,8 @@ namespace Editor
         public DynamicAtlasManager GuiAtlasManager => _guiAtlasManager;
         public SelectionManager SelectionManager => _selectionManager;
         public ToolManager ToolManager => _toolManager;
+
+        internal R2.RenderingManager R2RenderingManager => _r2Renderer;
 
         internal PropertiesView PropertiesView => _propertiesView;
         internal SceneView SceneView => _sceneView;

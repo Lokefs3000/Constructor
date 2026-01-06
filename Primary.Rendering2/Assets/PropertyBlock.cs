@@ -14,6 +14,7 @@ namespace Primary.Rendering2.Assets
     public unsafe sealed class PropertyBlock : IDisposable
     {
         private ShaderAsset2? _shader;
+        private int _loadIndex;
 
         private FrozenDictionary<int, PropertyRemapData> _remapDict;
         private int _propertyBlockSize;
@@ -21,15 +22,22 @@ namespace Primary.Rendering2.Assets
         private nint _propertyData;
         private PropertyData[] _properties;
 
+        private int _resourceCount;
+
         private bool _disposedValue;
 
         internal PropertyBlock(ShaderAsset2? shader = null)
         {
+            _shader = null;
+            _loadIndex = -1;
+
             _remapDict = FrozenDictionary<int, PropertyRemapData>.Empty;
             _propertyBlockSize = 0;
 
             _propertyData = nint.Zero;
             _properties = Array.Empty<PropertyData>();
+
+            _resourceCount = 0;
 
             if (shader != null)
                 Reload(shader);
@@ -76,6 +84,7 @@ namespace Primary.Rendering2.Assets
         public void Reload(ShaderAsset2? replacementShader = null)
         {
             _shader = replacementShader ?? _shader;
+            _loadIndex = _shader?.LoadIndex ?? -1;
 
             if (_shader == null)
             {
@@ -87,22 +96,33 @@ namespace Primary.Rendering2.Assets
 
                 _propertyData = nint.Zero;
                 _properties = Array.Empty<PropertyData>();
+
+                _resourceCount = 0;
             }
             else
             {
-                if (_propertyBlockSize != _shader.PropertyBlockSize || _propertyData == nint.Zero)
+                if (FlagUtility.HasFlag(_shader.HeaderFlags, ShHeaderFlags.ExternalProperties))
                 {
-                    if (_propertyData != nint.Zero)
-                        NativeMemory.Free(_propertyData.ToPointer());
-                    if (_shader.PropertyBlockSize > 0)
-                        _propertyData = (nint)NativeMemory.Alloc((nuint)_shader.PropertyBlockSize);
+                    _propertyBlockSize = 0;
+                }
+                else
+                {
+                    if (_propertyBlockSize != _shader.PropertyBlockSize || _propertyData == nint.Zero)
+                    {
+                        if (_propertyData != nint.Zero)
+                            NativeMemory.Free(_propertyData.ToPointer());
+                        if (_shader.PropertyBlockSize > 0)
+                            _propertyData = (nint)NativeMemory.Alloc((nuint)_shader.PropertyBlockSize);
 
-                    _propertyBlockSize = _shader.PropertyBlockSize;
+                        _propertyBlockSize = _shader.PropertyBlockSize;
+                    }
                 }
 
                 if (_properties.Length != _shader.Properties.Length)
                     _properties = _shader.Properties.IsEmpty ? Array.Empty<PropertyData>() : new PropertyData[_shader.Properties.Length];
-                Array.Clear(_properties);
+                Array.Fill(_properties, PropertyData.Null);
+
+                _resourceCount = 0;
 
                 if (_shader.Properties.IsEmpty)
                     _remapDict = FrozenDictionary<int, PropertyRemapData>.Empty;
@@ -113,13 +133,17 @@ namespace Primary.Rendering2.Assets
                     int index = 0;
                     foreach (ref readonly ShaderProperty property in _shader.Properties)
                     {
-                        if (FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Property))
+                        if (!FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Global))
                         {
                             remapDict[property.Name.GetDjb2HashCode()] = new PropertyRemapData
                             {
                                 Type = property.Type,
-                                IndexOrByteOffset = (ushort)(property.Type <= ShPropertyType.Texture ? index++ : property.IndexOrByteOffset)
+                                IndexOrByteOffset = (ushort)(property.Type <= ShPropertyType.Texture ? index++ : property.IndexOrByteOffset),
+                                ByteWidthOrChildIndex = property.Type <= ShPropertyType.Texture ? property.ChildIndex : property.ByteWidth
                             };
+
+                            if (property.Type <= ShPropertyType.Texture)
+                                _resourceCount++;
                         }
                     }
 
@@ -176,6 +200,8 @@ namespace Primary.Rendering2.Assets
             {
                 if (remap.Type != ShPropertyType.Texture)
                     return;
+                if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
+                    return;
 
                 _properties[remap.IndexOrByteOffset] = new PropertyData(texture);
             }
@@ -190,7 +216,7 @@ namespace Primary.Rendering2.Assets
                 if (remap.Type != ShPropertyType.Buffer)
                     return;
 
-                _properties[remap.IndexOrByteOffset] = new PropertyData(new FrameGraphResource(buffer));
+                _properties[remap.IndexOrByteOffset] = new PropertyData(new FrameGraphResource(buffer, null));
             }
         }
 
@@ -202,8 +228,10 @@ namespace Primary.Rendering2.Assets
             {
                 if (remap.Type != ShPropertyType.Texture)
                     return;
+                if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
+                    return;
 
-                _properties[remap.IndexOrByteOffset] = new PropertyData(new FrameGraphResource(texture));
+                _properties[remap.IndexOrByteOffset] = new PropertyData(new FrameGraphResource(texture, null));
             }
         }
 
@@ -217,6 +245,11 @@ namespace Primary.Rendering2.Assets
                     return;
 
                 _properties[remap.IndexOrByteOffset] = new PropertyData(FrameGraphResource.Invalid, texture);
+
+                if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
+                {
+                    _properties[remap.ByteWidthOrChildIndex] = new PropertyData(FrameGraphResource.Invalid, texture.RawRHISampler);
+                }
             }
         }
 
@@ -326,7 +359,7 @@ namespace Primary.Rendering2.Assets
             {
                 if (remap.Type != ShPropertyType.Struct)
                     return;
-                if (Unsafe.SizeOf<T>() != remap.ByteWidth)
+                if (Unsafe.SizeOf<T>() != remap.ByteWidthOrChildIndex)
                     return;
 
                 *(T*)((byte*)_propertyData.ToPointer() + remap.IndexOrByteOffset) = value;
@@ -357,7 +390,7 @@ namespace Primary.Rendering2.Assets
             {
                 if (remap.Type != ShPropertyType.Struct)
                     return default;
-                if (Unsafe.SizeOf<T>() != remap.ByteWidth)
+                if (Unsafe.SizeOf<T>() != remap.ByteWidthOrChildIndex)
                     return default;
 
                 return *(T*)((byte*)_propertyData.ToPointer() + remap.IndexOrByteOffset);
@@ -367,15 +400,35 @@ namespace Primary.Rendering2.Assets
         }
         #endregion
 
+        #region Raw
+        public void CopyBlockDataTo(nint ptr)
+        {
+            if (_propertyData != nint.Zero)
+                NativeMemory.Copy(_propertyData.ToPointer(), ptr.ToPointer(), (nuint)_propertyBlockSize);
+        }
+        #endregion
+
         public ShaderAsset2? Shader => _shader;
+
+        public nint BlockPointer => _propertyData;
+        public int BlockSize => _propertyBlockSize;
+
+        public int ResourceCount => _resourceCount;
+
+        public bool IsOutOfDate => (_shader?.LoadIndex ?? -1) != _loadIndex;
+
+        public static int GetID(ReadOnlySpan<char> id) => id.GetDjb2HashCode();
     }
 
-    internal readonly record struct PropertyData(FrameGraphResource Resource, object? Aux = null);
+    internal readonly record struct PropertyData(FrameGraphResource Resource, object? Aux = null)
+    {
+        internal static readonly PropertyData Null = new PropertyData(FrameGraphResource.Invalid, null);
+    }
 
     internal struct PropertyRemapData
     {
         public ShPropertyType Type;
         public ushort IndexOrByteOffset;
-        public ushort ByteWidth;
+        public ushort ByteWidthOrChildIndex;
     }
 }

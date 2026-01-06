@@ -327,6 +327,8 @@ namespace Primary.RHI.Direct3D12
         public ResourceStates GenericState => ResourceStates.Common;
         public ResourceStates CurrentState => _currentState;
 
+        internal ID3D12Resource D3D12Resource => _resource;
+
         internal class DescriptorImpl : Descriptor, ICommandDescriptor
         {
             private readonly GraphicsDeviceImpl _device;
@@ -487,5 +489,13 @@ namespace Primary.RHI.Direct3D12
             ConstantBuffer,
             ShaderResource
         }
+    }
+
+    public readonly record struct BufferInternal(Buffer Buffer)
+    {
+        public ID3D12Resource Resource => Unsafe.As<BufferImpl>(Buffer).D3D12Resource;
+        public CpuDescriptorHandle CpuDescriptorHandle => Unsafe.As<BufferImpl>(Buffer).CpuDescriptor;
+
+        public static implicit operator BufferInternal(Buffer buffer) => new BufferInternal(buffer); 
     }
 }

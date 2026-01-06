@@ -21,7 +21,7 @@ namespace Editor
             }
 
             Stopwatch sw = Stopwatch.StartNew();
-            using (Editor editor = new Editor(Path.GetFullPath(args[0])))
+            using (Editor editor = new Editor(Path.GetFullPath(args[0]), args))
             {
                 sw.Stop();
                 Log.Information("Editor startup took: {secs}s", sw.Elapsed.TotalSeconds);

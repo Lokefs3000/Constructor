@@ -81,7 +81,11 @@ namespace Primary.Rendering2.Resources
         GenericShader = 1 << 0,
         PixelShader = 1 << 1,
         RenderTarget = 1 << 2,
-        DepthStencil = 1 << 3
+        DepthStencil = 1 << 3,
+
+        ShaderResource = 1 << 5,
+
+        Global = 1 << 4
     }
 
     public enum FGTextureFormat : byte
@@ -108,7 +112,7 @@ namespace Primary.Rendering2.Resources
         RG32_UInt,
         RG32_SInt,
 
-        RG32_Float_X8X24_Typeless,
+        R32G8X24_Typeless,
         R32_Float_X8X24_Typeless,
         X32_Typeless_G8X24_UInt,
 
@@ -138,6 +142,7 @@ namespace Primary.Rendering2.Resources
         R32_SInt,
 
         R24G8_Typeless,
+        R24_Typeless_X8_UInt,
         R24_UNorm_X8_Typeless,
         X24_Typeless_G8_UInt,
 
@@ -181,8 +186,8 @@ namespace Primary.Rendering2.Resources
         BC5_SNorm,
 
         BC6H_Typeless,
-        BC5H_UFloat16,
-        BC5H_SFloat16,
+        BC6H_UFloat16,
+        BC6H_SFloat16,
 
         BC7_Typeless,
         BC7_UNorm,

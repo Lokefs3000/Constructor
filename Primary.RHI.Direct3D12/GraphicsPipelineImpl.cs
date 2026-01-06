@@ -12,6 +12,8 @@ namespace Primary.RHI.Direct3D12
     internal sealed unsafe class GraphicsPipelineImpl : GraphicsPipeline
     {
         private readonly GraphicsDeviceImpl _device;
+        private GCHandle _handle;
+
         private GraphicsPipelineDescription _description;
         private GraphicsPipelineBytecode _bytecode;
 
@@ -27,6 +29,8 @@ namespace Primary.RHI.Direct3D12
         internal GraphicsPipelineImpl(GraphicsDeviceImpl device, GraphicsPipelineDescription desc, GraphicsPipelineBytecode bytecode)
         {
             _device = device;
+            _handle = GCHandle.Alloc(this, GCHandleType.Normal);
+
             _pipelineStates = new ConcurrentDictionary<int, ID3D12PipelineState?>();
             _description = CloneDescription(ref desc);
             _bytecode = CloneBytecode(ref bytecode);
@@ -69,7 +73,7 @@ namespace Primary.RHI.Direct3D12
                 {
                     signatureDesc = new RootSignatureDescription2
                     {
-                        Flags = RootSignatureFlags.ConstantBufferViewShaderResourceViewUnorderedAccessViewHeapDirectlyIndexed | RootSignatureFlags.AllowInputAssemblerInputLayout,
+                        Flags = RootSignatureFlags.ConstantBufferViewShaderResourceViewUnorderedAccessViewHeapDirectlyIndexed | RootSignatureFlags.SamplerHeapDirectlyIndexed | RootSignatureFlags.AllowInputAssemblerInputLayout,
                         Parameters = new RootParameter1[desc.HasConstantBuffer ? 2 : 1],
                         StaticSamplers = desc.ImmutableSamplers.Length > 0 ? new StaticSamplerDescription1[desc.ImmutableSamplers.Length] : Array.Empty<StaticSamplerDescription1>()
                     };
@@ -91,7 +95,7 @@ namespace Primary.RHI.Direct3D12
                     AddressU = SwitchAddressMode(samplerDescription.AddressModeU),
                     AddressV = SwitchAddressMode(samplerDescription.AddressModeV),
                     AddressW = SwitchAddressMode(samplerDescription.AddressModeW),
-                    MipLODBias = 0.0f,
+                    MipLODBias = samplerDescription.MipLODBias,
                     MaxAnisotropy = Math.Max(samplerDescription.MaxAnistropy, 1u),
                     ComparisonFunction = ComparisonFunction.Never,
                     BorderColor = SwitchBorder(samplerDescription.Border),
@@ -104,7 +108,15 @@ namespace Primary.RHI.Direct3D12
                 };
             }
 
-            ResultChecker.ThrowIfUnhandled(_device.D3D12DeviceConfiguration.SerializeVersionedRootSignature(new VersionedRootSignatureDescription(signatureDesc), out Blob result, out Blob error));
+            VersionedRootSignatureDescription versioned = new VersionedRootSignatureDescription(signatureDesc);
+
+            Blob result, error;
+
+            if (_device.UseGlobalRootSignatureSerializer)
+                ResultChecker.ThrowIfUnhandled(_device.D3D12Device.SerializeRootSignature(versioned, out result!, out error!));
+            else
+                ResultChecker.ThrowIfUnhandled(_device.D3D12DeviceConfiguration.SerializeVersionedRootSignature(versioned, out result, out error));
+
             try
             {
                 if (error != null && error.BufferSize > 0)
@@ -350,7 +362,7 @@ namespace Primary.RHI.Direct3D12
                     TextureFilter.MinLinearMagPointMipLinear => Filter.MinLinearMagPointMipLinear,
                     TextureFilter.MinMagLinearMipPoint => Filter.MinMagLinearMipPoint,
                     TextureFilter.Linear => Filter.MinMagMipLinear,
-                    TextureFilter.MinMagAnisotropicMipPoint => Filter.MinMagAnisotropicMipPoint,
+                    TextureFilter.Anisotropic => Filter.MinMagAnisotropicMipPoint,
                     _ => throw new NotImplementedException()
                 };
             }
@@ -411,6 +423,8 @@ namespace Primary.RHI.Direct3D12
                     _pipelineStates.Clear();
                 });
 
+                _handle.Free();
+
                 _disposedValue = true;
             }
         }
@@ -465,6 +479,7 @@ namespace Primary.RHI.Direct3D12
 
         //TODO: implement
         public override string Name { set { } }
+        public override nint Handle => GCHandle.ToIntPtr(_handle);
 
         internal bool IsUsingConstantBuffer => _needsConstantBuffer;
         internal ID3D12RootSignature ID3D12RootSignature => _rootSignature;
@@ -473,15 +488,15 @@ namespace Primary.RHI.Direct3D12
         public override ref readonly GraphicsPipelineBytecode Bytecode => ref _bytecode;
     }
 
-    internal record struct PipelineState
+    public record struct PipelineState
     {
-        internal RTVUnion RTVs;
-        internal DepthStencilFormat DSV;
+        public RTVUnion RTVs;
+        public DepthStencilFormat DSV;
 
-        internal static readonly int Default = new PipelineState().GetHashCode();
+        public static readonly int Default = new PipelineState().GetHashCode();
 
         [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 8)]
-        internal struct RTVUnion
+        public struct RTVUnion
         {
             private ulong _e08;
 
@@ -489,9 +504,9 @@ namespace Primary.RHI.Direct3D12
             public bool IsEmpty => _e08 == 0;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal void Clear() => _e08 = 0;
+            public void Clear() => _e08 = 0;
 
-            internal unsafe RenderTargetFormat this[int index]
+            public unsafe RenderTargetFormat this[int index]
             {
 #if DEBUG
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -520,5 +535,14 @@ namespace Primary.RHI.Direct3D12
 #endif
             }
         }
+    }
+
+    public readonly record struct GraphicsPipelineInternal(GraphicsPipeline Pipeline)
+    {
+        public ID3D12PipelineState? GetPipelineForState(PipelineState state) => Unsafe.As<GraphicsPipelineImpl>(Pipeline).GetPipelineState(ref state);
+
+        public ID3D12RootSignature RootSignature => Unsafe.As<GraphicsPipelineImpl>(Pipeline).ID3D12RootSignature;
+
+        public static implicit operator GraphicsPipelineInternal(GraphicsPipeline pipeline) => new GraphicsPipelineInternal(pipeline);
     }
 }

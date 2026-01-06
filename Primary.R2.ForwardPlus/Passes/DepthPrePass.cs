@@ -22,7 +22,7 @@ namespace Primary.R2.ForwardPlus.Passes
 
             ForwardPlusRenderPath renderPath = Unsafe.As<ForwardPlusRenderPath>(stateData.Path);
 
-            using (RasterPassDescription desc = renderPass.SetupRasterPass("Depth", out PassData data))
+            using (RasterPassDescription desc = renderPass.SetupRasterPass("FP-DepthPrepass", out PassData data))
             {
                 {
                     data.OutDepth = cameraData.DepthTexture;

@@ -5,48 +5,79 @@ using RHI = Primary.RHI;
 
 namespace Primary.Rendering2.Resources
 {
-    public readonly struct FrameGraphResource
+    public readonly record struct FrameGraphResource : IEquatable<FrameGraphResource>
     {
         private readonly int _index;
         private readonly FGResourceId _resourceId;
         private readonly RHI.Resource? _resource;
         private readonly ResourceUnion _union;
 
+        private readonly string? _debugName;
+
         public FrameGraphResource()
         {
             _index = -1;
+            _debugName = null;
         }
 
-        internal FrameGraphResource(int index, FrameGraphTextureDesc res)
+        internal FrameGraphResource(int index, FGResourceId resourceId = FGResourceId.Global)
+        {
+            _index = index;
+            _resourceId = resourceId;
+            _resource = null;
+            _union = default;
+
+            _debugName = null;
+        }
+
+        internal FrameGraphResource(int index, FrameGraphTextureDesc res, string? debugName)
         {
             _index = index;
             _resourceId = FGResourceId.Texture;
             _resource = null;
             _union = new ResourceUnion(res);
+
+            _debugName = debugName;
         }
 
-        internal FrameGraphResource(int index, FrameGraphBufferDesc res)
+        internal FrameGraphResource(int index, FrameGraphBufferDesc res, string? debugName)
         {
             _index = index;
             _resourceId = FGResourceId.Buffer;
             _resource = null;
             _union = new ResourceUnion(res);
+
+            _debugName = debugName;
         }
 
-        internal FrameGraphResource(RHI.Buffer buffer)
+        internal FrameGraphResource(RHI.Buffer buffer, string? debugName)
         {
             _index = -1;
             _resourceId = FGResourceId.Buffer | FGResourceId.External;
             _resource = buffer;
             _union = default;
+
+            _debugName = debugName;
         }
 
-        internal FrameGraphResource(RHI.Texture texture)
+        internal FrameGraphResource(RHI.Texture texture, string? debugName)
         {
             _index = -1;
             _resourceId = FGResourceId.Texture | FGResourceId.External;
             _resource = texture;
             _union = default;
+
+            _debugName = debugName;
+        }
+
+        internal FrameGraphResource(RHI.Resource resource, string? debugName)
+        {
+            _index = -1;
+            _resourceId = (resource is RHI.Texture ? FGResourceId.Texture : FGResourceId.Buffer) | FGResourceId.External;
+            _resource = resource;
+            _union = default;
+
+            _debugName = debugName;
         }
 
         public FrameGraphTexture AsTexture()
@@ -63,7 +94,13 @@ namespace Primary.Rendering2.Resources
             return new FrameGraphBuffer(this);
         }
 
+        public override int GetHashCode() => IsExternal ? Resource!.GetHashCode() : Index.GetHashCode();
+        public override string ToString() => _debugName ?? _resource?.ToString() ?? (_index == -1 ? "Invalid" : $"{_resourceId}:{_index}");
+
+        public bool Equals(FrameGraphResource other) => IsExternal == other.IsExternal && IsExternal ? (other.Resource == Resource) : (other.Index == Index);
+
         public int Index => _index;
+        public string? DebugName => _debugName;
 
         [UnscopedRef]
         internal ref readonly FrameGraphTextureDesc TextureDesc => ref _union.Texture;
@@ -77,7 +114,7 @@ namespace Primary.Rendering2.Resources
 
         internal bool IsValidAndRenderGraph => _resource == null && _index >= 0;
 
-        public static readonly FrameGraphResource Invalid = new FrameGraphResource(-1, default(FrameGraphBufferDesc));
+        public static readonly FrameGraphResource Invalid = new FrameGraphResource(-1, default(FrameGraphBufferDesc), null);
 
         [StructLayout(LayoutKind.Explicit)]
         private readonly struct ResourceUnion
@@ -96,6 +133,7 @@ namespace Primary.Rendering2.Resources
     {
         Texture,
         Buffer,
+        Global,
 
         External = 1 << 7
     }

@@ -102,7 +102,7 @@ namespace Primary.RHI.Direct3D12
                 Format = FormatConverter.Convert(desc.Format),
                 SampleDescription = SampleDescription.Default,
                 Layout = TextureLayout.Unknown,
-                Flags = ResourceFlags.None//ResourceFlags_UseTightAlignment
+                Flags = ResourceFlags_UseTightAlignment
             };
 
             D3D12MemAlloc.ALLOCATION_DESC allocDesc = new D3D12MemAlloc.ALLOCATION_DESC
@@ -312,6 +312,8 @@ namespace Primary.RHI.Direct3D12
         public ResourceStates GenericState => ResourceStates.Common;
         public ResourceStates CurrentState => _currentState;
 
+        internal ID3D12Resource D3D12Resource => _resource;
+
         //https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_shader_component_mapping
 
         private const int ShaderComponentMappingMask = 0x7;
@@ -328,5 +330,13 @@ namespace Primary.RHI.Direct3D12
                     (((src3) & ShaderComponentMappingMask) << (ShaderComponentMappingShift * 3)) |
                     ShaderComponentMappingAlwaysSetBitAvoidingZeroMemMistakes));
         }
+    }
+
+    public readonly record struct TextureInternal(Texture Texture)
+    {
+        public ID3D12Resource Resource => Unsafe.As<TextureImpl>(Texture).D3D12Resource;
+        public CpuDescriptorHandle CpuDescriptorHandle => Unsafe.As<TextureImpl>(Texture).CpuDescriptor;
+
+        public static implicit operator TextureInternal(Texture texture) => new TextureInternal(texture);
     }
 }

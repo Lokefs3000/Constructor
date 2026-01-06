@@ -1,0 +1,35 @@
+#pragma path "Hidden/Blit"
+
+static const float2 s_Vertices[3] = {
+	float2(-1.0, -1.0),
+	float2(3.0, -1.0),
+	float2(-1.0, 3.0)
+};
+
+struct PsInput
+{
+    float4 Position : SV_Position;
+    float2 UV : TEXCOORD;
+};
+
+[vertex]
+PsInput VertexMain(uint vertexId : SV_VertexId)
+{
+    PsInput output =
+    {
+        float4(s_Vertices[vertexId] * 0.5, 0.0, 1.0),
+		0.5 * s_Vertices[vertexId] + 0.5
+    };
+	
+	output.UV = float2(output.UV.x, 1.0 - output.UV.y);
+    return output;
+}
+
+Texture2D<float4> txTexture;
+static SamplerState ssDefaultLinear : defaultLinear;
+
+[pixel]
+float4 PixelMain(PsInput input) : SV_Target
+{
+	return txTexture.Sample(ssDefaultLinear, input.UV);
+}

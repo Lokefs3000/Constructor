@@ -50,7 +50,7 @@ namespace Editor.Processors
 
             using BinaryWriter bw = new BinaryWriter(stream);
 
-            WriteHeader(bw, ref result);
+            WriteHeader(bw, ref result, processor);
             WriteDescription(bw, in args, processor);
             WriteResourceList(bw, processor);
             WriteRawPropertyList(bw, processor);
@@ -62,7 +62,7 @@ namespace Editor.Processors
             return result;
         }
 
-        private void WriteHeader(BinaryWriter bw, ref readonly ShaderProcesserResult result)
+        private void WriteHeader(BinaryWriter bw, ref readonly ShaderProcesserResult result, Editor.Shaders.ShaderProcessor processor)
         {
             SBCTarget target = SBCTarget.None;
 
@@ -78,6 +78,13 @@ namespace Editor.Processors
             if (FlagUtility.HasFlag(result.Stages, ShaderCompileStage.Pixel))
                 stages |= SBCStages.Pixel;
 
+            SBCHeaderFlags flags = SBCHeaderFlags.None;
+
+            if (!processor.GeneratePropertiesInHeader)
+                flags |= SBCHeaderFlags.ExternalProperties;
+            if (processor.AreConstantsSeparated)
+                flags |= SBCHeaderFlags.HeaderIsBuffer;
+
             SBCHeader header = new SBCHeader
             {
                 Header = SBCHeader.ConstHeader,
@@ -85,6 +92,9 @@ namespace Editor.Processors
 
                 Targets = target,
                 Stages = stages,
+
+                Flags = flags,
+                HeaderSize = (ushort)processor.HeaderBytesize
             };
 
             bw.Write(header);

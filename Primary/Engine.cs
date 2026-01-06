@@ -34,9 +34,11 @@ namespace Primary
         private ThreadHelper _threadHelper;
         private InputSystem _inputSystem;
 
-        public Engine()
+        public Engine(ReadOnlySpan<string> args)
         {
             s_instance = this;
+
+            AppArguments.Parse(args);
         }
 
         protected void Initialize(IAssetIdProvider assetIdProvider)
