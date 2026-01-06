@@ -10,6 +10,7 @@ namespace Primary
         internal static readonly ILogger Console = Create("Console");
         public static readonly ILogger Render = Create("Render");
         public static readonly ILogger NRD = Create("NRD");
+        public static readonly ILogger RHI = Create("RHI");
         internal static readonly ILogger Core = Create("Core");
 
         private static ILogger Create(string prefix)

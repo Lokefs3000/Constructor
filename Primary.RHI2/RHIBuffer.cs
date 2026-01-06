@@ -4,30 +4,11 @@ using System.Text;
 
 namespace Primary.RHI2
 {
-    public unsafe abstract class RHIBuffer : IDisposable, AsNativeObject<RHIBufferNative>
+    public unsafe abstract class RHIBuffer : RHIResource, AsNativeObject<RHIBufferNative>
     {
         protected RHIBufferDescription _description;
-        protected string? _debugName;
-
-        protected bool _disposedValue;
-
-        protected abstract void Dispose(bool disposing);
-        protected abstract void SetDebugName(string? debugName);
-
-        ~RHIBuffer()
-        {
-            Dispose(disposing: false);
-        }
-
-        public void Dispose()
-        {
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
-        }
 
         public ref readonly RHIBufferDescription Description => ref _description;
-        
-        public string? DebugName { get => _debugName; set { _debugName = value; SetDebugName(_debugName); } }
 
         public abstract RHIBufferNative* GetAsNative();
     }
@@ -45,7 +26,7 @@ namespace Primary.RHI2
         public RHIResourceUsage Usage;
         public RHIBufferMode Mode;
 
-        public int FirstElement;
+        public uint FirstElement;
         public int ElementCount;
 
         public RHIBufferDescription()

@@ -1,5 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Rendering2.Resources;
+using Primary.RHI2;
+using Primary.RHI2.Direct3D12;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,13 +17,17 @@ namespace Primary.Rendering2.D3D12
     [SupportedOSPlatform("windows")]
     internal unsafe static class ResourceUtility
     {
-        internal static int GetBufferSize(FrameGraphBuffer buffer) => (int)(buffer.IsExternal ?
+        internal static int GetBufferSize(NRDResource buffer, ResourceManager resources) => (int)(buffer.IsExternal ?
             Unsafe.As<RHI.Buffer>(buffer.Resource!).Description.ByteWidth :
             buffer.Description.Width);
 
-        internal static FrameGraphTexture GetFGTexture(nint ptr, bool isExternal) => isExternal ?
-            new FrameGraphResource(Unsafe.As<RHI.Texture>(RHI.Resource.FromIntPtr(ptr))!, null).AsTexture() :
-            new FrameGraphTexture((int)ptr);
+        internal static NRDResource GetNRDBufferResource(nint ptr, bool isExternal) => isExternal ?
+            new NRDResource(((D3D12RHIBufferNative*)ptr.ToPointer())) :
+            new NRDResource((int)ptr, FGResourceId.Buffer);
+
+        internal static NRDResource GetNRDTextureResource(nint ptr, bool isExternal) => isExternal ?
+            new NRDResource(((D3D12RHITextureNative*)ptr.ToPointer())) :
+            new NRDResource((int)ptr, FGResourceId.Texture);
 
         internal static ID3D12Resource* GetNativeExternalResource(FrameGraphResource resource)
         {

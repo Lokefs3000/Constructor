@@ -1,8 +1,6 @@
 ﻿using Primary.Rendering;
-using System;
-using System.Collections.Generic;
+using Primary.RHI2;
 using System.Numerics;
-using System.Text;
 
 namespace Primary.Rendering2
 {
@@ -60,12 +58,20 @@ namespace Primary.Rendering2
         }
 
         /// <summary>Not thread-safe</summary>
-        public RHI.SwapChain GetForWindow(Window window, bool createIfNull = true)
+        public RHISwapChain GetForWindow(Window window, bool createIfNull = true)
         {
             if (_swapChains.TryGetValue(window.WindowId, out SwapChainData data))
                 return data.SwapChain;
 
-            RHI.SwapChain swapChain = _manager.GraphicsDevice.CreateSwapChain(window.ClientSize, window.NativeWindowHandle);
+            RHISwapChain swapChain = _manager.GraphicsDevice.CreateSwapChain(new RHISwapChainDescription
+            {
+                WindowHandle = window.InternalWindowInterop,
+                WindowSize = window.ClientSize,
+
+                BackBufferFormat = RHIFormat.RGBA8_UNorm,
+                BackBufferCount = 2
+            }) ?? throw new NullReferenceException();
+
             Action<Vector2> resizeEvent = (x) => swapChain.Resize(x);
 
             data = new SwapChainData(window, swapChain, resizeEvent);
@@ -76,6 +82,6 @@ namespace Primary.Rendering2
             return swapChain;
         }
 
-        private readonly record struct SwapChainData(Window Window, RHI.SwapChain SwapChain, Action<Vector2> ResizeEvent);
+        private readonly record struct SwapChainData(Window Window, RHISwapChain SwapChain, Action<Vector2> ResizeEvent);
     }
 }

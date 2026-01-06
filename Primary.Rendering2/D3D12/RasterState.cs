@@ -2,7 +2,8 @@
 using Primary.Rendering2.Assets;
 using Primary.Rendering2.Resources;
 using Primary.Rendering2.Structures;
-using Primary.RHI;
+using Primary.RHI2;
+using Primary.RHI2.Direct3D12;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -23,8 +24,8 @@ namespace Primary.Rendering2.D3D12
     {
         private readonly NRDDevice _device;
 
-        private DirtyArray<FrameGraphTexture> _renderTargets;
-        private DirtyValue<FrameGraphTexture> _depthStencil;
+        private DirtyArray<NRDResource> _renderTargets;
+        private DirtyValue<NRDResource> _depthStencil;
 
         private DirtyArray<FGViewport?> _viewports;
         private DirtyArray<FGRect?> _scissors;
@@ -34,7 +35,7 @@ namespace Primary.Rendering2.D3D12
         private DirtyValue<SetBufferData> _vertexBuffer;
         private DirtyValue<SetBufferData> _indexBuffer;
 
-        private DirtyValue<RHI.GraphicsPipeline?> _pipeline;
+        private DirtyValue<RHIGraphicsPipeline?> _pipeline;
 
         private nint _propertyRawData;
         private int _propertyDataSize;
@@ -59,7 +60,7 @@ namespace Primary.Rendering2.D3D12
         private D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
         private D3D12_INDEX_BUFFER_VIEW? _indexBufferView;
 
-        private RHI.Direct3D12.PipelineState _rasterPipelineState;
+        private D3D12RasterState _rasterPipelineState;
 
         private nint _propertyDataBuffer;
         private int _propertyDataBufferSize;
@@ -68,18 +69,18 @@ namespace Primary.Rendering2.D3D12
         {
             _device = device;
 
-            _renderTargets = new DirtyArray<FrameGraphTexture>(8, FrameGraphTexture.Invalid);
-            _depthStencil = new DirtyValue<FrameGraphTexture>(FrameGraphTexture.Invalid);
+            _renderTargets = new DirtyArray<NRDResource>(8, NRDResource.Null);
+            _depthStencil = new DirtyValue<NRDResource>(NRDResource.Null);
 
             _viewports = new DirtyArray<FGViewport?>(8, null);
             _scissors = new DirtyArray<FGRect?>(8, null);
 
             _stencilRef = new DirtyValue<uint>(0);
 
-            _vertexBuffer = new DirtyValue<SetBufferData>(new SetBufferData(FrameGraphBuffer.Invalid, -1));
-            _indexBuffer = new DirtyValue<SetBufferData>(new SetBufferData(FrameGraphBuffer.Invalid, -1));
+            _vertexBuffer = new DirtyValue<SetBufferData>(new SetBufferData(NRDResource.Null, -1));
+            _indexBuffer = new DirtyValue<SetBufferData>(new SetBufferData(NRDResource.Null, -1));
 
-            _pipeline = new DirtyValue<RHI.GraphicsPipeline?>();
+            _pipeline = new DirtyValue<RHIGraphicsPipeline?>();
 
             _propertyRawData = nint.Zero;
             _propertyDataSize = 0;
@@ -100,7 +101,7 @@ namespace Primary.Rendering2.D3D12
             _vertexBufferView = default;
             _indexBufferView = null;
 
-            _rasterPipelineState = new RHI.Direct3D12.PipelineState();
+            _rasterPipelineState = new D3D12RasterState();
 
             _propertyDataBuffer = nint.Zero;
             _propertyDataBufferSize = 0;
@@ -108,14 +109,14 @@ namespace Primary.Rendering2.D3D12
 
         internal void ResetInternal()
         {
-            _renderTargets.Fill(FrameGraphTexture.Invalid);
-            _depthStencil.Value = FrameGraphTexture.Invalid;
+            _renderTargets.Fill(NRDResource.Null);
+            _depthStencil.Value = NRDResource.Null;
 
             _viewports.Fill(null);
             _scissors.Fill(null);
 
-            _vertexBuffer.Value = new SetBufferData(FrameGraphBuffer.Invalid, -1);
-            _indexBuffer.Value = new SetBufferData(FrameGraphBuffer.Invalid, -1);
+            _vertexBuffer.Value = new SetBufferData(NRDResource.Null, -1);
+            _indexBuffer.Value = new SetBufferData(NRDResource.Null, -1);
 
             _pipeline.Value = null;
 
@@ -134,21 +135,21 @@ namespace Primary.Rendering2.D3D12
             _vertexBufferView = default;
             _indexBufferView = null;
 
-            _rasterPipelineState = new RHI.Direct3D12.PipelineState();
+            _rasterPipelineState = new D3D12RasterState();
         }
 
-        internal void SetRenderTarget(int index, FrameGraphTexture texture) => _renderTargets[index] = texture;
-        internal void SetDepthStencil(FrameGraphTexture texture) => _depthStencil.Value = texture;
+        internal void SetRenderTarget(int index, NRDResource texture) => _renderTargets[index] = texture;
+        internal void SetDepthStencil(NRDResource texture) => _depthStencil.Value = texture;
 
         internal void SetViewport(int index, FGViewport? rect) => _viewports[index] = rect;
         internal void SetScissor(int index, FGRect? rect) => _scissors[index] = rect;
 
         internal void SetStencilRef(uint value) => _stencilRef.Value = value;
 
-        internal void SetVertexBuffer(FrameGraphBuffer buffer, int stride) => _vertexBuffer.Value = new SetBufferData(buffer, stride);
-        internal void SetIndexBuffer(FrameGraphBuffer buffer, int stride) => _indexBuffer.Value = new SetBufferData(buffer, stride);
+        internal void SetVertexBuffer(NRDResource buffer, int stride) => _vertexBuffer.Value = new SetBufferData(buffer, stride);
+        internal void SetIndexBuffer(NRDResource buffer, int stride) => _indexBuffer.Value = new SetBufferData(buffer, stride);
 
-        internal void SetPipeline(RHI.GraphicsPipeline? pipeline) => _pipeline.Value = pipeline;
+        internal void SetPipeline(RHIGraphicsPipeline? pipeline) => _pipeline.Value = pipeline;
 
         internal void ClearPropertyData(int minimumResourceDataSize, bool useBufferForHeader)
         {
@@ -182,19 +183,9 @@ namespace Primary.Rendering2.D3D12
                 NativeMemory.Copy(_propertyRawData.ToPointer(), ptr.ToPointer(), (nuint)size);
         }
 
-        internal void SetPropertyResource(int index, FrameGraphBuffer buffer, ShPropertyStages stages)
+        internal void SetPropertyResource(int index, NRDResource resource, ShPropertyStages stages)
         {
-            _resourceData[index] = new PropertyResourceData(buffer, null, stages);
-        }
-
-        internal void SetPropertyResource(int index, FrameGraphTexture texture, ShPropertyStages stages)
-        {
-            _resourceData[index] = new PropertyResourceData(texture, null, stages);
-        }
-
-        internal void SetPropertyResource(int index, RHI.Sampler sampler, ShPropertyStages stages)
-        {
-            _resourceData[index] = new PropertyResourceData(null, sampler, stages);
+            _resourceData[index] = new PropertyResourceData(resource, stages);
         }
 
         internal bool FlushState(ID3D12GraphicsCommandList10* cmdList)
@@ -212,8 +203,8 @@ namespace Primary.Rendering2.D3D12
                 {
                     if ((_renderTargets.DirtyMask & (1 << i)) > 0)
                     {
-                        FrameGraphTexture texture = _renderTargets[i];
-                        if (texture.IsValidAndRenderGraph || texture.IsExternal)
+                        NRDResource texture = _renderTargets[i];
+                        if (!texture.IsNull)
                         {
                             _device.BarrierManager.AddTextureBarrier(texture,
                                 D3D12_BARRIER_SYNC_RENDER_TARGET,
@@ -223,39 +214,50 @@ namespace Primary.Rendering2.D3D12
                             _device.ResourceManager.EnsureInitialized(texture);
 
                             _rtvDescriptors[i] = _device.RTVDescriptorHeap.GetDescriptorHandle(texture);
-                            _rasterPipelineState.RTVs[i] = FormatConverter.ToRTVFormat(texture.Description.Format);
 
+                            if (texture.IsExternal)
+                            {
+                                ref RHITextureDescription desc = ref ((D3D12RHITextureNative*)texture.Native)->Base.Description;
+                                _rasterPipelineState.RTVFormats[i] = desc.Format.ToRenderTargetFormat();
+                            }
+                            else
+                            {
+                                FrameGraphTexture fg = _device.ResourceManager.FindFGTexture(texture);
+                                _rasterPipelineState.RTVFormats[i] = fg.Description.Format.ToRenderTargetFormat();
+                            }
+                                
                             if (!_viewports[i].HasValue || !_scissors[i].HasValue)
                             {
-                                if (texture.IsValidAndRenderGraph)
+                                if (!texture.IsNull)
                                 {
-                                    ref readonly FrameGraphTextureDesc desc = ref texture.Description;
+                                    int width = 0;
+                                    int height = 0;
+
+                                    if (texture.IsExternal)
+                                    {
+                                        ref RHITextureDescription desc = ref ((D3D12RHITextureNative*)texture.Native)->Base.Description;
+
+                                        width = desc.Width;
+                                        height = desc.Height;
+                                    }
+                                    else
+                                    {
+                                        FrameGraphTexture fg = _device.ResourceManager.FindFGTexture(texture);
+                                        ref readonly FrameGraphTextureDesc desc = ref fg.Description;
+
+                                        width = desc.Width;
+                                        height = desc.Height;
+                                    }
 
                                     if (!_viewports[i].HasValue)
                                     {
-                                        _rawViewports[i] = new D3D12_VIEWPORT(0.0f, 0.0f, desc.Width, desc.Height);
+                                        _rawViewports[i] = new D3D12_VIEWPORT(0.0f, 0.0f, width, height);
                                         commit |= CommitFlags.Viewports;
                                     }
 
                                     if (!_scissors[i].HasValue)
                                     {
-                                        _rawRects[i] = new RECT(0, 0, desc.Width, desc.Height);
-                                        commit |= CommitFlags.Scissors;
-                                    }
-                                }
-                                else
-                                {
-                                    ref readonly RHI.TextureDescription desc = ref Unsafe.As<RHI.Texture>(texture.Resource!).Description;
-
-                                    if (!_viewports[i].HasValue)
-                                    {
-                                        _rawViewports[i] = new D3D12_VIEWPORT(0.0f, 0.0f, desc.Width, desc.Height);
-                                        commit |= CommitFlags.Viewports;
-                                    }
-
-                                    if (!_scissors[i].HasValue)
-                                    {
-                                        _rawRects[i] = new RECT(0, 0, (int)desc.Width, (int)desc.Height);
+                                        _rawRects[i] = new RECT(0, 0, width, height);
                                         commit |= CommitFlags.Scissors;
                                     }
                                 }
@@ -269,7 +271,7 @@ namespace Primary.Rendering2.D3D12
                                 rtModLength = i + 1;
 
                             _rtvDescriptors[i] = _device.RTVDescriptorHeap.NullDescriptor;
-                            _rasterPipelineState.RTVs[i] = RHI.RenderTargetFormat.Undefined;
+                            _rasterPipelineState.RTVFormats[i] = DXGI_FORMAT_UNKNOWN;
                         }
                     }
                 }
@@ -278,12 +280,13 @@ namespace Primary.Rendering2.D3D12
                 commit |= CommitFlags.RenderTargets;
 
                 _rtvDescriptorLength = rtModLength;
+                _rasterPipelineState.RTVFormats.Count = rtModLength;
             }
 
             if (_depthStencil.Dirty)
             {
-                FrameGraphTexture texture = _depthStencil.GetAndClean();
-                if (texture.IsValidAndRenderGraph || texture.IsExternal)
+                NRDResource texture = _depthStencil.GetAndClean();
+                if (!texture.IsNull)
                 {
                     _device.BarrierManager.AddTextureBarrier(texture,
                         D3D12_BARRIER_SYNC_DEPTH_STENCIL,
@@ -293,12 +296,22 @@ namespace Primary.Rendering2.D3D12
                     _device.ResourceManager.EnsureInitialized(texture);
 
                     _dsvDescriptor = _device.DSVDescriptorHeap.GetDescriptorHandle(texture);
-                    _rasterPipelineState.DSV = FormatConverter.ToDSVFormat(texture.Description.Format);
+
+                    if (texture.IsExternal)
+                    {
+                        ref RHITextureDescription desc = ref ((D3D12RHITextureNative*)texture.Native)->Base.Description;
+                        _rasterPipelineState.DSVFormat = desc.Format.ToDepthStencilFormat();
+                    }
+                    else
+                    {
+                        FrameGraphTexture fg = _device.ResourceManager.FindFGTexture(texture);
+                        _rasterPipelineState.DSVFormat = fg.Description.Format.ToDepthStencilFormat();
+                    }
                 }
                 else
                 {
                     _dsvDescriptor = _device.DSVDescriptorHeap.NullDescriptor;
-                    _rasterPipelineState.DSV = RHI.DepthStencilFormat.Undefined;
+                    _rasterPipelineState.DSVFormat = DXGI_FORMAT_UNKNOWN;
                 }
 
                 commit |= CommitFlags.RenderTargets;
@@ -309,21 +322,23 @@ namespace Primary.Rendering2.D3D12
                 int i = 0;
                 foreach (ref readonly FGViewport? viewport in _viewports.Values)
                 {
-                    FrameGraphTexture texture = _renderTargets[i];
+                    NRDResource texture = _renderTargets[i];
 
                     if (viewport.HasValue)
                     {
                         FGViewport value = viewport.Value;
                         _rawViewports[i] = new D3D12_VIEWPORT(value.TopLeftX, value.TopLeftY, value.Width, value.Height, value.MinDepth, value.MaxDepth);
                     }
-                    else if (texture.IsValidAndRenderGraph)
+                    else if (texture.IsTransient)
                     {
-                        ref readonly FrameGraphTextureDesc desc = ref texture.Description;
+                        FrameGraphTexture fg = _device.ResourceManager.FindFGTexture(texture);
+                        ref readonly FrameGraphTextureDesc desc = ref fg.Description;
+
                         _rawViewports[i] = new D3D12_VIEWPORT(0.0f, 0.0f, desc.Width, desc.Height);
                     }
                     else if (texture.IsExternal)
                     {
-                        ref readonly RHI.TextureDescription desc = ref Unsafe.As<RHI.Texture>(texture.Resource!).Description;
+                        ref RHITextureDescription desc = ref ((D3D12RHITextureNative*)texture.Native)->Base.Description;
                         _rawViewports[i] = new D3D12_VIEWPORT(0.0f, 0.0f, desc.Width, desc.Height);
                     }
                     else
@@ -367,25 +382,18 @@ namespace Primary.Rendering2.D3D12
             if (_vertexBuffer.Dirty)
             {
                 SetBufferData data = _vertexBuffer.GetAndClean();
-                if (data.Buffer.IsExternal || data.Buffer.IsValidAndRenderGraph)
+                if (!data.Buffer.IsNull)
                 {
-                    ID3D12Resource2* resource = _device.ResourceManager.GetResource(data.Buffer);
+                    ID3D12Resource2* resource = data.Buffer.GetNativeResource(_device.ResourceManager);
                     _device.BarrierManager.AddBufferBarrier(data.Buffer, D3D12_BARRIER_SYNC_VERTEX_SHADING, D3D12_BARRIER_ACCESS_VERTEX_BUFFER);
 
-                    int stride = data.Stride;
-                    if (stride == 0)
-                    {
-                        if (data.Buffer.IsExternal)
-                            stride = (int)Unsafe.As<RHI.Buffer>(data.Buffer.Resource!).Description.Stride;
-                        else
-                            stride = data.Buffer.Description.Stride;
-                    }
+                    Debug.Assert(data.Stride > 0);
 
                     _vertexBufferView = new D3D12_VERTEX_BUFFER_VIEW
                     {
                         BufferLocation = resource->GetGPUVirtualAddress(),
-                        SizeInBytes = (uint)ResourceUtility.GetBufferSize(data.Buffer),
-                        StrideInBytes = (uint)stride
+                        SizeInBytes = (uint)ResourceUtility.GetBufferSize(data.Buffer, _device.ResourceManager),
+                        StrideInBytes = (uint)data.Stride
                     };
 
                     commit |= CommitFlags.VertexBuffer;
@@ -395,25 +403,18 @@ namespace Primary.Rendering2.D3D12
             if (_indexBuffer.Dirty)
             {
                 SetBufferData data = _indexBuffer.GetAndClean();
-                if (data.Buffer.IsExternal || data.Buffer.IsValidAndRenderGraph)
+                if (!data.Buffer.IsNull)
                 {
                     ID3D12Resource2* resource = _device.ResourceManager.GetResource(data.Buffer);
                     _device.BarrierManager.AddBufferBarrier(data.Buffer, D3D12_BARRIER_SYNC_INDEX_INPUT, D3D12_BARRIER_ACCESS_INDEX_BUFFER);
 
-                    int stride = data.Stride;
-                    if (stride == 0)
-                    {
-                        if (data.Buffer.IsExternal)
-                            stride = (int)Unsafe.As<RHI.Buffer>(data.Buffer.Resource!).Description.Stride;
-                        else
-                            stride = data.Buffer.Description.Stride;
-                    }
+                    Debug.Assert(data.Stride > 0);
 
                     _indexBufferView = new D3D12_INDEX_BUFFER_VIEW
                     {
                         BufferLocation = resource->GetGPUVirtualAddress(),
-                        SizeInBytes = (uint)ResourceUtility.GetBufferSize(data.Buffer),
-                        Format = stride switch
+                        SizeInBytes = (uint)ResourceUtility.GetBufferSize(data.Buffer, _device.ResourceManager),
+                        Format = data.Stride switch
                         {
                             2 => DXGI_FORMAT_R16_UINT,
                             4 => DXGI_FORMAT_R32_UINT,
@@ -432,16 +433,15 @@ namespace Primary.Rendering2.D3D12
 
             if (_pipeline.Dirty)
             {
-                RHI.GraphicsPipeline pipeline = _pipeline.GetAndClean()!;
-                RHI.Direct3D12.GraphicsPipelineInternal @internal = pipeline;
+                D3D12RHIGraphicsPipeline pipeline = Unsafe.As<D3D12RHIGraphicsPipeline>(_pipeline.GetAndClean()!);
 
-                ID3D12PipelineState* pipelineState = (ID3D12PipelineState*)(@internal.GetPipelineForState(_rasterPipelineState)?.NativePointer ?? nint.Zero);
+                ID3D12PipelineState* pipelineState = pipeline.GetPipelineState(_rasterPipelineState);
                 if (pipelineState == null)
                     return false;
 
-                cmdList->SetGraphicsRootSignature((ID3D12RootSignature*)@internal.RootSignature.NativePointer);
+                cmdList->SetGraphicsRootSignature(pipeline.RootSignature.Get());
                 cmdList->SetPipelineState(pipelineState);
-                cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+                cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY.D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             }
 
             if (_hasHadPropertyChange)
@@ -477,16 +477,15 @@ namespace Primary.Rendering2.D3D12
                     {
                         ref readonly PropertyResourceData rd = ref _resourceData[i];
 
-                        if (!(rd.FGResource.HasValue || rd.RHISampler != null))
+                        if (rd.Resource.IsNull)
                         {
-                            EngLog.NRD.Error("[{idx}]: Null resource or sampler in resource data!", i);
+                            EngLog.NRD.Error("[{idx}]: Null resource in resource data!", i);
                             return false;
                         }
 
-                        if (rd.FGResource.HasValue)
+                        if (rd.Resource.Id != NRDResourceId.Sampler)
                         {
-                            FrameGraphResource resource = rd.FGResource.Value;
-                            Debug.Assert(resource.IsExternal || resource.IsValidAndRenderGraph);
+                            NRDResource resource = rd.Resource;
 
                             uint index = _device.GPUDescriptorHeap.GetDescriptorIndex(resource, out bool createdNewHeap);
                             if (createdNewHeap)
@@ -500,22 +499,22 @@ namespace Primary.Rendering2.D3D12
                             Unsafe.WriteUnaligned(dataPtr.ToPointer(), index);
                             dataPtr += sizeof(uint);
 
-                            if (resource.ResourceId == FGResourceId.Buffer)
+                            if (resource.Id == NRDResourceId.Buffer)
                             {
-                                BarrierManager.GetShaderBufferBarriers(resource.AsBuffer(), rd.Stages, out D3D12_BARRIER_SYNC sync, out D3D12_BARRIER_ACCESS access);
-                                _device.BarrierManager.AddBufferBarrier(resource.AsBuffer(), sync, access);
+                                BarrierManager.GetShaderBufferBarriers(_device.ResourceManager.FindFGBuffer(resource), rd.Stages, out D3D12_BARRIER_SYNC sync, out D3D12_BARRIER_ACCESS access);
+                                _device.BarrierManager.AddBufferBarrier(resource, sync, access);
                             }
                             else
                             {
-                                BarrierManager.GetShaderTextureBarriers(resource.AsTexture(), rd.Stages, out D3D12_BARRIER_SYNC sync, out D3D12_BARRIER_ACCESS access, out D3D12_BARRIER_LAYOUT layout);
-                                _device.BarrierManager.AddTextureBarrier(resource.AsTexture(), sync, access, layout);
+                                BarrierManager.GetShaderTextureBarriers(_device.ResourceManager.FindFGTexture(resource), rd.Stages, out D3D12_BARRIER_SYNC sync, out D3D12_BARRIER_ACCESS access, out D3D12_BARRIER_LAYOUT layout);
+                                _device.BarrierManager.AddTextureBarrier(resource, sync, access, layout);
                             }
                         }
                         else
                         {
-                            RHI.Sampler sampler = rd.RHISampler!;
+                            D3D12RHISamplerNative* sampler = (D3D12RHISamplerNative*)rd.Resource.Native;
 
-                            uint index = _device.SamplerDescriptorHeap.GetDescriptorIndex(sampler.Description, out bool createdNewHeap);
+                            uint index = _device.SamplerDescriptorHeap.GetDescriptorIndex(sampler->Base.Description, out bool createdNewHeap);
                             if (createdNewHeap)
                             {
                                 SetHeapBundle bundle = new SetHeapBundle(_device.GPUDescriptorHeap.CurrentActiveHeap, _device.SamplerDescriptorHeap.CurrentActiveHeap);
@@ -667,8 +666,8 @@ namespace Primary.Rendering2.D3D12
         }
     }
 
-    internal readonly record struct SetBufferData(FrameGraphBuffer Buffer, int Stride);
-    internal readonly record struct PropertyResourceData(FrameGraphResource? FGResource, RHI.Sampler? RHISampler, ShPropertyStages Stages);
+    internal readonly record struct SetBufferData(NRDResource Buffer, int Stride);
+    internal readonly record struct PropertyResourceData(NRDResource Resource, ShPropertyStages Stages);
     internal readonly record struct SetHeapBundle(Ptr<ID3D12DescriptorHeap> GpuHeap, Ptr<ID3D12DescriptorHeap> SamplerHeap);
 
     internal struct DirtyValue<T>

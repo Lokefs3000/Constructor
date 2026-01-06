@@ -963,7 +963,7 @@
         "TimeSpent": "04:08:19.2558951"
       },
       "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\DearImGuiStateManager.cs": {
-        "TimeSpent": "00:36:34.9712438"
+        "TimeSpent": "00:36:40.7493000"
       },
       "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\ProfilerView.cs": {
         "TimeSpent": "00:19:21.1818086"
@@ -1522,7 +1522,7 @@
         "TimeSpent": "00:03:59.4438380"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI\\GraphicsPipeline.cs": {
-        "TimeSpent": "00:15:16.3501987"
+        "TimeSpent": "00:25:19.3440384"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI\\GraphicsCommandBuffer.cs": {
         "TimeSpent": "01:08:08.6847722"
@@ -1705,7 +1705,7 @@
         "TimeSpent": "00:01:23.5255323"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI.Direct3D12\\SwapChainImpl.cs": {
-        "TimeSpent": "01:54:21.1125728"
+        "TimeSpent": "01:56:10.1544294"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI.Direct3D12\\Utility\\ExtUtility.cs": {
         "TimeSpent": "00:01:15.5370835"
@@ -1813,7 +1813,7 @@
         "TimeSpent": "01:47:12.6528642"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI.Direct3D12\\TextureImpl.cs": {
-        "TimeSpent": "01:26:28.3095521"
+        "TimeSpent": "01:27:10.9504121"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI.Direct3D12\\Interfaces\\ICommandBufferTexture.cs": {
         "TimeSpent": "00:00:57.4323419"
@@ -2786,7 +2786,7 @@
         "TimeSpent": "00:01:16.0116937"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\RenderingManager.cs": {
-        "TimeSpent": "01:43:20.5560163"
+        "TimeSpent": "01:46:51.4504138"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\RenderPass.cs": {
         "TimeSpent": "00:54:22.0997688"
@@ -2819,7 +2819,7 @@
         "TimeSpent": "00:10:40.0075114"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\Resources\\FrameGraphResource.cs": {
-        "TimeSpent": "00:19:29.3780746"
+        "TimeSpent": "00:23:37.6760963"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\Resources\\FGTextureFormat.Extensions.cs": {
         "TimeSpent": "00:15:57.4309437"
@@ -2834,7 +2834,7 @@
         "TimeSpent": "00:03:21.9952938"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\NRDDevice.cs": {
-        "TimeSpent": "03:01:15.8173478"
+        "TimeSpent": "03:25:05.2479552"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\Structures\\RasterCommandBuffer.cs": {
         "TimeSpent": "04:43:02.3187017"
@@ -3047,19 +3047,19 @@
         "TimeSpent": "00:04:52.3831826"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\NRD\\NRDFactory.cs": {
-        "TimeSpent": "00:01:16.1752273"
+        "TimeSpent": "00:03:07.9731073"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\RasterState.cs": {
-        "TimeSpent": "02:29:51.4864303"
+        "TimeSpent": "02:44:28.8378042"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\Pass\\FrameGraphResources.cs": {
         "TimeSpent": "01:01:01.3810172"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\ResourceManager.cs": {
-        "TimeSpent": "01:59:32.9158553"
+        "TimeSpent": "02:07:57.9423502"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\CpuDescriptorHeap.cs": {
-        "TimeSpent": "00:41:02.9836292"
+        "TimeSpent": "00:50:27.5484875"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\FormatConverter.cs": {
         "TimeSpent": "00:20:48.8175097"
@@ -3071,7 +3071,7 @@
         "TimeSpent": "00:41:14.9485535"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\BarrierManager.cs": {
-        "TimeSpent": "01:00:12.5459912"
+        "TimeSpent": "01:08:46.3616755"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\QueueFence.cs": {
         "TimeSpent": "00:07:22.9615385"
@@ -3080,7 +3080,7 @@
         "TimeSpent": "00:20:29.7352665"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\GpuDescriptorHeap.cs": {
-        "TimeSpent": "00:24:32.8031920"
+        "TimeSpent": "00:25:16.9172577"
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\ResourceUtility.cs": {
         "TimeSpent": "00:06:16.3239458"
@@ -3093,6 +3093,9 @@
       },
       "D:\\source\\repos\\Constructor\\Primary.Rendering2\\Pass\\FrameGraphSetup.cs": {
         "TimeSpent": "00:02:07.7279157"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.Rendering2\\D3D12\\NRDResource.cs": {
+        "TimeSpent": "00:08:12.8274575"
       }
     }
   },
@@ -3202,7 +3205,7 @@
         "TimeSpent": "00:04:12.5789020"
       },
       "D:\\source\\repos\\Constructor\\Editor.Shaders\\Data\\VarSemantic.cs": {
-        "TimeSpent": "00:02:05.6670853"
+        "TimeSpent": "00:02:13.0420005"
       },
       "D:\\source\\repos\\Constructor\\Editor.Shaders\\Data\\PropertyData.cs": {
         "TimeSpent": "00:03:51.8045950"
@@ -3288,16 +3291,16 @@
         "TimeSpent": "00:00:29.0802487"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHIDevice.cs": {
-        "TimeSpent": "00:03:16.5138750"
+        "TimeSpent": "00:11:41.0037106"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHIBuffer.cs": {
-        "TimeSpent": "00:11:34.6695925"
+        "TimeSpent": "00:23:47.4036472"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Enums.cs": {
-        "TimeSpent": "00:06:01.1276069"
+        "TimeSpent": "00:26:03.0890453"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHIDevice.cs": {
-        "TimeSpent": "00:40:57.6179713"
+        "TimeSpent": "01:03:40.3233635"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\UuidOf.cs": {
         "TimeSpent": "00:00:23.9132915"
@@ -3306,13 +3309,58 @@
         "TimeSpent": "00:02:13.2035383"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHIBuffer.cs": {
-        "TimeSpent": "00:22:31.4629652"
+        "TimeSpent": "00:31:30.9216915"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\ResourceHelper.cs": {
-        "TimeSpent": "00:07:09.5131810"
+        "TimeSpent": "00:14:01.8545611"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHITexture.cs": {
-        "TimeSpent": "00:01:41.8934082"
+        "TimeSpent": "00:34:17.7342642"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\ConversionHelper.cs": {
+        "TimeSpent": "00:34:35.2241923"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHIBuffer - Copy.cs": {
+        "TimeSpent": "00:01:12.5497524"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHITexture.cs": {
+        "TimeSpent": "00:09:00.5959208"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\Validation\\BufferValidator.cs": {
+        "TimeSpent": "00:18:46.6699186"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\Validation\\BufferValidator - Copy.cs": {
+        "TimeSpent": "00:00:09.1830080"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\Validation\\TextureValidator.cs": {
+        "TimeSpent": "00:16:39.3856662"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\FormatHelper.cs": {
+        "TimeSpent": "00:04:22.3889479"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHIDeviceFactory.cs": {
+        "TimeSpent": "00:01:18.4445650"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHIResource.cs": {
+        "TimeSpent": "00:01:38.1203413"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHISampler.cs": {
+        "TimeSpent": "00:09:56.5898963"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHISampler.cs": {
+        "TimeSpent": "00:03:44.7650817"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHISwapChain.cs": {
+        "TimeSpent": "00:04:06.5307845"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHISwapChain.cs": {
+        "TimeSpent": "00:18:07.9972770"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHIGraphicsPipeline.cs": {
+        "TimeSpent": "00:10:53.2793653"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHIGraphicsPipeline.cs": {
+        "TimeSpent": "01:01:22.5095378"
       }
     }
   }

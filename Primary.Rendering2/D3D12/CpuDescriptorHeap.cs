@@ -31,7 +31,7 @@ namespace Primary.Rendering2.D3D12
 
         private readonly D3D12_CPU_DESCRIPTOR_HANDLE _nullDescriptor;
 
-        private Dictionary<FrameGraphResource, D3D12_CPU_DESCRIPTOR_HANDLE> _allocatedDescriptors;
+        private Dictionary<NRDResource, D3D12_CPU_DESCRIPTOR_HANDLE> _allocatedDescriptors;
 
         private bool _disposedValue;
 
@@ -50,7 +50,7 @@ namespace Primary.Rendering2.D3D12
             _heapIndex = 0;
             _heapDescriptorOffset = 0;
 
-            _allocatedDescriptors = new Dictionary<FrameGraphResource, D3D12_CPU_DESCRIPTOR_HANDLE>();
+            _allocatedDescriptors = new Dictionary<NRDResource, D3D12_CPU_DESCRIPTOR_HANDLE>();
 
             AddNewHeapToList();
 
@@ -133,9 +133,9 @@ namespace Primary.Rendering2.D3D12
                 AddNewHeapToList();
         }
 
-        internal D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle(FrameGraphResource resource)
+        internal D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle(NRDResource resource)
         {
-            if (!(resource.IsValidAndRenderGraph || resource.IsExternal))
+            if (resource.IsNull)
                 return _nullDescriptor;
 
             if (_allocatedDescriptors.TryGetValue(resource, out D3D12_CPU_DESCRIPTOR_HANDLE handle))
@@ -165,7 +165,7 @@ namespace Primary.Rendering2.D3D12
                 {
                     case D3D12_DESCRIPTOR_HEAP_TYPE_RTV:
                         {
-                            FrameGraphTexture texture = resource.AsTexture();
+                            FrameGraphTexture texture = resources.FindFGTexture(resource);
 
                             Debug.Assert(texture.Index >= 0);
                             Debug.Assert(FlagUtility.HasFlag(texture.Description.Usage, FGTextureUsage.RenderTarget));
@@ -186,7 +186,7 @@ namespace Primary.Rendering2.D3D12
                         }
                     case D3D12_DESCRIPTOR_HEAP_TYPE_DSV:
                         {
-                            FrameGraphTexture texture = resource.AsTexture();
+                            FrameGraphTexture texture = resources.FindFGTexture(resource);
 
                             Debug.Assert(texture.Index >= 0);
                             Debug.Assert(FlagUtility.HasFlag(texture.Description.Usage, FGTextureUsage.DepthStencil));
@@ -227,7 +227,7 @@ namespace Primary.Rendering2.D3D12
             //TODO: proper error messages and handling
             if (ret.FAILED)
             {
-                _device.RHIDevice.FlushMessageQueue();
+                _device.RHIDevice.FlushPendingMessages();
                 throw new NotImplementedException("No error handling yet");
             }
 

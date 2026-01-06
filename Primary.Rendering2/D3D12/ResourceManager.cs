@@ -2,26 +2,25 @@
 using Primary.Profiling;
 using Primary.Rendering2.Pass;
 using Primary.Rendering2.Resources;
+using Primary.RHI2.Direct3D12;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.Versioning;
 using TerraFX.Interop.DirectX;
 using TerraFX.Interop.Windows;
-using System.Runtime.CompilerServices;
-
-using D3D12MemAlloc = Interop.D3D12MemAlloc;
-
 using static TerraFX.Interop.DirectX.D3D12;
+using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
 using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
+using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
+using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
+using static TerraFX.Interop.DirectX.D3D12_CLEAR_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_HEAP_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_HEAP_TYPE;
 using static TerraFX.Interop.DirectX.D3D12_RESOURCE_DIMENSION;
 using static TerraFX.Interop.DirectX.D3D12_RESOURCE_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_TEXTURE_LAYOUT;
 using static TerraFX.Interop.DirectX.DXGI_FORMAT;
-using static TerraFX.Interop.DirectX.D3D12_CLEAR_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
+using D3D12MemAlloc = Interop.D3D12MemAlloc;
 
 namespace Primary.Rendering2.D3D12
 {
@@ -33,10 +32,12 @@ namespace Primary.Rendering2.D3D12
         private D3D12MemAlloc.Allocation* _resourcesMemory;
         private int _resourceMemorySize;
 
-        private Dictionary<FrameGraphResource, Ptr<ID3D12Resource2>> _allocatedResources;
-        private HashSet<FrameGraphResource> _initializedResources;
+        private Dictionary<NRDResource, Ptr<ID3D12Resource2>> _allocatedResources;
+        private HashSet<NRDResource> _initializedResources;
 
-        private HashSet<FrameGraphResource> _pendingInitializes;
+        private HashSet<NRDResource> _pendingInitializes;
+
+        private FrameGraphResources? _frameResourceData;
 
         internal ResourceManager(NRDDevice device)
         {
@@ -45,10 +46,12 @@ namespace Primary.Rendering2.D3D12
             _resourcesMemory = null;
             _resourceMemorySize = 0;
 
-            _allocatedResources = new Dictionary<FrameGraphResource, Ptr<ID3D12Resource2>>();
-            _initializedResources = new HashSet<FrameGraphResource>();
+            _allocatedResources = new Dictionary<NRDResource, Ptr<ID3D12Resource2>>();
+            _initializedResources = new HashSet<NRDResource>();
 
-            _pendingInitializes = new HashSet<FrameGraphResource>();
+            _pendingInitializes = new HashSet<NRDResource>();
+
+            _frameResourceData = null;
 
             Debug.Assert(D3D12MemAlloc.Allocator.IsTightAlignmentSupported(device.Allocator) != 0);
         }
@@ -57,6 +60,8 @@ namespace Primary.Rendering2.D3D12
         {
             using (new ProfilingScope("Resources"))
             {
+                _frameResourceData = resources;
+
                 FreeReferencedResources();
 
                 Debug.Assert(_allocatedResources.Count == 0);
@@ -196,16 +201,18 @@ namespace Primary.Rendering2.D3D12
 
             _initializedResources.Clear();
             _pendingInitializes.Clear();
+
+            _frameResourceData = null;
         }
 
-        internal ID3D12Resource2* GetResource(FrameGraphResource resource)
+        internal ID3D12Resource2* GetResource(NRDResource resource)
         {
             if (resource.IsExternal)
             {
-                return resource.ResourceId switch
+                return resource.Id switch
                 {
-                    FGResourceId.Texture => (ID3D12Resource2*)new RHI.Direct3D12.TextureInternal(Unsafe.As<RHI.Texture>(resource.Resource!)).Resource.NativePointer.ToPointer(),
-                    FGResourceId.Buffer => (ID3D12Resource2*)new RHI.Direct3D12.BufferInternal(Unsafe.As<RHI.Buffer>(resource.Resource!)).Resource.NativePointer.ToPointer(),
+                    NRDResourceId.Texture => ((D3D12RHIBufferNative*)resource.Native)->Resource,
+                    NRDResourceId.Buffer => ((D3D12RHITextureNative*)resource.Native)->Resource,
                     _ => throw new NotImplementedException(),
                 };
             }
@@ -216,7 +223,23 @@ namespace Primary.Rendering2.D3D12
             return null;
         }
 
-        internal void EnsureInitialized(FrameGraphResource resource)
+        internal FrameGraphBuffer FindFGBuffer(NRDResource resource)
+        {
+            if (resource.EncId != NRDResourceId.Buffer)
+                return FrameGraphBuffer.Invalid;
+
+            return _frameResourceData?.FindFGBuffer(resource.Index) ?? FrameGraphBuffer.Invalid;
+        }
+
+        internal FrameGraphTexture FindFGTexture(NRDResource resource)
+        {
+            if (resource.EncId != NRDResourceId.Buffer)
+                return FrameGraphTexture.Invalid;
+  
+            return _frameResourceData?.FindFGTexture(resource.Index) ?? FrameGraphTexture.Invalid;
+        }
+
+        internal void EnsureInitialized(NRDResource resource)
         {
             if (resource.IsExternal)
                 return;
@@ -226,7 +249,7 @@ namespace Primary.Rendering2.D3D12
             _pendingInitializes.Add(resource);
         }
 
-        internal void SetAsInitialized(FrameGraphResource resource)
+        internal void SetAsInitialized(NRDResource resource)
         {
             if (resource.IsExternal)
                 return;
@@ -239,38 +262,40 @@ namespace Primary.Rendering2.D3D12
             if (_pendingInitializes.Count == 0)
                 return;
 
-            foreach (FrameGraphResource resource in _pendingInitializes)
+            foreach (NRDResource resource in _pendingInitializes)
             {
                 Debug.Assert(!_initializedResources.Contains(resource));
                 Debug.Assert(!resource.IsExternal);
 
-                if (resource.ResourceId == FGResourceId.Texture)
+                if (resource.EncId == NRDResourceId.Texture)
                 {
-                    ref readonly FrameGraphTextureDesc desc = ref resource.TextureDesc;
+                    FrameGraphTexture fgTexture = FindFGTexture(resource);
+                    ref readonly FrameGraphTextureDesc desc = ref fgTexture.Description;
 
                     if (FlagUtility.HasFlag(desc.Usage, FGTextureUsage.RenderTarget))
                     {
-                        _device.BarrierManager.AddTextureBarrier(resource.AsTexture(), D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+                        _device.BarrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
                     }
                     else if (FlagUtility.HasFlag(desc.Usage, FGTextureUsage.DepthStencil))
                     {
-                        _device.BarrierManager.AddTextureBarrier(resource.AsTexture(), D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+                        _device.BarrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
                     }
                 }
             }
 
             _device.BarrierManager.FlushBarriers(cmdList, BarrierFlushTypes.Texture);
 
-            foreach (FrameGraphResource resource in _pendingInitializes)
+            foreach (NRDResource resource in _pendingInitializes)
             {
-                if (resource.ResourceId == FGResourceId.Texture)
+                if (resource.EncId == NRDResourceId.Texture)
                 {
-                    ref readonly FrameGraphTextureDesc desc = ref resource.TextureDesc;
+                    FrameGraphTexture fgTexture = FindFGTexture(resource);
+                    ref readonly FrameGraphTextureDesc desc = ref fgTexture.Description;
 
                     if (FlagUtility.HasFlag(desc.Usage, FGTextureUsage.RenderTarget))
                     {
 #if DEBUG
-                        _device.BarrierManager.DbgEnsureState(resource.AsTexture(), cmdList, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+                        _device.BarrierManager.DbgEnsureState(resource, cmdList, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
 #endif
 
                         Color color = new Color(0.0f);
@@ -279,7 +304,7 @@ namespace Primary.Rendering2.D3D12
                     else if (FlagUtility.HasFlag(desc.Usage, FGTextureUsage.DepthStencil))
                     {
 #if DEBUG
-                        _device.BarrierManager.DbgEnsureState(resource.AsTexture(), cmdList, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+                        _device.BarrierManager.DbgEnsureState(resource, cmdList, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
 #endif
 
                         cmdList->ClearDepthStencilView(_device.DSVDescriptorHeap.GetDescriptorHandle(resource), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0xff, 0, null);

@@ -15,6 +15,7 @@ using static TerraFX.Interop.DirectX.D3D12_SAMPLER_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_DESCRIPTOR_HEAP_FLAGS;
 using Primary.Common;
 using TerraFX.Interop.Windows;
+using Primary.RHI2;
 
 namespace Primary.Rendering2.D3D12
 {
@@ -182,13 +183,13 @@ namespace Primary.Rendering2.D3D12
         internal readonly record struct HeapData(Ptr<ID3D12DescriptorHeap> Heap, D3D12_CPU_DESCRIPTOR_HANDLE StartHandle);
     }
 
-    internal readonly record struct SamplerDesc(RHI.SamplerDescription Description) : IEquatable<SamplerDesc>
+    internal readonly record struct SamplerDesc(RHISamplerDescription Description) : IEquatable<SamplerDesc>
     {
         public override int GetHashCode()
         {
             return MemoryMarshal.Cast<SamplerDesc, byte>(new ReadOnlySpan<SamplerDesc>(in this)).GetDjb2HashCode();
         }
 
-        public static implicit operator SamplerDesc(RHI.SamplerDescription desc) => new SamplerDesc(desc);
+        public static implicit operator SamplerDesc(RHISamplerDescription desc) => new SamplerDesc(desc);
     }
 }

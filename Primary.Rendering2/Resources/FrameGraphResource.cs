@@ -1,7 +1,7 @@
 ﻿using Primary.Common;
+using Primary.RHI2;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using RHI = Primary.RHI;
 
 namespace Primary.Rendering2.Resources
 {
@@ -9,7 +9,7 @@ namespace Primary.Rendering2.Resources
     {
         private readonly int _index;
         private readonly FGResourceId _resourceId;
-        private readonly RHI.Resource? _resource;
+        private readonly RHIResource? _resource;
         private readonly ResourceUnion _union;
 
         private readonly string? _debugName;
@@ -50,7 +50,7 @@ namespace Primary.Rendering2.Resources
             _debugName = debugName;
         }
 
-        internal FrameGraphResource(RHI.Buffer buffer, string? debugName)
+        internal FrameGraphResource(RHIBuffer buffer, string? debugName)
         {
             _index = -1;
             _resourceId = FGResourceId.Buffer | FGResourceId.External;
@@ -60,7 +60,7 @@ namespace Primary.Rendering2.Resources
             _debugName = debugName;
         }
 
-        internal FrameGraphResource(RHI.Texture texture, string? debugName)
+        internal FrameGraphResource(RHITexture texture, string? debugName)
         {
             _index = -1;
             _resourceId = FGResourceId.Texture | FGResourceId.External;
@@ -70,10 +70,10 @@ namespace Primary.Rendering2.Resources
             _debugName = debugName;
         }
 
-        internal FrameGraphResource(RHI.Resource resource, string? debugName)
+        internal FrameGraphResource(RHIResource resource, string? debugName)
         {
             _index = -1;
-            _resourceId = (resource is RHI.Texture ? FGResourceId.Texture : FGResourceId.Buffer) | FGResourceId.External;
+            _resourceId = (resource.Type == RHIResourceType.Texture ? FGResourceId.Texture : FGResourceId.Buffer) | FGResourceId.External;
             _resource = resource;
             _union = default;
 
@@ -107,7 +107,7 @@ namespace Primary.Rendering2.Resources
         [UnscopedRef]
         internal ref readonly FrameGraphBufferDesc BufferDesc => ref _union.Buffer;
 
-        internal RHI.Resource? Resource => _resource;
+        internal RHIResource? Resource => _resource;
 
         internal FGResourceId ResourceId => (FGResourceId)((int)_resourceId & 0b01111111);
         internal bool IsExternal => FlagUtility.HasFlag(_resourceId, FGResourceId.External);

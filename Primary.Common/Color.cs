@@ -61,6 +61,9 @@ namespace Primary.Common
         public static Color Black => new Color(0.0f);
         public static Color White => new Color(1.0f);
 
+        public static Color TransparentWhite => new Color(1.0f, 0.0f);
+        public static Color TransparentBlack => new Color(0.0f, 0.0f);
+
         public static Color FromHex(ReadOnlySpan<char> hex)
         {
             int rgba = int.Parse(hex, NumberStyles.HexNumber);

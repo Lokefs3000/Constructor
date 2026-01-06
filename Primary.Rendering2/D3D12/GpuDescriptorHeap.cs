@@ -31,7 +31,7 @@ namespace Primary.Rendering2.D3D12
         private int _activeHeapIndex;
         private int _activeHeapOffset;
 
-        private Dictionary<FrameGraphResource, uint> _activeDescriptors;
+        private Dictionary<NRDResource, uint> _activeDescriptors;
 
         private bool _disposedValue;
 
@@ -51,7 +51,7 @@ namespace Primary.Rendering2.D3D12
             _activeHeapIndex = 0;
             _activeHeapOffset = 0;
 
-            _activeDescriptors = new Dictionary<FrameGraphResource, uint>();
+            _activeDescriptors = new Dictionary<NRDResource, uint>();
         }
 
         private void Dispose(bool disposing)
@@ -93,11 +93,11 @@ namespace Primary.Rendering2.D3D12
             _activeDescriptors.Clear();
         }
 
-        internal uint GetDescriptorIndex(FrameGraphResource resource, out bool changedActiveHeap)
+        internal uint GetDescriptorIndex(NRDResource resource, out bool changedActiveHeap)
         {
             changedActiveHeap = false;
 
-            if (!(resource.IsExternal || resource.IsValidAndRenderGraph))
+            if (resource.IsNull)
                 return ushort.MaxValue;
 
             if (_activeDescriptors.TryGetValue(resource, out uint index))
@@ -121,15 +121,13 @@ namespace Primary.Rendering2.D3D12
             index = (uint)_activeDescriptors.Count;
             _activeDescriptors[resource] = index;
 
-            ID3D12Resource* res = resource.IsExternal ?
-                ResourceUtility.GetNativeExternalResource(resource) :
-                (ID3D12Resource*)_device.ResourceManager.GetResource(resource);
+            ID3D12Resource* res = (ID3D12Resource*)_device.ResourceManager.GetResource(resource);
 
             D3D12_CPU_DESCRIPTOR_HANDLE dstDescriptor = new D3D12_CPU_DESCRIPTOR_HANDLE(heap.StartHandle, _activeHeapOffset);
 
-            switch (resource.ResourceId)
+            switch (resource.Id)
             {
-                case FGResourceId.Texture:
+                case NRDResourceId.Texture:
                     {
                         if (resource.IsExternal)
                         {
@@ -193,7 +191,7 @@ namespace Primary.Rendering2.D3D12
 
                         break;
                     }
-                case FGResourceId.Buffer:
+                case NRDResourceId.Buffer:
                     {
                         if (resource.IsExternal)
                         {

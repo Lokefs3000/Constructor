@@ -11,13 +11,14 @@ using Primary.Rendering2.Recording;
 using Primary.Rendering2.Resources;
 using Primary.Rendering2.Structures;
 using Primary.Rendering2.Tree;
+using Primary.RHI2;
 using System.Diagnostics;
 
 namespace Primary.Rendering2
 {
     public class RenderingManager
     {
-        private readonly RHI.GraphicsDevice _graphicsDevice;
+        private readonly RHIDevice _graphicsDevice;
 
         private readonly OctreeManager _octreeManager;
         private readonly RenderWorld _renderWorld;
@@ -33,9 +34,9 @@ namespace Primary.Rendering2
         private ShaderAsset2 _finalBlitSwapChain;
         private PropertyBlock _finalBlitSwapChainPB;
 
-        public RenderingManager(RHI.GraphicsDevice device)
+        public RenderingManager()
         {
-            _graphicsDevice = device;
+            _graphicsDevice = RHIDeviceFactory.CreateDefaultApi(new RHIDeviceDescription { EnableValidation = Engine.IsDebugBuild }, EngLog.RHI);
 
             _octreeManager = new OctreeManager();
             _renderWorld = new RenderWorld();
@@ -44,7 +45,7 @@ namespace Primary.Rendering2
             _batchingManager = new BatchingManager();
             _globalsManager = new ShaderGlobalsManager();
             _swapChainCache = new SwapChainCache(this);
-            _nrdDevice = NRDFactory.Create(this, device);
+            _nrdDevice = NRDFactory.Create(this, _graphicsDevice);
 
             _currentPath = null;
 
@@ -213,7 +214,7 @@ namespace Primary.Rendering2
             OctreeVisualizer.Visualize(_octreeManager, renderer);
         }
 
-        public RHI.GraphicsDevice GraphicsDevice => _graphicsDevice;
+        public RHIDevice GraphicsDevice => _graphicsDevice;
 
         public OctreeManager OctreeManager => _octreeManager;
         public RenderWorld RenderWorld => _renderWorld;

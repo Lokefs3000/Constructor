@@ -64,6 +64,6 @@ namespace Primary.Rendering2.Recording
 
     public struct UCSetPipeline : IStateChangeCommand
     {
-        public nint Pipeline;
+        public int Pipeline;
     }
 }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Primary.RHI2;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,7 +14,7 @@ namespace Primary.Rendering2.Resources
         public int Depth;
 
         public FGTextureDimension Dimension;
-        public FGTextureFormat Format;
+        public RHIFormat Format;
         public FGTextureUsage Usage;
 
         public FrameGraphTextureSwizzle Swizzle;

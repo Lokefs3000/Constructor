@@ -2,18 +2,19 @@
 using Primary.Common;
 using Primary.Rendering2.Assets;
 using Primary.Rendering2.Resources;
+using Primary.RHI;
+using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using TerraFX.Interop.DirectX;
-
+using TerraFX.Interop.Windows;
 using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
 using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
 using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
-using static TerraFX.Interop.DirectX.D3D12_TEXTURE_BARRIER_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_RESOURCE_FLAGS;
-using TerraFX.Interop.Windows;
+using static TerraFX.Interop.DirectX.D3D12_TEXTURE_BARRIER_FLAGS;
 
 namespace Primary.Rendering2.D3D12
 {
@@ -25,7 +26,7 @@ namespace Primary.Rendering2.D3D12
         private List<D3D12_BUFFER_BARRIER> _bufferBarriers;
         private List<D3D12_TEXTURE_BARRIER> _textureBarriers;
 
-        private Dictionary<nint, ResourceState> _resourceStates;
+        private Dictionary<nint, NRDResourceState> _resourceStates;
 
         internal BarrierManager(NRDDevice device)
         {
@@ -34,7 +35,7 @@ namespace Primary.Rendering2.D3D12
             _bufferBarriers = new List<D3D12_BUFFER_BARRIER>();
             _textureBarriers = new List<D3D12_TEXTURE_BARRIER>();
 
-            _resourceStates = new Dictionary<nint, ResourceState>();
+            _resourceStates = new Dictionary<nint, NRDResourceState>();
         }
 
         internal void ClearInternal()
@@ -72,7 +73,7 @@ namespace Primary.Rendering2.D3D12
                 for (int i = 0; i < _bufferBarriers.Count; i++)
                 {
                     D3D12_BUFFER_BARRIER barrier = _bufferBarriers[i];
-                    ref ResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)barrier.pResource);
+                    ref NRDResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)barrier.pResource);
 
                     state.PreviousSync = barrier.SyncAfter;
                     state.PreviousAccess = barrier.AccessAfter;
@@ -91,7 +92,7 @@ namespace Primary.Rendering2.D3D12
                 for (int i = 0; i < _textureBarriers.Count; i++)
                 {
                     D3D12_TEXTURE_BARRIER barrier = _textureBarriers[i];
-                    ref ResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)barrier.pResource);
+                    ref NRDResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)barrier.pResource);
 
                     state.PreviousSync = barrier.SyncAfter;
                     state.PreviousAccess = barrier.AccessAfter;
@@ -107,15 +108,17 @@ namespace Primary.Rendering2.D3D12
             }
         }
 
-        internal void AddBufferBarrier(FrameGraphBuffer buffer, D3D12_BARRIER_SYNC sync, D3D12_BARRIER_ACCESS access)
+        internal void AddBufferBarrier(NRDResource buffer, D3D12_BARRIER_SYNC sync, D3D12_BARRIER_ACCESS access)
         {
-            ID3D12Resource* resource = ResourceUtility.GetResource(_device.ResourceManager, buffer);
+            Debug.Assert(buffer.Id == NRDResourceId.Buffer);
+            ID3D12Resource* resource = (ID3D12Resource*)buffer.GetNativeResource(_device.ResourceManager);
+
             AddBufferBarrier(resource, sync, access);
         }
 
         internal void AddBufferBarrier(ID3D12Resource* resource, D3D12_BARRIER_SYNC sync, D3D12_BARRIER_ACCESS access)
         {
-            ref ResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
+            ref NRDResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
 
             if (Unsafe.IsNullRef(ref state))
             {
@@ -132,7 +135,7 @@ namespace Primary.Rendering2.D3D12
                     Size = ulong.MaxValue
                 });
 
-                _resourceStates[(nint)resource] = new ResourceState(FGResourceId.Buffer, D3D12_BARRIER_SYNC_ALL, D3D12_BARRIER_ACCESS_COMMON);
+                _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Buffer, D3D12_BARRIER_SYNC_ALL, D3D12_BARRIER_ACCESS_COMMON);
             }
             else
             {
@@ -157,9 +160,10 @@ namespace Primary.Rendering2.D3D12
             }
         }
 
-        internal void AddTextureBarrier(FrameGraphTexture texture, D3D12_BARRIER_SYNC sync, D3D12_BARRIER_ACCESS access, D3D12_BARRIER_LAYOUT layout, D3D12_BARRIER_SUBRESOURCE_RANGE? range = null)
+        internal void AddTextureBarrier(NRDResource texture, D3D12_BARRIER_SYNC sync, D3D12_BARRIER_ACCESS access, D3D12_BARRIER_LAYOUT layout, D3D12_BARRIER_SUBRESOURCE_RANGE? range = null)
         {
-            ID3D12Resource* resource = ResourceUtility.GetResource(_device.ResourceManager, texture);
+            Debug.Assert(texture.Id == NRDResourceId.Texture);
+            ID3D12Resource* resource = (ID3D12Resource*)texture.GetNativeResource(_device.ResourceManager);
 
 #if DEBUG
             D3D12_RESOURCE_DESC1 desc1 = ((ID3D12Resource2*)resource)->GetDesc1();
@@ -174,7 +178,7 @@ namespace Primary.Rendering2.D3D12
 
         internal void AddTextureBarrier(ID3D12Resource* resource, D3D12_BARRIER_SYNC sync, D3D12_BARRIER_ACCESS access, D3D12_BARRIER_LAYOUT layout, D3D12_BARRIER_SUBRESOURCE_RANGE? range = null)
         {
-            ref ResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
+            ref NRDResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
 
             if (Unsafe.IsNullRef(ref state))
             {
@@ -194,7 +198,7 @@ namespace Primary.Rendering2.D3D12
                     Flags = D3D12_TEXTURE_BARRIER_FLAG_NONE,
                 });
 
-                _resourceStates[(nint)resource] = new ResourceState(FGResourceId.Texture, D3D12_BARRIER_SYNC_ALL, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_UNDEFINED);
+                _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Texture, D3D12_BARRIER_SYNC_ALL, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_UNDEFINED);
             }
             else
             {
@@ -225,11 +229,17 @@ namespace Primary.Rendering2.D3D12
             }
         }
 
+        internal void SetResourceState(ID3D12Resource* resource, NRDResourceState state) => _resourceStates[(nint)resource] = state;
+        internal ref readonly NRDResourceState GetResourceState(ID3D12Resource* resource) => ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
+
         [Conditional("DEBUG")]
-        internal void DbgEnsureState(FrameGraphBuffer buffer, ID3D12GraphicsCommandList10* cmdList, D3D12_BARRIER_SYNC sync, D3D12_BARRIER_ACCESS access)
+        internal void DbgEnsureState(NRDResource buffer, ID3D12GraphicsCommandList10* cmdList, D3D12_BARRIER_SYNC sync, D3D12_BARRIER_ACCESS access)
         {
-            ID3D12Resource* resource = ResourceUtility.GetResource(_device.ResourceManager, buffer);
-            ref ResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
+            ID3D12Resource* resource = (ID3D12Resource*)buffer.GetNativeResource(_device.ResourceManager);
+            if (resource == null)
+                return;
+
+            ref NRDResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
 
             Debug.Assert(state.PreviousSync == sync && state.PreviousAccess == access);
 
@@ -245,10 +255,13 @@ namespace Primary.Rendering2.D3D12
         }
 
         [Conditional("DEBUG")]
-        internal void DbgEnsureState(FrameGraphTexture texture, ID3D12GraphicsCommandList10* cmdList, D3D12_BARRIER_SYNC sync, D3D12_BARRIER_ACCESS access, D3D12_BARRIER_LAYOUT layout)
+        internal void DbgEnsureState(NRDResource texture, ID3D12GraphicsCommandList10* cmdList, D3D12_BARRIER_SYNC sync, D3D12_BARRIER_ACCESS access, D3D12_BARRIER_LAYOUT layout)
         {
-            ID3D12Resource* resource = ResourceUtility.GetResource(_device.ResourceManager, texture);
-            ref ResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
+            ID3D12Resource* resource = (ID3D12Resource*)texture.GetNativeResource(_device.ResourceManager);
+            if (resource == null)
+                return;
+
+            ref NRDResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
 
             Debug.Assert(state.PreviousSync == sync && state.PreviousAccess == access && state.PreviousLayout == layout);
 
@@ -262,15 +275,6 @@ namespace Primary.Rendering2.D3D12
             //        debugCmdList->AssertTextureLayout(resource, 0xffffffff, layout);
             //    }
             //}
-        }
-
-        private struct ResourceState(FGResourceId Id, D3D12_BARRIER_SYNC StartSync, D3D12_BARRIER_ACCESS StartAccess, D3D12_BARRIER_LAYOUT StartLayout = D3D12_BARRIER_LAYOUT_COMMON)
-        {
-            public readonly FGResourceId Id = Id;
-
-            public D3D12_BARRIER_SYNC PreviousSync = StartSync;
-            public D3D12_BARRIER_ACCESS PreviousAccess = StartAccess;
-            public D3D12_BARRIER_LAYOUT PreviousLayout = StartLayout;
         }
 
         private record struct BarrierGroupBundle(D3D12_BARRIER_GROUP G0, D3D12_BARRIER_GROUP G1);
@@ -373,5 +377,14 @@ namespace Primary.Rendering2.D3D12
         Global = 1 << 0,
         Texture = 1 << 1,
         Buffer = 1 << 2,
+    }
+
+    internal struct NRDResourceState(FGResourceId Id, D3D12_BARRIER_SYNC StartSync, D3D12_BARRIER_ACCESS StartAccess, D3D12_BARRIER_LAYOUT StartLayout = D3D12_BARRIER_LAYOUT_COMMON)
+    {
+        public readonly FGResourceId Id = Id;
+
+        public D3D12_BARRIER_SYNC PreviousSync = StartSync;
+        public D3D12_BARRIER_ACCESS PreviousAccess = StartAccess;
+        public D3D12_BARRIER_LAYOUT PreviousLayout = StartLayout;
     }
 }

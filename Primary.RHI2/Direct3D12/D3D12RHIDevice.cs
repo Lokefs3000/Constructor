@@ -24,14 +24,14 @@ using static TerraFX.Interop.DirectX.D3D12_COMMAND_QUEUE_PRIORITY;
 using static Interop.D3D12MemAlloc.ALLOCATOR_FLAGS;
 
 using D3D12MA = Interop.D3D12MemAlloc;
+using Primary.RHI2.Validation;
+using System.Collections.Frozen;
 
 namespace Primary.RHI2.Direct3D12
 {
     [SupportedOSPlatform("windows")]
     public unsafe sealed class D3D12RHIDevice : RHIDevice
     {
-        private D3D12RHIDeviceNative* _nativeRep;
-
         private ILogger? _logger;
 
         private ComPtr<IDXGIFactory7> _factory;
@@ -49,10 +49,15 @@ namespace Primary.RHI2.Direct3D12
 
         private D3D12MA.Allocator* _d3d12Allocator;
 
-        internal D3D12RHIDevice(RHIDeviceDescription description, ILogger logger)
-        {
-            _nativeRep = (D3D12RHIDeviceNative*)NativeMemory.Alloc((nuint)Unsafe.SizeOf<D3D12RHIDeviceNative>());
+        private D3D12RHIDeviceNative* _nativeRep;
 
+        private Queue<Action> _pendingFreeCallbacks;
+
+        private int _debugMessageWidth;
+        private void* _debugMessageData;
+
+        internal D3D12RHIDevice(RHIDeviceDescription description, ILogger? logger)
+        {
             _logger = logger;
 
             //DXGI
@@ -204,12 +209,44 @@ namespace Primary.RHI2.Direct3D12
 
                 _d3d12Allocator = ptr;
             }
+
+            //Native
+            {
+                _nativeRep = (D3D12RHIDeviceNative*)NativeMemory.Alloc((nuint)Unsafe.SizeOf<D3D12RHIDeviceNative>());
+                _nativeRep->Base = new RHIDeviceNative
+                {
+
+                };
+                _nativeRep->Factory = (ComPtr<IDXGIFactory7>*)Unsafe.AsPointer(ref _factory);
+                _nativeRep->Adapter = (ComPtr<IDXGIAdapter4>*)Unsafe.AsPointer(ref _adapter);
+                _nativeRep->Debug = (ComPtr<ID3D12Debug6>*)Unsafe.AsPointer(ref _debug);
+                _nativeRep->Device = (ComPtr<ID3D12Device14>*)Unsafe.AsPointer(ref _device);
+                _nativeRep->InfoQueue = (ComPtr<ID3D12InfoQueue>*)Unsafe.AsPointer(ref _infoQueue);
+                _nativeRep->InfoQueue1 = (ComPtr<ID3D12InfoQueue1>*)Unsafe.AsPointer(ref _infoQueue1);
+                _nativeRep->DirectCmdQueue = (ComPtr<ID3D12CommandQueue>*)Unsafe.AsPointer(ref _directCmdQueue);
+                _nativeRep->ComputeCmdQueue = (ComPtr<ID3D12CommandQueue>*)Unsafe.AsPointer(ref _computeCmdQueue);
+                _nativeRep->CopyCmdQueue = (ComPtr<ID3D12CommandQueue>*)Unsafe.AsPointer(ref _copyCmdQueue);
+                _nativeRep->D3D12MAllocator = _d3d12Allocator;
+            }
+
+            _pendingFreeCallbacks = new Queue<Action>();
+
+            _debugMessageWidth = 0;
+            _debugMessageData = null;
         }
 
         protected override void Dispose(bool disposing)
         {
             if (!_disposedValue)
             {
+                HandlePendingUpdates();
+
+                if (_nativeRep != null)
+                {
+                    NativeMemory.Free(_nativeRep);
+                    _nativeRep = null;
+                }
+
                 _d3d12Allocator->Base.Release();
 
                 _copyCmdQueue.Reset();
@@ -225,30 +262,107 @@ namespace Primary.RHI2.Direct3D12
                 _adapter.Reset();
                 _factory.Reset();
 
-                if (_nativeRep != null)
-                {
-                    NativeMemory.Free(_nativeRep);
-                    _nativeRep = null;
-                }
-
                 _disposedValue = true;
             }
         }
 
-        public override RHIBuffer CreateBuffer(in RHIBufferDescription description, string? debugName = null)
+        public override void HandlePendingUpdates()
         {
-            throw new NotImplementedException();
+            while (_pendingFreeCallbacks.TryDequeue(out Action? action))
+            {
+                action();
+            }
+
+            FlushPendingMessages();
+        }
+
+        public override RHIBuffer? CreateBuffer(in RHIBufferDescription description, string? debugName = null)
+        {
+            if (!BufferValidator.Validate(in description, _logger, debugName))
+                return null;
+
+            D3D12RHIBuffer buffer = new D3D12RHIBuffer(this, description);
+            if (debugName != null)
+                buffer.DebugName = debugName;
+
+            return buffer;
+        }
+
+        public override RHITexture? CreateTexture(in RHITextureDescription description, string? debugName = null)
+        {
+            if (!TextureValidator.Validate(in description, _logger, debugName))
+                return null;
+
+            D3D12RHITexture texture = new D3D12RHITexture(this, description);
+            if (debugName != null)
+                texture.DebugName = debugName;
+
+            return texture;
+        }
+
+        public override void FlushPendingMessages()
+        {
+            if (_infoQueue1.Get() != null)
+            {
+                _infoQueue1.Get()->ClearStoredMessages();
+            }
+            else if (_infoQueue.Get() != null)
+            {
+                ID3D12InfoQueue* infoQueue = _infoQueue.Get();
+                for (int i = 0; i < (int)infoQueue->GetNumStoredMessages(); i++)
+                {
+                    uint length = 0;
+                    if (infoQueue->GetMessage((ulong)i, null, (nuint*)&length).FAILED)
+                        continue;
+
+                    if (_debugMessageWidth < length)
+                    {
+                        if (_debugMessageData != null)
+                            NativeMemory.Free(_debugMessageData);
+
+                        _debugMessageWidth = (int)(length * 2);
+                        _debugMessageData = NativeMemory.Alloc((nuint)_debugMessageWidth);
+                    }
+
+                    D3D12_MESSAGE* message = (D3D12_MESSAGE*)_debugMessageData;
+                    if (infoQueue->GetMessage((ulong)i, message, (nuint*)&length).FAILED)
+                        continue;
+
+                    string cat = message->Category.ToString().Substring(23);
+                    string id = message->ID.ToString().Substring(17);
+                    string desc = new string(message->pDescription, 0, (int)message->DescriptionByteLength);
+
+                    switch (message->Severity)
+                    {
+                        case D3D12_MESSAGE_SEVERITY_CORRUPTION: _logger?.Fatal("[{cat}/{id}]: {desc}", cat, id, desc); break;
+                        case D3D12_MESSAGE_SEVERITY_ERROR: _logger?.Error("[{cat}/{id}]: {desc}", cat, id, desc); break;
+                        case D3D12_MESSAGE_SEVERITY_WARNING: _logger?.Warning("[{cat}/{id}]: {desc}", cat, id, desc); break;
+                        case D3D12_MESSAGE_SEVERITY_INFO: _logger?.Information("[{cat}/{id}]: {desc}", cat, id, desc); break;
+                        case D3D12_MESSAGE_SEVERITY_MESSAGE: _logger?.Debug("[{cat}/{id}]: {desc}", cat, id, desc); break;
+                    }
+                }
+
+                infoQueue->ClearStoredMessages();
+            }
         }
 
         internal void AddResourceFreeNextFrame(Action callback)
         {
-            throw new NotImplementedException();
+            _pendingFreeCallbacks.Enqueue(callback);
         }
 
         public override unsafe RHIDeviceNative* GetAsNative() => (RHIDeviceNative*)_nativeRep;
 
+        public ComPtr<IDXGIFactory7> Factory => _factory;
+
         public ComPtr<ID3D12Device14> Device => _device;
         public D3D12MA.Allocator* Allocator => _d3d12Allocator;
+
+        public ComPtr<ID3D12CommandQueue> DirectCmdQueue => _directCmdQueue.Get();
+        public ComPtr<ID3D12CommandQueue> ComputeCmdQueue => _computeCmdQueue.Get();
+        public ComPtr<ID3D12CommandQueue> CopyCmdQueue => _copyCmdQueue.Get();
+
+        public override RHIDeviceAPI DeviceAPI => RHIDeviceAPI.Direct3D12;
 
         private static D3D12_MESSAGE_SEVERITY[] s_allowedSeverities = [
             D3D12_MESSAGE_SEVERITY_CORRUPTION,
@@ -258,8 +372,25 @@ namespace Primary.RHI2.Direct3D12
             ];
     }
 
-    public struct D3D12RHIDeviceNative
+    public unsafe struct D3D12RHIDeviceNative
     {
         public RHIDeviceNative Base;
+
+        public ComPtr<IDXGIFactory7>* Factory;
+        public ComPtr<IDXGIAdapter4>* Adapter;
+
+        public ComPtr<ID3D12Debug6>* Debug;
+        public ComPtr<ID3D12Device14>* Device;
+
+        public ComPtr<ID3D12InfoQueue>* InfoQueue;
+        public ComPtr<ID3D12InfoQueue1>* InfoQueue1;
+
+        public ComPtr<ID3D12CommandQueue>* DirectCmdQueue;
+        public ComPtr<ID3D12CommandQueue>* ComputeCmdQueue;
+        public ComPtr<ID3D12CommandQueue>* CopyCmdQueue;
+
+        public D3D12MA.Allocator* D3D12MAllocator;
+
+        public static implicit operator RHIDeviceNative(D3D12RHIDeviceNative native) => native.Base;
     }
 }

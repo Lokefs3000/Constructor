@@ -21,6 +21,8 @@ using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
 
 using D3D12MemAlloc = Interop.D3D12MemAlloc;
 using Primary.Rendering;
+using Primary.RHI2;
+using Primary.RHI2.Direct3D12;
 
 namespace Primary.Rendering2.D3D12
 {
@@ -28,7 +30,7 @@ namespace Primary.Rendering2.D3D12
     internal unsafe sealed class NRDDevice : INativeRenderDispatcher
     {
         private readonly RenderingManager _manager;
-        private readonly RHI.GraphicsDevice _gd;
+        private readonly RHIDevice _gd;
 
         private readonly IDXGIAdapter4* _adapter;
         private readonly ID3D12Device14* _device;
@@ -64,23 +66,23 @@ namespace Primary.Rendering2.D3D12
         private int _rasterIndex;
         private int _computeIndex;
 
-        private Queue<RHI.Direct3D12.SwapChainInternal> _awaitingPresents;
+        private Queue<RHISwapChain> _awaitingPresents;
 
-        internal NRDDevice(RenderingManager manager, RHI.GraphicsDevice device)
+        internal NRDDevice(RenderingManager manager, RHIDevice device)
         {
-            GraphicsDeviceInternal @internal = GraphicsDeviceInternal.CreateFrom(device);
+            D3D12RHIDeviceNative* native = (D3D12RHIDeviceNative*)device.GetAsNative();
 
             _manager = manager;
             _gd = device;
 
-            _adapter = (IDXGIAdapter4*)@internal.Adapter.NativePointer;
-            _device = (ID3D12Device14*)@internal.Device.NativePointer;
+            _adapter = native->Adapter->Get();
+            _device = native->Device->Get();
 
-            _allocator = @internal.Allocator.Pointer;
+            _allocator = native->D3D12MAllocator;
 
-            _graphicsQueue = (ID3D12CommandQueue*)@internal.GraphicsQueue.NativePointer;
-            _computeQueue = (ID3D12CommandQueue*)@internal.ComputeQueue.NativePointer;
-            _copyQueue = (ID3D12CommandQueue*)@internal.CopyQueue.NativePointer;
+            _graphicsQueue = native->DirectCmdQueue->Get();
+            _computeQueue = native->ComputeCmdQueue->Get();
+            _copyQueue = native->CopyCmdQueue->Get();
 
             _allocatorQueue1 = [
                 new Queue<CmdListData>(),
@@ -110,7 +112,7 @@ namespace Primary.Rendering2.D3D12
 
             _freeRunningQueues = 0;
 
-            _awaitingPresents = new Queue<SwapChainInternal>();
+            _awaitingPresents = new Queue<RHISwapChain>();
         }
 
         public void Dispatch(RenderPassManager manager)
@@ -120,8 +122,6 @@ namespace Primary.Rendering2.D3D12
             FrameGraphRecorder recorder = manager.Recorder;
             FrameGraphSetup setup = manager.Setup;
 
-            _gd.BeginFrame();
-
             if ((_freeRunningQueues & 0x1) > 0)
                 _directFence.Wait();
             if ((_freeRunningQueues & 0x2) > 0)
@@ -130,6 +130,8 @@ namespace Primary.Rendering2.D3D12
                 _copyFence.Wait();
 
             _freeRunningQueues = 0;
+
+            _gd.HandlePendingUpdates();
 
             using (new ProfilingScope("Init"))
             {
@@ -176,11 +178,8 @@ namespace Primary.Rendering2.D3D12
 
             _drawCycle = !_drawCycle;
 
-            while (_awaitingPresents.TryDequeue(out SwapChainInternal @internal))
-                @internal.ForcePresent(RHI.PresentParameters.None);
-
-            _gd.FinishFrame();
-            _gd.FlushMessageQueue();
+            while (_awaitingPresents.TryDequeue(out RHISwapChain? @internal))
+                @internal.Present();
         }
 
         private void DispatchRaster(TimelineRasterEvent rasterEvent, FrameGraphTimeline timeline, FrameGraphResources resources, FrameGraphRecorder graphRecorder)
@@ -242,9 +241,9 @@ namespace Primary.Rendering2.D3D12
                             UCClearRenderTarget cmd = recorder.GetCommandAtOffset<UCClearRenderTarget>(offset);
                             offset += Unsafe.SizeOf<UCClearRenderTarget>();
 
-                            FrameGraphResource resource = resources.FindFGTexture(cmd.RenderTarget);
+                            NRDResource resource = ResourceUtility.GetNRDTextureResource(cmd.RenderTarget, false);
 
-                            _barrierManager.AddTextureBarrier(resource.AsTexture(), D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+                            _barrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
                             _barrierManager.FlushBarriers(cmdData.CmdList.Pointer, BarrierFlushTypes.Texture);
 
                             if (cmd.Rect.HasValue)
@@ -263,9 +262,9 @@ namespace Primary.Rendering2.D3D12
                             UCClearDepthStencil cmd = recorder.GetCommandAtOffset<UCClearDepthStencil>(offset);
                             offset += Unsafe.SizeOf<UCClearDepthStencil>();
 
-                            FrameGraphResource resource = resources.FindFGTexture(cmd.DepthStencil);
+                            NRDResource resource = ResourceUtility.GetNRDTextureResource(cmd.DepthStencil, false);
 
-                            _barrierManager.AddTextureBarrier(resource.AsTexture(), D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+                            _barrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
                             _barrierManager.FlushBarriers(cmdData.CmdList.Pointer, BarrierFlushTypes.Texture);
 
                             if (cmd.Rect.HasValue)
@@ -310,14 +309,12 @@ namespace Primary.Rendering2.D3D12
                             UCSetBuffer cmd = recorder.GetCommandAtOffset<UCSetBuffer>(offset);
                             offset += Unsafe.SizeOf<UCSetBuffer>();
 
-                            FrameGraphBuffer buffer = (cmd.IsExternal ?
-                                new FrameGraphResource(Unsafe.As<RHI.Buffer>(RHI.Buffer.FromIntPtr(cmd.Buffer)!), null).AsBuffer() :
-                                resources.FindFGBuffer((int)cmd.Buffer));
+                            NRDResource resource = ResourceUtility.GetNRDBufferResource(cmd.Buffer, cmd.IsExternal);
 
                             switch (cmd.Location)
                             {
-                                case Structures.FGSetBufferLocation.VertexBuffer: _rasterState.SetVertexBuffer(buffer, cmd.Stride); break;
-                                case Structures.FGSetBufferLocation.IndexBuffer: _rasterState.SetIndexBuffer(buffer, cmd.Stride); break;
+                                case Structures.FGSetBufferLocation.VertexBuffer: _rasterState.SetVertexBuffer(resource, cmd.Stride); break;
+                                case Structures.FGSetBufferLocation.IndexBuffer: _rasterState.SetIndexBuffer(resource, cmd.Stride); break;
                             }
                             break;
                         }
@@ -341,11 +338,11 @@ namespace Primary.Rendering2.D3D12
 
                                 switch (data.Meta.Type)
                                 {
-                                    case SetPropertyType.Buffer: _rasterState.SetPropertyResource(i, resources.FindFGBuffer((int)data.Resource), data.Meta.Target); break;
-                                    case SetPropertyType.Texture: _rasterState.SetPropertyResource(i, resources.FindFGTexture((int)data.Resource), data.Meta.Target); break;
-                                    case SetPropertyType.RHIBuffer: _rasterState.SetPropertyResource(i, new FrameGraphResource(Unsafe.As<RHI.Buffer>(RHI.Resource.FromIntPtr(data.Resource)!), null).AsBuffer(), data.Meta.Target); break;
-                                    case SetPropertyType.RHITexture: _rasterState.SetPropertyResource(i, new FrameGraphResource(Unsafe.As<RHI.Texture>(RHI.Resource.FromIntPtr(data.Resource)!), null).AsTexture(), data.Meta.Target); break;
-                                    case SetPropertyType.RHISampler: _rasterState.SetPropertyResource(i, Unsafe.As<RHI.Sampler>(RHI.Resource.FromIntPtr(data.Resource)!), data.Meta.Target); break;
+                                    case SetPropertyType.Buffer: _rasterState.SetPropertyResource(i, new NRDResource((int)data.Resource, NRDResourceId.Buffer), data.Meta.Target); break;
+                                    case SetPropertyType.Texture: _rasterState.SetPropertyResource(i, new NRDResource((int)data.Resource, NRDResourceId.Texture), data.Meta.Target); break;
+                                    case SetPropertyType.RHIBuffer: _rasterState.SetPropertyResource(i, new NRDResource((D3D12RHIBufferNative*)data.Resource.ToPointer()), data.Meta.Target); break;
+                                    case SetPropertyType.RHITexture: _rasterState.SetPropertyResource(i, new NRDResource((D3D12RHITextureNative*)data.Resource.ToPointer()), data.Meta.Target); break;
+                                    case SetPropertyType.RHISampler: _rasterState.SetPropertyResource(i, new NRDResource((D3D12RHISamplerNative*)data.Resource.ToPointer()), data.Meta.Target); break;
                                 }
                             }
 
@@ -397,7 +394,7 @@ namespace Primary.Rendering2.D3D12
                             UCSetPipeline cmd = recorder.GetCommandAtOffset<UCSetPipeline>(offset);
                             offset += Unsafe.SizeOf<UCSetPipeline>();
 
-                            _rasterState.SetPipeline(cmd.Pipeline == nint.Zero ? null : Unsafe.As<RHI.GraphicsPipeline>(GCHandle.FromIntPtr(cmd.Pipeline).Target));
+                            _rasterState.SetPipeline(resources.GetPipelineFromIndex(cmd.Pipeline));
                             break;
                         }
                     case RecCommandType.PresentOnWindow:
@@ -413,24 +410,31 @@ namespace Primary.Rendering2.D3D12
                             Window? window = WindowManager.Instance.FindWindow((SDL.SDL_WindowID)cmd.WindowId);
                             if (window != null)
                             {
-                                RHI.SwapChain swapChain = _manager.SwapChainCache.GetForWindow(window);
-                                RHI.Direct3D12.SwapChainInternal @internal = swapChain;
+                                RHISwapChain swapChain = _manager.SwapChainCache.GetForWindow(window);
+                                D3D12RHISwapChainNative* native = (D3D12RHISwapChainNative*)swapChain.GetAsNative();
 
-                                FrameGraphTexture texture = ResourceUtility.GetFGTexture(cmd.Texture, cmd.IsExternal);
+                                ref D3D12RHISwapChainBuffer currentBuffer = ref native->Buffers[*native->ActiveBufferIndex];
+                                NRDResource resource = ResourceUtility.GetNRDTextureResource(cmd.Texture, cmd.IsExternal);
 
-                                _barrierManager.AddTextureBarrier((ID3D12Resource*)@internal.ActiveBackBuffer.NativePointer.ToPointer(), D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_DEST, D3D12_BARRIER_LAYOUT_COPY_DEST);
-                                _barrierManager.AddTextureBarrier(texture, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_SOURCE, D3D12_BARRIER_LAYOUT_COPY_SOURCE);
+                                _barrierManager.SetResourceState((ID3D12Resource*)currentBuffer.Resource.Get(), new NRDResourceState(FGResourceId.Texture, currentBuffer.BarrierSync, currentBuffer.BarrierAccess, currentBuffer.BarrierLayout));
+
+                                _barrierManager.AddTextureBarrier((ID3D12Resource*)currentBuffer.Resource.Get(), D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_DEST, D3D12_BARRIER_LAYOUT_COPY_DEST);
+                                _barrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_SOURCE, D3D12_BARRIER_LAYOUT_COPY_SOURCE);
                                 _barrierManager.FlushBarriers(cmdData.CmdList.Pointer, BarrierFlushTypes.Texture);
 
-                                D3D12_TEXTURE_COPY_LOCATION dst = new D3D12_TEXTURE_COPY_LOCATION((ID3D12Resource*)@internal.ActiveBackBuffer.NativePointer.ToPointer());
-                                D3D12_TEXTURE_COPY_LOCATION src = new D3D12_TEXTURE_COPY_LOCATION(ResourceUtility.GetResource(_resourceManager, texture));
+                                D3D12_TEXTURE_COPY_LOCATION dst = new D3D12_TEXTURE_COPY_LOCATION((ID3D12Resource*)currentBuffer.Resource.Get());
+                                D3D12_TEXTURE_COPY_LOCATION src = new D3D12_TEXTURE_COPY_LOCATION((ID3D12Resource*)resource.GetNativeResource(_resourceManager));
 
                                 cmdData.CmdList.Pointer->CopyTextureRegion(&dst, 0, 0, 0, &src, null);
 
-                                _barrierManager.AddTextureBarrier((ID3D12Resource*)@internal.ActiveBackBuffer.NativePointer.ToPointer(), D3D12_BARRIER_SYNC_ALL, D3D12_BARRIER_ACCESS_COMMON, D3D12_BARRIER_LAYOUT_PRESENT);
+                                _barrierManager.AddTextureBarrier((ID3D12Resource*)currentBuffer.Resource.Get(), D3D12_BARRIER_SYNC_DRAW, D3D12_BARRIER_ACCESS_COMMON, D3D12_BARRIER_LAYOUT_PRESENT);
                                 _barrierManager.FlushBarriers(cmdData.CmdList.Pointer, BarrierFlushTypes.Texture);
 
-                                _awaitingPresents.Enqueue(@internal);
+                                _awaitingPresents.Enqueue(swapChain);
+
+                                currentBuffer.BarrierSync = D3D12_BARRIER_SYNC_DRAW;
+                                currentBuffer.BarrierAccess = D3D12_BARRIER_ACCESS_COMMON;
+                                currentBuffer.BarrierLayout = D3D12_BARRIER_LAYOUT_PRESENT;
                             }
 
                             break;
@@ -491,7 +495,7 @@ namespace Primary.Rendering2.D3D12
          
                 if (hr.FAILED)
                 {
-                    _gd.FlushMessageQueue();
+                    _gd.FlushPendingMessages();
                     throw new NotImplementedException("Add error message");
                 }
 
@@ -500,7 +504,7 @@ namespace Primary.Rendering2.D3D12
 
                 if (hr.FAILED)
                 {
-                    _gd.FlushMessageQueue();
+                    _gd.FlushPendingMessages();
                     throw new NotImplementedException("Add error message");
                 }
 
@@ -536,7 +540,7 @@ namespace Primary.Rendering2.D3D12
             }
         }
 
-        internal RHI.GraphicsDevice RHIDevice => _gd;
+        internal RHIDevice RHIDevice => _gd;
 
         internal ID3D12Device14* Device => _device;
 

@@ -11,9 +11,9 @@ using TerraFX.Interop.DirectX;
 namespace Primary.RHI2.Direct3D12
 {
     [SupportedOSPlatform("windows")]
-    internal unsafe static class ResourceHelper
+    public unsafe static class ResourceHelper
     {
-        internal static bool SetResourceName(ID3D12Resource2* resource, string? newName)
+        public static bool SetResourceName(ID3D12Resource2* resource, string? newName)
         {
             if (newName != null)
             {
@@ -45,6 +45,31 @@ namespace Primary.RHI2.Direct3D12
             {
                 return resource->SetName(null).SUCCEEDED;
             }
+        }
+
+        public static D3D12_FILTER EncodeBasicFilter(RHIFilterType min, RHIFilterType mag, RHIFilterType mip, RHIReductionType reduction)
+        {
+            return (D3D12_FILTER)(
+                ((((int)min) & D3D12.D3D12_FILTER_TYPE_MASK) << D3D12.D3D12_MIN_FILTER_SHIFT) |
+                ((((int)mag) & D3D12.D3D12_FILTER_TYPE_MASK) << D3D12.D3D12_MAG_FILTER_SHIFT) |
+                ((((int)mip) & D3D12.D3D12_FILTER_TYPE_MASK) << D3D12.D3D12_MIP_FILTER_SHIFT) |
+                ((((int)reduction) & D3D12.D3D12_FILTER_REDUCTION_TYPE_MASK) << D3D12.D3D12_FILTER_REDUCTION_TYPE_SHIFT));
+        }
+
+        public static D3D12_FILTER EncodeAnisotropicFilter(RHIReductionType reduction)
+        {
+            return (D3D12_FILTER)(
+                D3D12.D3D12_ANISOTROPIC_FILTERING_BIT |
+                (int)EncodeBasicFilter(RHIFilterType.Linear, RHIFilterType.Linear, RHIFilterType.Linear, reduction));
+        }
+
+        public static uint EncodeShader4ComponentMapping(uint src0, uint src1, uint src2, uint src3)
+        {
+            return ((src0) & D3D12.D3D12_SHADER_COMPONENT_MAPPING_MASK) |
+                   (((src1) & D3D12.D3D12_SHADER_COMPONENT_MAPPING_MASK) << D3D12.D3D12_SHADER_COMPONENT_MAPPING_SHIFT) |
+                   (((src2) & D3D12.D3D12_SHADER_COMPONENT_MAPPING_MASK) << (D3D12.D3D12_SHADER_COMPONENT_MAPPING_SHIFT * 2)) |
+                   (((src3) & D3D12.D3D12_SHADER_COMPONENT_MAPPING_MASK) << (D3D12.D3D12_SHADER_COMPONENT_MAPPING_SHIFT * 3)) |
+                   D3D12.D3D12_SHADER_COMPONENT_MAPPING_ALWAYS_SET_BIT_AVOIDING_ZEROMEM_MISTAKES;
         }
     }
 }
