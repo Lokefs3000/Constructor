@@ -1,14 +1,10 @@
 ﻿using Primary.Common;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace Primary.RHI2
 {
-    public unsafe abstract class RHISampler : RHIResource, AsNativeObject<RHISamplerNative>
+    public unsafe abstract class RHISampler : RHIResource, IAsNativeObject<RHISamplerNative>
     {
         protected RHISamplerDescription _description;
 
@@ -39,6 +35,7 @@ namespace Primary.RHI2
         public RHIComparisonFunction ComparisonFunction;
 
         public Color BorderColor;
+        public bool BorderColorAsUInt;
 
         public float MinLOD;
         public float MaxLOD;
@@ -60,6 +57,7 @@ namespace Primary.RHI2
             ComparisonFunction = RHIComparisonFunction.Never;
 
             BorderColor = Color.TransparentBlack;
+            BorderColorAsUInt = false;
 
             MinLOD = 0.0f;
             MaxLOD = float.MaxValue;
@@ -82,6 +80,7 @@ namespace Primary.RHI2
             ComparisonFunction = other.ComparisonFunction;
 
             BorderColor = other.BorderColor;
+            BorderColorAsUInt = other.BorderColorAsUInt;
 
             MinLOD = other.MinLOD;
             MaxLOD = other.MaxLOD;

@@ -3,12 +3,12 @@ using Editor.Assets;
 using Hexa.NET.ImGui;
 using Primary.Assets;
 using Primary.Common;
+using Primary.RHI2;
 using System.Diagnostics;
 using System.Numerics;
 using System.Text;
 using Tomlyn;
 using Tomlyn.Model;
-using RHI = Primary.RHI;
 
 namespace Editor.DearImGui.Properties
 {
@@ -42,17 +42,17 @@ namespace Editor.DearImGui.Properties
 
                 if (ImGuiWidgets.ComboBox("Fill mode:", ref fillMode, s_fillMode))
                 {
-                    _args.FillMode = Enum.Parse<RHI.FillMode>(fillMode);
+                    _args.FillMode = Enum.Parse<RHIFillMode>(fillMode);
                 }
 
                 if (ImGuiWidgets.ComboBox("Cull mode:", ref cullMode, s_cullMode))
                 {
-                    _args.CullMode = Enum.Parse<RHI.CullMode>(cullMode);
+                    _args.CullMode = Enum.Parse<RHICullMode>(cullMode);
                 }
 
                 if (ImGuiWidgets.ComboBox("Topology:", ref primitiveTopology, s_primitiveTopology))
                 {
-                    _args.PrimitiveTopology = Enum.Parse<RHI.PrimitiveTopologyType>(primitiveTopology);
+                    _args.PrimitiveTopology = Enum.Parse<RHIPrimitiveTopologyType>(primitiveTopology);
                 }
 
                 ImGuiWidgets.Checkbox("Front counter clockwise:", ref _args.FrontCounterClockwise);
@@ -76,12 +76,12 @@ namespace Editor.DearImGui.Properties
 
                     if (ImGuiWidgets.ComboBox("Depth write mask:", ref depthWriteMask, s_depthWriteMask))
                     {
-                        _args.DepthWriteMask = Enum.Parse<RHI.DepthWriteMask>(depthWriteMask);
+                        _args.DepthWriteMask = Enum.Parse<RHIDepthWriteMask>(depthWriteMask);
                     }
 
                     if (ImGuiWidgets.ComboBox("Depth func:", ref depthFunc, s_comparisonFunc))
                     {
-                        _args.DepthFunc = Enum.Parse<RHI.ComparisonFunc>(depthFunc);
+                        _args.DepthFunc = Enum.Parse<RHIComparisonFunction>(depthFunc);
                     }
 
                     ImGui.Unindent();
@@ -127,26 +127,21 @@ namespace Editor.DearImGui.Properties
                         string func = args.Func.ToString();
 
                         if (ImGuiWidgets.ComboBox("Fail op:", ref failOp, s_stencilOp))
-                            args.FailOp = Enum.Parse<RHI.StencilOp>(failOp);
+                            args.FailOp = Enum.Parse<RHIStencilOperation>(failOp);
                         if (ImGuiWidgets.ComboBox("Depth fail op:", ref depthFailOp, s_stencilOp))
-                            args.DepthFailOp = Enum.Parse<RHI.StencilOp>(depthFailOp);
+                            args.DepthFailOp = Enum.Parse<RHIStencilOperation>(depthFailOp);
                         if (ImGuiWidgets.ComboBox("Pass op:", ref passOp, s_stencilOp))
-                            args.PassOp = Enum.Parse<RHI.StencilOp>(passOp);
+                            args.PassOp = Enum.Parse<RHIStencilOperation>(passOp);
                         if (ImGuiWidgets.ComboBox("Func:", ref func, s_comparisonFunc))
-                            args.Func = Enum.Parse<RHI.ComparisonFunc>(func);
+                            args.Func = Enum.Parse<RHIComparisonFunction>(func);
                     }
                 }
             }
 
             if (ImGui.CollapsingHeader("Blend", ImGuiTreeNodeFlags.DefaultOpen))
             {
-                string logicOp = _args.LogicOp.ToString();
-
                 ImGuiWidgets.Checkbox("Alpha to coverage enabled:", ref _args.AlphaToCoverageEnable);
                 ImGuiWidgets.Checkbox("Independent blend enabled:", ref _args.IndependentBlendEnable);
-
-                if (ImGuiWidgets.CheckedComboBox("Logic op:", ref logicOp, ref _args.LogicOpEnable, s_logicOp))
-                    _args.LogicOp = Enum.Parse<RHI.LogicOp>(logicOp);
 
                 ImGui.Indent();
 
@@ -204,34 +199,34 @@ namespace Editor.DearImGui.Properties
                                 {
                                     ref BlendArgs args = ref argsSpan[i];
                                     args.BlendEnable = true;
-                                    args.SourceBlend = RHI.Blend.One;
-                                    args.DestinationBlend = RHI.Blend.Zero;
-                                    args.BlendOp = RHI.BlendOp.Add;
-                                    args.SourceBlendAlpha = RHI.Blend.One;
-                                    args.DestinationBlendAlpha = RHI.Blend.Zero;
-                                    args.BlendOpAlpha = RHI.BlendOp.Add;
+                                    args.SourceBlend = RHIBlend.One;
+                                    args.DestinationBlend = RHIBlend.Zero;
+                                    args.BlendOp = RHIBlendOperation.Add;
+                                    args.SourceBlendAlpha = RHIBlend.One;
+                                    args.DestinationBlendAlpha = RHIBlend.Zero;
+                                    args.BlendOpAlpha = RHIBlendOperation.Add;
                                 }
                                 if (ImGui.MenuItem("Premultiplied"))
                                 {
                                     ref BlendArgs args = ref argsSpan[i];
                                     args.BlendEnable = true;
-                                    args.SourceBlend = RHI.Blend.SourceAlpha;
-                                    args.DestinationBlend = RHI.Blend.InverseSourceAlpha;
-                                    args.BlendOp = RHI.BlendOp.Add;
-                                    args.SourceBlendAlpha = RHI.Blend.One;
-                                    args.DestinationBlendAlpha = RHI.Blend.InverseSourceAlpha;
-                                    args.BlendOpAlpha = RHI.BlendOp.Add;
+                                    args.SourceBlend = RHIBlend.SrcAlpha;
+                                    args.DestinationBlend = RHIBlend.InvSrcAlpha;
+                                    args.BlendOp = RHIBlendOperation.Add;
+                                    args.SourceBlendAlpha = RHIBlend.One;
+                                    args.DestinationBlendAlpha = RHIBlend.InvSrcAlpha;
+                                    args.BlendOpAlpha = RHIBlendOperation.Add;
                                 }
                                 if (ImGui.MenuItem("Additive"))
                                 {
                                     ref BlendArgs args = ref argsSpan[i];
                                     args.BlendEnable = true;
-                                    args.SourceBlend = RHI.Blend.SourceAlpha;
-                                    args.DestinationBlend = RHI.Blend.SourceAlpha;
-                                    args.BlendOp = RHI.BlendOp.Add;
-                                    args.SourceBlendAlpha = RHI.Blend.SourceAlpha;
-                                    args.DestinationBlendAlpha = RHI.Blend.InverseSourceAlpha;
-                                    args.BlendOpAlpha = RHI.BlendOp.Add;
+                                    args.SourceBlend = RHIBlend.SrcAlpha;
+                                    args.DestinationBlend = RHIBlend.SrcAlpha;
+                                    args.BlendOp = RHIBlendOperation.Add;
+                                    args.SourceBlendAlpha = RHIBlend.SrcAlpha;
+                                    args.DestinationBlendAlpha = RHIBlend.InvSrcAlpha;
+                                    args.BlendOpAlpha = RHIBlendOperation.Add;
                                 }
 
                                 ImGui.EndMenu();
@@ -257,18 +252,18 @@ namespace Editor.DearImGui.Properties
                                 ImGui.Indent();
 
                                 if (ImGuiWidgets.ComboBox("Source:", ref srcBlend, s_blend))
-                                    args.SourceBlend = Enum.Parse<RHI.Blend>(srcBlend);
+                                    args.SourceBlend = Enum.Parse<RHIBlend>(srcBlend);
                                 if (ImGuiWidgets.ComboBox("Destination:", ref dstBlend, s_blend))
-                                    args.DestinationBlend = Enum.Parse<RHI.Blend>(dstBlend);
+                                    args.DestinationBlend = Enum.Parse<RHIBlend>(dstBlend);
                                 if (ImGuiWidgets.ComboBox("Op:", ref blendOp, s_blendOp))
-                                    args.BlendOp = Enum.Parse<RHI.BlendOp>(blendOp);
+                                    args.BlendOp = Enum.Parse<RHIBlendOperation>(blendOp);
 
                                 if (ImGuiWidgets.ComboBox("Source alpha:", ref srcBlendAlpha, s_blend))
-                                    args.SourceBlendAlpha = Enum.Parse<RHI.Blend>(srcBlendAlpha);
+                                    args.SourceBlendAlpha = Enum.Parse<RHIBlend>(srcBlendAlpha);
                                 if (ImGuiWidgets.ComboBox("Destination alpha:", ref dstBlendAlpha, s_blend))
-                                    args.DestinationBlendAlpha = Enum.Parse<RHI.Blend>(dstBlendAlpha);
+                                    args.DestinationBlendAlpha = Enum.Parse<RHIBlend>(dstBlendAlpha);
                                 if (ImGuiWidgets.ComboBox("Op alpha:", ref blendOpAlpha, s_blendOp))
-                                    args.BlendOpAlpha = Enum.Parse<RHI.BlendOp>(blendOpAlpha);
+                                    args.BlendOpAlpha = Enum.Parse<RHIBlendOperation>(blendOpAlpha);
 
                                 ImGui.Unindent();
                             }
@@ -296,48 +291,48 @@ namespace Editor.DearImGui.Properties
                                 _blends.Add(new BlendArgs
                                 {
                                     BlendEnable = false,
-                                    SourceBlend = RHI.Blend.One,
-                                    DestinationBlend = RHI.Blend.Zero,
-                                    BlendOp = RHI.BlendOp.Add,
-                                    SourceBlendAlpha = RHI.Blend.One,
-                                    DestinationBlendAlpha = RHI.Blend.Zero,
-                                    BlendOpAlpha = RHI.BlendOp.Add,
+                                    SourceBlend = RHIBlend.One,
+                                    DestinationBlend = RHIBlend.Zero,
+                                    BlendOp = RHIBlendOperation.Add,
+                                    SourceBlendAlpha = RHIBlend.One,
+                                    DestinationBlendAlpha = RHIBlend.Zero,
+                                    BlendOpAlpha = RHIBlendOperation.Add,
                                     RenderTargetWriteMask = 0xf
                                 });
                             if (ImGui.MenuItem("Opaque"))
                                 _blends.Add(new BlendArgs
                                 {
                                     BlendEnable = true,
-                                    SourceBlend = RHI.Blend.One,
-                                    DestinationBlend = RHI.Blend.Zero,
-                                    BlendOp = RHI.BlendOp.Add,
-                                    SourceBlendAlpha = RHI.Blend.One,
-                                    DestinationBlendAlpha = RHI.Blend.Zero,
-                                    BlendOpAlpha = RHI.BlendOp.Add,
+                                    SourceBlend = RHIBlend.One,
+                                    DestinationBlend = RHIBlend.Zero,
+                                    BlendOp = RHIBlendOperation.Add,
+                                    SourceBlendAlpha = RHIBlend.One,
+                                    DestinationBlendAlpha = RHIBlend.Zero,
+                                    BlendOpAlpha = RHIBlendOperation.Add,
                                     RenderTargetWriteMask = 0xf
                                 });
                             if (ImGui.MenuItem("Premultiplied"))
                                 _blends.Add(new BlendArgs
                                 {
                                     BlendEnable = true,
-                                    SourceBlend = RHI.Blend.SourceAlpha,
-                                    DestinationBlend = RHI.Blend.InverseSourceAlpha,
-                                    BlendOp = RHI.BlendOp.Add,
-                                    SourceBlendAlpha = RHI.Blend.One,
-                                    DestinationBlendAlpha = RHI.Blend.InverseSourceAlpha,
-                                    BlendOpAlpha = RHI.BlendOp.Add,
+                                    SourceBlend = RHIBlend.SrcAlpha,
+                                    DestinationBlend = RHIBlend.InvSrcAlpha,
+                                    BlendOp = RHIBlendOperation.Add,
+                                    SourceBlendAlpha = RHIBlend.One,
+                                    DestinationBlendAlpha = RHIBlend.InvSrcAlpha,
+                                    BlendOpAlpha = RHIBlendOperation.Add,
                                     RenderTargetWriteMask = 0xf
                                 });
                             if (ImGui.MenuItem("Additive"))
                                 _blends.Add(new BlendArgs
                                 {
                                     BlendEnable = true,
-                                    SourceBlend = RHI.Blend.SourceAlpha,
-                                    DestinationBlend = RHI.Blend.SourceAlpha,
-                                    BlendOp = RHI.BlendOp.Add,
-                                    SourceBlendAlpha = RHI.Blend.SourceAlpha,
-                                    DestinationBlendAlpha = RHI.Blend.InverseSourceAlpha,
-                                    BlendOpAlpha = RHI.BlendOp.Add,
+                                    SourceBlend = RHIBlend.SrcAlpha,
+                                    DestinationBlend = RHIBlend.SrcAlpha,
+                                    BlendOp = RHIBlendOperation.Add,
+                                    SourceBlendAlpha = RHIBlend.SrcAlpha,
+                                    DestinationBlendAlpha = RHIBlend.InvSrcAlpha,
+                                    BlendOpAlpha = RHIBlendOperation.Add,
                                     RenderTargetWriteMask = 0xf
                                 });
 
@@ -452,8 +447,8 @@ namespace Editor.DearImGui.Properties
 
                     _args = new ShaderArgs
                     {
-                        FillMode = RHI.FillMode.Solid,
-                        CullMode = RHI.CullMode.Back,
+                        FillMode = RHIFillMode.Solid,
+                        CullMode = RHICullMode.Back,
 
                         FrontCounterClockwise = false,
 
@@ -465,34 +460,31 @@ namespace Editor.DearImGui.Properties
                         ConservativeRaster = false,
 
                         DepthEnable = true,
-                        DepthWriteMask = RHI.DepthWriteMask.All,
-                        DepthFunc = RHI.ComparisonFunc.LessEqual,
+                        DepthWriteMask = RHIDepthWriteMask.All,
+                        DepthFunc = RHIComparisonFunction   .LessEqual,
 
                         StencilEnable = false,
                         StencilReadMask = 0xff,
                         StencilWriteMask = 0xff,
 
-                        PrimitiveTopology = RHI.PrimitiveTopologyType.Triangle,
+                        PrimitiveTopology = RHIPrimitiveTopologyType.Triangle,
 
                         AlphaToCoverageEnable = false,
                         IndependentBlendEnable = false,
 
-                        LogicOpEnable = false,
-                        LogicOp = RHI.LogicOp.NoOp,
-
                         FrontFace = new StencilFaceArgs
                         {
-                            FailOp = RHI.StencilOp.Keep,
-                            DepthFailOp = RHI.StencilOp.Keep,
-                            PassOp = RHI.StencilOp.Keep,
-                            Func = RHI.ComparisonFunc.Always
+                            FailOp = RHIStencilOperation.Keep,
+                            DepthFailOp = RHIStencilOperation.Keep,
+                            PassOp = RHIStencilOperation.Keep,
+                            Func = RHIComparisonFunction.Always
                         },
                         BackFace = new StencilFaceArgs
                         {
-                            FailOp = RHI.StencilOp.Keep,
-                            DepthFailOp = RHI.StencilOp.Keep,
-                            PassOp = RHI.StencilOp.Keep,
-                            Func = RHI.ComparisonFunc.Always
+                            FailOp = RHIStencilOperation.Keep,
+                            DepthFailOp = RHIStencilOperation.Keep,
+                            PassOp = RHIStencilOperation.Keep,
+                            Func = RHIComparisonFunction.Always
                         }
                     };
 
@@ -500,12 +492,12 @@ namespace Editor.DearImGui.Properties
                     _blends.Add(new BlendArgs
                     {
                         BlendEnable = false,
-                        SourceBlend = RHI.Blend.One,
-                        DestinationBlend = RHI.Blend.Zero,
-                        BlendOp = RHI.BlendOp.Add,
-                        SourceBlendAlpha = RHI.Blend.One,
-                        DestinationBlendAlpha = RHI.Blend.Zero,
-                        BlendOpAlpha = RHI.BlendOp.Add,
+                        SourceBlend = RHIBlend.One,
+                        DestinationBlend = RHIBlend.Zero,
+                        BlendOp = RHIBlendOperation.Add,
+                        SourceBlendAlpha = RHIBlend.One,
+                        DestinationBlendAlpha = RHIBlend.Zero,
+                        BlendOpAlpha = RHIBlendOperation.Add,
                         RenderTargetWriteMask = 0xf
                     });
 
@@ -562,8 +554,6 @@ namespace Editor.DearImGui.Properties
                 root["primitive_topology"] = _args.PrimitiveTopology.ToString();
                 root["alpha_to_coverage_enable"] = _args.AlphaToCoverageEnable;
                 root["independent_blend_enable"] = _args.IndependentBlendEnable;
-                root["logic_op_enable"] = _args.LogicOpEnable;
-                root["logic_op"] = _args.LogicOp.ToString();
 
                 TomlTable frontFace = new TomlTable();
                 frontFace["stencil_fail_op"] = _args.FrontFace.FailOp.ToString();
@@ -626,8 +616,8 @@ namespace Editor.DearImGui.Properties
 
             _args = new ShaderArgs
             {
-                FillMode = Enum.Parse<RHI.FillMode>((string)document["fill_mode"]),
-                CullMode = Enum.Parse<RHI.CullMode>((string)document["cull_mode"]),
+                FillMode = Enum.Parse<RHIFillMode>((string)document["fill_mode"]),
+                CullMode = Enum.Parse<RHICullMode>((string)document["cull_mode"]),
 
                 FrontCounterClockwise = (bool)document["front_counter_clockwise"],
 
@@ -639,34 +629,31 @@ namespace Editor.DearImGui.Properties
                 ConservativeRaster = (bool)document["conservative_raster"],
 
                 DepthEnable = (bool)document["depth_enable"],
-                DepthWriteMask = Enum.Parse<RHI.DepthWriteMask>((string)document["depth_write_mask"]),
-                DepthFunc = Enum.Parse<RHI.ComparisonFunc>((string)document["depth_func"]),
+                DepthWriteMask = Enum.Parse<RHIDepthWriteMask>((string)document["depth_write_mask"]),
+                DepthFunc = Enum.Parse<RHIComparisonFunction>((string)document["depth_func"]),
 
                 StencilEnable = (bool)document["stencil_enable"],
                 StencilReadMask = (byte)(long)document["stencil_read_mask"],
                 StencilWriteMask = (byte)(long)document["stencil_write_mask"],
 
-                PrimitiveTopology = Enum.Parse<RHI.PrimitiveTopologyType>((string)document["primitive_topology"]),
+                PrimitiveTopology = Enum.Parse<RHIPrimitiveTopologyType>((string)document["primitive_topology"]),
 
                 AlphaToCoverageEnable = (bool)document["alpha_to_coverage_enable"],
                 IndependentBlendEnable = (bool)document["independent_blend_enable"],
 
-                LogicOpEnable = (bool)document["logic_op_enable"],
-                LogicOp = Enum.Parse<RHI.LogicOp>((string)document["logic_op"]),
-
                 FrontFace = new StencilFaceArgs
                 {
-                    FailOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_fail_op"]),
-                    DepthFailOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_depth_fail_op"]),
-                    PassOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_pass_op"]),
-                    Func = Enum.Parse<RHI.ComparisonFunc>((string)stencilFrontFace["stencil_func"])
+                    FailOp = Enum.Parse<RHIStencilOperation>((string)stencilFrontFace["stencil_fail_op"]),
+                    DepthFailOp = Enum.Parse<RHIStencilOperation>((string)stencilFrontFace["stencil_depth_fail_op"]),
+                    PassOp = Enum.Parse<RHIStencilOperation>((string)stencilFrontFace["stencil_pass_op"]),
+                    Func = Enum.Parse<RHIComparisonFunction>((string)stencilFrontFace["stencil_func"])
                 },
                 BackFace = new StencilFaceArgs
                 {
-                    FailOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_fail_op"]),
-                    DepthFailOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_depth_fail_op"]),
-                    PassOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_pass_op"]),
-                    Func = Enum.Parse<RHI.ComparisonFunc>((string)stencilFrontFace["stencil_func"])
+                    FailOp = Enum.Parse<RHIStencilOperation>((string)stencilFrontFace["stencil_fail_op"]),
+                    DepthFailOp = Enum.Parse<RHIStencilOperation>((string)stencilFrontFace["stencil_depth_fail_op"]),
+                    PassOp = Enum.Parse<RHIStencilOperation>((string)stencilFrontFace["stencil_pass_op"]),
+                    Func = Enum.Parse<RHIComparisonFunction>((string)stencilFrontFace["stencil_func"])
                 }
             };
 
@@ -680,13 +667,13 @@ namespace Editor.DearImGui.Properties
                     {
                         BlendEnable = (bool)blendTable["blend_enable"],
 
-                        SourceBlend = Enum.Parse<RHI.Blend>((string)blendTable["src_blend"]),
-                        DestinationBlend = Enum.Parse<RHI.Blend>((string)blendTable["dst_blend"]),
-                        BlendOp = Enum.Parse<RHI.BlendOp>((string)blendTable["blend_op"]),
+                        SourceBlend = Enum.Parse<RHIBlend>((string)blendTable["src_blend"]),
+                        DestinationBlend = Enum.Parse<RHIBlend>((string)blendTable["dst_blend"]),
+                        BlendOp = Enum.Parse<RHIBlendOperation>((string)blendTable["blend_op"]),
 
-                        SourceBlendAlpha = Enum.Parse<RHI.Blend>((string)blendTable["src_blend_alpha"]),
-                        DestinationBlendAlpha = Enum.Parse<RHI.Blend>((string)blendTable["dst_blend_alpha"]),
-                        BlendOpAlpha = Enum.Parse<RHI.BlendOp>((string)blendTable["blend_op_alpha"]),
+                        SourceBlendAlpha = Enum.Parse<RHIBlend>((string)blendTable["src_blend_alpha"]),
+                        DestinationBlendAlpha = Enum.Parse<RHIBlend>((string)blendTable["dst_blend_alpha"]),
+                        BlendOpAlpha = Enum.Parse<RHIBlendOperation>((string)blendTable["blend_op_alpha"]),
 
                         RenderTargetWriteMask = (byte)(long)blendTable["render_target_write_mask"]
                     });
@@ -733,22 +720,21 @@ namespace Editor.DearImGui.Properties
             ImGui.PopID();
         }
 
-        private static readonly string[] s_fillMode = Enum.GetNames<RHI.FillMode>();
-        private static readonly string[] s_cullMode = Enum.GetNames<RHI.CullMode>();
-        private static readonly string[] s_depthWriteMask = Enum.GetNames<RHI.DepthWriteMask>();
-        private static readonly string[] s_comparisonFunc = Enum.GetNames<RHI.ComparisonFunc>();
-        private static readonly string[] s_primitiveTopology = Enum.GetNames<RHI.PrimitiveTopologyType>();
-        private static readonly string[] s_logicOp = Enum.GetNames<RHI.LogicOp>();
-        private static readonly string[] s_stencilOp = Enum.GetNames<RHI.StencilOp>();
-        private static readonly string[] s_blend = Enum.GetNames<RHI.Blend>();
-        private static readonly string[] s_blendOp = Enum.GetNames<RHI.BlendOp>();
+        private static readonly string[] s_fillMode = Enum.GetNames<RHIFillMode>();
+        private static readonly string[] s_cullMode = Enum.GetNames<RHICullMode>();
+        private static readonly string[] s_depthWriteMask = Enum.GetNames<RHIDepthWriteMask>();
+        private static readonly string[] s_comparisonFunc = Enum.GetNames<RHIComparisonFunction>();
+        private static readonly string[] s_primitiveTopology = Enum.GetNames<RHIPrimitiveTopologyType>();
+        private static readonly string[] s_stencilOp = Enum.GetNames<RHIStencilOperation>();
+        private static readonly string[] s_blend = Enum.GetNames<RHIBlend>();
+        private static readonly string[] s_blendOp = Enum.GetNames<RHIBlendOperation>();
 
         internal record class TargetData(string LocalPath);
 
         private struct ShaderArgs
         {
-            public RHI.FillMode FillMode;
-            public RHI.CullMode CullMode;
+            public RHIFillMode FillMode;
+            public RHICullMode CullMode;
             public bool FrontCounterClockwise;
             public int DepthBias;
             public float DepthBiasClamp;
@@ -756,37 +742,35 @@ namespace Editor.DearImGui.Properties
             public bool DepthClipEnable;
             public bool ConservativeRaster;
             public bool DepthEnable;
-            public RHI.DepthWriteMask DepthWriteMask;
-            public RHI.ComparisonFunc DepthFunc;
+            public RHIDepthWriteMask DepthWriteMask;
+            public RHIComparisonFunction DepthFunc;
             public bool StencilEnable;
             public byte StencilReadMask;
             public byte StencilWriteMask;
-            public RHI.PrimitiveTopologyType PrimitiveTopology;
+            public RHIPrimitiveTopologyType PrimitiveTopology;
             public bool AlphaToCoverageEnable;
             public bool IndependentBlendEnable;
-            public bool LogicOpEnable;
-            public RHI.LogicOp LogicOp;
             public StencilFaceArgs FrontFace;
             public StencilFaceArgs BackFace;
         }
 
         private struct StencilFaceArgs
         {
-            public RHI.StencilOp FailOp;
-            public RHI.StencilOp DepthFailOp;
-            public RHI.StencilOp PassOp;
-            public RHI.ComparisonFunc Func;
+            public RHIStencilOperation FailOp;
+            public RHIStencilOperation DepthFailOp;
+            public RHIStencilOperation PassOp;
+            public RHIComparisonFunction Func;
         }
 
         private struct BlendArgs
         {
             public bool BlendEnable;
-            public RHI.Blend SourceBlend;
-            public RHI.Blend DestinationBlend;
-            public RHI.BlendOp BlendOp;
-            public RHI.Blend SourceBlendAlpha;
-            public RHI.Blend DestinationBlendAlpha;
-            public RHI.BlendOp BlendOpAlpha;
+            public RHIBlend SourceBlend;
+            public RHIBlend DestinationBlend;
+            public RHIBlendOperation BlendOp;
+            public RHIBlend SourceBlendAlpha;
+            public RHIBlend DestinationBlendAlpha;
+            public RHIBlendOperation BlendOpAlpha;
             public byte RenderTargetWriteMask;
         }
     }

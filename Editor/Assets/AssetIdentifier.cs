@@ -47,7 +47,7 @@ namespace Editor.Assets
                 tokenizer.MoveNext();
                 uint localId = uint.Parse(tokenizer.Current.ToString());
 
-                _assets.TryAdd(localFilePath, new AssetId(localId));
+                _assets.TryAdd(localFilePath, new AssetId(_projectId, localId));
                 _assetPaths.TryAdd(new AssetId(_projectId, localId), localFilePath);
                 _idHashSet.Add(localId);
             }
@@ -78,7 +78,7 @@ namespace Editor.Assets
         {
             if (!AssetPipeline.IsLocalPath(localPath))
             {
-                if (!AssetPipeline.TryGetLocalPathFromFull(localPath, out localPath))
+                if (!AssetPipeline.TryGetLocalPathFromFull(localPath, out localPath!))
                 {
                     EdLog.Assets.Warning("Cannot get asset id for not local path: {path}", localPath);
                     return AssetId.Invalid;

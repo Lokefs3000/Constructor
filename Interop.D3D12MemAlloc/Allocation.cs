@@ -60,21 +60,21 @@ namespace Interop.D3D12MemAlloc
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?GetOffset@Allocation@D3D12MA@@QEBA_KXZ", ExactSpelling = true)]
         [return: NativeTypeName("UINT64")]
-        public static extern  ulong GetOffset(Allocation* pThis);
+        public static extern ulong GetOffset(Allocation* pThis);
 
         [return: NativeTypeName("UINT64")]
-        public  ulong GetAlignment()
+        public ulong GetAlignment()
         {
             return m_Alignment;
         }
 
         [return: NativeTypeName("UINT64")]
-        public  ulong GetSize()
+        public ulong GetSize()
         {
             return m_Size;
         }
 
-        public  ID3D12Resource* GetResource()
+        public ID3D12Resource* GetResource()
         {
             return m_Resource;
         }
@@ -83,14 +83,14 @@ namespace Interop.D3D12MemAlloc
         public static extern void SetResource(Allocation* pThis, ID3D12Resource* pResource);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?GetHeap@Allocation@D3D12MA@@QEBAPEAUID3D12Heap@@XZ", ExactSpelling = true)]
-        public static extern  ID3D12Heap* GetHeap(Allocation* pThis);
+        public static extern ID3D12Heap* GetHeap(Allocation* pThis);
 
         public void SetPrivateData(void* pPrivateData)
         {
             m_pPrivateData = pPrivateData;
         }
 
-        public  void* GetPrivateData()
+        public void* GetPrivateData()
         {
             return m_pPrivateData;
         }
@@ -99,7 +99,7 @@ namespace Interop.D3D12MemAlloc
         public static extern void SetName(Allocation* pThis, [NativeTypeName("LPCWSTR")] ushort* Name);
 
         [return: NativeTypeName("LPCWSTR")]
-        public  ushort* GetName()
+        public ushort* GetName()
         {
             return m_Name;
         }
@@ -118,7 +118,7 @@ namespace Interop.D3D12MemAlloc
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?GetAllocHandle@Allocation@D3D12MA@@AEBA_KXZ", ExactSpelling = true)]
         [return: NativeTypeName("D3D12MA::AllocHandle")]
-        private static extern  ulong GetAllocHandle(Allocation* pThis);
+        private static extern ulong GetAllocHandle(Allocation* pThis);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?GetBlock@Allocation@D3D12MA@@AEAAPEAVNormalBlock@2@XZ", ExactSpelling = true)]
         [return: NativeTypeName("D3D12MA::NormalBlock *")]
@@ -193,7 +193,7 @@ namespace Interop.D3D12MemAlloc
             [NativeTypeName("uint : 2")]
             private uint m_Type
             {
-                 get
+                get
                 {
                     return _bitfield1 & 0x3u;
                 }
@@ -207,7 +207,7 @@ namespace Interop.D3D12MemAlloc
             [NativeTypeName("uint : 3")]
             private uint m_ResourceDimension
             {
-                 get
+                get
                 {
                     return (_bitfield1 >> 2) & 0x7u;
                 }
@@ -221,7 +221,7 @@ namespace Interop.D3D12MemAlloc
             [NativeTypeName("uint : 24")]
             private uint m_ResourceFlags
             {
-                 get
+                get
                 {
                     return (_bitfield1 >> 5) & 0xFFFFFFu;
                 }
@@ -237,7 +237,7 @@ namespace Interop.D3D12MemAlloc
             [NativeTypeName("uint : 9")]
             private uint m_TextureLayout
             {
-                 get
+                get
                 {
                     return _bitfield2 & 0x1FFu;
                 }
@@ -257,22 +257,22 @@ namespace Interop.D3D12MemAlloc
             }
 
             [return: NativeTypeName("D3D12MA::Allocation::Type")]
-            public new  Type GetType()
+            public new Type GetType()
             {
                 return (Type)(m_Type);
             }
 
-            public  D3D12_RESOURCE_DIMENSION GetResourceDimension()
+            public D3D12_RESOURCE_DIMENSION GetResourceDimension()
             {
                 return (D3D12_RESOURCE_DIMENSION)(m_ResourceDimension);
             }
 
-            public  D3D12_RESOURCE_FLAGS GetResourceFlags()
+            public D3D12_RESOURCE_FLAGS GetResourceFlags()
             {
                 return (D3D12_RESOURCE_FLAGS)(m_ResourceFlags);
             }
 
-            public  D3D12_TEXTURE_LAYOUT GetTextureLayout()
+            public D3D12_TEXTURE_LAYOUT GetTextureLayout()
             {
                 return (D3D12_TEXTURE_LAYOUT)(m_TextureLayout);
             }

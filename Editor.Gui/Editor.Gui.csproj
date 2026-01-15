@@ -11,10 +11,14 @@
     <Optimize>True</Optimize>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Editor.Interop\Editor.Interop.csproj" />
+    <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
+    <ProjectReference Include="..\Primary.RHI2\Primary.RHI2.csproj" />
     <ProjectReference Include="..\Primary\Primary.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Managers\" />
-    <Folder Include="Debug\" />
+    <Folder Include="Assets\Loaders\" />
+    <Folder Include="Modifiers\" />
+    <Folder Include="Visual\" />
   </ItemGroup>
 </Project>

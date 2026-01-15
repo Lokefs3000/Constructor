@@ -1,5 +1,4 @@
-﻿using Primary.RHI.Direct3D12.Descriptors;
-using Vortice.Direct3D12;
+﻿using Vortice.Direct3D12;
 
 namespace Primary.RHI.Direct3D12.Interfaces
 {

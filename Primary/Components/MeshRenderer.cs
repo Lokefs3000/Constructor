@@ -1,6 +1,6 @@
 ﻿using Primary.Assets;
 using Primary.Editor;
-using Primary.Rendering.Data;
+using Primary.Rendering.Assets;
 using Primary.Scenes;
 using Primary.Timing;
 using System.Runtime.Serialization;

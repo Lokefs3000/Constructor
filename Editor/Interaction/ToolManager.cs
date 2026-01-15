@@ -24,11 +24,11 @@ namespace Editor.Interaction
         {
             _controls = [
                 new CoreControlTool(this),
-                new GeoEditControlTool(this)
+                //new GeoEditControlTool(this)
                 ];
 
             _tools = [
-                new TranslateTool(this),
+                null!,//new TranslateTool(this),
                 null!,
                 null!,
                 ];
@@ -44,7 +44,7 @@ namespace Editor.Interaction
             _snapScale = 1.0f;
 
             _controls[0].Activated();
-            _tools[0].Selected();
+            //_tools[0].Selected();
         }
 
         /// <summary>Not thread-safe</summary>
@@ -83,7 +83,7 @@ namespace Editor.Interaction
             if (_isSnappingDefault)
                 _isSnappingActive = !_isSnappingActive;
 
-            _tools[(int)Tool].Update();
+            //_tools[(int)Tool].Update();
         }
 
         public EditorTool Tool => _tool;

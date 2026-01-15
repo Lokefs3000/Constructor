@@ -1,13 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.Common
 {
@@ -79,6 +72,12 @@ namespace Primary.Common
         public static AABB Subtract(AABB left, AABB right)
         {
             return new AABB(Vector256.Subtract(left.AsVector256Unsafe(), right.AsVector256Unsafe()));
+        }
+
+        public static AABB FromExtents(Vector3 center, Vector3 extents)
+        {
+            Vector3 half = extents * 0.5f;
+            return new AABB(center - half, center + half);
         }
 
         public static readonly AABB Zero = new AABB();

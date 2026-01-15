@@ -1,26 +1,14 @@
-﻿using Arch.Core;
-using Editor.Assets;
+﻿using Editor.Assets;
 using Editor.Inspector.Components;
 using Editor.Inspector.Editors;
-using Editor.Processors;
 using Editor.Serialization.Json;
 using Hexa.NET.ImGui;
 using Primary.Assets;
 using Primary.Common;
-using Primary.Rendering.PostProcessing;
-using Primary.Scenes;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using System.Threading.Tasks;
-using Tomlyn;
-using Tomlyn.Model;
 
 namespace Editor.DearImGui.Properties
 {
@@ -43,26 +31,26 @@ namespace Editor.DearImGui.Properties
             TargetData? td = Unsafe.As<TargetData>(target);
             if (td != null && _asset != null)
             {
-                foreach (IPostProcessingData effect in _asset.Effects)
-                {
-                    if (!_editors.TryGetValue(effect.GetType(), out ObjectEditor? editor))
-                    {
-                        editor = new DefaultObjectEditor();
-                        editor.SetupInspectorFields(effect);
-
-                        _editors.Add(effect.GetType(), editor);
-                    }    
-
-                    editor?.DrawInspector();
-                }
+                //foreach (IPostProcessingData effect in _asset.Effects)
+                //{
+                //    if (!_editors.TryGetValue(effect.GetType(), out ObjectEditor? editor))
+                //    {
+                //        editor = new DefaultObjectEditor();
+                //        editor.SetupInspectorFields(effect);
+                //
+                //        _editors.Add(effect.GetType(), editor);
+                //    }
+                //
+                //    editor?.DrawInspector();
+                //}
 
                 ImGui.Button("Add effect"u8, new Vector2(-1.0f, 0.0f));
                 ImGui.OpenPopupOnItemClick("##ADDFX"u8, ImGuiPopupFlags.MouseButtonLeft);
 
                 if (ImGui.BeginPopup("##ADDFX"u8, ImGuiWindowFlags.NoMove))
                 {
-                    if (ImGui.Selectable("Enviorment effect"u8))
-                        _asset.AddEffect<EnviormentEffectData>();
+                    //if (ImGui.Selectable("Enviorment effect"u8))
+                    //    _asset.AddEffect<EnviormentEffectData>();
 
                     ImGui.EndPopup();
                 }
@@ -95,13 +83,13 @@ namespace Editor.DearImGui.Properties
                 _asset = AssetManager.LoadAsset<PostProcessingVolumeAsset>(td.LocalPath, true);
                 _editors = new Dictionary<Type, ObjectEditor>();
 
-                foreach (IPostProcessingData effect in _asset.Effects)
-                {
-                    DefaultObjectEditor objectEditor = new DefaultObjectEditor();
-                    objectEditor.SetupInspectorFields(effect);
-
-                    _editors.Add(effect.GetType(), objectEditor);
-                }
+                //foreach (IPostProcessingData effect in _asset.Effects)
+                //{
+                //    DefaultObjectEditor objectEditor = new DefaultObjectEditor();
+                //    objectEditor.SetupInspectorFields(effect);
+                //
+                //    _editors.Add(effect.GetType(), objectEditor);
+                //}
             }
             else
             {
@@ -126,8 +114,8 @@ namespace Editor.DearImGui.Properties
                         return;
                     }
 
-                    string s = JsonSerializer.Serialize(_asset.Effects, s_serializerOptions);
-                    stream.Write(Encoding.UTF8.GetBytes(s));
+                    //string s = JsonSerializer.Serialize(_asset.Effects, s_serializerOptions);
+                    //stream.Write(Encoding.UTF8.GetBytes(s));
                 }
             }
 

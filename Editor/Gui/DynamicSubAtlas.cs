@@ -1,14 +1,14 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Primary.Mathematics;
-using Primary.RenderLayer;
+using Primary.RHI2;
 using Primary.Threading;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace Editor.Gui
+namespace Editor.UI
 {
     internal sealed class DynamicSubAtlas : IDisposable
     {
@@ -18,7 +18,7 @@ namespace Editor.Gui
 
         private List<FittedTile> _fittedIcons;
 
-        private GfxTexture _texture;
+        private RHITexture? _texture;
         private ConcurrentDictionary<int, DynAtlasIcon> _icons;
 
         private bool _disposedValue;
@@ -95,25 +95,21 @@ namespace Editor.Gui
                 {
                     nint basePixelsPtr = pixels.OpaquePointer;
 
-                    _texture.Dispose();
-                    _texture = GfxDevice.Current.CreateTexture(new Primary.RHI.TextureDescription
+                    _texture?.Dispose();
+                    _texture = RHIDevice.Instance!.CreateTexture(new RHITextureDescription
                     {
-                        Width = (uint)_atlasSize,
-                        Height = (uint)_atlasSize,
-                        Depth = 1,
+                        Width = _atlasSize,
+                        Height = _atlasSize,
+                        DepthOrArraySize = 1,
 
                         MipLevels = 1,
 
-                        Dimension = Primary.RHI.TextureDimension.Texture2D,
-                        Format = Primary.RHI.TextureFormat.RGBA8un,
-                        Memory = Primary.RHI.MemoryUsage.Immutable,
-                        Usage = Primary.RHI.TextureUsage.ShaderResource,
-                        CpuAccessFlags = Primary.RHI.CPUAccessFlags.None,
+                        Dimension = RHIDimension.Texture2D,
+                        Format = RHIFormat.RGBA8_UNorm,
+                        Usage = RHIResourceUsage.ShaderResource,
 
-                        Swizzle = Primary.RHI.TextureSwizzle.Default,
-                    }, new Span<nint>(ref basePixelsPtr));
-
-                    _texture.Name = $"DynAtlas-{_fittedIcons.Count}";
+                        Swizzle = RHISwizzle.RGBA,
+                    }, new Span<nint>(ref basePixelsPtr), $"DynAtlas-{_fittedIcons.Count}");
                 }).Wait();
             }
             catch (Exception ex)
@@ -276,7 +272,7 @@ namespace Editor.Gui
 
         internal bool IsEmpty => _fittedIcons.Count == 0;
 
-        internal GfxTexture AtlasTexture => _texture;
+        internal RHITexture? AtlasTexture => _texture;
 
         public const int DynAtlasInitialSize = 512;
         public const int DynAtlasInitialTileSize = 256;

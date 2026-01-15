@@ -2,29 +2,32 @@
 using Hexa.NET.ImGui;
 using Primary.Assets;
 using Primary.Common;
-using Primary.Rendering2;
-using Primary.Rendering2.Assets;
-using Primary.Rendering2.Data;
-using Primary.Rendering2.Recording;
-using Primary.Rendering2.Resources;
-using Primary.Rendering2.Structures;
+using Primary.Rendering;
+using Primary.Rendering.Assets;
+using Primary.Rendering.Data;
+using Primary.Rendering.Recording;
+using Primary.Rendering.Resources;
+using Primary.Rendering.Structures;
+using Primary.RHI2;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-
-using RHI = Primary.RHI;
 
 namespace Editor.Rendering.Passes
 {
     internal sealed class DearImGuiRenderPass : IRenderPass
     {
-        private ShaderAsset2 _dearImGuiShader;
+        private ShaderAsset _dearImGuiShader;
         private PropertyBlock _propertyBlock;
+
+        private Dictionary<nint, RHITexture> _activeTextures;
 
         internal DearImGuiRenderPass()
         {
-            _dearImGuiShader = AssetManager.LoadAsset<ShaderAsset2>("Editor/Shaders/DearImGui.hlsl2", true);
+            _dearImGuiShader = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/DearImGui.hlsl2", true);
             _propertyBlock = _dearImGuiShader.CreatePropertyBlock()!;
+
+            _activeTextures = new Dictionary<nint, RHITexture>();
         }
 
         public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
@@ -59,6 +62,8 @@ namespace Editor.Rendering.Passes
                 passData.Shader = _dearImGuiShader;
                 passData.Block = _propertyBlock;
 
+                passData.ActiveTextures = _activeTextures;
+
                 desc.UseResource(FGResourceUsage.ReadWrite, passData.VertexBuffer);
                 desc.UseResource(FGResourceUsage.ReadWrite, passData.IndexBuffer);
                 desc.UseResource(FGResourceUsage.ReadWrite, passData.VertexData);
@@ -86,7 +91,7 @@ namespace Editor.Rendering.Passes
 
                     NativeMemory.Copy(list.VtxBuffer.Data, Unsafe.AsPointer(ref vertices.Span[offsetVtx]), (nuint)(list.VtxBuffer.Size * Unsafe.SizeOf<ImDrawVert>()));
                     NativeMemory.Copy(list.IdxBuffer.Data, Unsafe.AsPointer(ref indices.Span[offsetVtx]), (nuint)(list.IdxBuffer.Size * Unsafe.SizeOf<ushort>()));
-                    
+
                     offsetVtx += list.VtxBuffer.Size;
                     offsetIdx += list.IdxBuffer.Size;
                 }
@@ -129,15 +134,15 @@ namespace Editor.Rendering.Passes
                     {
                         if (draw.TexRef.TexData->BackendUserData == null)
                             continue;
-                        passData.Block!.SetResource(PropertyBlock.GetID("txTexture"), (RHI.Resource.FromIntPtr((nint)draw.TexRef.TexData->BackendUserData) as RHI.Texture)!);
+                        //passData.Block!.SetResource(PropertyBlock.GetID("txTexture"), (nint)draw.TexRef.TexData->BackendUserData, RHIResourceType.Texture);
                     }
                     else
                     {
                         if (draw.TexRef.TexID.Handle == 0)
                             continue;
 
-                        RHI.Resource? resource = RHI.Resource.FromIntPtr((nint)draw.TexRef.TexID.Handle);
-                        passData.Block!.SetResource(PropertyBlock.GetID("txTexture"), (resource as RHI.Texture)!);
+                        nint native = (nint)draw.TexRef.TexID.Handle;
+                        //passData.Block!.SetResource(PropertyBlock.GetID("txTexture"), native, RHIResourceType.Texture);
                     }
 
                     cmd.SetScissor(0, new FGRect((int)draw.ClipRect.X, (int)draw.ClipRect.Y, (int)draw.ClipRect.Z, (int)draw.ClipRect.W));
@@ -166,41 +171,40 @@ namespace Editor.Rendering.Passes
 
                             uint* pixels = (uint*)textureData.GetPixels();
 
-                            RHI.Texture texture = RHI.GraphicsDevice.Instance!.CreateTexture(new RHI.TextureDescription
+                            RHITexture texture = RHIDevice.Instance!.CreateTexture(new RHITextureDescription
                             {
-                                Width = (uint)textureData.Width,
-                                Height = (uint)textureData.Height,
+                                Width = textureData.Width,
+                                Height = textureData.Height,
                                 Depth = 1,
 
                                 MipLevels = 1,
 
-                                Dimension = RHI.TextureDimension.Texture2D,
-                                Format = RHI.TextureFormat.RGBA8un,
-                                Memory = RHI.MemoryUsage.Default,
-                                Usage = RHI.TextureUsage.ShaderResource,
-                                CpuAccessFlags = RHI.CPUAccessFlags.None,
+                                Dimension = RHIDimension.Texture2D,
+                                Format = RHIFormat.RGBA8_UNorm,
+                                Usage = RHIResourceUsage.ShaderResource,
 
-                                Swizzle = RHI.TextureSwizzle.Default,
-                            }, new Span<nint>(&pixels, 1));
-                            texture.Name = $"DearImGui - Texture [{textureData.UniqueID}]";
+                                Swizzle = RHISwizzle.RGBA,
+                            }, new Span<nint>(&pixels, 1), $"DearImGui - Texture [{textureData.UniqueID}]")!;
 
-                            //_activeTextures.Add(texture);
+                            RHITextureNative* native = texture.GetAsNative();
 
-                            textureData.SetTexID(texture.Handle);
+                            passData.ActiveTextures!.Add((nint)native, texture);
+
+                            textureData.SetTexID(native);
                             textureData.SetStatus(ImTextureStatus.Ok);
-                            textureData.BackendUserData = texture.Handle.ToPointer();
+                            textureData.BackendUserData = native;
 
                             ImGuiIOPtr io = ImGui.GetIO();
                         }
                         else if (textureData.Status == ImTextureStatus.WantUpdates)
                         {
-                            RHI.Texture? texture = RHI.Resource.FromIntPtr((nint)textureData.BackendUserData) as RHI.Texture;
-                            ExceptionUtility.Assert(texture != null);
+                            RHITextureNative* native = (RHITextureNative*)textureData.BackendUserData;
+                            RHITexture texture = passData.ActiveTextures![(nint)native];
 
                             ImTextureRect updateRect = textureData.UpdateRect;
 
-                            using FGMappedSubresource<byte> pixels = cmd.Map<byte>(new FGMapTextureDesc(texture, new FGBox(updateRect.X, updateRect.Y, 0, updateRect.W, updateRect.H, 1)));
-                            nint dataPointer = (nint)Unsafe.AsPointer(ref pixels.Span.DangerousGetReference());
+                            //using FGMappedSubresource<byte> pixels = cmd.Map<byte>(new FGMapTextureDesc(texture, new FGBox(updateRect.X, updateRect.Y, 0, updateRect.W, updateRect.H, 1)));
+                            nint dataPointer = nint.Zero;//(nint)Unsafe.AsPointer(ref pixels.Span.DangerousGetReference());
 
                             ExceptionUtility.Assert(dataPointer != 0);
 
@@ -217,8 +221,8 @@ namespace Editor.Rendering.Passes
                             if (textureData.BackendUserData == null)
                                 continue;
 
-                            RHI.Texture? texture = RHI.Resource.FromIntPtr((nint)textureData.BackendUserData) as RHI.Texture;
-                            ExceptionUtility.Assert(texture != null);
+                            RHITextureNative* native = (RHITextureNative*)textureData.BackendUserData;
+                            RHITexture texture = passData.ActiveTextures![(nint)native];
 
                             texture?.Dispose();
 
@@ -240,8 +244,10 @@ namespace Editor.Rendering.Passes
 
             public FrameGraphBuffer VertexData;
 
-            public ShaderAsset2? Shader;
+            public ShaderAsset? Shader;
             public PropertyBlock? Block;
+
+            public Dictionary<nint, RHITexture>? ActiveTextures;
 
             public void Clear()
             {

@@ -1,259 +1,182 @@
-﻿using Primary.Assets.Types;
-using Primary.Rendering;
-using System.Collections.Frozen;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets;
+using Primary.Assets.Types;
+using Primary.Common;
+using Primary.Rendering.Assets;
+using Primary.RHI2;
+using System.Numerics;
 
 namespace Primary.Assets
 {
-    public sealed class MaterialAsset : IAssetDefinition
+    public sealed class MaterialAsset : BaseAssetDefinition<MaterialAsset, MaterialAssetData>
     {
-        private readonly MaterialAssetData _assetData;
-
-        internal MaterialAsset(MaterialAssetData assetData)
+        internal MaterialAsset(MaterialAssetData assetData) : base(assetData)
         {
-            _assetData = assetData;
         }
 
-        public object? GetResource(string path) => _assetData.GetResource(path);
-        public void SetResource(string path, object? resource) => _assetData.SetResource(path, resource);
+        #region Resources
 
-        internal MaterialAssetData AssetData => _assetData;
+        #region Set
+        /// <inheritdoc cref="PropertyBlock.SetResource(int, RHIBuffer)">
+        public void SetResource(int id, RHIBuffer buffer) => AssetData.PropertyBlock?.SetResource(id, buffer);
+        /// <inheritdoc cref="PropertyBlock.SetResource(int, RHITexture)">
+        public void SetResource(int id, RHITexture texture) => AssetData.PropertyBlock?.SetResource(id, texture);
+        /// <inheritdoc cref="PropertyBlock.SetResource(int, TextureAsset)">
+        public void SetResource(int id, TextureAsset texture) => AssetData.PropertyBlock?.SetResource(id, texture);
 
-        public ShaderAsset? Shader { get => _assetData.TargetShader; set => _assetData.ChangeCurrentShader(value, null); }
-        public IReadOnlyDictionary<string, MaterialProperty> Properties => _assetData.Properties;
+        ////////////////////////////////////////////////////////////////
 
-        internal nint Handle => _assetData.Handle;
+        /// <inheritdoc cref="PropertyBlock.SetResource(int, RHIBuffer)">
+        public void SetResource(ReadOnlySpan<char> id, RHIBuffer buffer) => AssetData.PropertyBlock?.SetResource(id.GetDjb2HashCode(), buffer);
+        /// <inheritdoc cref="PropertyBlock.SetResource(int, RHITexture)">
+        public void SetResource(ReadOnlySpan<char> id, RHITexture texture) => AssetData.PropertyBlock?.SetResource(id.GetDjb2HashCode(), texture);
+        /// <inheritdoc cref="PropertyBlock.SetResource(int, TextureAsset)">
+        public void SetResource(ReadOnlySpan<char> id, TextureAsset texture) => AssetData.PropertyBlock?.SetResource(id.GetDjb2HashCode(), texture);
+        #endregion
 
-        public ResourceStatus Status => _assetData.Status;
+        #region Get
+        /// <inheritdoc cref="PropertyBlock.GetRHIBuffer(int)"/>
+        public RHIBuffer? GetRHIBuffer(int id) => AssetData.PropertyBlock?.GetRHIBuffer(id);
+        /// <inheritdoc cref="PropertyBlock.GetRHITexture(int)"/>
+        public RHITexture? GetRHITexture(int id) => AssetData.PropertyBlock?.GetRHITexture(id);
+        /// <inheritdoc cref="PropertyBlock.GetTextureAsset(int)"/>
+        public TextureAsset? GetTextureAsset(int id) => AssetData.PropertyBlock?.GetTextureAsset(id);
 
-        public string Name => _assetData.Name;
-        public AssetId Id => _assetData.Id;
+        ////////////////////////////////////////////////////////////////
 
-        internal ShaderBindGroup? BindGroup => _assetData.BindGroup;
+        /// <inheritdoc cref="PropertyBlock.GetRHIBuffer(int)"/>
+        public RHIBuffer? GetRHIBuffer(ReadOnlySpan<char> id) => AssetData.PropertyBlock?.GetRHIBuffer(id.GetDjb2HashCode());
+        /// <inheritdoc cref="PropertyBlock.GetRHITexture(int)"/>
+        public RHITexture? GetRHITexture(ReadOnlySpan<char> id) => AssetData.PropertyBlock?.GetRHITexture(id.GetDjb2HashCode());
+        /// <inheritdoc cref="PropertyBlock.GetTextureAsset(int)"/>
+        public TextureAsset? GetTextureAsset(ReadOnlySpan<char> id) => AssetData.PropertyBlock?.GetTextureAsset(id.GetDjb2HashCode());
+        #endregion
+
+        #endregion
+
+        #region Properties
+
+        #region Set
+        /// <inheritdoc cref="PropertyBlock.SetSingle(int, float)">
+        public void SetSingle(int id, float value) => AssetData.PropertyBlock?.SetSingle(id, value);
+        /// <inheritdoc cref="PropertyBlock.SetDouble(int, double)">
+        public void SetDouble(int id, double value) => AssetData.PropertyBlock?.SetDouble(id, value);
+        /// <inheritdoc cref="PropertyBlock.SetUInt(int, uint)">
+        public void SetUInt(int id, uint value) => AssetData.PropertyBlock?.SetUInt(id, value);
+        /// <inheritdoc cref="PropertyBlock.SetInt(int, int)">
+        public void SetInt(int id, int value) => AssetData.PropertyBlock?.SetInt(id, value);
+        /// <inheritdoc cref="PropertyBlock.SetVector2(int, System.Numerics.Vector2)">
+        public void SetVector2(int id, Vector2 value) => AssetData.PropertyBlock?.SetVector2(id, value);
+        /// <inheritdoc cref="PropertyBlock.SetVector3(int, System.Numerics.Vector3)">
+        public void SetVector3(int id, Vector3 value) => AssetData.PropertyBlock?.SetVector3(id, value);
+        /// <inheritdoc cref="PropertyBlock.SetVector4(int, System.Numerics.Vector4)">
+        public void SetVector4(int id, Vector4 value) => AssetData.PropertyBlock?.SetVector4(id, value);
+        /// <inheritdoc cref="PropertyBlock.SetStruct{T}(int, T)">
+        public void SetMatrix4x4(int id, Matrix4x4 value) => AssetData.PropertyBlock?.SetMatrix4x4(id, value);
+        /// <inheritdoc cref="PropertyBlock.SetStruct{T}(int, T)">
+        public void SetStruct<T>(int id, T value) where T : unmanaged => AssetData.PropertyBlock?.SetStruct(id, value);
+
+        ////////////////////////////////////////////////////////////////
+
+        /// <inheritdoc cref="PropertyBlock.SetSingle(int, float)">
+        public void SetSingle(ReadOnlySpan<char> id, float value) => AssetData.PropertyBlock?.SetSingle(id.GetDjb2HashCode(), value);
+        /// <inheritdoc cref="PropertyBlock.SetDouble(int, double)">
+        public void SetDouble(ReadOnlySpan<char> id, double value) => AssetData.PropertyBlock?.SetDouble(id.GetDjb2HashCode(), value);
+        /// <inheritdoc cref="PropertyBlock.SetUInt(int, uint)">
+        public void SetUInt(ReadOnlySpan<char> id, uint value) => AssetData.PropertyBlock?.SetUInt(id.GetDjb2HashCode(), value);
+        /// <inheritdoc cref="PropertyBlock.SetInt(int, int)">
+        public void SetInt(ReadOnlySpan<char> id, int value) => AssetData.PropertyBlock?.SetInt(id.GetDjb2HashCode(), value);
+        /// <inheritdoc cref="PropertyBlock.SetVector2(int, System.Numerics.Vector2)">
+        public void SetVector2(ReadOnlySpan<char> id, Vector2 value) => AssetData.PropertyBlock?.SetVector2(id.GetDjb2HashCode(), value);
+        /// <inheritdoc cref="PropertyBlock.SetVector3(int, System.Numerics.Vector3)">
+        public void SetVector3(ReadOnlySpan<char> id, Vector3 value) => AssetData.PropertyBlock?.SetVector3(id.GetDjb2HashCode(), value);
+        /// <inheritdoc cref="PropertyBlock.SetVector4(int, System.Numerics.Vector4)">
+        public void SetVector4(ReadOnlySpan<char> id, Vector4 value) => AssetData.PropertyBlock?.SetVector4(id.GetDjb2HashCode(), value);
+        /// <inheritdoc cref="PropertyBlock.SetMatrix4x4(int, Matrix4x4)">
+        public void SetMatrix4x4(ReadOnlySpan<char> id, Matrix4x4 value) => AssetData.PropertyBlock?.SetMatrix4x4(id.GetDjb2HashCode(), value);
+        /// <inheritdoc cref="PropertyBlock.SetStruct{T}(int, T)">
+        public void SetStruct<T>(ReadOnlySpan<char> id, T value) where T : unmanaged => AssetData.PropertyBlock?.SetStruct(id.GetDjb2HashCode(), value);
+        #endregion
+
+        #region Get
+
+        #endregion
+        /// <inheritdoc cref="PropertyBlock.GetSingle(int)">
+        public float GetSingle(int id) => AssetData.PropertyBlock?.GetSingle(id) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetDouble(int)">
+        public double GetDouble(int id) => AssetData.PropertyBlock?.GetDouble(id) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetUInt(int)">
+        public uint GetUInt(int id) => AssetData.PropertyBlock?.GetUInt(id) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetInt(int)">
+        public int GetInt(int id) => AssetData.PropertyBlock?.GetInt(id) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetVector2(int)">
+        public Vector2 GetVector2(int id) => AssetData.PropertyBlock?.GetVector2(id) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetVector3(int)">
+        public Vector3 GetVector3(int id) => AssetData.PropertyBlock?.GetVector3(id) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetVector4(int)">
+        public Vector4 GetVector4(int id) => AssetData.PropertyBlock?.GetVector4(id) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetMatrix4x4(int)">
+        public Matrix4x4 GetMatrix4x4(int id) => AssetData.PropertyBlock?.GetMatrix4x4(id) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetStruct{T}(int)">
+        public T GetStruct<T>(int id) where T : unmanaged => AssetData.PropertyBlock?.GetStruct<T>(id) ?? default;
+
+        ////////////////////////////////////////////////////////////////
+
+        /// <inheritdoc cref="PropertyBlock.GetSingle(int)">
+        public float GetSingle(ReadOnlySpan<char> id) => AssetData.PropertyBlock?.GetSingle(id.GetDjb2HashCode()) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetDouble(int)">
+        public double GetDouble(ReadOnlySpan<char> id) => AssetData.PropertyBlock?.GetDouble(id.GetDjb2HashCode()) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetUInt(int)">
+        public uint GetUInt(ReadOnlySpan<char> id) => AssetData.PropertyBlock?.GetUInt(id.GetDjb2HashCode()) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetInt(int)">
+        public int GetInt(ReadOnlySpan<char> id) => AssetData.PropertyBlock?.GetInt(id.GetDjb2HashCode()) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetVector2(int)">
+        public Vector2 GetVector2(ReadOnlySpan<char> id) => AssetData.PropertyBlock?.GetVector2(id.GetDjb2HashCode()) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetVector3(int)">
+        public Vector3 GetVector3(ReadOnlySpan<char> id) => AssetData.PropertyBlock?.GetVector3(id.GetDjb2HashCode()) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetVector4(int)">
+        public Vector4 GetVector4(ReadOnlySpan<char> id) => AssetData.PropertyBlock?.GetVector4(id.GetDjb2HashCode()) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetMatrix4x4(int)">
+        public Matrix4x4 GetMatrix4x4(ReadOnlySpan<char> id) => AssetData.PropertyBlock?.GetMatrix4x4(id.GetDjb2HashCode()) ?? default;
+        /// <inheritdoc cref="PropertyBlock.GetStruct{T}(int)">
+        public T GetStruct<T>(ReadOnlySpan<char> id) where T : unmanaged => AssetData.PropertyBlock?.GetStruct<T>(id.GetDjb2HashCode()) ?? default;
+        #endregion
+
+        public ShaderAsset? Shader { get => AssetData.Shader; set => AssetData.ChangeActiveShader(NullableUtility.ThrowIfNull(value)); }
+        public ROPropertyBlock PropertyBlock => AssetData.PropertyBlock;
     }
 
-    internal sealed class MaterialAssetData : IInternalAssetData
+    public sealed class MaterialAssetData : BaseInternalAssetData<MaterialAsset>
     {
-        private readonly WeakReference _asset;
+        private ShaderAsset? _shader;
+        private PropertyBlock? _propertyBlock;
 
-        private ResourceStatus _status;
-
-        private readonly AssetId _id;
-        private string _name;
-
-        private ShaderAsset? _targetShader;
-
-        //TODO: add native block of memory to use as cbuffer
-
-        private FrozenDictionary<string, MaterialProperty> _properties;
-        private ShaderBindGroup? _bindGroup;
-
-        private GCHandle _gc;
-        private nint _handle;
-
-        internal MaterialAssetData(AssetId id)
+        internal MaterialAssetData(AssetId id) : base(id)
         {
-            _asset = new WeakReference(null);
-
-            _status = ResourceStatus.Pending;
-
-            _id = id;
-            _name = string.Empty;
-
-            _targetShader = null;
-
-            _properties = FrozenDictionary<string, MaterialProperty>.Empty;
-            _bindGroup = null;
-
-            _gc = GCHandle.Alloc(null);
-            _handle = nint.Zero;
+            _shader = null;
+            _propertyBlock = null;
         }
 
-        public void Dispose()
+        internal void ChangeActiveShader(ShaderAsset newShader)
         {
-            _status = ResourceStatus.Disposed;
-
-            _asset.Target = null;
-
-            _targetShader = null;
-
-            _properties = FrozenDictionary<string, MaterialProperty>.Empty;
-            _bindGroup = null;
-
-            _gc.Free();
-            _handle = nint.Zero;
-        }
-
-        public void SetAssetInternalStatus(ResourceStatus status)
-        {
-            _status = status;
-        }
-
-        public void SetAssetInternalName(string name)
-        {
-            _name = name;
-        }
-
-        internal void UpdateAssetData(MaterialAsset asset)
-        {
-            _asset.Target = asset;
-
-            _status = ResourceStatus.Success;
-
-            _gc = GCHandle.Alloc(asset, GCHandleType.Normal);
-            _handle = GCHandle.ToIntPtr(_gc);
-        }
-
-        internal void UpdateAssetFailed(MaterialAsset asset)
-        {
-            _asset.Target = asset;
-
-            _status = ResourceStatus.Error;
-
-            _targetShader = null;
-        }
-
-        internal void ChangeCurrentShader(ShaderAsset? newShader, ShaderBindGroup? bindGroup)
-        {
-            if (newShader == _targetShader)
+            if (_shader == newShader)
                 return;
 
-            _targetShader = newShader;
+            _shader = newShader;
 
-            if (newShader != null)
-            {
-                Dictionary<string, MaterialProperty> properties = new Dictionary<string, MaterialProperty>();
-                ShaderBindGroup newBindGroup = bindGroup ?? newShader.CreateDefaultBindGroup();
-
-                foreach (ShaderVariable variable in newShader.Variables.Values)
-                {
-                    if (variable.BindGroup == newBindGroup.GroupName)
-                    {
-                        int idx = Array.FindIndex(variable.Attributes, (x) => x.Type == ShaderAttributeType.Property);
-                        if (idx >= 0)
-                        {
-                            ref ShaderVariableAttribute attribute = ref variable.Attributes[idx];
-                            ShaderVariableAttribProperty property = (ShaderVariableAttribProperty)attribute.Value!;
-
-                            properties.Add(property.Name, new MaterialProperty
-                            {
-                                Type = variable.Type switch
-                                {
-                                    ShaderVariableType.Texture1D => MaterialVariableType.Texture,
-                                    ShaderVariableType.Texture2D => MaterialVariableType.Texture,
-                                    ShaderVariableType.Texture3D => MaterialVariableType.Texture,
-                                    ShaderVariableType.TextureCube => MaterialVariableType.Texture,
-                                    _ => throw new NotSupportedException(variable.Type.ToString())
-                                },
-                                VariableName = variable.Name,
-                            });
-
-                            if (bindGroup == null)
-                            {
-                                newBindGroup.SetResource(variable.Name, _bindGroup?.GetResource(variable.Name) ?? property.Default switch
-                                {
-                                    ShaderPropertyDefault.White => AssetManager.Static.DefaultWhite,
-                                    ShaderPropertyDefault.Normal => AssetManager.Static.DefaultNormal,
-                                    _ => AssetManager.Static.DefaultWhite
-                                });
-                            }
-                        }
-                    }
-                }
-
-                _properties = properties.ToFrozenDictionary();
-                _bindGroup = newBindGroup;
-            }
-            else
-            {
-                _properties = FrozenDictionary<string, MaterialProperty>.Empty;
-                _bindGroup = null;
-            }
-
-            /*Span<ShaderResourceSignature.Resource> resources = resourceSignature.Resources;
-            for (int i = 0; i < resources.Length; i++)
-            {
-                ref ShaderResourceSignature.Resource res = ref resources[i];
-
-                _properties.Add(res.PropertyName, new MaterialProperty
-                {
-                    
-                });
-            }*/
+            _propertyBlock?.Dispose();
+            _propertyBlock = newShader.CreatePropertyBlock();
         }
 
-        internal object? GetResource(string path)
+        public void UpdateAssetData(MaterialAsset asset, ShaderAsset shader, PropertyBlock block)
         {
-            ref readonly MaterialProperty property = ref _properties.GetValueRefOrNullRef(path);
-            if (Unsafe.IsNullRef(in property))
-                return null;
+            base.UpdateAssetData(asset);
 
-            return _bindGroup?.GetResource(property.VariableName);
+            _shader = shader;
+            _propertyBlock = block;
         }
 
-        internal void SetResource(string path, object? resource)
-        {
-            ref readonly MaterialProperty property = ref _properties.GetValueRefOrNullRef(path);
-            if (Unsafe.IsNullRef(in property))
-                return;
-
-            if (resource == null)
-            {
-                _bindGroup?.SetResource(property.VariableName, GetDefault(property.Default));
-            }
-            else
-            {
-                switch (property.Type)
-                {
-                    case MaterialVariableType.Texture: _bindGroup?.SetResource(property.VariableName, resource as TextureAsset ?? GetDefault(property.Default)); break;
-                }
-            }
-
-            static TextureAsset GetDefault(ShaderPropertyDefault @default)
-            {
-                switch (@default)
-                {
-                    case ShaderPropertyDefault.White: return AssetManager.Static.DefaultWhite;
-                    case ShaderPropertyDefault.Normal: return AssetManager.Static.DefaultNormal;
-                }
-
-                throw new NotSupportedException(@default.ToString());
-            }
-        }
-
-        internal ResourceStatus Status => _status;
-
-        internal AssetId Id => _id;
-        internal string Name => _name;
-
-        public int LoadIndex => 0;
-
-        internal ShaderAsset? TargetShader => _targetShader;
-        internal IReadOnlyDictionary<string, MaterialProperty> Properties => _properties;
-
-        internal nint Handle => _handle;
-
-        internal ShaderBindGroup? BindGroup => _bindGroup;
-
-        public Type AssetType => typeof(MaterialAsset);
-        public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
-
-        AssetId IInternalAssetData.Id => Id;
-        ResourceStatus IInternalAssetData.Status => Status;
-        string IInternalAssetData.Name => Name;
-    }
-
-    public record struct MaterialProperty
-    {
-        public MaterialVariableType Type;
-        public string VariableName;
-        public ShaderPropertyDefault Default;
-    }
-
-    public enum MaterialVariableType : byte
-    {
-        Texture
+        internal ShaderAsset? Shader => _shader;
+        internal PropertyBlock? PropertyBlock => _propertyBlock;
     }
 }

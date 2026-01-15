@@ -1,24 +1,52 @@
-﻿using Primary.Profiling;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Profiling;
+using Primary.Rendering.Data;
+using Primary.Rendering.Memory;
 using Primary.Rendering.Pass;
-using Serilog;
-using System.Reflection;
+using Primary.Rendering.Recording;
+using Primary.Rendering.Resources;
+using Primary.RHI2;
+using Primary.Utility;
 
 namespace Primary.Rendering
 {
     public sealed class RenderPassManager : IDisposable
     {
-        private List<PassConfiguration> _renderPasses;
-        private List<IRenderPass> _orderedPasses;
+        private RenderPass _renderPass;
+        private RenderPassCompiler _renderPassCompiler;
+        private FrameGraphTimeline _timeline;
+        private FrameGraphResources _resources;
+        private FrameGraphRecorder _recorder;
+        private FrameGraphState _state;
+        private FrameGraphSetup _setup;
 
-        private bool _needsReorder;
+        private SequentialLinearAllocator _intermediateAllocator;
+        private RenderPassErrorReporter _errorReporter;
+        private RasterPassContext _rasterContext;
+        private ComputePassContext _computeContext;
+
+        private List<IRenderPass> _activePasses;
+        private List<FrameGraphCommands> _commands;
+
         private bool _disposedValue;
 
-        internal RenderPassManager()
+        internal RenderPassManager(RenderingManager manager)
         {
-            _renderPasses = new List<PassConfiguration>();
-            _orderedPasses = new List<IRenderPass>();
+            _renderPass = new RenderPass(this);
+            _renderPassCompiler = new RenderPassCompiler();
+            _timeline = new FrameGraphTimeline();
+            _resources = new FrameGraphResources(manager);
+            _recorder = new FrameGraphRecorder(this);
+            _state = new FrameGraphState();
+            _setup = new FrameGraphSetup();
 
-            _needsReorder = false;
+            _intermediateAllocator = new SequentialLinearAllocator(ushort.MaxValue /*65kb*/);
+            _errorReporter = new RenderPassErrorReporter();
+            _rasterContext = new RasterPassContext(_errorReporter, _intermediateAllocator, _resources, manager.ContextContainer);
+            _computeContext = new ComputePassContext(_errorReporter, _intermediateAllocator, _resources, manager.ContextContainer);
+
+            _activePasses = new List<IRenderPass>();
+            _commands = new List<FrameGraphCommands>();
         }
 
         private void Dispose(bool disposing)
@@ -27,13 +55,11 @@ namespace Primary.Rendering
             {
                 if (disposing)
                 {
-                    foreach (PassConfiguration pass in _renderPasses)
-                    {
-                        pass.Pass.Dispose();
-                    }
+                    _resources.Dispose();
+                    _timeline.Dispose();
+                    _recorder.Dispose();
 
-                    _renderPasses.Clear();
-                    _orderedPasses.Clear();
+                    _intermediateAllocator.Dispose();
                 }
 
                 _disposedValue = true;
@@ -46,141 +72,106 @@ namespace Primary.Rendering
             GC.SuppressFinalize(this);
         }
 
-        public T? AddRenderPass<T>() where T : class, IRenderPass, new()
+        internal void ClearInternals()
         {
-            if (_renderPasses.Exists((x) => x.Pass is T))
-            {
-                Log.Warning("Cannot add render pass as it already exists within collection: {pass}", typeof(T).Name);
-                return default;
-            }
-
-            T pass = new T();
-
-            _renderPasses.Add(new PassConfiguration
-            {
-                Pass = pass,
-                Priority = typeof(T).GetCustomAttribute<RenderPassPriorityAttribute>()
-            });
-
-            _needsReorder = true;
-            return pass;
+            _renderPass.ClearInternals();
+            _timeline.ClearTimeline();
+            _resources.ClearNewFrame();
+            _recorder.ClearForFrame();
+            _state.ClearForFrame();
+            _setup.ClearForFrame();
+            _intermediateAllocator.Reset();
+            _commands.Clear();
         }
 
-        public void RemoveRenderPass<T>() where T : class, IRenderPass
+        internal void SetupPasses(RenderContextContainer contextContainer)
         {
-            int index = _renderPasses.FindIndex((x) => x.Pass is T);
-            if (index >= 0)
+            using (new ProfilingScope("Setup"))
             {
-                PassConfiguration config = _renderPasses[index];
-                config.Pass.Dispose();
-
-                _renderPasses.RemoveAt(index);
-                _needsReorder = true;
-            }
-            else
-            {
-                Log.Information("No render pass of type: {pass} within collection", typeof(T).Name);
-            }
-        }
-
-        internal void ReorganizePassesIfRequired()
-        {
-            if (_needsReorder)
-            {
-                _orderedPasses.Clear();
-
-                List<int> passesLeft = new List<int>();
-                HashSet<Type> realPasses = new HashSet<Type>();
-                HashSet<KeyValuePair<Type, Type>> warnedPasses = new HashSet<KeyValuePair<Type, Type>>();
-
-                for (int i = 0; i < _renderPasses.Count; i++)
+                foreach (IRenderPass renderPass in _activePasses)
                 {
-                    passesLeft.Add(i);
-                    realPasses.Add(_renderPasses[i].Pass.GetType());
+                    renderPass.SetupRenderPasses(_renderPass, contextContainer);
                 }
+            }
+        }
 
-                while (passesLeft.Count > 0)
+        internal void CompilePasses(RenderContextContainer contextContainer)
+        {
+            using (new ProfilingScope("Compile"))
+            {
+                FrameGraphTexture texture = contextContainer.Get<RenderCameraData>()!.ColorTexture;
+                _renderPassCompiler.Compile(texture, _renderPass.Passes, _timeline, _resources, _state);
+            }
+        }
+
+        internal void ExecutePasses(RenderContextContainer contextContainer)
+        {
+            using (new ProfilingScope("Execute"))
+            {
+                ReadOnlySpan<RenderPassDescription> submittedPasses = _renderPass.Passes;
+                foreach (int passIndex in _timeline.Passes)
                 {
-                    for (int i = 0; i < passesLeft.Count; i++)
+                    ref readonly RenderPassDescription desc = ref submittedPasses[passIndex];
+                    if (desc.Type == RenderPassType.Graphics)
                     {
-                        int index = passesLeft[i];
-                        PassConfiguration config = _renderPasses[index];
+                        CommandRecorder recorder = _recorder.GetNewRecorder(passIndex);
+                        RenderPassStateData stateData = _state.GetStateData(passIndex);
 
-                        bool hasAllRequirmentsMet = true;
-                        if (config.Priority != null)
-                        {
-                            foreach (Type requirement in config.Priority.Requirements)
-                            {
-                                if (!realPasses.Contains(requirement) || !config.Priority.RequiresAllPasses)
-                                {
-                                    if (!warnedPasses.Contains(new KeyValuePair<Type, Type>(config.Pass.GetType(), requirement)))
-                                    {
-                                        Log.Warning("Render pass: {pass} requires a pass that does not exist: {reqPass}", config.Pass.GetType().Name, requirement.Name);
-                                        warnedPasses.Add(new KeyValuePair<Type, Type>(config.Pass.GetType(), requirement));
-                                    }
+                        stateData.SetupState(in desc);
+                        _rasterContext.SetupContext(stateData, recorder);
 
-                                    if (config.Priority.RequiresAllPasses)
-                                    {
-                                        hasAllRequirmentsMet = false;
-                                        passesLeft.RemoveAt(i);
-                                        break;
-                                    }
-                                }
-                                else if (!_orderedPasses.Exists((x) => x.GetType() == requirement))
-                                {
-                                    hasAllRequirmentsMet = false;
-                                    break;
-                                }
-                            }
-                        }
+                        submittedPasses[passIndex].Function?.Invoke(_rasterContext, _renderPass.GetPassData(desc.PassDataType!) ?? throw new NullReferenceException());
+                        recorder.FinishRecording();
 
-                        if (hasAllRequirmentsMet)
-                        {
-                            _orderedPasses.Add(config.Pass);
-                            passesLeft.RemoveAt(i);
-                        }
+                        _commands.Add(new FrameGraphCommands(recorder));
+                    }
+                    else if (desc.Type == RenderPassType.Compute)
+                    {
+                        CommandRecorder recorder = _recorder.GetNewRecorder(passIndex);
+                        RenderPassStateData stateData = _state.GetStateData(passIndex);
+
+                        stateData.SetupState(in desc);
+                        _computeContext.SetupContext(stateData, recorder);
+
+                        submittedPasses[passIndex].Function?.Invoke(_computeContext, _renderPass.GetPassData(desc.PassDataType!) ?? throw new NullReferenceException());
+                        recorder.FinishRecording();
+
+                        _commands.Add(new FrameGraphCommands(recorder));
                     }
                 }
-
-                _needsReorder = false;
             }
         }
 
-        internal void ExecuteAllPasses(IRenderPath path, RenderPassData passData)
+        internal void SetWindowOutput(RHISwapChain swapChain, FrameGraphTexture texture)
         {
-            for (int i = 0; i < _orderedPasses.Count; i++)
+            _setup.OutputSwapChain = swapChain;
+            _setup.DestinationTexture = texture;
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public void AddRenderPass<T>() where T : class, IRenderPass, new()
+        {
+            if (!_activePasses.Exists((x) => x is T))
             {
-                IRenderPass pass = _orderedPasses[i];
-
-                using (new ProfilingScope(pass.GetType().Name))
-                {
-                    pass.PrepareFrame(path, passData);
-                    pass.ExecutePass(path, passData);
-                    pass.CleanupFrame(path, passData);
-                }
+                _activePasses.Add(new T());
             }
         }
 
-        internal struct PassConfiguration
+        /// <summary>Not thread-safe</summary>
+        public void RemoveRenderPass<T>() where T : class, IRenderPass, new()
         {
-            public IRenderPass Pass;
-            public RenderPassPriorityAttribute? Priority;
-        }
-    }
-
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public sealed class RenderPassPriorityAttribute : Attribute
-    {
-        private readonly Type[] _requirements;
-        private readonly bool _requiresAllPasses;
-
-        public RenderPassPriorityAttribute(bool requiresAllPasses, params Type[] requirements)
-        {
-            _requirements = requirements;
-            _requiresAllPasses = requiresAllPasses;
+            _activePasses.RemoveWhere((x) => x is T);
         }
 
-        public Type[] Requirements => _requirements;
-        public bool RequiresAllPasses => _requiresAllPasses;
+        internal RenderPass RenderPass => _renderPass;
+        internal RenderPassCompiler Compiler => _renderPassCompiler;
+
+        internal FrameGraphTimeline Timeline => _timeline;
+        internal FrameGraphResources Resources => _resources;
+        internal FrameGraphRecorder Recorder => _recorder;
+        internal FrameGraphSetup Setup => _setup;
+
+        public ReadOnlySpan<RenderPassDescription> CurrentPasses => _renderPass.Passes;
+        public ReadOnlySpan<FrameGraphCommands> Commands => _commands.AsSpan();
     }
 }

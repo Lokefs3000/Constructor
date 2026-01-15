@@ -1,22 +1,17 @@
 ﻿using Primary.Assets;
-using Primary.Rendering2;
-using Primary.Rendering2.Assets;
-using Primary.Rendering2.Data;
-using Primary.Rendering2.Recording;
-using Primary.Rendering2.Resources;
-using Primary.Rendering2.Structures;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using Primary.Rendering;
+using Primary.Rendering.Assets;
+using Primary.Rendering.Data;
+using Primary.Rendering.Recording;
+using Primary.Rendering.Resources;
+using Primary.Rendering.Structures;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.R2.ForwardPlus.Passes
 {
     internal sealed class TestPass : IRenderPass
     {
-        private static ShaderAsset2 _shader = AssetManager.LoadAsset<ShaderAsset2>("Engine/Shaders/ForwardPlus/Test.hlsl2", true);
+        private static ShaderAsset _shader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/ForwardPlus/Test.hlsl2", true);
         private static PropertyBlock _block = _shader.CreatePropertyBlock()!;
 
         public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)

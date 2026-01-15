@@ -13,27 +13,27 @@ namespace Interop.D3D12MemAlloc
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?GetD3D12Options@Allocator@D3D12MA@@QEBAAEBUD3D12_FEATURE_DATA_D3D12_OPTIONS@@XZ", ExactSpelling = true)]
         [return: NativeTypeName("const D3D12_FEATURE_DATA_D3D12_OPTIONS &")]
-        public static extern  D3D12_FEATURE_DATA_D3D12_OPTIONS* GetD3D12Options(Allocator* pThis);
+        public static extern D3D12_FEATURE_DATA_D3D12_OPTIONS* GetD3D12Options(Allocator* pThis);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?IsUMA@Allocator@D3D12MA@@QEBAHXZ", ExactSpelling = true)]
         [return: NativeTypeName("BOOL")]
-        public static extern  int IsUMA(Allocator* pThis);
+        public static extern int IsUMA(Allocator* pThis);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?IsCacheCoherentUMA@Allocator@D3D12MA@@QEBAHXZ", ExactSpelling = true)]
         [return: NativeTypeName("BOOL")]
-        public static extern  int IsCacheCoherentUMA(Allocator* pThis);
+        public static extern int IsCacheCoherentUMA(Allocator* pThis);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?IsGPUUploadHeapSupported@Allocator@D3D12MA@@QEBAHXZ", ExactSpelling = true)]
         [return: NativeTypeName("BOOL")]
-        public static extern  int IsGPUUploadHeapSupported(Allocator* pThis);
+        public static extern int IsGPUUploadHeapSupported(Allocator* pThis);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?IsTightAlignmentSupported@Allocator@D3D12MA@@QEBAHXZ", ExactSpelling = true)]
         [return: NativeTypeName("BOOL")]
-        public static extern  int IsTightAlignmentSupported(Allocator* pThis);
+        public static extern int IsTightAlignmentSupported(Allocator* pThis);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?GetMemoryCapacity@Allocator@D3D12MA@@QEBA_KI@Z", ExactSpelling = true)]
         [return: NativeTypeName("UINT64")]
-        public static extern  ulong GetMemoryCapacity(Allocator* pThis, uint memorySegmentGroup);
+        public static extern ulong GetMemoryCapacity(Allocator* pThis, uint memorySegmentGroup);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?CreateResource@Allocator@D3D12MA@@QEAAJPEBUALLOCATION_DESC@2@PEBUD3D12_RESOURCE_DESC@@W4D3D12_RESOURCE_STATES@@PEBUD3D12_CLEAR_VALUE@@PEAPEAVAllocation@2@AEBU_GUID@@PEAPEAX@Z", ExactSpelling = true)]
         [return: NativeTypeName("HRESULT")]
@@ -77,10 +77,10 @@ namespace Interop.D3D12MemAlloc
         public static extern void CalculateStatistics(Allocator* pThis, [NativeTypeName("D3D12MA::TotalStatistics *")] TotalStatistics* pStats);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?BuildStatsString@Allocator@D3D12MA@@QEBAXPEAPEA_WH@Z", ExactSpelling = true)]
-        public static extern  void BuildStatsString(Allocator* pThis, [NativeTypeName("WCHAR **")] ushort** ppStatsString, [NativeTypeName("BOOL")] int DetailedMap);
+        public static extern void BuildStatsString(Allocator* pThis, [NativeTypeName("WCHAR **")] ushort** ppStatsString, [NativeTypeName("BOOL")] int DetailedMap);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?FreeStatsString@Allocator@D3D12MA@@QEBAXPEA_W@Z", ExactSpelling = true)]
-        public static extern  void FreeStatsString(Allocator* pThis, [NativeTypeName("WCHAR *")] ushort* pStatsString);
+        public static extern void FreeStatsString(Allocator* pThis, [NativeTypeName("WCHAR *")] ushort* pStatsString);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?BeginDefragmentation@Allocator@D3D12MA@@QEAAXPEBUDEFRAGMENTATION_DESC@2@PEAPEAVDefragmentationContext@2@@Z", ExactSpelling = true)]
         public static extern void BeginDefragmentation(Allocator* pThis, [NativeTypeName("const DEFRAGMENTATION_DESC *")] DEFRAGMENTATION_DESC* pDesc, DefragmentationContext** ppContext);

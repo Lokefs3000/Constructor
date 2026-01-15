@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.Versioning;
-using System.Text;
+﻿using System.Runtime.Versioning;
 using TerraFX.Interop;
 using TerraFX.Interop.Windows;
 

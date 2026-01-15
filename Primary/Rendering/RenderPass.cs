@@ -1,59 +1,121 @@
-﻿using Microsoft.Extensions.ObjectPool;
+﻿using Collections.Pooled;
+using CommunityToolkit.HighPerformance;
+using Primary.Rendering.Assets;
+using Primary.Rendering.Pass;
+using Primary.Rendering.Resources;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace Primary.Rendering
 {
     public sealed class RenderPass
     {
-        private DefaultObjectPool<RasterPassDescription> _rasterDescriptions;
+        private readonly RenderPassManager _manager;
 
-        private List<IPassDescription> _submittedPasses;
+        private RenderPassErrorReporter _errorReporter;
+        private RenderPassBlackboard _blackboard;
 
-        internal RenderPass()
+        private Dictionary<Type, IPassData> _passDataPool;
+        private List<RenderPassDescription> _passes;
+
+        private int _resourceCounter;
+
+        internal RenderPass(RenderPassManager manager)
         {
-            _rasterDescriptions = new DefaultObjectPool<RasterPassDescription>(new RasterPassDescriptionPolicy());
+            _manager = manager;
 
-            _submittedPasses = new List<IPassDescription>();
+            _errorReporter = new RenderPassErrorReporter();
+            _blackboard = new RenderPassBlackboard();
+
+            _passDataPool = new Dictionary<Type, IPassData>();
+            _passes = new List<RenderPassDescription>();
         }
 
-        public RasterPassDescription CreateRasterPass()
-        {
-            RasterPassDescription description = _rasterDescriptions.Get();
-            description.Reset(this);
+        internal int GetNewResourceIndex() => _resourceCounter++;
 
-            return description;
+        internal void ClearInternals()
+        {
+            foreach (var kvp in _passDataPool)
+                kvp.Value.Clear();
+
+            _blackboard.EraseBlackboards();
+
+            _passes.Clear();
+
+            _resourceCounter = 0;
         }
 
-        internal void SubmitPassForExecution(IPassDescription pass)
+        internal IPassData? GetPassData(Type type)
         {
-            _submittedPasses.Add(pass);
+            if (_passDataPool.TryGetValue(type, out IPassData? data))
+                return data;
+            return null;
         }
 
-        internal void ClearForNextFrame()
+        public RasterPassDescription SetupRasterPass<T>(string name, out T data) where T : class, IPassData, new()
         {
-            for (int i = 0; i < _submittedPasses.Count; i++)
+            if (!_passDataPool.TryGetValue(typeof(T), out IPassData? passData))
             {
-                if (_submittedPasses[i] is RasterPassDescription raster)
-                    _rasterDescriptions.Return(raster);
+                passData = new T();
+                _passDataPool[typeof(T)] = passData;
             }
 
-            _submittedPasses.Clear();
+            data = Unsafe.As<T>(passData);
+            data.Clear();
+
+            RasterPassDescription desc = new RasterPassDescription(this, name, typeof(T));
+            return desc;
         }
 
-        internal IReadOnlyList<IPassDescription> Descriptions => _submittedPasses;
-        internal bool IsEmpty => _submittedPasses.Count == 0;
-
-        private struct RasterPassDescriptionPolicy : IPooledObjectPolicy<RasterPassDescription>
+        public ComputePassDescription SetupComputePass<T>(string name, out T data) where T : class, IPassData, new()
         {
-            public RasterPassDescription Create()
+            if (!_passDataPool.TryGetValue(typeof(T), out IPassData? passData))
             {
-                return new RasterPassDescription();
+                passData = new T();
+                _passDataPool[typeof(T)] = passData;
             }
 
-            public bool Return(RasterPassDescription obj)
+            data = Unsafe.As<T>(passData);
+            data.Clear();
+
+            ComputePassDescription desc = new ComputePassDescription(this, name, typeof(T));
+            return desc;
+        }
+
+        internal void AddNewRenderPass(RenderPassDescription desc) => _passes.Add(desc);
+
+        internal void ReportError(RPErrorSource source, RPErrorType type, string? resourceName) => _errorReporter.ReportError(source, type, resourceName);
+
+        public RenderPassManager Manager => _manager;
+        public RenderPassBlackboard Blackboard => _blackboard;
+
+        internal ReadOnlySpan<RenderPassDescription> Passes => _passes.AsSpan();
+
+        internal static void AddGlobalResources(PooledList<UsedResourceData> resources, PooledList<UsedRenderTargetData> renderTargets)
+        {
+            _globalResourceHash.Clear();
+
+            foreach (UsedResourceData data in resources)
             {
-                obj.Reset(null);
-                return true;
+                Debug.Assert(data.Resource.IsValidAndRenderGraph);
+                _globalResourceHash.Add(data.Resource.Index);
+            }
+
+            foreach (UsedRenderTargetData data in renderTargets)
+            {
+                Debug.Assert(((FrameGraphResource)data.Target).IsValidAndRenderGraph);
+                _globalResourceHash.Add(data.Target.Index);
+            }
+
+            ShaderGlobalsManager instance = ShaderGlobalsManager.Instance;
+            foreach (var kvp in instance.TransitionalProperties)
+            {
+                if (!_globalResourceHash.Contains(kvp.Key) && instance.TryGetPropertyValue(kvp.Value.String, out PropertyData data))
+                    resources.Add(new UsedResourceData(FGResourceUsage.Read, data.Resource));
             }
         }
+
+        [ThreadStatic]
+        private static HashSet<int> _globalResourceHash = new HashSet<int>();
     }
 }

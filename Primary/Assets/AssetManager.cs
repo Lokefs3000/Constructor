@@ -35,7 +35,8 @@ namespace Primary.Assets
                 { typeof(ShaderAsset), new ShaderAssetLoader() },
                 { typeof(MaterialAsset), new MaterialAssetLoader() },
                 { typeof(TextureAsset), new TextureAssetLoader() },
-                { typeof(PostProcessingVolumeAsset), new EffectVolumeLoader() }
+                { typeof(PostProcessingVolumeAsset), new EffectVolumeLoader() },
+                { typeof(ComputeShaderAsset), new ComputeShaderAssetLoader() }
             }.ToFrozenDictionary();
 
             _invalidAssets = new Dictionary<Type, (IAssetDefinition, IInternalAssetData)>();
@@ -321,6 +322,32 @@ namespace Primary.Assets
             }
 
             return @this.LoadAssetImpl(type, realisedPath, assetId, synchronous, null);
+        }
+
+        /// <summary>Thread-safe</summary>
+        public static void WaitForAssetLoad(AssetId assetId)
+        {
+            //empty for now
+        }
+
+        /// <summary>Thread-safe</summary>
+        public static void WaitForAssetLoad(ReadOnlySpan<char> sourcePath)
+        {
+            AssetManager @this = NullableUtility.ThrowIfNull(s_instance);
+            if (@this._assetIdProvider == null)
+            {
+                EngLog.Assets.Error("[a:{path}]: No asset id provider has been assigned and thus no resource id can be realized from path.", sourcePath.ToString());
+                return;
+            }
+
+            AssetId id = @this._assetIdProvider.RetriveIdForPath(sourcePath);
+            if (id.IsInvalid)
+            {
+                EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
+                return;
+            }
+
+            WaitForAssetLoad(id);
         }
 
         /// <summary>Not thread-safe</summary>

@@ -1,9 +1,7 @@
 ﻿using Editor.Geometry;
 using Primary.Assets.Types;
-using Primary.Rendering;
-using Primary.Rendering.Data;
+using Primary.RHI2;
 using System.Runtime.CompilerServices;
-using RHI = Primary.RHI;
 
 namespace Editor.Assets.Types
 {
@@ -47,8 +45,8 @@ namespace Editor.Assets.Types
 
         private bool _needsRegenerate;
 
-        private RHI.Buffer? _vertexBuffer;
-        private RHI.Buffer? _indexBuffer;
+        private RHIBuffer? _vertexBuffer;
+        private RHIBuffer? _indexBuffer;
 
         private int _vertexBufferSize;
         private int _indexBufferSize;
@@ -136,14 +134,11 @@ namespace Editor.Assets.Types
                         _vertexBufferSize = (int)(_generator.Vertices.Length * 1.5);
                         unsafe
                         {
-                            _vertexBuffer = RenderingManager.Device.CreateBuffer(new RHI.BufferDescription
+                            _vertexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
                             {
-                                ByteWidth = (uint)(Unsafe.SizeOf<GeoVertex>() * _vertexBufferSize),
-                                Stride = (uint)Unsafe.SizeOf<GeoVertex>(),
-                                Memory = RHI.MemoryUsage.Default,
-                                Usage = RHI.BufferUsage.VertexBuffer,
-                                Mode = RHI.BufferMode.None,
-                                CpuAccessFlags = RHI.CPUAccessFlags.Write
+                                Width = (uint)(Unsafe.SizeOf<GeoVertex>() * _vertexBufferSize),
+                                Stride = Unsafe.SizeOf<GeoVertex>(),
+                                Usage = RHIResourceUsage.VertexInput,
                             }, (nint)Unsafe.AsPointer(ref _generator.Vertices[0]));
                         }
                     }
@@ -155,14 +150,11 @@ namespace Editor.Assets.Types
                         _indexBufferSize = (int)(_generator.Indices.Length * 1.5);
                         unsafe
                         {
-                            _indexBuffer = RenderingManager.Device.CreateBuffer(new RHI.BufferDescription
+                            _indexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
                             {
-                                ByteWidth = (uint)(Unsafe.SizeOf<ushort>() * _indexBufferSize),
-                                Stride = (uint)Unsafe.SizeOf<ushort>(),
-                                Memory = RHI.MemoryUsage.Default,
-                                Usage = RHI.BufferUsage.IndexBuffer,
-                                Mode = RHI.BufferMode.None,
-                                CpuAccessFlags = RHI.CPUAccessFlags.Write
+                                Width = (uint)(Unsafe.SizeOf<ushort>() * _indexBufferSize),
+                                Stride = Unsafe.SizeOf<ushort>(),
+                                Usage = RHIResourceUsage.VertexInput,
                             }, (nint)Unsafe.AsPointer(ref _generator.Indices[0]));
                         }
                     }

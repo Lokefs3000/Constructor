@@ -1,9 +1,9 @@
 ﻿using Primary.Assets.Types;
 using Primary.Common;
-using Primary.Rendering.Data;
+using Primary.Rendering.Assets;
+using Primary.RHI2;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Primary.Assets
 {
@@ -50,8 +50,8 @@ namespace Primary.Assets
         private RenderMesh[] _meshes;
         private ModelNode? _node;
 
-        private RHI.Buffer? _vertexBuffer;
-        private RHI.Buffer? _indexBuffer;
+        private RHIBuffer? _vertexBuffer;
+        private RHIBuffer? _indexBuffer;
 
         internal ModelAssetData(AssetId id)
         {
@@ -78,8 +78,8 @@ namespace Primary.Assets
 
             _asset.Target = null;
 
-            foreach (RenderMesh rm in _meshes)
-                rm.FreeHandle();
+            //foreach (RenderMesh rm in _meshes)
+            //    rm.FreeHandle();
 
             _meshes = Array.Empty<RenderMesh>();
             _node = null;
@@ -98,7 +98,7 @@ namespace Primary.Assets
             _name = name;
         }
 
-        internal void UpdateAssetData(ModelAsset asset, RenderMesh[] meshes, ModelNode node, RHI.Buffer vertexBuffer, RHI.Buffer indexBuffer)
+        internal void UpdateAssetData(ModelAsset asset, RenderMesh[] meshes, ModelNode node, RHIBuffer vertexBuffer, RHIBuffer indexBuffer)
         {
             _asset.Target = asset;
             _meshes = meshes;
@@ -132,8 +132,8 @@ namespace Primary.Assets
             return false;
         }
 
-        public RHI.Buffer? VertexBuffer => _vertexBuffer;
-        public RHI.Buffer? IndexBuffer => _indexBuffer;
+        public RHIBuffer? VertexBuffer => _vertexBuffer;
+        public RHIBuffer? IndexBuffer => _indexBuffer;
 
         internal ResourceStatus Status => _status;
 
@@ -158,8 +158,6 @@ namespace Primary.Assets
         {
             _id = id;
         }
-
-        internal new void FreeHandle() => base.FreeHandle();
 
         public ModelAsset Model => Unsafe.As<ModelAsset>(Unsafe.As<ModelAssetData>(Source).Definition ?? throw new NullReferenceException());
         public string Id => _id;

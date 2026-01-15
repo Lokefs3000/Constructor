@@ -12,14 +12,11 @@ namespace Primary.Assets
         private List<ISubFilesystem> _filesystem;
         private bool _disposedValue;
 
-        private ShaderLibrary _shaderLibrary;
-
         internal AssetFilesystem()
         {
             s_instance = this;
 
             _filesystem = new List<ISubFilesystem>();
-            _shaderLibrary = new ShaderLibrary();
         }
 
         public void AddFilesystem(ISubFilesystem filesystem)
@@ -95,7 +92,6 @@ namespace Primary.Assets
             {
                 if (disposing)
                 {
-                    _shaderLibrary.Dispose();
                     s_instance = null;
                 }
 
@@ -115,7 +111,5 @@ namespace Primary.Assets
         public static Stream? OpenStream(ReadOnlySpan<char> path, BundleReader? bundleToReadFrom = null) => s_instance!.OpenAsStream(path, bundleToReadFrom);
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool Exists(ReadOnlySpan<char> path, BundleReader? bundleToReadFrom = null) => s_instance!.DoesFileExist(path, bundleToReadFrom);
-
-        public static ShaderLibrary ShaderLibrary => s_instance!._shaderLibrary;
     }
 }

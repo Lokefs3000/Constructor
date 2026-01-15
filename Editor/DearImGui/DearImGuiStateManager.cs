@@ -4,15 +4,11 @@ using Primary.Assets;
 using Primary.Common;
 using Primary.Profiling;
 using Primary.Rendering;
-using Primary.Rendering.Pass;
-using Primary.Rendering.Raw;
 using SDL;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
-
-using RHI = Primary.RHI;
 
 namespace Editor.DearImGui
 {
@@ -21,7 +17,7 @@ namespace Editor.DearImGui
         private Editor _editor;
 
         private ImGuiContextPtr _context;
-        private DearImGuiRenderPass _renderPass;
+        //private DearImGuiRenderPass _renderPass;
 
         private bool _disposedValue;
 
@@ -43,7 +39,7 @@ namespace Editor.DearImGui
             ImGuiIOPtr io = ImGui.GetIO();
             io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
 
-            _renderPass = new DearImGuiRenderPass();
+            //_renderPass = new DearImGuiRenderPass();
         }
 
         private void Dispose(bool disposing)
@@ -52,7 +48,7 @@ namespace Editor.DearImGui
             {
                 _editor.EventManager.EventRecieved -= EventRecived;
 
-                _renderPass.Dispose();
+                //_renderPass.Dispose();
 
                 ImGuiImplSDL3.Shutdown();
                 ImGui.DestroyContext();
@@ -99,11 +95,12 @@ namespace Editor.DearImGui
 
         internal void SetupPasses(RenderPass renderPass)
         {
-            _renderPass.ExecutePass(renderPass);
+            //_renderPass.ExecutePass(renderPass);
         }
 
         private static void EventRecived(SDL_Event @event) => ImGuiImplSDL3.ProcessEvent(ref Unsafe.As<SDL_Event, SDLEvent>(ref @event));
 
+        /*
         private class DearImGuiRenderPass
         {
             private RHI.GraphicsDevice _device;
@@ -419,5 +416,6 @@ namespace Editor.DearImGui
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void CleanupFrame(IRenderPath path, RenderPassData passData) { }
         }
+        */
     }
 }

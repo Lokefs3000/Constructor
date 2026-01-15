@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Editor.Assets.Importers;
 using Editor.Platform.Windows;
+using Editor.UI.Assets.Importers;
 using Primary;
 using Primary.Assets;
 using Primary.Assets.Types;
@@ -109,13 +110,14 @@ namespace Editor.Assets
                 needsDbRefresh = true;
 
             AddImporter<ModelAssetImporter>(".fbx", ".obj");
-            AddImporter<ShaderAssetImporter>(".hlsl");
             AddImporter<TextureAssetImporter>(".png", ".jpg", ".jpeg", ".texcomp", ".cubemap");
             AddImporter<MaterialAssetImporter>(".mat");
             AddImporter<GeoSceneAssetImporter>(".geoscn");
             AddImporter<EffectVolumeAssetImporter>(".fxvol");
-            AddImporter<NewShaderImporter>(".hlsl2");
-            AddImporter<NewMaterialAssetImporter>(".mat2");
+            AddImporter<ShaderAssetImporter>(".hlsl2", ".shader");
+            AddImporter<MaterialAssetImporter>(".mat2");
+            AddImporter<UIFontAssetImporter>(".uifont");
+            AddImporter<ComputeShaderAssetImporter>(".compute");
 
             RefreshDatabase(needsDbRefresh, startupUi);
         }
@@ -134,7 +136,6 @@ namespace Editor.Assets
 
                     File.WriteAllText(AssetIdentifier.DataFilePath, _identifier.TrySerializeAssetIds());
 
-                    Editor.GlobalSingleton.ProjectShaderLibrary.FlushFileMappings();
                     Editor.GlobalSingleton.ProjectSubFilesystem.FlushFileRemappings();
 
                     Editor.GlobalSingleton.EngineFilesystem.FlushFileRemappings();
@@ -185,7 +186,7 @@ namespace Editor.Assets
                 ReadOnlySpan<char> localPath = line.Slice(ranges[0].Start.Value, ranges[0].End.Value - ranges[0].Start.Value);
                 ReadOnlySpan<char> lastWriteTime = line.Slice(ranges[1].Start.Value, ranges[1].End.Value - ranges[1].Start.Value);
 
-                AssetId id = new AssetId(uint.Parse(localPath));
+                AssetId id = new AssetId(ulong.Parse(localPath));
                 if (!_identifier.IsIdValid(id))
                 {
                     EdLog.Assets.Warning("Invalid asset id in imported assets: {id}", id);
@@ -505,9 +506,10 @@ namespace Editor.Assets
                     startupUi.PopStep();
                 }
 
+                startupUi.Progress = 1.0f;
+
                 File.WriteAllText(AssetIdentifier.DataFilePath, _identifier.TrySerializeAssetIds());
 
-                Editor.GlobalSingleton.ProjectShaderLibrary.FlushFileMappings();
                 Editor.GlobalSingleton.ProjectSubFilesystem.FlushFileRemappings();
 
                 Editor.GlobalSingleton.EngineFilesystem.FlushFileRemappings();
@@ -580,10 +582,7 @@ namespace Editor.Assets
                                     string assetPath = GetAssetPath(localPath);
 
                                     bool ret = importer.Importer.Import(this, filesystem, realPath, assetPath, assetPath.Substring(Editor.GlobalSingleton.ProjectPath.Length));
-                                    if (ret)
-                                    {
-                                        _importedAssets[_identifier.GetOrRegisterAsset(localPath)] = File.GetLastWriteTime(realPath);
-                                    }
+                                    _importedAssets[_identifier.GetOrRegisterAsset(localPath)] = File.GetLastWriteTime(realPath);
                                 }
                                 catch (Exception ex)
                                 {
@@ -790,7 +789,7 @@ namespace Editor.Assets
         internal event Action<string, string>? FileRenamed;
 
         /// <summary>Thread-safe</summary>
-        private string GetAssetPath(string localPath) => Path.Combine(EditorFilepaths.LibraryImportedPath, _identifier.GetOrRegisterAsset(localPath).ToString() + ".iaf").Replace('\\', '/');
+        private string GetAssetPath(string localPath) => Path.Combine(EditorFilepaths.LibraryImportedPath, _identifier.GetOrRegisterAsset(localPath).Id.ToString() + ".iaf").Replace('\\', '/');
 
         //TODO: add support for already local paths
         private bool EnsureLocalPath(string fullPath, [NotNullWhen(true)] out string? localPath)
@@ -891,14 +890,27 @@ namespace Editor.Assets
                 localPath = fullPath.Substring(EditorFilepaths.EnginePath.Length - 6);
                 return true;
             }
-            else if (GetFileNamespace(span.Slice(EditorFilepaths.EditorPath.Length - 5)).GetDjb2HashCode() == s_editorNamespaceHash)
+            else if (GetFileNamespace(span.Slice(EditorFilepaths.EditorPath.Length - 6)).GetDjb2HashCode() == s_editorNamespaceHash)
             {
-                localPath = fullPath.Substring(EditorFilepaths.EditorPath.Length - 5);
+                localPath = fullPath.Substring(EditorFilepaths.EditorPath.Length - 6);
                 return true;
             }
 
             localPath = null;
             return false;
+        }
+
+        /// <summary>Thread-safe</summary>
+        public static bool TryGetFullPathFromLocal(string localPath, [NotNullWhen(true)] out string? fullPath)
+        {
+            fullPath = null;
+
+            ProjectSubFilesystem? filesystem = SelectAppropriateFilesystem(GetFileNamespace(localPath));
+            if (filesystem == null)
+                return false;
+
+            fullPath = filesystem.GetFullPath(localPath);
+            return true;
         }
 
         private static readonly int s_contentNamespaceHash = "Content".GetDjb2HashCode();

@@ -1,4 +1,3 @@
-using System;
 using System.Diagnostics;
 
 namespace Interop.D3D12MemAlloc
@@ -8,7 +7,7 @@ namespace Interop.D3D12MemAlloc
     [Conditional("DEBUG")]
     internal sealed partial class NativeTypeNameAttribute : Attribute
     {
-        private  string _name;
+        private string _name;
 
         /// <summary>Initializes a new instance of the <see cref="NativeTypeNameAttribute" /> class.</summary>
         /// <param name="name">The name of the type that was used in the native signature.</param>

@@ -1,6 +1,6 @@
 using TerraFX.Interop.DirectX;
-using static TerraFX.Interop.DirectX.D3D12_RESIDENCY_PRIORITY;
 using static Interop.D3D12MemAlloc.POOL_FLAGS;
+using static TerraFX.Interop.DirectX.D3D12_RESIDENCY_PRIORITY;
 
 namespace Interop.D3D12MemAlloc
 {

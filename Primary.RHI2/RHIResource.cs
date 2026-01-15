@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Primary.RHI2
+﻿namespace Primary.RHI2
 {
     public abstract class RHIResource : IDisposable
     {
@@ -24,17 +20,24 @@ namespace Primary.RHI2
             GC.SuppressFinalize(this);
         }
 
+        public abstract unsafe RHIResourceNative* GetBaseAsNative();
+
         public string? DebugName
         {
             get => _debugName;
             set
             {
                 if (_debugName != value)
-                    SetDebugName(_debugName);
+                    SetDebugName(value);
                 _debugName = value;
             }
         }
 
         public abstract RHIResourceType Type { get; }
+    }
+
+    public struct RHIResourceNative
+    {
+
     }
 }

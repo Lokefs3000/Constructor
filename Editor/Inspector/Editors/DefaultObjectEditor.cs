@@ -1,15 +1,11 @@
-﻿using Editor.DearImGui.Properties;
-using Editor.Inspector.Editors;
+﻿using Editor.Inspector.Editors;
 using Editor.Inspector.Entities;
 using Primary.Assets;
 using Primary.Assets.Types;
-using Primary.Components;
-using Primary.Rendering.Data;
-using Primary.Scenes;
+using Primary.Rendering.Assets;
 using System.Collections.Frozen;
 using System.Numerics;
 using System.Reflection;
-using TerraFX.Interop.Windows;
 
 namespace Editor.Inspector.Components
 {

@@ -13,9 +13,9 @@ using Vortice.Direct3D;
 using Vortice.Direct3D12;
 using Vortice.Direct3D12.Debug;
 using Vortice.DXGI;
+using D3D12MemAlloc = Interop.D3D12MemAlloc;
 using Feature = Vortice.Direct3D12.Feature;
 using Terra = TerraFX.Interop.DirectX;
-using D3D12MemAlloc = Interop.D3D12MemAlloc;
 
 namespace Primary.RHI.Direct3D12
 {

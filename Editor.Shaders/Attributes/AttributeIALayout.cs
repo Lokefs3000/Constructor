@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using RHI = Primary.RHI;
+﻿using Primary.RHI2;
 
 namespace Editor.Shaders.Attributes
 {
@@ -22,8 +16,8 @@ namespace Editor.Shaders.Attributes
             new AttributeVariable("Name", typeof(string), null, AttributeFlags.Required),
             new AttributeVariable("Offset", typeof(int), -1, AttributeFlags.None),
             new AttributeVariable("Slot", typeof(int), 0, AttributeFlags.None),
-            new AttributeVariable("Class", typeof(RHI.InputClassification), null, AttributeFlags.None),
-            new AttributeVariable("Format", typeof(RHI.InputElementFormat), null, AttributeFlags.None),
+            new AttributeVariable("Class", typeof(RHIInputClass), null, AttributeFlags.None),
+            new AttributeVariable("Format", typeof(RHIElementFormat), null, AttributeFlags.None),
             ];
     }
 }

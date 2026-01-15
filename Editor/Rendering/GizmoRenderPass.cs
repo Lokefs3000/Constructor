@@ -1,9 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Editor.Interaction;
 using Primary.Assets;
-using Primary.Rendering;
-using Primary.Rendering.Pass;
-using Primary.Rendering.Raw;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using RHI = Primary.RHI;

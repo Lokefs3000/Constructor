@@ -1,4 +1,5 @@
 ﻿using Primary.Assets.Types;
+using Primary.RHI2;
 using System.Runtime.CompilerServices;
 
 namespace Primary.Assets
@@ -14,8 +15,8 @@ namespace Primary.Assets
 
         internal TextureAssetData AssetData => _assetData;
 
-        public RHI.Texture? RawRHITexture => _assetData.Texture;
-        public RHI.Sampler? RawRHISampler => _assetData.Sampler;
+        public RHITexture? RawRHITexture => _assetData.Texture;
+        public RHISampler? RawRHISampler => _assetData.Sampler;
 
         public ResourceStatus Status => _assetData.Status;
 
@@ -24,9 +25,7 @@ namespace Primary.Assets
 
         public int Width => _assetData.Width;
         public int Height => _assetData.Height;
-        public RHI.TextureFormat Format => _assetData.Format;
-
-        public nint Handle => _assetData.Texture?.Handle ?? nint.Zero;
+        public RHIFormat Format => _assetData.Format;
     }
 
     internal class TextureAssetData : IInternalAssetData
@@ -38,12 +37,12 @@ namespace Primary.Assets
         private readonly AssetId _id;
         private string _name;
 
-        private RHI.Texture? _texture;
-        private RHI.Sampler? _sampler;
+        private RHITexture? _texture;
+        private RHISampler? _sampler;
 
         private int _width;
         private int _height;
-        private RHI.TextureFormat _format;
+        private RHIFormat _format;
 
         internal TextureAssetData(AssetId id)
         {
@@ -59,7 +58,7 @@ namespace Primary.Assets
 
             _width = 0;
             _height = 0;
-            _format = RHI.TextureFormat.Undefined;
+            _format = RHIFormat.Unknown;
         }
 
         public void Dispose()
@@ -76,7 +75,7 @@ namespace Primary.Assets
 
             _width = 0;
             _height = 0;
-            _format = RHI.TextureFormat.Undefined;
+            _format = RHIFormat.Unknown;
         }
 
         public void SetAssetInternalStatus(ResourceStatus status)
@@ -89,7 +88,7 @@ namespace Primary.Assets
             _name = name;
         }
 
-        internal void UpdateAssetData(TextureAsset asset, RHI.Texture texture, RHI.Sampler sampler)
+        internal void UpdateAssetData(TextureAsset asset, RHITexture texture, RHISampler sampler)
         {
             _asset.Target = asset;
 
@@ -98,8 +97,8 @@ namespace Primary.Assets
             _texture = texture;
             _sampler = sampler;
 
-            _width = (int)texture.Description.Width;
-            _height = (int)texture.Description.Height;
+            _width = texture.Description.Width;
+            _height = texture.Description.Height;
             _format = texture.Description.Format;
         }
 
@@ -117,12 +116,12 @@ namespace Primary.Assets
 
         public int LoadIndex => 0;
 
-        internal RHI.Texture? Texture => _texture;
-        internal RHI.Sampler? Sampler => _sampler;
+        internal RHITexture? Texture => _texture;
+        internal RHISampler? Sampler => _sampler;
 
         internal int Width => _width;
         internal int Height => _height;
-        internal RHI.TextureFormat Format => _format;
+        internal RHIFormat Format => _format;
 
         public Type AssetType => typeof(TextureAsset);
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);

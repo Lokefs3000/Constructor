@@ -1,0 +1,69 @@
+#define LINEAR_GRADIENT_WIDTH 48
+#define LINEAR_GRADIENT_HEIGHT 8
+
+struct LinearGradientData
+{
+    uint2 OriginOffset;
+
+    uint KeyStartIndex;
+    uint KeyCount;
+};
+
+struct GradientKey
+{
+    float Time;
+    float4 Color;
+};
+
+StructuredBuffer<LinearGradientData> sbLinearGradients;
+ByteAddressBuffer baGradientKeyBuffer;
+
+RWTexture2D<float4> txGradientOutput;
+
+[kernel]
+[numthreads(16, 2, 1)]
+void CSGenLinearGradients(uint3 dispatchId : SV_DispatchThreadID)
+{
+    LinearGradientData gradientData = sbLinearGradients[dispatchId.z];
+
+    uint2 texSectionSize = uint2(LINEAR_GRADIENT_WIDTH / 16, LINEAR_GRADIENT_HEIGHT / 2);
+    uint2 texOffset = dispatchId.xy * texSectionSize;
+
+    uint2 texOffsetLimit = texOffset + texSectionSize;
+
+    for (uint y = texOffset.y; y < texOffsetLimit.y; ++y)
+    {
+        for (uint x = texOffset.x; x < texOffsetLimit.x; ++x)
+        {
+            if (x == 0)
+            {
+                txGradientOutput[uint2(x, y)] = baGradientKeyBuffer.Load<GradientKey>(gradientData.KeyStartIndex * sizeof(GradientKey)).Color;
+                continue;
+            }
+
+            float time = (x - gradientData.OriginOffset.x) / float(LINEAR_GRADIENT_WIDTH - 1);
+
+            float4 from = float4(1.0, 0.0, 1.0, 1.0); //default error color
+            float4 to = float4(1.0, 0.0, 1.0, 1.0); //default error color
+
+            float2 timeParams = 0.0;
+
+            for (uint i = 0; i < gradientData.KeyCount; ++i)
+            {
+                GradientKey key = baGradientKeyBuffer.Load<GradientKey>((gradientData.KeyStartIndex + i) * sizeof(GradientKey));
+                if (key.Time >= time)
+                {
+                    to = key.Color;
+                    timeParams.y = key.Time;
+                    break;
+                }
+
+                from = key.Color;
+                timeParams.x = key.Time;
+            }
+
+            uint2 indexor = uint2(x, y);
+            txGradientOutput[indexor] = lerp(from, to, (time - timeParams.x) / (timeParams.y - timeParams.x));
+        }
+    }
+}

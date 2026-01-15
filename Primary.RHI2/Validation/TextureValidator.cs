@@ -1,9 +1,5 @@
 ﻿using Primary.Common;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using TerraFX.Interop.DirectX;
 
 namespace Primary.RHI2.Validation
 {
@@ -79,7 +75,7 @@ namespace Primary.RHI2.Validation
                             logger?.Error("[r:{n}]: 3 dimensional texture must have a depth larger then 0 and less than 2048", resourceName);
                             return false;
                         }
-                        
+
                         break;
                     }
             }
@@ -127,13 +123,13 @@ namespace Primary.RHI2.Validation
                     return false;
                 }
 
-                if (description.DepthOrArraySize == 1)
+                if (description.DepthOrArraySize != 1)
                 {
                     logger?.Error("[r:{n}]: A texture intended for use as a render target must have an array size of 1", resourceName);
                     return false;
                 }
 
-                if (description.Format.IsRenderTargetCapable())
+                if (!description.Format.IsRenderTargetCapable())
                 {
                     logger?.Error("[r:{n}]: A texture intended for use as a render target must have a compatible format", resourceName);
                     return false;
@@ -148,13 +144,13 @@ namespace Primary.RHI2.Validation
                     return false;
                 }
 
-                if (description.DepthOrArraySize == 1)
+                if (description.DepthOrArraySize != 1)
                 {
                     logger?.Error("[r:{n}]: A texture intended for use as a depth stencil must have an array size of 1", resourceName);
                     return false;
                 }
 
-                if (description.Format.IsRenderTargetCapable())
+                if (!description.Format.IsDepthStencilCapable())
                 {
                     logger?.Error("[r:{n}]: A texture intended for use as a depth stencil must have a compatible format", resourceName);
                     return false;

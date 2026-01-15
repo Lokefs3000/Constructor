@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Text;
+﻿using System.Runtime.CompilerServices;
 
 namespace Primary.Assets.Types
 {
@@ -26,7 +23,7 @@ namespace Primary.Assets.Types
             _loadIndex = -1;
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             _asset.Target = null;
 

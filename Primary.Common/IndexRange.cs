@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Text;
+﻿using System.Diagnostics.CodeAnalysis;
 
 namespace Primary.Common
 {
@@ -15,7 +12,7 @@ namespace Primary.Common
             Start = start;
             End = end;
         }
-        
+
         public IndexRange(int length)
         {
             Start = 0;
@@ -29,6 +26,8 @@ namespace Primary.Common
         public override string ToString() => $"{Start} - {End}";
 
         public int Length => End - Start;
+
+        public static readonly IndexRange Empty = new IndexRange(0, 0);
 
         public static implicit operator Range(IndexRange range) => new Range(range.Start, range.End);
     }

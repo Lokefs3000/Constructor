@@ -159,7 +159,7 @@ namespace Editor.DearImGui
 
                                 foreach (GeoBrush brush in _activeScene.BrushScene!.Brushes)
                                 {
-                                    
+
                                 }
 
                                 ImGui.EndTabItem();
@@ -172,7 +172,7 @@ namespace Editor.DearImGui
             }
             ImGui.End();
 
-            if(hasFocus)
+            if (hasFocus)
             {
                 ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(4.0f));
                 ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 3.0f);

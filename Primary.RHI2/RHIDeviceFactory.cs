@@ -1,8 +1,5 @@
 ﻿using Primary.RHI2.Direct3D12;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Primary.RHI2
 {

@@ -1,12 +1,4 @@
-﻿using Primary.Components;
-using Primary.Scenes;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
+﻿using Primary.Scenes;
 
 namespace Editor.Serialization
 {
@@ -16,7 +8,7 @@ namespace Editor.Serialization
         {
             try
             {
-                string ret = SceneSerializer.Serialize(entity);
+                string ret = string.Empty;//SceneSerializer.Serialize(entity);
                 return ret;
             }
             catch (Exception ex)

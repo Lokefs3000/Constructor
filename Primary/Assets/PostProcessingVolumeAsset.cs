@@ -1,14 +1,6 @@
 ﻿using Primary.Assets.Types;
-using Primary.Rendering.PostProcessing;
 using Primary.Utility;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
-using Vortice.DXGI;
 
 namespace Primary.Assets
 {
@@ -21,46 +13,12 @@ namespace Primary.Assets
             _assetData = assetData;
         }
 
-        /// <summary>Not thread-safe</summary>
-        public void AddEffect<T>() where T : IPostProcessingData, new()
-        {
-            if (!_assetData.Effects.Exists((x) => x is T))
-            {
-                _assetData.Effects.Add(new T());
-            }
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public void RemoveEffect<T>() where T : IPostProcessingData, new()
-        {
-            _assetData.Effects.RemoveWhere((x) => x is T);
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public void MoveEffect<T>(int newIndex) where T : IPostProcessingData, new()
-        {
-            if ((uint)newIndex >= _assetData.Effects.Count)
-                return;
-
-            int index = _assetData.Effects.FindIndex((x) => x is T);
-            if (index == newIndex)
-                return;
-
-            IPostProcessingData old = _assetData.Effects[index];
-            IPostProcessingData @new = _assetData.Effects[newIndex];
-
-            _assetData.Effects[index] = old;
-            _assetData.Effects[newIndex] = @new;
-        }
-
         internal PPVolumeAssetData AssetData => _assetData;
 
         public ResourceStatus Status => _assetData.Status;
 
         public string Name => _assetData.Name;
         public AssetId Id => _assetData.Id;
-
-        public IReadOnlyList<IPostProcessingData> Effects => _assetData.Effects;
     }
 
     internal sealed class PPVolumeAssetData : IInternalAssetData
@@ -72,8 +30,6 @@ namespace Primary.Assets
         private readonly AssetId _id;
         private string _name;
 
-        private List<IPostProcessingData> _effectData;
-
         internal PPVolumeAssetData(AssetId id)
         {
             _asset = new WeakReference(null);
@@ -82,8 +38,6 @@ namespace Primary.Assets
 
             _id = id;
             _name = string.Empty;
-
-            _effectData = new List<IPostProcessingData>();
         }
 
         public void Dispose()
@@ -91,8 +45,6 @@ namespace Primary.Assets
             _status = ResourceStatus.Disposed;
 
             _asset.Target = null;
-
-            _effectData.Clear();
         }
         public void SetAssetInternalStatus(ResourceStatus status)
         {
@@ -104,13 +56,11 @@ namespace Primary.Assets
             _name = name;
         }
 
-        internal void UpdateAssetData(PostProcessingVolumeAsset asset, List<IPostProcessingData> effectData)
+        internal void UpdateAssetData(PostProcessingVolumeAsset asset)
         {
             _asset.Target = asset;
 
             _status = ResourceStatus.Success;
-
-            _effectData = effectData;
         }
 
         internal void UpdateAssetFailed(PostProcessingVolumeAsset asset)
@@ -118,8 +68,6 @@ namespace Primary.Assets
             _asset.Target = asset;
 
             _status = ResourceStatus.Error;
-
-            _effectData.Clear();
         }
 
         internal ResourceStatus Status => _status;
@@ -128,8 +76,6 @@ namespace Primary.Assets
         internal string Name => _name;
 
         public int LoadIndex => 0;
-
-        internal List<IPostProcessingData> Effects => _effectData;
 
         public Type AssetType => typeof(PostProcessingVolumeAsset);
         public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);

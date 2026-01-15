@@ -1,5 +1,4 @@
 ﻿using Editor.Rendering.Debugging;
-using Primary.Rendering;
 
 namespace Editor.Rendering
 {
@@ -7,15 +6,14 @@ namespace Editor.Rendering
     {
         private Editor _editor;
 
-        private GizmoRenderPass _gizmoPass;
-        private ToolsRenderPass _toolsPass;
-        private SelectionRenderPass _selectionRenderPass;
-        private GeoToolRenderPass _geoToolRenderPass;
+        //private GizmoRenderPass _gizmoPass;
+        //private ToolsRenderPass _toolsPass;
+        //private SelectionRenderPass _selectionRenderPass;
+        //private GeoToolRenderPass _geoToolRenderPass;
 
-        private Gizmos _gizmos;
+        //private Gizmos _gizmos;
 
         private EntityDebugRenderer _entityDbgRenderer;
-        private StructureDebugRenderer _structureDbgRenderer;
 
         private bool _disposedValue;
 
@@ -23,15 +21,14 @@ namespace Editor.Rendering
         {
             _editor = Editor.GlobalSingleton;
 
-            _gizmoPass = new GizmoRenderPass();
-            _toolsPass = new ToolsRenderPass();
-            _selectionRenderPass = new SelectionRenderPass();
-            _geoToolRenderPass = new GeoToolRenderPass();
+            //_gizmoPass = new GizmoRenderPass();
+            //_toolsPass = new ToolsRenderPass();
+            //_selectionRenderPass = new SelectionRenderPass();
+            //_geoToolRenderPass = new GeoToolRenderPass();
 
-            _gizmos = new Gizmos();
+            //_gizmos = new Gizmos();
 
             _entityDbgRenderer = new EntityDebugRenderer();
-            _structureDbgRenderer = new StructureDebugRenderer();
         }
 
         private void Dispose(bool disposing)
@@ -40,12 +37,12 @@ namespace Editor.Rendering
             {
                 if (disposing)
                 {
-                    _gizmos.Dispose();
+                    //_gizmos.Dispose();
 
-                    _geoToolRenderPass.Dispose();
-                    _selectionRenderPass.Dispose();
-                    _toolsPass.Dispose();
-                    _gizmoPass.Dispose();
+                    //_geoToolRenderPass.Dispose();
+                    //_selectionRenderPass.Dispose();
+                    //_toolsPass.Dispose();
+                    //_gizmoPass.Dispose();
                 }
 
                 _disposedValue = true;
@@ -60,23 +57,23 @@ namespace Editor.Rendering
 
         internal void PrepareFrame()
         {
-            _gizmos.ResetForNewFrame();
+            //_gizmos.ResetForNewFrame();
         }
 
-        internal void SetupPasses(RenderPass renderPass)
+        internal void SetupPasses()
         {
-            _entityDbgRenderer.Render();
-            _structureDbgRenderer.Render();
-
-            _gizmos.FinalizeBuffers();
-
-            _gizmoPass.SetupRenderState(renderPass);
-            _selectionRenderPass.SetupRenderState(renderPass);
-            _geoToolRenderPass.SetupRenderState(renderPass);
-            _toolsPass.SetupRenderState(renderPass);
-            _editor.DearImGuiStateManager.SetupPasses(renderPass);
+            //_entityDbgRenderer.Render();
+            //_structureDbgRenderer.Render();
+            //
+            //_gizmos.FinalizeBuffers();
+            //
+            //_gizmoPass.SetupRenderState(renderPass);
+            //_selectionRenderPass.SetupRenderState(renderPass);
+            //_geoToolRenderPass.SetupRenderState(renderPass);
+            //_toolsPass.SetupRenderState(renderPass);
+            //_editor.DearImGuiStateManager.SetupPasses(renderPass);
         }
 
-        internal Gizmos Gizmos => _gizmos;
+        //internal Gizmos Gizmos => _gizmos;
     }
 }

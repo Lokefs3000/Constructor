@@ -1,19 +1,14 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Hexa.NET.ImGui;
 using Primary.Common;
-using Primary.Rendering2.Pass;
-using Primary.Rendering2.Recording;
-using System;
+using Primary.Rendering;
+using Primary.Rendering.Pass;
+using Primary.Rendering.Recording;
 using System.Collections.Frozen;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-
-using R2 = Primary.Rendering2;
 
 namespace Editor.DearImGui
 {
@@ -40,7 +35,7 @@ namespace Editor.DearImGui
             {
                 if (disposing)
                 {
-                    
+
                 }
 
                 _disposedValue = true;
@@ -60,7 +55,7 @@ namespace Editor.DearImGui
 
         public void Render()
         {
-            R2.RenderingManager renderer = Editor.GlobalSingleton.R2RenderingManager;
+            RenderingManager renderer = Editor.GlobalSingleton.RenderingManager;
 
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
 
@@ -113,7 +108,7 @@ namespace Editor.DearImGui
                 ImDrawListPtr drawList = ImGui.GetWindowDrawList();
                 Vector2 avail = ImGui.GetContentRegionAvail();
 
-                R2.RenderPassManager passManager = renderer.RenderPassManager;
+                RenderPassManager passManager = renderer.RenderPassManager;
                 foreach (ref readonly RenderPassDescription desc in passManager.CurrentPasses)
                 {
                     if (desc.Function != null)
@@ -164,7 +159,7 @@ namespace Editor.DearImGui
             {
                 if (_activePassId != -1)
                 {
-                    R2.RenderPassManager passManager = renderer.RenderPassManager;
+                    RenderPassManager passManager = renderer.RenderPassManager;
 
                     int index = 0;
                     foreach (ref readonly RenderPassDescription desc in passManager.CurrentPasses)

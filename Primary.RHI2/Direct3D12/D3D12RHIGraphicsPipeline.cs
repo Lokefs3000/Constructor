@@ -1,24 +1,22 @@
-﻿using Primary.Common;
-using System;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Common;
+using System.Buffers;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using System.Text;
 using TerraFX.Interop.DirectX;
 using TerraFX.Interop.Windows;
-using CommunityToolkit.HighPerformance;
-using System.Buffers;
 
-using static TerraFX.Interop.DirectX.D3D12_PIPELINE_STATE_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_CONSERVATIVE_RASTERIZATION_MODE;
 using static TerraFX.Interop.DirectX.D3D12_LOGIC_OP;
-using static TerraFX.Interop.DirectX.D3D12_ROOT_PARAMETER_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_SHADER_VISIBILITY;
-using static TerraFX.Interop.DirectX.D3D12_ROOT_SIGNATURE_FLAGS;
+using static TerraFX.Interop.DirectX.D3D12_PIPELINE_STATE_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_ROOT_DESCRIPTOR_FLAGS;
+using static TerraFX.Interop.DirectX.D3D12_ROOT_PARAMETER_TYPE;
+using static TerraFX.Interop.DirectX.D3D12_ROOT_SIGNATURE_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_SAMPLER_FLAGS;
+using static TerraFX.Interop.DirectX.D3D12_SHADER_VISIBILITY;
+using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 
 namespace Primary.RHI2.Direct3D12
 {
@@ -35,7 +33,9 @@ namespace Primary.RHI2.Direct3D12
         internal D3D12RHIGraphicsPipeline(D3D12RHIDevice device, RHIGraphicsPipelineDescription description, RHIGraphicsPipelineBytecode bytecode)
         {
             _device = device;
-            _description = description;
+
+            _bytecode = new RHIGraphicsPipelineBytecode(bytecode);
+            _description = new RHIGraphicsPipelineDescription(description);
 
             {
                 D3D12_ROOT_PARAMETER1[] parameters = new D3D12_ROOT_PARAMETER1[2];
@@ -71,7 +71,7 @@ namespace Primary.RHI2.Direct3D12
                     };
                 }
 
-                D3D12_STATIC_SAMPLER_DESC1[] samplers = description.ImmutableSamplers.Length > 0 ?
+                D3D12_STATIC_SAMPLER_DESC1[] samplers = description.ImmutableSamplers.Length == 0 ?
                     Array.Empty<D3D12_STATIC_SAMPLER_DESC1>() :
                     new D3D12_STATIC_SAMPLER_DESC1[description.ImmutableSamplers.Length];
 
@@ -171,9 +171,9 @@ namespace Primary.RHI2.Direct3D12
                 Array.Empty<D3D12_INPUT_ELEMENT_DESC>() :
                 new D3D12_INPUT_ELEMENT_DESC[_description.InputElements.Length];
 
-            Ptr<sbyte>[] elementNames = inputElements.Length == 0 ?
-                Array.Empty<Ptr<sbyte>>() :
-                new Ptr<sbyte>[inputElements.Length];
+            Ptr<byte>[] elementNames = inputElements.Length == 0 ?
+                Array.Empty<Ptr<byte>>() :
+                new Ptr<byte>[inputElements.Length];
 
             try
             {
@@ -182,16 +182,17 @@ namespace Primary.RHI2.Direct3D12
                     RHIGPInputElement ie = _description.InputElements[i];
 
                     string semanticStr = ie.Semantic.ToString().ToUpper();
-                    sbyte* semanticStrPtr = (sbyte*)NativeMemory.Alloc((nuint)(semanticStr.Length + 1), sizeof(sbyte));
+                    byte* semanticStrPtr = (byte*)NativeMemory.Alloc((nuint)(semanticStr.Length + 1), sizeof(byte));
 
-                    NativeMemory.Copy(Unsafe.AsPointer(ref semanticStr.DangerousGetReference()), semanticStrPtr, (nuint)semanticStr.Length);
-                    semanticStrPtr[semanticStr.Length] = (sbyte)'\0';
+                    for (int j = 0; j < semanticStr.Length; j++)
+                        semanticStrPtr[j] = (byte)semanticStr[j];
+                    semanticStrPtr[semanticStr.Length] = (byte)'\0';
 
                     elementNames[i] = semanticStrPtr;
 
                     inputElements[i] = new D3D12_INPUT_ELEMENT_DESC
                     {
-                        SemanticName = semanticStrPtr,
+                        SemanticName = (sbyte*)semanticStrPtr,
                         SemanticIndex = (uint)ie.SemanticIndex,
                         Format = ie.Format.ToFormat(),
                         InputSlot = (uint)ie.InputSlot,
@@ -223,7 +224,7 @@ namespace Primary.RHI2.Direct3D12
                             DepthClipEnable = _description.Rasterizer.DepthClipEnabled,
                             MultisampleEnable = false,
                             AntialiasedLineEnable = false,
-                            ForcedSampleCount = 1,
+                            ForcedSampleCount = 0,
                             ConservativeRaster = _description.Rasterizer.ConservativeRaster ?
                                 D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON :
                                 D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF
@@ -260,8 +261,10 @@ namespace Primary.RHI2.Direct3D12
                         PrimitiveTopologyType = _description.PrimitiveTopologyType.ToPrimitiveTopologyType(),
 
                         SampleDesc = new DXGI_SAMPLE_DESC { Count = 1, Quality = 0 },
+                        SampleMask = uint.MaxValue,
+
                         CachedPSO = new D3D12_CACHED_PIPELINE_STATE { CachedBlobSizeInBytes = 0, pCachedBlob = null },
-                        Flags = D3D12_PIPELINE_STATE_FLAG_NONE
+                        Flags = D3D12_PIPELINE_STATE_FLAG_NONE,
                     };
 
                     for (int i = 0; i < _description.Blend.RenderTargets.Length; i++)
@@ -329,7 +332,7 @@ namespace Primary.RHI2.Direct3D12
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing)
+            if (!_disposedValue)
             {
                 _device.AddResourceFreeNextFrame(() =>
                 {
@@ -382,10 +385,14 @@ namespace Primary.RHI2.Direct3D12
         public DXGI_FORMAT DSVFormat;
         public __RTVs RTVFormats;
 
+        public D3D12RasterState()
+        {
+            DSVFormat = DXGI_FORMAT_UNKNOWN;
+            RTVFormats = new __RTVs();
+        }
+
         public struct __RTVs
         {
-            public int Count;
-
             public DXGI_FORMAT e0;
             public DXGI_FORMAT e1;
             public DXGI_FORMAT e2;
@@ -394,6 +401,20 @@ namespace Primary.RHI2.Direct3D12
             public DXGI_FORMAT e5;
             public DXGI_FORMAT e6;
             public DXGI_FORMAT e7;
+
+            public int Count;
+
+            public __RTVs()
+            {
+                e0 = DXGI_FORMAT_UNKNOWN;
+                e1 = DXGI_FORMAT_UNKNOWN;
+                e2 = DXGI_FORMAT_UNKNOWN;
+                e3 = DXGI_FORMAT_UNKNOWN;
+                e4 = DXGI_FORMAT_UNKNOWN;
+                e5 = DXGI_FORMAT_UNKNOWN;
+                e6 = DXGI_FORMAT_UNKNOWN;
+                e7 = DXGI_FORMAT_UNKNOWN;
+            }
 
             public DXGI_FORMAT this[int index]
             {

@@ -1,14 +1,12 @@
 ﻿using Primary.Common;
 using Primary.RHI.Direct3D12.Utility;
-using System.Diagnostics;
+using SharpGen.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Vortice.Direct3D12;
 using Vortice.DXGI;
 using Vortice.Mathematics;
-using Terra = TerraFX.Interop.DirectX;
 using D3D12MemAlloc = Interop.D3D12MemAlloc;
-using SharpGen.Runtime;
 
 namespace Primary.RHI.Direct3D12.Memory
 {
@@ -119,7 +117,7 @@ namespace Primary.RHI.Direct3D12.Memory
                 mappedPtr = uploadBuffer.Rent(&allocation, (uint)totalSizeInBytes);
                 Checking.Assert(mappedPtr != nint.Zero);
             }
-         
+
             Span<byte> mapped = new Span<byte>(mappedPtr.ToPointer(), (int)requiredDstSize);
 
             for (int i = 0; i < layouts.Length; i++)
@@ -134,7 +132,7 @@ namespace Primary.RHI.Direct3D12.Memory
 
                 CopyToDestination(src, dst, (uint)info.CalculatePitch(footPrint.Footprint.Width), rows[i], footPrint.Footprint.RowPitch);
             }
-   
+
             uploadBuffer.Return(allocation);
             return (uploadBuffer.Resource, uploadBuffer.CalculateOffset(mappedPtr));
 

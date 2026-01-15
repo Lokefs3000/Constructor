@@ -1,12 +1,13 @@
 ﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets;
 using Primary.Common;
-using Primary.Rendering2;
-using Primary.Rendering2.Assets;
-using Primary.Rendering2.Batching;
-using Primary.Rendering2.Data;
-using Primary.Rendering2.Recording;
-using Primary.Rendering2.Resources;
-using Primary.Rendering2.Structures;
+using Primary.Rendering;
+using Primary.Rendering.Assets;
+using Primary.Rendering.Batching;
+using Primary.Rendering.Data;
+using Primary.Rendering.Recording;
+using Primary.Rendering.Resources;
+using Primary.Rendering.Structures;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -33,13 +34,13 @@ namespace Primary.R2.ForwardPlus.Passes
                     Stride = Unsafe.SizeOf<RenderFlag>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.Structured | FGBufferUsage.Global,
                 }, "FP-RenderFlagBuffer");
-                
+
                 resources.RawDataBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
                 {
                     Width = (uint)Math.Max(CountRawDataSize(list), 4),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.Raw | FGBufferUsage.Global
                 }, "FP-RawDataBuffer");
-                
+
                 resources.GlobalMatricies = desc.CreateBuffer(new FrameGraphBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<GlobalMatriciesData>(),
@@ -91,7 +92,7 @@ namespace Primary.R2.ForwardPlus.Passes
 
             unsafe
             {
-                using RentedArray<MaterialAsset2> materials = RentedArray<MaterialAsset2>.Rent(passData.RenderList.MaterialIds.Count);
+                using RentedArray<MaterialAsset> materials = RentedArray<MaterialAsset>.Rent(passData.RenderList.MaterialIds.Count);
                 foreach (var kvp in passData.RenderList.MaterialIds)
                 {
                     materials[(int)kvp.Value] = kvp.Key;
@@ -102,7 +103,7 @@ namespace Primary.R2.ForwardPlus.Passes
                     using FGMappedSubresource<byte> rawData = commandBuffer.Map<byte>(passData.RawDataBuffer);
 
                     nint dataPtr = (nint)Unsafe.AsPointer(in rawData.Span.DangerousGetReference());
-                    foreach (MaterialAsset2 material in materials)
+                    foreach (MaterialAsset material in materials)
                     {
                         ROPropertyBlock block = material.PropertyBlock;
 
@@ -128,7 +129,7 @@ namespace Primary.R2.ForwardPlus.Passes
 
             foreach (var kvp in list.MaterialIds)
             {
-                MaterialAsset2 material = kvp.Key;
+                MaterialAsset material = kvp.Key;
                 size += material.PropertyBlock.BlockSize;
             }
 

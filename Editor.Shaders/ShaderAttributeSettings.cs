@@ -1,10 +1,5 @@
 ﻿using Editor.Shaders.Attributes;
-using System;
 using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Shaders
 {
@@ -25,7 +20,7 @@ namespace Editor.Shaders
 
         public bool TryGetSignature(string name, out AttributeSignature? signature) => _signatures.TryGetValue(name, out signature);
 
-        public static readonly ShaderAttributeSettings Default = new ShaderAttributeSettings(
+        public static readonly ShaderAttributeSettings Graphics = new ShaderAttributeSettings(
             new AttributeVertex(),
             new AttributePixel(),
             new AttributeConstants(),
@@ -35,5 +30,14 @@ namespace Editor.Shaders
             new AttributeDisplay(),
             new AttributeGlobal(),
             new AttributeSampled());
+
+        public static readonly ShaderAttributeSettings Compute = new ShaderAttributeSettings(
+            new AttributeKernel(),
+            new AttributeConstants(),
+            new AttributeProperty(),
+            new AttributeDisplay(),
+            new AttributeGlobal(),
+            new AttributeSampled(),
+            new AttributeNumThreads());
     }
 }

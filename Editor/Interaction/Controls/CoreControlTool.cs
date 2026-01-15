@@ -2,12 +2,7 @@
 using Editor.Interaction.Tools;
 using Primary.Components;
 using Primary.Scenes;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Interaction.Controls
 {
@@ -98,7 +93,7 @@ namespace Editor.Interaction.Controls
 
         public void CommitTransform()
         {
-            
+
         }
 
         public SceneEntity Entity => _entity;

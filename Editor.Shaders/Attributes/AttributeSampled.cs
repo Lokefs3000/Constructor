@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Editor.Shaders.Attributes
+﻿namespace Editor.Shaders.Attributes
 {
     public sealed class AttributeSampled : AttributeSignature
     {

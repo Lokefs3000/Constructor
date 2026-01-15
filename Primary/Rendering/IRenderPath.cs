@@ -1,13 +1,10 @@
-﻿using Primary.Editor;
-using Primary.Rendering.Pass;
-
-namespace Primary.Rendering
+﻿namespace Primary.Rendering
 {
-    public interface IRenderPath : IDisposable
+    public interface IRenderPath
     {
-        public void PreparePasses(RenderPassData passData);
-        public void ExecutePasses(RenderPass renderPass);
+        public void PreRenderPassSetup(RenderingManager manager);
 
-        public void EmitDebugStatistics(DebugDataContainer container);
+        public void Install(RenderingManager manager);
+        public void Uinstall(RenderingManager manager);
     }
 }

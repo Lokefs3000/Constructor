@@ -1,20 +1,19 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
 using Primary.Common;
-using Primary.Rendering;
+using Primary.RHI2;
 using RectpackSharp;
 using StbImageSharp;
 using System.Buffers;
 using System.Collections.Frozen;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using RHI = Primary.RHI;
 
 namespace Editor.DearImGui.Components
 {
     internal sealed class ContentIconBuilder : IDisposable
     {
-        private RHI.Texture? _iconTexture;
+        private RHITexture? _iconTexture;
 
         private HashSet<string> _iconPaths;
         private FrozenDictionary<int, Boundaries> _iconUVPositions;
@@ -129,21 +128,19 @@ namespace Editor.DearImGui.Components
                         {
                             nint ptrV = (nint)ptr;
 
-                            _iconTexture = RenderingManager.Device.CreateTexture(new RHI.TextureDescription
+                            _iconTexture = RHIDevice.Instance!.CreateTexture(new RHITextureDescription
                             {
-                                Width = bounds.Width,
-                                Height = bounds.Height,
+                                Width = (int)bounds.Width,
+                                Height = (int)bounds.Height,
                                 Depth = 1,
 
                                 MipLevels = 1,
 
-                                Dimension = RHI.TextureDimension.Texture2D,
-                                Format = RHI.TextureFormat.RGBA8un,
-                                Memory = RHI.MemoryUsage.Immutable,
-                                Usage = RHI.TextureUsage.ShaderResource,
-                                CpuAccessFlags = RHI.CPUAccessFlags.None,
+                                Dimension = RHIDimension.Texture2D,
+                                Format = RHIFormat.RGBA8_UNorm,
+                                Usage = RHIResourceUsage.ShaderResource,
 
-                                Swizzle = RHI.TextureSwizzle.Default,
+                                Swizzle = RHISwizzle.RGBA,
                             }, new Span<nint>(ref ptrV));
                         }
                     }
@@ -187,7 +184,7 @@ namespace Editor.DearImGui.Components
             return _iconUVPositions.TryGetValue(iconId, out boundaries);
         }
 
-        public RHI.Texture? Texture => _iconTexture;
+        public RHITexture? Texture => _iconTexture;
 
         private record struct ImageData(PoolArray<byte> Pixels, int Width, int Height);
     }

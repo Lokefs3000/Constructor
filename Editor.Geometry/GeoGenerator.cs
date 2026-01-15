@@ -40,7 +40,7 @@ namespace Editor.Geometry
             {
                 _vertices.Dispose();
                 _indices.Dispose();
-                
+
                 _disposedValue = true;
             }
         }
@@ -212,8 +212,8 @@ namespace Editor.Geometry
 
                 Array.Sort(faces, (a, b) =>
                 {
-                    uint aNum = a.MaterialIndex?.Id.Value ?? uint.MaxValue;
-                    uint bNum = b.MaterialIndex?.Id.Value ?? uint.MaxValue;
+                    ulong aNum = a.MaterialIndex?.Id.Value ?? ulong.MaxValue;
+                    ulong bNum = b.MaterialIndex?.Id.Value ?? ulong.MaxValue;
                     return aNum.CompareTo(bNum);
                 });
 

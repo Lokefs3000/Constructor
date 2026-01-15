@@ -1,22 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.Versioning;
-using System.Text;
+﻿using System.Runtime.Versioning;
 using TerraFX.Interop.DirectX;
-
-using static TerraFX.Interop.DirectX.DXGI_FORMAT;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_DIMENSION;
-using static TerraFX.Interop.DirectX.D3D12_FILL_MODE;
-using static TerraFX.Interop.DirectX.D3D12_CULL_MODE;
-using static TerraFX.Interop.DirectX.D3D12_DEPTH_WRITE_MASK;
-using static TerraFX.Interop.DirectX.D3D12_COMPARISON_FUNC;
-using static TerraFX.Interop.DirectX.D3D12_STENCIL_OP;
 using static TerraFX.Interop.DirectX.D3D12_BLEND;
 using static TerraFX.Interop.DirectX.D3D12_BLEND_OP;
-using static TerraFX.Interop.DirectX.D3D12_PRIMITIVE_TOPOLOGY_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_TEXTURE_ADDRESS_MODE;
-using static TerraFX.Interop.DirectX.D3D12_STATIC_BORDER_COLOR;
+using static TerraFX.Interop.DirectX.D3D12_COMPARISON_FUNC;
+using static TerraFX.Interop.DirectX.D3D12_CULL_MODE;
+using static TerraFX.Interop.DirectX.D3D12_DEPTH_WRITE_MASK;
+using static TerraFX.Interop.DirectX.D3D12_FILL_MODE;
 using static TerraFX.Interop.DirectX.D3D12_INPUT_CLASSIFICATION;
+using static TerraFX.Interop.DirectX.D3D12_PRIMITIVE_TOPOLOGY_TYPE;
+using static TerraFX.Interop.DirectX.D3D12_RESOURCE_DIMENSION;
+using static TerraFX.Interop.DirectX.D3D12_STATIC_BORDER_COLOR;
+using static TerraFX.Interop.DirectX.D3D12_STENCIL_OP;
+using static TerraFX.Interop.DirectX.D3D12_TEXTURE_ADDRESS_MODE;
+using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 
 namespace Primary.RHI2.Direct3D12
 {
@@ -373,6 +369,10 @@ namespace Primary.RHI2.Direct3D12
             RHIElementFormat.Single2 => DXGI_FORMAT_R32G32_FLOAT,
             RHIElementFormat.Single3 => DXGI_FORMAT_R32G32B32_FLOAT,
             RHIElementFormat.Single4 => DXGI_FORMAT_R32G32B32A32_FLOAT,
+            RHIElementFormat.UInt1 => DXGI_FORMAT_R32_UINT,
+            RHIElementFormat.UInt2 => DXGI_FORMAT_R32G32_UINT,
+            RHIElementFormat.UInt3 => DXGI_FORMAT_R32G32B32_UINT,
+            RHIElementFormat.UInt4 => DXGI_FORMAT_R32G32B32A32_UINT,
             RHIElementFormat.Byte4 => DXGI_FORMAT_R8G8B8A8_UNORM,
             _ => DXGI_FORMAT_UNKNOWN,
         };

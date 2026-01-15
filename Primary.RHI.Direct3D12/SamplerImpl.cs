@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text;
-using TerraFX.Interop.Windows;
+﻿using System.Runtime.InteropServices;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -51,7 +47,7 @@ namespace Primary.RHI.Direct3D12
         }
 
         public override ref readonly SamplerDescription Description => ref _description;
-        
+
         public override nint Handle => _handlePtr;
     }
 }

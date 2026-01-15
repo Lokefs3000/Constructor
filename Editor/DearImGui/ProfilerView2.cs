@@ -2,20 +2,14 @@
 using Editor.Gui;
 using Hexa.NET.ImGui;
 using Primary.Common;
-using Primary.Pooling;
 using Primary.Profiling;
 using Primary.Timing;
-using SDL;
-using System;
 using System.Buffers;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using TerraFX.Interop.Windows;
 
 namespace Editor.DearImGui
 {

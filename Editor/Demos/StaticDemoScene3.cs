@@ -1,17 +1,7 @@
-﻿using Arch.Core;
-using Primary.Assets;
+﻿using Primary.Assets;
 using Primary.Components;
-using Primary.Rendering.Data;
-using Primary.Rendering2.Assets;
-using Primary.Rendering2.Temporary;
 using Primary.Scenes;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Demos
 {
@@ -29,8 +19,7 @@ namespace Editor.Demos
                 AssetManager.LoadAsset<ModelAsset>("Engine/Models/Icosphere.fbx").GetRenderMesh("Icosphere"),
                 AssetManager.LoadAsset<ModelAsset>("Engine/Models/Torus.fbx").GetRenderMesh("Torus"),
                 ];
-            MaterialAsset material = AssetManager.LoadAsset<MaterialAsset>("Content/Textures/Metal055A/Metal055A.mat");
-            MaterialAsset2 material2 = AssetManager.LoadAsset<MaterialAsset2>("Content/Textures/Metal055A/Metal055A.mat2");
+            MaterialAsset material = AssetManager.LoadAsset<MaterialAsset>("Content/Textures/Metal055A/Metal055A.mat2");
 
             Quaternion q = Quaternion.CreateFromYawPitchRoll(MathF.PI * 0.25f, MathF.PI * 0.25f, MathF.PI * 0.25f);
 
@@ -46,7 +35,7 @@ namespace Editor.Demos
 
             {
                 SceneEntity cam = scene.CreateEntity(SceneEntity.Null);
-                
+
                 ref Camera camera = ref cam.AddComponent<Camera>();
                 ref Transform transform = ref cam.AddComponent<Transform>();
 
@@ -75,10 +64,6 @@ namespace Editor.Demos
                         ref MeshRenderer renderer = ref entity.AddComponent<MeshRenderer>();
                         renderer.Mesh = renderMeshes[startIndex];
                         renderer.Material = material;
-
-                        ref MeshRenderer2 renderer2 = ref entity.AddComponent<MeshRenderer2>();
-                        renderer2.Mesh = renderMeshes[startIndex];
-                        renderer2.Material = material2;
 
                         startIndex++;
                         if (startIndex >= renderMeshes.Length)

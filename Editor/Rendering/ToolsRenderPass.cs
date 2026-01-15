@@ -5,10 +5,6 @@ using Editor.Interaction.Controls;
 using Editor.Interaction.Tools;
 using Primary.Assets;
 using Primary.Components;
-using Primary.Rendering;
-using Primary.Rendering.Pass;
-using Primary.Rendering.Raw;
-using Silk.NET.Assimp;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -165,7 +161,7 @@ namespace Editor.Rendering
             for (int i = 0; i < 1; i++)
             {
                 {
-                    
+
                     Span<Matrix4x4> mapped = commandBuffer.Map<Matrix4x4>(_vertexData, RHI.MapIntent.Write);
                     mapped[0] = i == 0 ? lookMatrix * viewportData.VP : Matrix4x4.CreateOrthographic(size.X, size.Y, -1.0f, 1.0f);
                     commandBuffer.Unmap(_vertexData);
@@ -545,9 +541,9 @@ namespace Editor.Rendering
                 Vector2 halfRelative = info.Relative * new Vector2(1.0f, 0.5f);
 
                 Vector3 tl = Vector3.Transform(new Vector3(pos.X - halfRelative.X, pos.Y + halfRelative.Y, pos.Z), billboard);
-                Vector3 tr = Vector3.Transform(new Vector3(pos.X                 , pos.Y + halfRelative.Y, pos.Z), billboard);
+                Vector3 tr = Vector3.Transform(new Vector3(pos.X, pos.Y + halfRelative.Y, pos.Z), billboard);
                 Vector3 bl = Vector3.Transform(new Vector3(pos.X - halfRelative.X, pos.Y - halfRelative.Y, pos.Z), billboard);
-                Vector3 br = Vector3.Transform(new Vector3(pos.X                 , pos.Y - halfRelative.Y, pos.Z), billboard);
+                Vector3 br = Vector3.Transform(new Vector3(pos.X, pos.Y - halfRelative.Y, pos.Z), billboard);
 
                 AddUVTriangle(tl, tr, bl, new Vector2(info.UVMax, 0.0f), new Vector2(info.UVMin, 0.0f), new Vector2(info.UVMax, 1.0f), color);
                 AddUVTriangle(tr, bl, br, new Vector2(info.UVMin, 0.0f), new Vector2(info.UVMax, 1.0f), new Vector2(info.UVMin, 1.0f), color);

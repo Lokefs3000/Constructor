@@ -1,9 +1,4 @@
 ﻿using Hexa.NET.ImGui;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.DearImGui.Tooling
 {
@@ -22,7 +17,7 @@ namespace Editor.DearImGui.Tooling
             {
                 if (ImGui.Begin("Cubemap tool"u8, ref _isVisible))
                 {
-                    
+
                 }
                 ImGui.End();
             }

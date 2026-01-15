@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Primary.RHI2
+﻿namespace Primary.RHI2
 {
     public static class FormatHelper
     {
@@ -151,5 +147,40 @@ namespace Primary.RHI2
             RHIFormat.X24_Typeless_G8_UInt => true,
             _ => false,
         };
+
+        public static bool IsSwapChainCapable(this RHIFormat format) => format switch
+        {
+            RHIFormat.RGBA8_UNorm => true,
+            RHIFormat.RGBA8_UNorm_sRGB => true,
+            _ => false
+        };
+
+        public static bool IsBlockCompressed(this RHIFormat format) => format switch
+        {
+            RHIFormat.BC1_Typeless => true,
+            RHIFormat.BC1_UNorm => true,
+            RHIFormat.BC1_UNorm_sRGB => true,
+            RHIFormat.BC2_Typeless => true,
+            RHIFormat.BC2_UNorm => true,
+            RHIFormat.BC2_UNorm_sRGB => true,
+            RHIFormat.BC3_Typeless => true,
+            RHIFormat.BC3_UNorm => true,
+            RHIFormat.BC3_UNorm_sRGB => true,
+            RHIFormat.BC4_Typeless => true,
+            RHIFormat.BC4_UNorm => true,
+            RHIFormat.BC4_SNorm => true,
+            RHIFormat.BC5_Typeless => true,
+            RHIFormat.BC5_UNorm => true,
+            RHIFormat.BC5_SNorm => true,
+            RHIFormat.BC6H_Typeless => true,
+            RHIFormat.BC6H_UFloat16 => true,
+            RHIFormat.BC6H_SFloat16 => true,
+            RHIFormat.BC7_Typeless => true,
+            RHIFormat.BC7_UNorm => true,
+            RHIFormat.BC7_UNorm_sRGB => true,
+            _ => false
+        };
+
+        public static RHIFormatInfo GetInfo(this RHIFormat format) => RHIFormatInfo.Query(format);
     }
 }

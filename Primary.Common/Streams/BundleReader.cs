@@ -143,7 +143,7 @@ namespace Primary.Common.Streams
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            return _hashCode.GetValueOrDefault(base.GetHashCode()); 
+            return _hashCode.GetValueOrDefault(base.GetHashCode());
         }
 
         public ImmutableArray<string> Files => _entries.Keys;

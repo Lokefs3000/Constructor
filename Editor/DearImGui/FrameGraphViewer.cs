@@ -1,7 +1,4 @@
 ﻿using Hexa.NET.ImGui;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Editor.DearImGui
 {

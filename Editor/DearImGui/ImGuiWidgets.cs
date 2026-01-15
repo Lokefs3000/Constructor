@@ -5,7 +5,7 @@ using Hexa.NET.ImGui;
 using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Common;
-using Primary.Rendering.Data;
+using Primary.Rendering.Assets;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -283,11 +283,11 @@ namespace Editor.DearImGui
                     {
                         selected = curr;
                         ret = true;
-                
+
                         break;
                     }
                 }
-            
+
                 ImGui.EndCombo();
             }
 
@@ -604,7 +604,7 @@ namespace Editor.DearImGui
                     ImGui.TextColored(new Vector4(1.0f, 1.0f, 1.0f, 0.5f), "Id: " + value.Id);
                     ImGui.TextColored(new Vector4(1.0f, 1.0f, 1.0f, 0.5f), "Status: " + value.Status);
                 }
-                
+
                 ImGui.TextColored(new Vector4(1.0f, 1.0f, 1.0f, 0.5f), typeof(T).Name);
 
                 ImGui.EndTooltip();
@@ -747,7 +747,7 @@ namespace Editor.DearImGui
             {
                 ImGui.TextUnformatted("Id: " + id);
                 ImGui.TextColored(new Vector4(1.0f, 1.0f, 1.0f, 0.5f), typeof(T).Name);
-            
+
                 ImGui.EndTooltip();
             }
 

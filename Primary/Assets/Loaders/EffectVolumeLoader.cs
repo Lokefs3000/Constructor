@@ -1,10 +1,6 @@
-﻿using CsToml;
-using CsToml.Values;
-using Primary.Assets.Types;
+﻿using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
-using Primary.Rendering;
-using Primary.Rendering.PostProcessing;
 using Primary.Serialization.Json;
 using System.Text.Json;
 
@@ -43,15 +39,15 @@ namespace Primary.Assets.Loaders
 
                 ExceptionUtility.Assert(stream != null);
 
-                IPostProcessingData[]? effectData = JsonSerializer.Deserialize(stream!, VolumeEffectJsonContext.Default.IPostProcessingDataArray);
-                if (effectData == null)
-                {
-                    EngLog.Assets.Error("Failed to parse effect volume json: {v}", sourcePath);
-                    effectVolumeData.UpdateAssetFailed(effectVolume);
-                    return;
-                }
-                
-                effectVolumeData.UpdateAssetData(effectVolume, [.. effectData]);
+                //IPostProcessingData[]? effectData = JsonSerializer.Deserialize(stream!, VolumeEffectJsonContext.Default.IPostProcessingDataArray);
+                //if (effectData == null)
+                //{
+                //    EngLog.Assets.Error("Failed to parse effect volume json: {v}", sourcePath);
+                //    effectVolumeData.UpdateAssetFailed(effectVolume);
+                //    return;
+                //}
+
+                effectVolumeData.UpdateAssetData(effectVolume);
             }
 #if DEBUG
             finally

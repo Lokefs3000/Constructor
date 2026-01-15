@@ -1,6 +1,0 @@
-shader = "Engine/Shaders/Lit.hlsl"
-
-[properties]
-Albedo = 947326387
-Specular = 947328792
-Normal = 947328737

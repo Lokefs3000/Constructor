@@ -7,7 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
-    <ProjectReference Include="..\Primary.Rendering2\Primary.Rendering2.csproj" />
     <ProjectReference Include="..\Primary\Primary.csproj" />
   </ItemGroup>
 </Project>

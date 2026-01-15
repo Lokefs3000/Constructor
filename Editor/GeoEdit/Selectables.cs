@@ -2,12 +2,7 @@
 using Editor.Geometry.Shapes;
 using Editor.Interaction;
 using Editor.Interaction.Logic;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.GeoEdit
 {

@@ -1,11 +1,6 @@
 ﻿using Editor.Storage;
 using Primary.Assets;
 using Primary.Assets.Types;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Assets.Importers
 {

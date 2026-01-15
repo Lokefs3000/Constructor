@@ -1,10 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Editor.Shaders
+﻿namespace Editor.Shaders
 {
     public ref struct ShaderProcessorArgs
+    {
+        public string InputSource;
+        public string? SourceFileName;
+
+        public string[] IncludeDirectories;
+
+        public ShaderCompileTarget Targets;
+    }
+
+    public ref struct ComputeShaderProcessorArgs
     {
         public string InputSource;
         public string? SourceFileName;
@@ -28,5 +34,6 @@ namespace Editor.Shaders
 
         Vertex = 1 << 0,
         Pixel = 1 << 1,
+        Compute = 1 << 2,
     }
 }

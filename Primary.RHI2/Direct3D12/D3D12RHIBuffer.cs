@@ -1,21 +1,19 @@
-﻿using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
-using System.Runtime.Versioning;
-using Primary.Common;
-using System.Runtime.InteropServices;
+﻿using Primary.Common;
 using System.Runtime.CompilerServices;
-
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_DIMENSION;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
-using static TerraFX.Interop.DirectX.DXGI_FORMAT;
-using static TerraFX.Interop.DirectX.D3D12_TEXTURE_LAYOUT;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+using TerraFX.Interop.DirectX;
+using TerraFX.Interop.Windows;
 using static Interop.D3D12MemAlloc.ALLOCATION_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_HEAP_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_HEAP_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
 using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
-
+using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
+using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
+using static TerraFX.Interop.DirectX.D3D12_HEAP_FLAGS;
+using static TerraFX.Interop.DirectX.D3D12_HEAP_TYPE;
+using static TerraFX.Interop.DirectX.D3D12_RESOURCE_DIMENSION;
+using static TerraFX.Interop.DirectX.D3D12_RESOURCE_FLAGS;
+using static TerraFX.Interop.DirectX.D3D12_TEXTURE_LAYOUT;
+using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 using D3D12MA = Interop.D3D12MemAlloc;
 
 namespace Primary.RHI2.Direct3D12
@@ -126,6 +124,7 @@ namespace Primary.RHI2.Direct3D12
         }
 
         public override unsafe RHIBufferNative* GetAsNative() => (RHIBufferNative*)_nativeRep;
+        public override unsafe RHIResourceNative* GetBaseAsNative() => (RHIResourceNative*)_nativeRep;
 
         public override RHIResourceType Type => RHIResourceType.Buffer;
     }

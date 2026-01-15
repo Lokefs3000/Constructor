@@ -1,13 +1,6 @@
 ﻿using Editor.GeoEdit;
 using Editor.Geometry;
 using Editor.Interaction;
-using Hexa.NET.ImGui;
-using Primary.Scenes;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.DearImGui.Properties
 {
@@ -42,7 +35,7 @@ namespace Editor.DearImGui.Properties
         {
             TargetData td = (TargetData)target;
 
-            
+
         }
 
         public void Changed(object? target)

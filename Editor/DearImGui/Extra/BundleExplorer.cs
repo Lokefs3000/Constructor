@@ -2,13 +2,8 @@
 using Hexa.NET.ImGui;
 using Primary.Common.Streams;
 using Primary.IO;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.DearImGui.Extra
 {

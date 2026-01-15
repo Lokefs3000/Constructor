@@ -62,7 +62,7 @@ namespace Editor.DearImGui
                             ImGui.TableSetColumnIndex(0);
                             if (ImGui.Selectable(data.Name.AsSpan(2)))
                                 _currentConsoleInput = Encoding.UTF8.GetString(data.Name.AsSpan(2)) + " ";
-                            
+
                             ImGui.TableSetColumnIndex(1);
                             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
                             if (ImGui.InputText(data.Name, ref tempString, 24, ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll))

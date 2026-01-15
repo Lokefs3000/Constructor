@@ -1,31 +1,26 @@
 ﻿using Primary.Common;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Editor.Shaders.Data
 {
-    public readonly record struct StaticSamplerData(string Name, AttributeData[] Attributes, SamplerFilter Filter, SamplerAddressMode AddressModeU, SamplerAddressMode AddressModeV, SamplerAddressMode AddressModeW, uint MaxAnisotropy, float MipLODBias, float MinLOD, float MaxLOD, SamplerBorder Border, IndexRange DeclerationRange);
+    public readonly record struct StaticSamplerData(string Name, AttributeData[] Attributes, SamplerFilter Min, SamplerFilter Mag, SamplerFilter Mip, SamplerReductionType Reduction, SamplerAddressMode AddressModeU, SamplerAddressMode AddressModeV, SamplerAddressMode AddressModeW, uint MaxAnisotropy, float MipLODBias, float MinLOD, float MaxLOD, SamplerBorder Border, IndexRange DeclerationRange);
 
     public enum SamplerFilter : byte
     {
-        Point = 0,
-        MinMagPointMipLinear,
-        MinPointMagLinearMipPoint,
-        MinPointMagMipLinear,
-        MinLinearMagMipPoint,
-        MinLinearMagPointMipLinear,
-        MinMagLinearMipPoint,
-        Linear,
-        MinMagAnisotropicMipPoint,
+        Linear = 0,
+        Point
+    }
+
+    public enum SamplerReductionType : byte
+    {
+        Standard = 0,
     }
 
     public enum SamplerAddressMode : byte
     {
         Repeat = 0,
         Mirror,
-        ClampToEdge,
-        ClampToBorder
+        Clamp,
+        Border
     }
 
     public enum SamplerBorder : byte

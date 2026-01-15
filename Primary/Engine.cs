@@ -4,12 +4,11 @@ using Primary.Console;
 using Primary.Input;
 using Primary.Polling;
 using Primary.Profiling;
-using Primary.Rendering;
 using Primary.Scenes;
 using Primary.Systems;
 using Primary.Threading;
 using Primary.Timing;
-using Serilog;
+using Primary.Rendering;
 using System.Runtime.CompilerServices;
 
 namespace Primary

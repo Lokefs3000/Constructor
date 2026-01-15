@@ -1,0 +1,26 @@
+struct VsInput
+{
+    float2 Position : POSITION;
+    float2 UV       : TEXCOORD;
+    float4 Color    : COLOR;
+
+    nointerpolation uint MetadataOffset : TEXCOORD1;
+};
+
+struct DefaultPsInput
+{
+    float4 Position : SV_Position;
+    float2 UV       : TEXCOORD;
+    float4 Color    : COLOR;
+
+    nointerpolation uint MetadataOffset : TEXCOORD1;
+};
+
+struct CbGlobalData
+{
+    float4x4 Model;
+    uint MetadataOffset;
+};
+
+ConstantBuffer<CbGlobalData> cbGlobals;
+ByteAddressBuffer baMetadata;

@@ -1,11 +1,8 @@
 ﻿using CommunityToolkit.HighPerformance;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using System.Text;
 using TerraFX.Interop.DirectX;
 
 namespace Primary.RHI2.Direct3D12
@@ -43,7 +40,8 @@ namespace Primary.RHI2.Direct3D12
             }
             else
             {
-                return resource->SetName(null).SUCCEEDED;
+                char n = '\0';
+                return resource->SetName(&n).SUCCEEDED;
             }
         }
 

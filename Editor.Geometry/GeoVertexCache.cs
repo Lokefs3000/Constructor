@@ -1,13 +1,6 @@
 ﻿using Editor.Geometry.Shapes;
 using Primary.Assets;
-using System;
-using System.Buffers;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Geometry
 {

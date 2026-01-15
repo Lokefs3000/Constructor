@@ -1,4 +1,3 @@
-using System;
 using System.Diagnostics;
 
 namespace Interop.D3D12MemAlloc
@@ -8,7 +7,7 @@ namespace Interop.D3D12MemAlloc
     [Conditional("DEBUG")]
     internal sealed partial class NativeAnnotationAttribute : Attribute
     {
-        private  string _annotation;
+        private string _annotation;
 
         /// <summary>Initializes a new instance of the <see cref="NativeAnnotationAttribute" /> class.</summary>
         /// <param name="annotation">The annotation that was used in the native declaration.</param>

@@ -5,9 +5,7 @@ using Primary.Common;
 using Primary.Components;
 using Primary.Input;
 using Primary.Mathematics;
-using Primary.Rendering;
-using Primary.RenderLayer;
-using Primary.RHI;
+using Primary.RHI2;
 using Primary.Scenes;
 using Primary.Timing;
 using System.Globalization;
@@ -17,7 +15,7 @@ namespace Editor.DearImGui
 {
     internal class SceneView : IDisposable
     {
-        private GfxRenderTarget _outputRT;
+        private RHITexture _outputRT;
         private SceneEntity _sceneEntity;
 
         private Matrix4x4 _viewMatrix;
@@ -43,15 +41,14 @@ namespace Editor.DearImGui
 
         internal SceneView(DynamicAtlasManager atlasManager)
         {
-            _outputRT = GfxDevice.Current.CreateRenderTarget(new RenderTargetDescription
-            {
-                Dimensions = new Size(1, 1),
-
-                ColorFormat = RenderTargetFormat.RGB10A2un,
-                DepthFormat = DepthStencilFormat.Undefined,
-
-                ShaderVisibility = RenderTargetVisiblity.Color
-            });
+            //_outputRT = RHIDevice.Instance!.CreateRenderTarget(new RHITextureDescription
+            //{
+            //    Width = 1,
+            //
+            //    ColorFormat = RHIFormat.RGB10A2_UNorm,
+            //
+            //    ShaderVisibility = RenderTargetVisiblity.Color
+            //});
             _sceneEntity = SceneEntityManager.CreateEntity(null);
 
             _viewMatrix = Matrix4x4.Identity;
@@ -181,24 +178,24 @@ namespace Editor.DearImGui
                         if (!_widgets[i].IsFloating)
                             _widgets[i].RenderSelf();
                     }
-                //
-                //    //if (ImGui.BeginMenu("Viewmode"))
-                //    //{
-                //    //    ref RenderingConfig rconfig = ref Editor.GlobalSingleton.RenderingManager.Configuration;
-                //    //
-                //    //    if (ImGui.MenuItem("Lit", rconfig.RenderMode == RenderingMode.Lit)) rconfig.RenderMode = RenderingMode.Lit;
-                //    //    if (ImGui.MenuItem("Unlit", rconfig.RenderMode == RenderingMode.Unlit)) rconfig.RenderMode = RenderingMode.Unlit;
-                //    //    if (ImGui.MenuItem("Wireframe", rconfig.RenderMode == RenderingMode.Wireframe)) rconfig.RenderMode = RenderingMode.Wireframe;
-                //    //    if (ImGui.MenuItem("Normals", rconfig.RenderMode == RenderingMode.Normals)) rconfig.RenderMode = RenderingMode.Normals;
-                //    //    if (ImGui.MenuItem("Lighting", rconfig.RenderMode == RenderingMode.Lighting)) rconfig.RenderMode = RenderingMode.Lighting;
-                //    //    if (ImGui.MenuItem("Detail lighting", rconfig.RenderMode == RenderingMode.DetailLighting)) rconfig.RenderMode = RenderingMode.DetailLighting;
-                //    //    if (ImGui.MenuItem("Reflections", rconfig.RenderMode == RenderingMode.Reflections)) rconfig.RenderMode = RenderingMode.Reflections;
-                //    //    if (ImGui.MenuItem("Shader complexity", rconfig.RenderMode == RenderingMode.ShaderComplexity)) rconfig.RenderMode = RenderingMode.ShaderComplexity;
-                //    //    if (ImGui.MenuItem("Overdraw", rconfig.RenderMode == RenderingMode.Overdraw)) rconfig.RenderMode = RenderingMode.Overdraw;
-                //    //
-                //    //    ImGui.EndMenu();
-                //    //}
-                //    //
+                    //
+                    //    //if (ImGui.BeginMenu("Viewmode"))
+                    //    //{
+                    //    //    ref RenderingConfig rconfig = ref Editor.GlobalSingleton.RenderingManager.Configuration;
+                    //    //
+                    //    //    if (ImGui.MenuItem("Lit", rconfig.RenderMode == RenderingMode.Lit)) rconfig.RenderMode = RenderingMode.Lit;
+                    //    //    if (ImGui.MenuItem("Unlit", rconfig.RenderMode == RenderingMode.Unlit)) rconfig.RenderMode = RenderingMode.Unlit;
+                    //    //    if (ImGui.MenuItem("Wireframe", rconfig.RenderMode == RenderingMode.Wireframe)) rconfig.RenderMode = RenderingMode.Wireframe;
+                    //    //    if (ImGui.MenuItem("Normals", rconfig.RenderMode == RenderingMode.Normals)) rconfig.RenderMode = RenderingMode.Normals;
+                    //    //    if (ImGui.MenuItem("Lighting", rconfig.RenderMode == RenderingMode.Lighting)) rconfig.RenderMode = RenderingMode.Lighting;
+                    //    //    if (ImGui.MenuItem("Detail lighting", rconfig.RenderMode == RenderingMode.DetailLighting)) rconfig.RenderMode = RenderingMode.DetailLighting;
+                    //    //    if (ImGui.MenuItem("Reflections", rconfig.RenderMode == RenderingMode.Reflections)) rconfig.RenderMode = RenderingMode.Reflections;
+                    //    //    if (ImGui.MenuItem("Shader complexity", rconfig.RenderMode == RenderingMode.ShaderComplexity)) rconfig.RenderMode = RenderingMode.ShaderComplexity;
+                    //    //    if (ImGui.MenuItem("Overdraw", rconfig.RenderMode == RenderingMode.Overdraw)) rconfig.RenderMode = RenderingMode.Overdraw;
+                    //    //
+                    //    //    ImGui.EndMenu();
+                    //    //}
+                    //    //
                     //if (ImGui.MenuItem("Stats", _showQuickStats))
                     //    _showQuickStats = !_showQuickStats;
                 }
@@ -356,7 +353,7 @@ namespace Editor.DearImGui
 
             if (io.MouseClicked[(int)ImGuiMouseButton.Middle])
                 MouseDown?.Invoke(ImGuiMouseButton.Middle);
-            else if (io.MouseReleased[(int)ImGuiMouseButton.Middle]) 
+            else if (io.MouseReleased[(int)ImGuiMouseButton.Middle])
                 MouseUp?.Invoke(ImGuiMouseButton.Middle);
 
             if (io.MouseClicked[(int)ImGuiMouseButton.Right])

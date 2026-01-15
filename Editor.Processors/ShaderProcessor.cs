@@ -1,568 +1,754 @@
 ﻿using CommunityToolkit.HighPerformance;
-using Editor.Interop.Ed;
-using Editor.Processors.Shaders;
+using Editor.Shaders;
+using Editor.Shaders.Attributes;
+using Editor.Shaders.Data;
+using Primary.Assets;
+using Primary.Assets.Loaders;
 using Primary.Common;
+using Primary.RHI2;
 using Serilog;
-using System.Buffers;
-using System.Numerics;
+using SharpGen.Runtime;
+using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using Vortice.Direct3D12.Shader;
-using Vortice.Dxc;
-
-using RHI = Primary.RHI;
 
 namespace Editor.Processors
 {
-    public unsafe class ShaderProcessor : IAssetProcessor
+    public sealed class ShaderProcessor
     {
-        public string[] ReadFiles = Array.Empty<string>();
-        public string? ShaderPath = null;
-
-        public bool Execute(object args_in)
+        public ShaderProcesserResult? Execute(in NewShaderProcessorArgs args)
         {
-            ShaderProcessorArgs args = (ShaderProcessorArgs)args_in;
-
-            string sourceFile;
-            using (FileStream stream = NullableUtility.AlwaysThrowIfNull(FileUtility.TryWaitOpen(args.AbsoluteFilepath, FileMode.Open, FileAccess.Read, FileShare.Read)))
+            string? sourceIn = FileUtility.TryReadAllText(args.SourceFilepath);
+            if (sourceIn == null)
             {
-                using PoolArray<byte> pool = ArrayPool<byte>.Shared.Rent((int)stream.Length);
-                stream.ReadExactly(pool.AsSpan(0, (int)stream.Length));
-
-                sourceFile = Encoding.UTF8.GetString(pool.AsSpan(0, (int)stream.Length));
+                args.Logger.Error("Failed to read source from file: {f}", args.SourceFilepath);
+                return null;
             }
 
-            string sourceSearchDir = Path.GetDirectoryName(args.AbsoluteFilepath)!;
-
-            string[] paths = ["", sourceSearchDir, .. args.ContentSearchDirs];
-            using IDxcCompiler3 compiler = Dxc.CreateDxcCompiler<IDxcCompiler3>();
-
-            //ShaderPreprocessorResult preprocessorResult = ShaderPreprocessor.Inspect(args.Logger, Path.GetFileName(args.AbsoluteFilepath), sourceFile, paths);
-
-            string processedSource;
-            using (ShaderIncludeHandler includeHandler = new ShaderIncludeHandler(paths))
-            using (IDxcResult result = compiler.Compile(sourceFile, ["-HV", "2021", "-WX", "-P"], includeHandler))
+            using Stream? stream = FileUtility.TryWaitOpenNoThrow(args.OutputFilepath, FileMode.Create, FileAccess.Write, FileShare.None);
+            if (stream == null)
             {
-                string errors = result.GetErrors();
-                if (errors.Length > 0)
-                {
-                    args.Logger?.Error(errors + $" {Environment.StackTrace}");
-                    return false;
-                }
-
-                using IDxcBlob blob = result.GetResult();
-                processedSource = Marshal.PtrToStringUTF8(blob.BufferPointer)!;
-
-                ReadFiles = includeHandler.ReadFiles;
+                args.Logger.Error("Failed to open stream for output path: {f}", args.OutputFilepath);
+                return null;
             }
 
-            ShaderParseResult parseResult = new ShaderSourceParser().ParseSource(processedSource, sourceSearchDir, args.ContentSearchDirs[0]);
-
-            ShaderPath = parseResult.Path;
-
-            ExceptionUtility.Assert(parseResult.EntryPointVertex != null);
-            ExceptionUtility.Assert(parseResult.EntryPointPixel != null);
-            ExceptionUtility.Assert(parseResult.Path != null);
-
-            string[] templateArgs = Array.Empty<string>();
-            ShaderAPITargets apiTarget = ShaderAPITargets.None;
-
-            switch (args.Target)
+            Editor.Shaders.ShaderProcessor processor = new Editor.Shaders.ShaderProcessor(args.Logger, ShaderAttributeSettings.Graphics);
+            ShaderProcesserResult? resultNullable = processor.Process(new Editor.Shaders.ShaderProcessorArgs
             {
-                case RHI.GraphicsAPI.Vulkan:
-                    {
-                        templateArgs = [
-                "-spirv",
-                "-HV", "2021",
-                "-WX",
-#if DEBUG
-                "-Zi",
-                "-fspv-debug=vulkan-with-source",
-#endif
-                "-O3",
-                "-fspv-target-env=vulkan1.3",
-                "-fvk-use-dx-layout",
-                "-fvk-use-dx-position-w"
-            ];
+                InputSource = sourceIn,
+                SourceFileName = Path.GetFileName(args.SourceFilepath),
 
-                        apiTarget = ShaderAPITargets.Vulkan;
-                        break;
-                    }
-                case RHI.GraphicsAPI.Direct3D12:
-                    {
-                        templateArgs = [
-                "-HV", "2021",
-                "-WX",
-#if DEBUG
-                "-Zi",
-#endif
-                "-O3",
-            ];
+                IncludeDirectories = args.IncludeDirectories,
 
-                        apiTarget = ShaderAPITargets.Direct3D12;
-                        break;
-                    }
+                Targets = args.Targets
+            });
+
+            if (!resultNullable.HasValue)
+            {
+                args.Logger.Error("Failed to process shader: {f}", args.SourceFilepath);
+                return null;
             }
 
-            Memory<byte> vs = CompileSource(compiler, parseResult, paths, parseResult.EntryPointVertex!, "vs_6_6", templateArgs, args.Logger);
-            if (vs.IsEmpty) return false;
+            ShaderProcesserResult result = resultNullable.Value;
 
-            Memory<byte> ps = CompileSource(compiler, parseResult, paths, parseResult.EntryPointPixel!, "ps_6_6", templateArgs, args.Logger);
-            if (ps.IsEmpty) return false;
+            using BinaryWriter bw = new BinaryWriter(stream);
 
-            using (FileStream stream = FileUtility.TryWaitOpen(args.AbsoluteOutputPath, FileMode.Create, FileAccess.Write, FileShare.None))
-            using (BinaryWriter bw = new BinaryWriter(stream))
-            {
-                bw.Write(HeaderId);
-                bw.Write(HeaderVersion);
+            Dictionary<ReferenceIndex, ShPropertyStages> dataStageUsageDict = CreateStageUsageDictionary(result.Data);
 
-                bw.Write(parseResult.Path!);
+            WriteHeader(bw, ref result, result.Data);
+            WriteDescription(bw, in args, result.Data);
+            WriteResourceList(bw, result.Data, dataStageUsageDict);
+            WriteRawPropertyList(bw, result.Data);
+            WriteInputLayout(bw, result.Data);
+            WriteStaticSamplers(bw, result.Data);
+            WriteBytecodeOffsetBlock(bw, ref result, in args);
+            WriteBytecode(bw, ref result);
 
-                WritePipelineDesc(bw, ref args, parseResult);
-                WriteSupplementData(bw, parseResult, compiler, paths, args.Logger);
-
-                bw.Write(apiTarget);
-                bw.Write(ShaderBytecodeTargets.Vertex | ShaderBytecodeTargets.Pixel);
-
-                bw.Write(apiTarget);
-
-                bw.Write((uint)vs.Length);
-                bw.Write(vs.Span);
-
-                bw.Write((uint)ps.Length);
-                bw.Write(ps.Span);
-            }
-
-            return true;
+            return result;
         }
 
-        private static Memory<byte> CompileSource(IDxcCompiler3 compiler, ShaderParseResult parseResult, string[] includePaths, string entryPoint, string profile, string[] arguments, ILogger logger)
+        private void WriteHeader(BinaryWriter bw, ref readonly ShaderProcesserResult result, ShaderData data)
         {
-            using (ShaderIncludeHandler includeHandler = new ShaderIncludeHandler(includePaths))
+            SBCTarget target = SBCTarget.None;
+
+            if (FlagUtility.HasFlag(result.Targets, ShaderCompileTarget.Direct3D12))
+                target |= SBCTarget.Direct3D12;
+            if (FlagUtility.HasFlag(result.Targets, ShaderCompileTarget.Vulkan))
+                target |= SBCTarget.Vulkan;
+
+            SBCStages stages = SBCStages.None;
+
+            if (FlagUtility.HasFlag(result.Stages, ShaderCompileStage.Vertex))
+                stages |= SBCStages.Vertex;
+            if (FlagUtility.HasFlag(result.Stages, ShaderCompileStage.Pixel))
+                stages |= SBCStages.Pixel;
+
+            SBCHeaderFlags flags = SBCHeaderFlags.None;
+
+            if (!data.GeneratePropertiesInHeader)
+                flags |= SBCHeaderFlags.ExternalProperties;
+            if (data.AreConstantsSeparated)
+                flags |= SBCHeaderFlags.HeaderIsBuffer;
+
+            SBCHeader header = new SBCHeader
             {
-                string[] args = arguments.Concat([
-                "-E", entryPoint,
-                "-T", profile
-            ]).ToArray();
+                Header = SBCHeader.ConstHeader,
+                Version = SBCHeader.ConstVersion,
 
-                using IDxcResult result = compiler.Compile(parseResult.OutputSource, args, includeHandler);
+                Targets = target,
+                Stages = stages,
 
-                string errors = result.GetErrors();
-                if (errors != string.Empty)
+                Flags = flags,
+                HeaderSize = (ushort)data.HeaderBytesize
+            };
+
+            bw.Write(header);
+        }
+
+        private void WriteDescription(BinaryWriter bw, ref readonly NewShaderProcessorArgs args, ShaderData data)
+        {
+            int expectedConstantsSize = 0;
+            int idx = data.Resources.FindIndex((x) => x.Type == ResourceType.ConstantBuffer && Array.Exists(x.Attributes, (y) => y.Signature is AttributeConstants));
+            if (idx != -1)
+            {
+                ref readonly ResourceData resData = ref data.Resources[idx];
+                ref readonly StructData @struct = ref data.GetRefSource(resData.Value);
+
+                Checking.Assert(!Unsafe.IsNullRef(in @struct));
+                expectedConstantsSize = EstimateStructSize(in @struct);
+
+                int EstimateStructSize(ref readonly StructData @struct)
                 {
-                    logger.Error(errors);
-                    return Memory<byte>.Empty;
+                    int size = 0;
+                    foreach (ref readonly VariableData variable in @struct.Variables.AsSpan())
+                    {
+                        ValueDataRef generic = variable.Generic;
+                        if (generic.Generic == ValueGeneric.Custom)
+                        {
+                            ref readonly StructData varStruct = ref data.GetRefSource(generic);
+                            Debug.Assert(!Unsafe.IsNullRef(in varStruct));
+
+                            size += EstimateStructSize(in varStruct);
+                        }
+                        else
+                        {
+                            size += generic.Generic switch
+                            {
+                                ValueGeneric.Float => sizeof(float),
+                                ValueGeneric.Double => sizeof(double),
+                                ValueGeneric.UInt => sizeof(uint),
+                                ValueGeneric.Int => sizeof(int),
+                                _ => throw new NotSupportedException()
+                            } * generic.Rows * generic.Columns;
+                        }
+                    }
+
+                    return size;
                 }
 
-                using IDxcBlob bytecodeBlob = result.GetResult();
-                Memory<byte> bytecode = bytecodeBlob.AsBytes();
+                if (expectedConstantsSize > 128)
+                    throw new Exception($"Constants size is larger then 128 bytes (actual: {expectedConstantsSize}) (TODO: Add custom exception)"/*TODO: Add custom exception*/);
+            }
 
-                if (args.Contains("-spirv"))
+            bw.Write(args.TopologyType);
+            bw.Write((byte)expectedConstantsSize);
+
+            bw.Write(args.Rasterizer);
+            bw.Write(args.DepthStencil);
+
+            bw.Write(args.Blend);
+            bw.Write((byte)args.Blends.Length);
+
+            foreach (ref readonly SBCRenderTargetBlend rtBlend in args.Blends.AsSpan())
+            {
+                bw.Write(rtBlend);
+            }
+        }
+
+        private void WriteResourceList(BinaryWriter bw, ShaderData data, Dictionary<ReferenceIndex, ShPropertyStages> usageDict)
+        {
+            int count = 0;
+
+            int i = 0;
+            foreach (ref readonly ResourceData resource in data.Resources)
+            {
+                if (usageDict.ContainsKey(new ReferenceIndex(ReferenceType.Resource, i++)))
+                    count++;
+            }
+
+            bw.Write((ushort)count);
+
+            i = 0;
+            foreach (ref readonly ResourceData resource in data.Resources)
+            {
+                if (!usageDict.TryGetValue(new ReferenceIndex(ReferenceType.Resource, i++), out ShPropertyStages stages))
+                    continue;
+
+                bw.Write(resource.Type switch
                 {
-                    (nint data, int length) = OptimizeSpirv(MemoryMarshal.Cast<byte, uint>(bytecode.Span));
-                    if (data == nint.Zero)
-                    {
-                        //bad
-                    }
+                    ResourceType.Texture1D => SBCResourceType.Texture1D,
+                    ResourceType.Texture2D => SBCResourceType.Texture2D,
+                    ResourceType.Texture3D => SBCResourceType.Texture3D,
+                    ResourceType.TextureCube => SBCResourceType.TextureCube,
+                    ResourceType.ConstantBuffer => SBCResourceType.ConstantBuffer,
+                    ResourceType.StructuredBuffer => SBCResourceType.StructuredBuffer,
+                    ResourceType.ByteAddressBuffer => SBCResourceType.ByteAddressBuffer,
+                    ResourceType.SamplerState => SBCResourceType.SamplerState,
+                    _ => throw new NotSupportedException()
+                });
 
-                    byte[] resultBuffer = new byte[length];
-                    unsafe
+                bw.Write(stages switch
+                {
+                    ShPropertyStages.VertexShading => SBCShaderStages.VertexShading,
+                    ShPropertyStages.PixelShading => SBCShaderStages.PixelShading,
+                    ShPropertyStages.AllShading => SBCShaderStages.AllShading,
+                    _ => throw new NotSupportedException()
+                });
+
+                long backup = bw.BaseStream.Position;
+
+                bw.Write(SBCResourceFlags.None);
+                bw.Write(resource.Name);
+
+                AttributeData attributeData = new AttributeData();
+                SBCResourceFlags flags = SBCResourceFlags.None;
+
+                if (resource.IsReadWrite)
+                    flags |= SBCResourceFlags.IsReadWrite;
+
+                if ((attributeData = Array.Find(resource.Attributes, static (x) => x.Signature is AttributeConstants)).Signature != null)
+                {
+                    flags |= SBCResourceFlags.Constants;
+                }
+                if ((attributeData = Array.Find(resource.Attributes, static (x) => x.Signature is AttributeDisplay)).Signature != null && attributeData.Data != null)
+                {
+                    flags |= SBCResourceFlags.Display;
+                    bw.Write(attributeData.GetVariable<PropertyDisplay>("Display") switch
                     {
-                        fixed (byte* ptr = resultBuffer)
+                        PropertyDisplay.Default => SBCPropertyDisplay.Default,
+                        PropertyDisplay.Color => SBCPropertyDisplay.Color,
+                        _ => throw new NotImplementedException()
+                    });
+                }
+                if ((attributeData = Array.Find(resource.Attributes, static (x) => x.Signature is AttributeGlobal)).Signature != null)
+                {
+                    flags |= SBCResourceFlags.Global;
+
+                    string? customName = attributeData.GetVariable<string>("Name");
+                    bw.Write(new SBCAttributeGlobal
+                    {
+                        HasCustomName = customName != null
+                    });
+
+                    if (customName != null)
+                        bw.Write(customName);
+                }
+                if ((attributeData = Array.Find(resource.Attributes, static (x) => x.Signature is AttributeProperty)).Signature != null)
+                {
+                    flags |= SBCResourceFlags.Property;
+
+                    string? customName = attributeData.GetVariable<string>("Name");
+                    bw.Write(new SBCAttributeProperty
+                    {
+                        Default = attributeData.GetVariable<PropertyDefault>("Default") switch
                         {
-                            Unsafe.CopyBlockUnaligned(ptr, data.ToPointer(), (uint)length);
-                        }
+                            PropertyDefault.NumOne => SBCPropertyDefault.NumOne,
+                            PropertyDefault.NumZero => SBCPropertyDefault.NumZero,
+                            PropertyDefault.NumIdentity => SBCPropertyDefault.NumIdentity,
+                            PropertyDefault.TexWhite => SBCPropertyDefault.TexWhite,
+                            PropertyDefault.TexBlack => SBCPropertyDefault.TexBlack,
+                            PropertyDefault.TexMask => SBCPropertyDefault.TexMask,
+                            PropertyDefault.TexNormal => SBCPropertyDefault.TexNormal,
+                            _ => throw new NotImplementedException()
+                        },
+                        HasCustomName = customName != null
+                    });
 
-                        NativeMemory.Free(data.ToPointer());
-                    }
+                    if (customName != null)
+                        bw.Write(customName);
+                }
+                if ((attributeData = Array.Find(resource.Attributes, static (x) => x.Signature is AttributeSampled)).Signature != null)
+                {
+                    flags |= SBCResourceFlags.Sampled;
 
-                    return resultBuffer.AsMemory();
+                    string? customName = attributeData.GetVariable<string>("Sampler");
+                    bw.Write(new SBCAttributeSampled
+                    {
+                        HasCustomName = customName != null
+                    });
+
+                    if (customName != null)
+                        bw.Write(customName);
+                }
+
+                long current = bw.BaseStream.Position;
+
+                bw.BaseStream.Seek(backup, SeekOrigin.Begin);
+                bw.Write(flags);
+                bw.BaseStream.Seek(current, SeekOrigin.Begin);
+            }
+        }
+
+        private void WriteRawPropertyList(BinaryWriter bw, ShaderData data)
+        {
+            List<ValueTuple<VariableData, bool>> variables = new List<ValueTuple<VariableData, bool>>();
+            foreach (ref readonly PropertyData resource in data.Properties)
+            {
+                ValueDataRef generic = resource.Generic;
+                Checking.Assert(generic.IsSpecified);
+
+                variables.Add((new VariableData(resource.Name, resource.Attributes, generic, null), false));
+
+                if (generic.Generic == ValueGeneric.Custom)
+                {
+                    ref readonly StructData @struct = ref data.GetRefSource(generic);
+                    AppendSubStructMembers(in @struct, variables);
+                }
+            }
+
+            bw.Write((ushort)variables.Count);
+
+            int localByteOffset = 0;
+            int globalByteOffset = 0;
+
+            foreach (ref readonly ValueTuple<VariableData, bool> tuple in variables.AsSpan())
+            {
+                VariableData variable = tuple.Item1;
+
+                ValueDataRef generic = variable.Generic;
+                Checking.Assert(generic.IsSpecified);
+
+                int size = data.CalculateSize(generic);
+
+                if (generic.Generic == ValueGeneric.Custom)
+                {
+                    bw.Write((ushort)((1 << 15) | size));
                 }
                 else
                 {
-                    return bytecode;
-                }
-            }
-        }
-
-        private static void WritePipelineDesc(BinaryWriter bw, ref ShaderProcessorArgs args, ShaderParseResult result)
-        {
-            ref ShaderDescriptionArgs desc = ref args.Description;
-
-            bw.Write((byte)desc.FillMode);
-            bw.Write((byte)desc.CullMode);
-            bw.Write(desc.FrontCounterClockwise);
-            bw.Write(desc.DepthBias);
-            bw.Write(desc.DepthBiasClamp);
-            bw.Write(desc.SlopeScaledDepthBias);
-            bw.Write(desc.DepthClipEnable);
-            bw.Write(desc.ConservativeRaster);
-            bw.Write(desc.DepthEnable);
-            bw.Write((byte)desc.DepthWriteMask);
-            bw.Write((byte)desc.DepthFunc);
-            bw.Write(desc.StencilEnable);
-            bw.Write(desc.StencilReadMask);
-            bw.Write(desc.StencilWriteMask);
-            bw.Write((byte)desc.PrimitiveTopology);
-            WriteStencilFace(bw, ref desc.FrontFace);
-            WriteStencilFace(bw, ref desc.BackFace);
-            bw.Write(desc.AlphaToCoverageEnable);
-            bw.Write(desc.IndependentBlendEnable);
-            bw.Write(desc.LogicOpEnable);
-            bw.Write((byte)desc.LogicOp);
-            bw.Write((byte)(result.ConstantsSize / 4));
-            bw.Write((byte)args.Blends.Length);
-            for (int i = 0; i < args.Blends.Length; i++)
-            {
-                ref BlendDescriptionArgs blend = ref args.Blends[i];
-                bw.Write(blend.BlendEnable);
-                bw.Write((byte)blend.SourceBlend);
-                bw.Write((byte)blend.DestinationBlend);
-                bw.Write((byte)blend.BlendOp);
-                bw.Write((byte)blend.SourceBlendAlpha);
-                bw.Write((byte)blend.DestinationBlendAlpha);
-                bw.Write((byte)blend.BlendOpAlpha);
-                bw.Write(blend.RenderTargetWriteMask);
-            }
-        }
-
-        private static void WriteStencilFace(BinaryWriter bw, ref StencilFaceDescriptionArgs face)
-        {
-            bw.Write((byte)face.FailOp);
-            bw.Write((byte)face.DepthFailOp);
-            bw.Write((byte)face.PassOp);
-            bw.Write((byte)face.Func);
-        }
-
-        private static bool WriteSupplementData(BinaryWriter bw, ShaderParseResult parseResult, IDxcCompiler3 compiler, string[] includePaths, ILogger logger)
-        {
-            using (ShaderIncludeHandler includeHandler = new ShaderIncludeHandler(includePaths))
-            {
-                using IDxcUtils utils = Dxc.CreateDxcUtils();
-                using IDxcResult result = compiler.Compile(parseResult.OutputSource, [
-                    "-HV", "2021",
-                "-WX",
-                "-T", "vs_6_6",
-                "-E", parseResult.EntryPointVertex!,
-                ], includeHandler);
-
-                string errs = result.GetErrors();
-                if (errs.Length > 0)
-                {
-                    logger.Error(errs);
-                    return false;
+                    bw.Write((ushort)((int)(generic.Generic switch
+                    {
+                        ValueGeneric.Float => SBCValueGeneric.Single,
+                        ValueGeneric.Double => SBCValueGeneric.Double,
+                        ValueGeneric.Int => SBCValueGeneric.Int,
+                        ValueGeneric.UInt => SBCValueGeneric.UInt,
+                        _ => throw new NotImplementedException(),
+                    }) | (generic.Rows << 12) | (generic.Columns << 9)));
                 }
 
-                using IDxcBlob reflectionBlob = result.GetOutput(DxcOutKind.Reflection);
-                using ID3D12ShaderReflection reflection = utils.CreateReflection<ID3D12ShaderReflection>(reflectionBlob);
+                long backup = bw.BaseStream.Position;
 
-                ShaderParameterDescription[] inputParams = reflection.InputParameters;
-                int currentByteOffset = 0;
+                bw.Write(ushort.MaxValue);
+                bw.Write(SBCPropertyFlags.None);
 
-                bw.Write((byte)inputParams.Count((x) => x.SystemValueType == Vortice.Direct3D.SystemValueType.Undefined));
-                for (int i = 0; i < inputParams.Length; i++)
+                bw.Write(variable.Name);
+
+                AttributeData attributeData = new AttributeData();
+                SBCPropertyFlags flags = SBCPropertyFlags.None;
+
+                if (tuple.Item2)
+                    flags |= SBCPropertyFlags.HasParent;
+
+                if ((attributeData = Array.Find(variable.Attributes, static (x) => x.Signature is AttributeDisplay)).Signature != null && attributeData.Data != null)
                 {
-                    ShaderParameterDescription description = inputParams[i];
-                    if (description.SystemValueType != Vortice.Direct3D.SystemValueType.Undefined)
-                        continue;
-
-                    ShaderInputLayout layoutMod = parseResult.InputLayout.Find((x) => x.Name == description.SemanticName);
-
-                    RHI.InputElementDescription elem = new RHI.InputElementDescription();
-
-                    elem.Semantic = (RHI.InputElementSemantic)((int)Enum.Parse<RHI.InputElementSemantic>(description.SemanticName, true) + description.SemanticIndex);
-
-                    elem.Format = layoutMod.Format.GetValueOrDefault();
-                    if (!layoutMod.Format.HasValue)
+                    flags |= SBCPropertyFlags.Display;
+                    bw.Write(attributeData.GetVariable<PropertyDisplay>("Display") switch
                     {
-                        int usageMask = BitOperations.PopCount((uint)description.UsageMask) - 1;
-                        if (usageMask == -1)
-                            elem.Format = RHI.InputElementFormat.Padding;
-                        else
-                        {
-                            switch (description.ComponentType)
-                            {
-                                case Vortice.Direct3D.RegisterComponentType.UInt32: elem.Format = (RHI.InputElementFormat)((int)RHI.InputElementFormat.UInt1 + usageMask); break;
-                                case Vortice.Direct3D.RegisterComponentType.Float32: elem.Format = (RHI.InputElementFormat)((int)RHI.InputElementFormat.Float1 + usageMask); break;
-                                default:
-                                    //bad
-                                    break;
-                            }
-                        }
-                    }
-
-                    int byteOffset = layoutMod.Offset.GetValueOrDefault(currentByteOffset);
-
-                    elem.InputSlot = layoutMod.Slot.GetValueOrDefault(0);
-                    elem.ByteOffset = byteOffset;
-
-                    elem.InputSlotClass = layoutMod.Class.GetValueOrDefault(RHI.InputClassification.Vertex);
-                    elem.InstanceDataStepRate = 0;
-
-                    bw.Write(elem);
-
-                    switch (elem.Format)
-                    {
-                        case RHI.InputElementFormat.Padding: currentByteOffset = Math.Max(currentByteOffset, byteOffset); break;
-                        case RHI.InputElementFormat.Float1: currentByteOffset += sizeof(float); break;
-                        case RHI.InputElementFormat.Float2: currentByteOffset += sizeof(float) * 2; break;
-                        case RHI.InputElementFormat.Float3: currentByteOffset += sizeof(float) * 3; break;
-                        case RHI.InputElementFormat.Float4: currentByteOffset += sizeof(float) * 4; break;
-                        case RHI.InputElementFormat.UInt1: currentByteOffset += sizeof(uint); break;
-                        case RHI.InputElementFormat.UInt2: currentByteOffset += sizeof(uint) * 2; break;
-                        case RHI.InputElementFormat.UInt3: currentByteOffset += sizeof(uint) * 3; break;
-                        case RHI.InputElementFormat.UInt4: currentByteOffset += sizeof(uint) * 4; break;
-                        case RHI.InputElementFormat.Byte4: currentByteOffset += sizeof(byte) * 4; break;
-                    }
-                }
-
-                bw.Write((byte)parseResult.Variables.Count((x) => !x.IsConstants));
-                for (int i = 0; i < parseResult.Variables.Count; i++)
-                {
-                    ShaderVariable variable = parseResult.Variables[i];
-                    if (variable.IsConstants)
-                        continue;
-
-                    RHI.BoundResourceDescription description = new RHI.BoundResourceDescription
-                    {
-                        Index = variable.Index,
-                        Type = RHI.ResourceType.Texture
-                    };
-
-                    switch (variable.Type)
-                    {
-                        case ShaderVariableType.ConstantBuffer: description.Type = RHI.ResourceType.ConstantBuffer; break;
-                        case ShaderVariableType.StructuredBuffer: description.Type = RHI.ResourceType.ShaderBuffer; break;
-                        case ShaderVariableType.RWStructuredBuffer: description.Type = RHI.ResourceType.ShaderBuffer; break;
-                        case ShaderVariableType.Texture1D: description.Type = RHI.ResourceType.Texture; break;
-                        case ShaderVariableType.Texture1DArray: description.Type = RHI.ResourceType.Texture; break;
-                        case ShaderVariableType.Texture2D: description.Type = RHI.ResourceType.Texture; break;
-                        case ShaderVariableType.Texture2DArray: description.Type = RHI.ResourceType.Texture; break;
-                        case ShaderVariableType.Texture3D: description.Type = RHI.ResourceType.Texture; break;
-                        case ShaderVariableType.TextureCube: description.Type = RHI.ResourceType.Texture; break;
-                    }
-
-                    bw.Write(description);
-                }
-
-                bw.Write((byte)parseResult.ImmutableSamplers.Count);
-                for (int i = 0; i < parseResult.ImmutableSamplers.Count; i++)
-                {
-                    ImmutableSampler sampler = parseResult.ImmutableSamplers[i];
-
-                    bw.Write(sampler.Index);
-                    bw.Write(sampler.Name);
-
-                    bw.Write(new RHI.ImmutableSamplerDescription
-                    {
-                        Filter = sampler.Filter,
-                        AddressModeU = sampler.AddressModeU,
-                        AddressModeV = sampler.AddressModeV,
-                        AddressModeW = sampler.AddressModeW,
-                        MaxAnistropy = sampler.MaxAnistropy,
-                        MipLODBias = sampler.MipLODBias,
-                        MinLOD = sampler.MinLOD,
-                        MaxLOD = sampler.MaxLOD,
+                        PropertyDisplay.Default => SBCPropertyDisplay.Default,
+                        PropertyDisplay.Color => SBCPropertyDisplay.Color,
+                        _ => throw new NotImplementedException()
                     });
                 }
-
-                bw.Write((byte)parseResult.Variables.Count((x) => !x.IsConstants));
-                int k = 0;
-                for (int i = 0; i < parseResult.Variables.Count; i++)
+                if ((attributeData = Array.Find(variable.Attributes, static (x) => x.Signature is AttributeGlobal)).Signature != null)
                 {
-                    ShaderVariable variable = parseResult.Variables[i];
-                    if (variable.IsConstants)
-                        continue;
+                    flags |= SBCPropertyFlags.Global;
 
-                    bw.Write(variable.Type);
-                    bw.Write(variable.Name);
-                    bw.Write(variable.BindGroup);
-                    bw.Write((byte)k++);
-
-                    bw.Write((byte)variable.Attributes.Length);
-
-                    for (int j = 0; j < variable.Attributes.Length; j++)
+                    string? customName = attributeData.GetVariable<string>("Name");
+                    bw.Write(new SBCAttributeGlobal
                     {
-                        ref ShaderAttribute attrib = ref variable.Attributes[j];
-                        bw.Write((byte)attrib.Type);
+                        HasCustomName = customName != null
+                    });
 
-                        switch (attrib.Type)
+                    if (customName != null)
+                        bw.Write(customName);
+                }
+                if ((attributeData = Array.Find(variable.Attributes, static (x) => x.Signature is AttributeProperty)).Signature != null)
+                {
+                    flags |= SBCPropertyFlags.Property;
+
+                    string? customName = attributeData.GetVariable<string>("Name");
+                    bw.Write(new SBCAttributeProperty
+                    {
+                        Default = attributeData.GetVariable<PropertyDefault>("Default") switch
                         {
-                            case ShaderAttributeType.Constants: break;
-                            case ShaderAttributeType.Property:
-                                {
-                                    ShaderAttribProperty value = (ShaderAttribProperty)attrib.Value!;
-                                    bw.Write(value.Name);
-                                    bw.Write((byte)value.Default);
+                            PropertyDefault.NumOne => SBCPropertyDefault.NumOne,
+                            PropertyDefault.NumZero => SBCPropertyDefault.NumZero,
+                            PropertyDefault.NumIdentity => SBCPropertyDefault.NumIdentity,
+                            PropertyDefault.TexWhite => SBCPropertyDefault.TexWhite,
+                            PropertyDefault.TexBlack => SBCPropertyDefault.TexBlack,
+                            PropertyDefault.TexMask => SBCPropertyDefault.TexMask,
+                            PropertyDefault.TexNormal => SBCPropertyDefault.TexNormal,
+                            _ => throw new NotImplementedException()
+                        },
+                        HasCustomName = customName != null
+                    });
 
-                                    break;
-                                }
+                    if (customName != null)
+                        bw.Write(customName);
+                }
+
+                long current = bw.BaseStream.Position;
+
+                bw.BaseStream.Seek(backup, SeekOrigin.Begin);
+                bw.Write((ushort)(FlagUtility.HasFlag(flags, SBCPropertyFlags.Global) ? globalByteOffset : localByteOffset));
+                bw.Write(flags);
+                bw.BaseStream.Seek(current, SeekOrigin.Begin);
+
+                if (FlagUtility.HasFlag(flags, SBCPropertyFlags.Global))
+                    globalByteOffset += size;
+                else
+                    localByteOffset += size;
+            }
+
+            void AppendSubStructMembers(ref readonly StructData @struct, List<ValueTuple<VariableData, bool>> variables)
+            {
+                foreach (ref readonly VariableData variable in @struct.Variables.AsSpan())
+                {
+                    ValueDataRef generic = variable.Generic;
+                    Checking.Assert(generic.IsSpecified);
+
+                    variables.Add((variable, true));
+
+                    if (generic.Generic == ValueGeneric.Custom)
+                    {
+                        ref readonly StructData childStruct = ref data.GetRefSource(generic);
+                        AppendSubStructMembers(in @struct, variables);
+                    }
+                }
+            }
+        }
+
+        private void WriteInputLayout(BinaryWriter bw, ShaderData data)
+        {
+            int idx = data.Functions.FindIndex((x) => Array.Exists(x.Attributes, (y) => y.Signature is AttributeVertex));
+            Checking.Assert(idx != -1);
+
+            ref readonly FunctionData vertexEntry = ref data.Functions[idx];
+            int structData = Array.FindIndex(vertexEntry.Arguments, (x) => x.Generic.Generic == ValueGeneric.Custom);
+
+            if (structData != -1)
+            {
+                ref readonly StructData @struct = ref data.GetRefSource(vertexEntry.Arguments[structData].Generic);
+                if (@struct.Variables.Length > 0)
+                {
+                    using RentedArray<SBCInputElement> inputElements = RentedArray<SBCInputElement>.Rent(@struct.Variables.Length);
+                    int actualValid = 0;
+
+                    int byteOffset = 0;
+                    for (int i = 0; i < @struct.Variables.Length; i++)
+                    {
+                        ref readonly VariableData variable = ref @struct.Variables[i];
+
+                        ValueDataRef generic = variable.Generic;
+                        Checking.Assert(generic.IsSpecified && generic.Generic != ValueGeneric.Custom);
+                        Checking.Assert(variable.Semantic.HasValue);
+
+                        VarSemantic semantic = variable.Semantic.Value;
+                        if (semantic.Semantic >= SemanticName.SV_InstanceId)
+                            continue;
+
+                        SBCInputElement stagingElement = new SBCInputElement
+                        {
+                            Semantic = semantic.Semantic switch
+                            {
+                                SemanticName.Position => SBCInputSemantic.Position,
+                                SemanticName.Texcoord => SBCInputSemantic.Texcoord,
+                                SemanticName.Color => SBCInputSemantic.Color,
+                                SemanticName.Normal => SBCInputSemantic.Normal,
+                                SemanticName.Tangent => SBCInputSemantic.Tangent,
+                                //SemanticName.Bitangnet => SBCInputSemantic.Bitangnet,
+                                SemanticName.BlendIndices => SBCInputSemantic.BlendIndices,
+                                SemanticName.BlendWeight => SBCInputSemantic.BlendWeight,
+                                SemanticName.PositionT => SBCInputSemantic.PositionT,
+                                SemanticName.PSize => SBCInputSemantic.PSize,
+                                SemanticName.Fog => SBCInputSemantic.Fog,
+                                SemanticName.TessFactor => SBCInputSemantic.TessFactor,
+                                _ => throw new NotImplementedException()
+                            },
+                            SemanticIndex = (byte)semantic.Index,
+                            Format = (SBCInputFormat)((int)(generic.Generic switch
+                            {
+                                ValueGeneric.Float => SBCInputFormat.Float1,
+                                ValueGeneric.UInt => SBCInputFormat.UInt1,
+                                _ => throw new NotImplementedException()
+                            }) + Math.Max(generic.Rows - 1, 0)),
+
+                            InputSlot = 0,
+                            ByteOffset = ushort.MaxValue,
+
+                            InputSlotClass = SBCInputClassification.Vertex
+                        };
+
+                        byteOffset += generic.Generic switch
+                        {
+                            ValueGeneric.Float => sizeof(float),
+                            ValueGeneric.UInt => sizeof(uint),
+                            _ => throw new NotImplementedException()
+                        } * generic.Rows;
+
+                        inputElements[i] = stagingElement;
+                        actualValid++;
+                    }
+
+                    if (actualValid > 0)
+                    {
+                        for (int i = 0; i < vertexEntry.Attributes.Length; i++)
+                        {
+                            AttributeData layoutData = vertexEntry.Attributes[i];
+                            if (layoutData.Signature is AttributeIALayout and not null)
+                            {
+                                string elementName = layoutData.GetVariable<string>("Name")!;
+                                idx = @struct.Variables.FindIndex((x) => x.Name == elementName);
+
+                                if (idx == -1)
+                                    throw new Exception($"No input layout variable with name: {elementName} found (TODO: Add custom exception)"/*TODO: Add custom exception*/);
+
+                                ref SBCInputElement inputElement = ref inputElements[idx];
+
+                                if (layoutData.TryGetVariable("Offset", out int offset))
+                                    inputElement.ByteOffset = (ushort)offset;
+
+                                if (layoutData.TryGetVariable("Slot", out int slot))
+                                    inputElement.InputSlot = Math.Min((byte)slot, (byte)8);
+
+                                if (layoutData.TryGetVariable("Class", out RHIInputClass inputClass))
+                                    inputElement.InputSlotClass = inputClass switch
+                                    {
+                                        RHIInputClass.PerVertex => SBCInputClassification.Vertex,
+                                        RHIInputClass.PerInstance => SBCInputClassification.Instance,
+                                        _ => throw new NotImplementedException()
+                                    };
+
+                                if (layoutData.TryGetVariable("Format", out RHIElementFormat format))
+                                    inputElement.Format = format switch
+                                    {
+                                        RHIElementFormat.Single1 => SBCInputFormat.Float1,
+                                        RHIElementFormat.Single2 => SBCInputFormat.Float2,
+                                        RHIElementFormat.Single3 => SBCInputFormat.Float3,
+                                        RHIElementFormat.Single4 => SBCInputFormat.Float4,
+                                        RHIElementFormat.Byte4 => SBCInputFormat.Byte4,
+                                        _ => throw new NotImplementedException()
+                                    };
+                            }
                         }
+
+                        bw.Write((byte)actualValid);
+                        for (int i = 0; i < @struct.Variables.Length; i++)
+                        {
+                            ref readonly VariableData variable = ref @struct.Variables[i];
+
+                            VarSemantic semantic = variable.Semantic!.Value;
+                            if (semantic.Semantic >= SemanticName.SV_InstanceId)
+                                continue;
+
+                            bw.Write(inputElements[i]);
+                        }
+                    }
+                    else
+                        bw.Write((byte)0);
+                }
+                else
+                    bw.Write((byte)0);
+            }
+            else
+                bw.Write((byte)0);
+
+        }
+
+        private void WriteStaticSamplers(BinaryWriter bw, ShaderData data)
+        {
+            bw.Write((byte)data.StaticSamplers.Length);
+            if (!data.StaticSamplers.IsEmpty)
+            {
+                foreach (ref readonly StaticSamplerData samplerData in data.StaticSamplers)
+                {
+                    bw.Write(new SBCStaticSampler
+                    {
+                        Min = TranslateFilter(samplerData.Min),
+                        Mag = TranslateFilter(samplerData.Mag),
+                        Mip = TranslateFilter(samplerData.Mip),
+                        Reduction = samplerData.Reduction switch
+                        {
+                            SamplerReductionType.Standard => SBCSamplerReduction.Standard,
+                            _ => throw new NotImplementedException(),
+                        },
+                        AddressModeU = TranslateSAM(samplerData.AddressModeU),
+                        AddressModeV = TranslateSAM(samplerData.AddressModeV),
+                        AddressModeW = TranslateSAM(samplerData.AddressModeW),
+                        MaxAnisotropy = (byte)Math.Clamp(samplerData.MaxAnisotropy, 1, 16),
+                        MipLODBias = samplerData.MipLODBias,
+                        MinLOD = samplerData.MinLOD,
+                        MaxLOD = samplerData.MaxLOD,
+                        Border = samplerData.Border switch
+                        {
+                            SamplerBorder.TransparentBlack => SBCSamplerBorder.TransparentBlack,
+                            SamplerBorder.OpaqueBlack => SBCSamplerBorder.OpaqueBlack,
+                            SamplerBorder.OpaqueWhite => SBCSamplerBorder.OpaqueWhite,
+                            SamplerBorder.OpaqueBlackUInt => SBCSamplerBorder.OpaqueBlackUInt,
+                            SamplerBorder.OpaqueWhiteUInt => SBCSamplerBorder.OpaqueWhiteUInt,
+                            _ => throw new NotImplementedException(),
+                        }
+                    });
+                }
+            }
+
+            static SBCSamplerFilter TranslateFilter(SamplerFilter filter) => filter switch
+            {
+                SamplerFilter.Linear => SBCSamplerFilter.Linear,
+                SamplerFilter.Point => SBCSamplerFilter.Point,
+                _ => throw new NotImplementedException(),
+            };
+
+            static SBCSamplerAddressMode TranslateSAM(SamplerAddressMode addressMode) => addressMode switch
+            {
+                SamplerAddressMode.Repeat => SBCSamplerAddressMode.Repeat,
+                SamplerAddressMode.Mirror => SBCSamplerAddressMode.Mirror,
+                SamplerAddressMode.Clamp => SBCSamplerAddressMode.Clamp,
+                SamplerAddressMode.Border => SBCSamplerAddressMode.Border,
+                _ => throw new NotImplementedException(),
+            };
+        }
+
+        private void WriteBytecodeOffsetBlock(BinaryWriter bw, ref readonly ShaderProcesserResult result, ref readonly NewShaderProcessorArgs args)
+        {
+            int currentOffset = (int)(bw.BaseStream.Position + Unsafe.SizeOf<int>() * 2 * result.Bytecodes.Length);
+
+            result.Bytecodes.Sort((x, y) => x.TargetData.CompareTo(y.TargetData));
+            foreach (ShaderBytecode bytecode in result.Bytecodes)
+            {
+                bw.Write(currentOffset);
+                bw.Write(bytecode.Bytes.Length);
+
+                currentOffset += bytecode.Bytes.Length;
+            }
+        }
+
+        private void WriteBytecode(BinaryWriter bw, ref readonly ShaderProcesserResult result)
+        {
+            foreach (ShaderBytecode bytecode in result.Bytecodes)
+            {
+                bw.Write(bytecode.Bytes);
+            }
+        }
+
+        private static Dictionary<ReferenceIndex, ShPropertyStages> CreateStageUsageDictionary(ShaderData data)
+        {
+            Dictionary<ReferenceIndex, ShPropertyStages> dict = new Dictionary<ReferenceIndex, ShPropertyStages>();
+
+            foreach (FunctionData function in data.Functions)
+            {
+                if (Array.Exists(function.Attributes, (x) => x.Signature is AttributeVertex))
+                {
+                    TravelForStageRecursive(ShPropertyStages.VertexShading, function.IncludeData);
+                }
+                else if (Array.Exists(function.Attributes, (x) => x.Signature is AttributePixel))
+                {
+                    TravelForStageRecursive(ShPropertyStages.PixelShading, function.IncludeData);
+                }
+            }
+
+            void TravelForStageRecursive(ShPropertyStages stage, FunctionIncludeData includes)
+            {
+                foreach (ref readonly ReferenceIndex index in includes.Indices)
+                {
+                    switch (index.Type)
+                    {
+                        case ReferenceType.Function: TravelForStageRecursive(stage, data.Functions[index.Index].IncludeData); break;
+                        default:
+                            {
+                                ref ShPropertyStages stages = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, index, out bool exists);
+                                if (exists)
+                                    stages |= stage;
+                                else
+                                    stages = stage;
+
+                                break;
+                            }
                     }
                 }
             }
 
-            return true;
-        }
-
-        private static (nint data, int length) OptimizeSpirv(Span<uint> binary)
-        {
-            nint optimizer = EdInterop.SPIRV_CreateOptimize();
-            try
-            {
-                SPIRV_OptimizeOut @out = new()
-                {
-                    Alloc = &SpirvAlloc,
-                    InBinary = (uint*)Unsafe.AsPointer(ref binary.DangerousGetReferenceAt(0)),
-                    InSize = (ulong)binary.Length,
-                };
-
-                EdInterop.SPIRV_OptRegisterPerfPasses(optimizer);
-                if (EdInterop.SPIRV_RunOptimize(optimizer, &@out))
-                {
-                    return ((nint)@out.OutBinary, (int)@out.OutSize);
-                }
-
-                return (nint.Zero, 0);
-            }
-            finally
-            {
-                EdInterop.SPIRV_DestroyOptimize(optimizer);
-            }
-        }
-
-        [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-        private static void* SpirvAlloc(ulong size) => NativeMemory.Alloc((nuint)size);
-
-        public const uint HeaderId = 0x204c4243;
-        public const uint HeaderVersion = 0;
-
-        private class PipelineDesc
-        {
-            public RHI.FillMode FillMode { get; set; }
-            public RHI.CullMode CullMode { get; set; }
-            public bool FrontCounterClockwise { get; set; }
-            public int DepthBias { get; set; }
-            public float DepthBiasClamp { get; set; }
-            public float SlopeScaledDepthBias { get; set; }
-            public bool DepthClipEnable { get; set; }
-            public bool ConservativeRaster { get; set; }
-            public bool DepthEnable { get; set; }
-            public RHI.DepthWriteMask DepthWriteMask { get; set; }
-            public RHI.ComparisonFunc DepthFunc { get; set; }
-            public bool StencilEnable { get; set; }
-            public byte StencilReadMask { get; set; }
-            public byte StencilWriteMask { get; set; }
-            public RHI.PrimitiveTopologyType PrimitiveTopology { get; set; }
-            public StencilFace FrontFace { get; set; }
-            public StencilFace BackFace { get; set; }
-            public bool AlphaToCoverageEnable { get; set; }
-            public bool IndependentBlendEnable { get; set; }
-            public bool LogicOpEnable { get; set; }
-            public RHI.LogicOp LogicOp { get; set; }
-            public List<BlendDescription> Blends { get; set; }
-        }
-
-        private record struct StencilFace
-        {
-            public RHI.StencilOp StencilFailOp { get; set; }
-            public RHI.StencilOp StencilDepthFailOp { get; set; }
-            public RHI.StencilOp StencilPassOp { get; set; }
-            public RHI.ComparisonFunc StencilFunc { get; set; }
-        }
-
-        private record class BlendDescription
-        {
-            public bool BlendEnable { get; set; }
-            public RHI.Blend SrcBlend { get; set; }
-            public RHI.Blend DstBlend { get; set; }
-            public RHI.BlendOp BlendOp { get; set; }
-            public RHI.Blend SrcBlendAlpha { get; set; }
-            public RHI.Blend DstBlendAlpha { get; set; }
-            public RHI.BlendOp BlendOpAlpha { get; set; }
-            public byte RenderTargetWriteMask { get; set; }
-        }
-
-        private record struct ShaderResource
-        {
-            public ShaderVariableType Type;
-            public string Name;
-            public byte Index;
+            return dict;
         }
     }
 
-    public struct ShaderProcessorArgs
+    public struct NewShaderProcessorArgs
     {
-        public string AbsoluteFilepath;
-        public string AbsoluteOutputPath;
+        public string SourceFilepath;
+        public string OutputFilepath;
 
-        public string[] ContentSearchDirs;
+        public string[] IncludeDirectories;
 
-        public ILogger? Logger;
+        public ILogger Logger;
 
-        public RHI.GraphicsAPI Target;
+        public ShaderCompileTarget Targets;
 
-        public ShaderDescriptionArgs Description;
-        public BlendDescriptionArgs[] Blends;
+        public SBCPrimitiveTopology TopologyType;
+        public SBCRasterizer Rasterizer;
+        public SBCDepthStencil DepthStencil;
+        public SBCBlend Blend;
+        public SBCRenderTargetBlend[] Blends;
     }
 
-    public struct ShaderDescriptionArgs
+    public struct SPRasterizer
     {
-        public RHI.FillMode FillMode;
-        public RHI.CullMode CullMode;
+        public SBCFillMode FillMode;
+        public SBCCullMode CullMode;
         public bool FrontCounterClockwise;
         public int DepthBias;
         public float DepthBiasClamp;
         public float SlopeScaledDepthBias;
         public bool DepthClipEnable;
         public bool ConservativeRaster;
+    }
+
+    public struct SPDepthStencil
+    {
         public bool DepthEnable;
-        public RHI.DepthWriteMask DepthWriteMask;
-        public RHI.ComparisonFunc DepthFunc;
+        public SBCDepthWriteMask WriteMask;
+        public SBCComparisonFunc DepthFunc;
         public bool StencilEnable;
         public byte StencilReadMask;
         public byte StencilWriteMask;
-        public RHI.PrimitiveTopologyType PrimitiveTopology;
+        public SPDepthStencilFace FrontFace;
+        public SPDepthStencilFace BackFace;
+    }
+
+    public struct SPDepthStencilFace
+    {
+        public SBCStencilOp Fail;
+        public SBCStencilOp DepthFail;
+        public SBCStencilOp Pass;
+        public SBCComparisonFunc Func;
+    }
+
+    public struct SPBlend
+    {
         public bool AlphaToCoverageEnable;
         public bool IndependentBlendEnable;
-        public bool LogicOpEnable;
-        public RHI.LogicOp LogicOp;
-        public StencilFaceDescriptionArgs FrontFace;
-        public StencilFaceDescriptionArgs BackFace;
+        public SPRenderTargetBlend[] Blends;
     }
 
-    public struct StencilFaceDescriptionArgs
-    {
-        public RHI.StencilOp FailOp;
-        public RHI.StencilOp DepthFailOp;
-        public RHI.StencilOp PassOp;
-        public RHI.ComparisonFunc Func;
-    }
-
-    public struct BlendDescriptionArgs
+    public struct SPRenderTargetBlend
     {
         public bool BlendEnable;
-        public RHI.Blend SourceBlend;
-        public RHI.Blend DestinationBlend;
-        public RHI.BlendOp BlendOp;
-        public RHI.Blend SourceBlendAlpha;
-        public RHI.Blend DestinationBlendAlpha;
-        public RHI.BlendOp BlendOpAlpha;
-        public byte RenderTargetWriteMask;
-    }
-
-    internal enum ShaderBytecodeTargets : byte
-    {
-        None = 0,
-        Vertex = 1 << 0,
-        Pixel = 1 << 1,
-    }
-
-    internal enum ShaderAPITargets : byte
-    {
-        None = 0,
-        Vulkan = 1 << 0,
-        Direct3D12 = 1 << 1,
+        public SBCBlendSource Source;
+        public SBCBlendSource Destination;
+        public SBCBlendOp Operation;
+        public SBCBlendSource SourceAlpha;
+        public SBCBlendSource DestinationAlpha;
+        public SBCBlendOp OperationAlpha;
+        public byte WriteMask;
     }
 }

@@ -1,13 +1,13 @@
 ﻿using Editor.Assets;
 using Editor.Assets.Loaders;
 using Editor.Assets.Types;
-using Editor.DearImGui;
-using Editor.DearImGui.Extra;
-using Editor.DearImGui.Tooling;
 using Editor.Demos;
-using Editor.Gui;
+using Editor.UI;
+using Editor.UI.Debugging;
+using Editor.UI.Designer;
 using Editor.Interaction;
 using Editor.Platform.Windows;
+using Editor.Project;
 using Editor.Rendering;
 using Editor.Storage;
 using Hexa.NET.ImGui;
@@ -16,6 +16,7 @@ using Primary.Assets;
 using Primary.Components;
 using Primary.Polling;
 using Primary.Profiling;
+using Primary.R2.ForwardPlus;
 using Primary.Rendering;
 using Primary.Scenes;
 using Primary.Timing;
@@ -24,19 +25,18 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
-
-using R2 = Primary.Rendering2;
+using Editor.UI.Assets;
 
 namespace Editor
 {
     public class Editor : Engine
     {
         private readonly string _baseProjectPath;
+        private readonly ProjectConfiguration _projectConfig;
 
         private DateTime _startTime;
 
         private ProjectSubFilesystem _projectSubFilesystem;
-        private ProjectShaderLibrary _projectShaderLibrary;
 
         private ProjectSubFilesystem _engineFilesystem;
         private ProjectSubFilesystem _editorFilesystem;
@@ -44,10 +44,8 @@ namespace Editor
         private AssetDatabase _assetDatabase;
         private AssetPipeline _assetPipeline;
 
-        private R2.RenderingManager _r2Renderer;
-
-        private DearImGuiStateManager _dearImGuiStateManager;
-        private DearImGuiWindowManager _dearImGuiWindowManager;
+        //private DearImGuiStateManager _dearImGuiStateManager;
+        //private DearImGuiWindowManager _dearImGuiWindowManager;
         //private EditorGuiManager _guiManager;
         private SelectionManager _selectionManager;
         private ToolManager _toolManager;
@@ -55,27 +53,28 @@ namespace Editor
 
         private DynamicAtlasManager _guiAtlasManager;
 
-        private ProfilerView2 _profilerView2;
-        private HierchyView _hierchyView;
-        private PropertiesView _propertiesView;
-        private RenderingView _renderingView;
-        private EditorTaskViewer _editorTaskViewer;
-        private ContentView _contentView;
-        private SceneView _sceneView;
-        private ImportFileView _importFileView;
-        private RHIInspector _rhiInsector;
-        private PopupManager _popupManager;
-        private InputDebugger _inputDebugger;
-        private DebugView _debugView;
-        private GeoEditorView _geoEditorView;
-        private BundleExplorer _bundleExplorer;
-        private ConsoleView _consoleView;
-        private CubemapTool _cubemapTool;
+        private UIManager _uiManager;
+
+        //private ProfilerView2 _profilerView2;
+        //private HierchyView _hierchyView;
+        //private PropertiesView _propertiesView;
+        //private RenderingView _renderingView;
+        //private EditorTaskViewer _editorTaskViewer;
+        //private ContentView _contentView;
+        //private SceneView _sceneView;
+        //private ImportFileView _importFileView;
+        //private PopupManager _popupManager;
+        //private InputDebugger _inputDebugger;
+        //private DebugView _debugView;
+        //private GeoEditorView _geoEditorView;
+        //private BundleExplorer _bundleExplorer;
+        //private ConsoleView _consoleView;
+        //private CubemapTool _cubemapTool;
 
         internal Editor(string baseProjectPath, string[] args) : base(args.Length > 1 ? args.AsSpan(1) : Span<string>.Empty)
         {
             using StartupDisplayUI ui = new StartupDisplayUI();
-  
+
             CancellationTokenSource cts = new CancellationTokenSource();
             Task pumpTask = Task.Factory.StartNew(() =>
             {
@@ -106,14 +105,15 @@ namespace Editor
                 baseProjectPath += Path.DirectorySeparatorChar;
 
             VerifyProjectPath(baseProjectPath);
+
             _baseProjectPath = baseProjectPath;
+            _projectConfig = new ProjectConfiguration(Path.Combine(_baseProjectPath, "Project.toml"));
 
             EditorFilepaths.Initialize(baseProjectPath);
 
             ui.PushStep("Setup filesystem");
 
             _projectSubFilesystem = new ProjectSubFilesystem(EditorFilepaths.ContentPath);
-            _projectShaderLibrary = new ProjectShaderLibrary(EditorFilepaths.ContentPath);
 
             _engineFilesystem = new ProjectSubFilesystem(@"D:/source/repos/Constructor/Source/Engine");
             _editorFilesystem = new ProjectSubFilesystem(@"D:/source/repos/Constructor/Source/Editor");
@@ -129,14 +129,10 @@ namespace Editor
 
             ui.PushStep("Initialize editor");
 
-            R2.Components.RegisterComponentsDefault.RegisterDefault();
-            R2.Assets.RegisterAssetsDefault.RegisterDefault();
             RegisterComponentsDefault.RegisterDefault();
 
-            _r2Renderer = new R2.RenderingManager();
-
-            _dearImGuiStateManager = new DearImGuiStateManager(this);
-            _dearImGuiWindowManager = new DearImGuiWindowManager();
+            //_dearImGuiStateManager = new DearImGuiStateManager(this);
+            //_dearImGuiWindowManager = new DearImGuiWindowManager();
             //_guiManager = new EditorGuiManager();
             _selectionManager = new SelectionManager();
             _toolManager = new ToolManager();
@@ -144,22 +140,23 @@ namespace Editor
 
             _guiAtlasManager = new DynamicAtlasManager();
 
-            _profilerView2 = new ProfilerView2(_guiAtlasManager);
-            _hierchyView = new HierchyView();
-            _propertiesView = new PropertiesView();
-            _renderingView = new RenderingView();
-            _editorTaskViewer = new EditorTaskViewer();
-            _contentView = new ContentView();
-            _sceneView = new SceneView(_guiAtlasManager);
-            _importFileView = new ImportFileView();
-            _rhiInsector = new RHIInspector();
-            _popupManager = new PopupManager();
-            _inputDebugger = new InputDebugger();
-            _debugView = new DebugView();
-            _geoEditorView = new GeoEditorView();
-            _bundleExplorer = new BundleExplorer();
-            _consoleView = new ConsoleView();
-            _cubemapTool = new CubemapTool();
+            _uiManager = new UIManager(EdLog.Gui);
+
+            //_profilerView2 = new ProfilerView2(_guiAtlasManager);
+            //_hierchyView = new HierchyView();
+            //_propertiesView = new PropertiesView();
+            //_renderingView = new RenderingView();
+            //_editorTaskViewer = new EditorTaskViewer();
+            //_contentView = new ContentView();
+            //_sceneView = new SceneView(_guiAtlasManager);
+            //_importFileView = new ImportFileView();
+            //_popupManager = new PopupManager();
+            //_inputDebugger = new InputDebugger();
+            //_debugView = new DebugView();
+            //_geoEditorView = new GeoEditorView();
+            //_bundleExplorer = new BundleExplorer();
+            //_consoleView = new ConsoleView();
+            //_cubemapTool = new CubemapTool();
 
             ui.PopStep();
 
@@ -173,7 +170,7 @@ namespace Editor
             _guiAtlasManager.Dispose();
 
             _editorRenderManager.Dispose();
-            _dearImGuiStateManager.Dispose();
+            //_dearImGuiStateManager.Dispose();
             _assetPipeline.Dispose();
 
             base.Dispose();
@@ -199,16 +196,16 @@ namespace Editor
             EdLog.Gui.Information("         AVX10.1: {b}", Avx10v1.IsSupported);
 
             Window window = WindowManager.CreateWindow("Primary", new Vector2(1336, 726), CreateWindowFlags.Resizable);
+            UIDockHost centralHost = _uiManager.CreateHostedDock(window);
 
-            RenderingManager.DefaultWindow = window;
-            RenderingManager.PostRender += _editorRenderManager.SetupPasses;
+            _uiManager.OpenWindow<UIDesigner>(centralHost);
 
-            _r2Renderer.SetNewRenderPath(new EditorRenderPath());
+            RenderingManager.SetNewRenderPath(new EditorRenderPath());
 
-            _dearImGuiStateManager.InitWindow(window);
+            //_dearImGuiStateManager.InitWindow(window);
 
-            _dearImGuiWindowManager.Open<FrameGraphViewer>();
-            _dearImGuiWindowManager.Open<RenderPassInspector>();
+            //_dearImGuiWindowManager.Open<FrameGraphViewer>();
+            //_dearImGuiWindowManager.Open<RenderPassInspector>();
 
             _guiAtlasManager.TriggerRebuild();
 
@@ -249,26 +246,26 @@ namespace Editor
             _assetDatabase.HandlePendingUpdates();
             _assetPipeline.PollRemainingEvents();
             //_guiManager.Update();
+            _uiManager.UpdatePendingLayouts();
             _toolManager.Update();
 
             ThreadHelper.ExecutePendingTasks();
 
             DrawDearImgui();
 
+            UIDebugRenderer.Draw(Gizmos.Instance, _uiManager.ActiveHosts.First());
+
             InputSystem.UpdatePending();
             EventManager.PollEvents();
             SystemManager.RunSystems();
-            //RenderingManager.SwapChainCache.GetOrAddDefault(RenderingManager.DefaultWindow!)?.Present(Primary.RHI.PresentParameters.VSync);
-            _r2Renderer.Render();
-            //_r2Renderer.RenderDebug(Gizmos.R2);
-            //RenderingManager.ExecuteRender();
+            RenderingManager.Render();
         }
 
         private void DrawDearImgui()
         {
             using (new ProfilingScope("EditorGui"))
             {
-                _dearImGuiStateManager.BeginFrame();
+                //_dearImGuiStateManager.BeginFrame();
 
                 /*if (ImGui.Begin("Profiler"))
                 {
@@ -284,36 +281,35 @@ namespace Editor
                 }
                 ImGui.End();*/
 
-                if (ImGui.BeginMainMenuBar())
-                {
-                    _debugView.MenuBar();
-                    
-                    if (ImGui.BeginMenu("View"))
-                    {
-                        _bundleExplorer.MenuBar();
-                        ImGui.EndMenu();
-                    }
+                //if (ImGui.BeginMainMenuBar())
+                //{
+                //    _debugView.MenuBar();
+                //
+                //    if (ImGui.BeginMenu("View"))
+                //    {
+                //        _bundleExplorer.MenuBar();
+                //        ImGui.EndMenu();
+                //    }
+                //
+                //    ImGui.EndMainMenuBar();
+                //}
 
-                    ImGui.EndMainMenuBar();
-                }
-
-                _profilerView2.Render();
-                _hierchyView.Render();
-                _propertiesView.Render();
-                        //_renderingView.Render();
-                _editorTaskViewer.Render();
-                _contentView.Render();
-                _sceneView.Render();
-                _importFileView.Render();
-                _rhiInsector.Render();
-                _popupManager.Render();
-                _inputDebugger.Render();
-                _debugView.Render();
-                _geoEditorView.Render();
-                _bundleExplorer.Render();
-                _consoleView.Render();
-                _cubemapTool.Render();
-                _dearImGuiWindowManager.RenderOpenWindows();
+                //_profilerView2.Render();
+                //_hierchyView.Render();
+                //_propertiesView.Render();
+                //_renderingView.Render();
+                //_editorTaskViewer.Render();
+                //_contentView.Render();
+                //_sceneView.Render();
+                //_importFileView.Render();
+                //_popupManager.Render();
+                //_inputDebugger.Render();
+                //_debugView.Render();
+                //_geoEditorView.Render();
+                //_bundleExplorer.Render();
+                //_consoleView.Render();
+                //_cubemapTool.Render();
+                //_dearImGuiWindowManager.RenderOpenWindows();
 
                 //ImGui.Text($"Runtime: {(DateTime.Now - _startTime).TotalSeconds}s");
 
@@ -325,7 +321,7 @@ namespace Editor
                 //drawList.AddText(new Vector2(20.0f, 44.0f), 0xffffffff, $"Jit: il:{(JitInfo.GetCompiledILBytes() / 1024.0).ToString("F2", CultureInfo.InvariantCulture)}kb  mc:{JitInfo.GetCompiledMethodCount()}  ct:{JitInfo.GetCompilationTime()}");
                 //drawList.AddText(new Vector2(20.0f, 56.0f), 0xffffffff, $"GC: {(GC.GetTotalMemory(false) / (1024.0 * 1024.0)).ToString("F6")}mb");
 
-                _dearImGuiStateManager.EndFrame();
+                //_dearImGuiStateManager.EndFrame();
 
                 _timer += Time.DeltaTime;
                 if (_timer > 2.0f)
@@ -353,32 +349,27 @@ namespace Editor
             AssetFilesystem.AddFilesystem(_engineFilesystem);
             AssetFilesystem.AddFilesystem(_editorFilesystem);
 
-            AssetFilesystem.ShaderLibrary.AddSubLibrary(_projectShaderLibrary);
-
             _assetPipeline.PollRemainingEvents();
         }
 
         public string ProjectPath => _baseProjectPath;
+        public ProjectConfiguration ProjectConfig => _projectConfig;
 
         internal ProjectSubFilesystem ProjectSubFilesystem => _projectSubFilesystem;
-        internal ProjectShaderLibrary ProjectShaderLibrary => _projectShaderLibrary;
 
         internal ProjectSubFilesystem EngineFilesystem => _engineFilesystem;
         internal ProjectSubFilesystem EditorFilesystem => _editorFilesystem;
 
-        internal DearImGuiStateManager DearImGuiStateManager => _dearImGuiStateManager;
         public AssetDatabase AssetDatabase => _assetDatabase;
         public AssetPipeline AssetPipeline => _assetPipeline;
         public DynamicAtlasManager GuiAtlasManager => _guiAtlasManager;
         public SelectionManager SelectionManager => _selectionManager;
         public ToolManager ToolManager => _toolManager;
 
-        internal R2.RenderingManager R2RenderingManager => _r2Renderer;
-
-        internal PropertiesView PropertiesView => _propertiesView;
-        internal SceneView SceneView => _sceneView;
-        internal PopupManager PopupManager => _popupManager;
-        internal GeoEditorView GeoEditorView => _geoEditorView;
+        //internal PropertiesView PropertiesView => _propertiesView;
+        //internal SceneView SceneView => _sceneView;
+        //internal PopupManager PopupManager => _popupManager;
+        //internal GeoEditorView GeoEditorView => _geoEditorView;
 
         private static void VerifyProjectPath(string path)
         {

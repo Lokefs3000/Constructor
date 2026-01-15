@@ -7,10 +7,8 @@ using Primary.Common;
 using Primary.IO;
 using Primary.Scenes;
 using Primary.Utility;
-using SDL;
 using System.Diagnostics;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 
 namespace Editor.DearImGui
 {
@@ -686,19 +684,19 @@ namespace Editor.DearImGui
 
         private void DrawTempIcons(ref DrawingData data)
         {
-            if (_iconSet.AtlasTexture.IsNull)
+            if (_iconSet.AtlasTexture == null)
                 return;
-            ImTextureRef textureRef = ImGuiUtility.GetTextureRef(_iconSet.AtlasTexture.Handle);
-
-            Span<TempIconDrawData> span = _tempIconPositions.AsSpan();
-            for (int i = 0; i < span.Length; i++)
-            {
-                ref TempIconDrawData icon = ref span[i];
-                if (_iconSet.TryGetAtlasIcon(icon.IconId, out DynAtlasIcon atlasIcon))
-                {
-                    data.DrawList.AddImage(textureRef, icon.Boundaries.Min, icon.Boundaries.Max, atlasIcon.UVs.Minimum, atlasIcon.UVs.Maximum, icon.Color);
-                }
-            }
+            //ImTextureRef textureRef = ImGuiUtility.GetTextureRef(_iconSet.AtlasTexture.Handle);
+            //
+            //Span<TempIconDrawData> span = _tempIconPositions.AsSpan();
+            //for (int i = 0; i < span.Length; i++)
+            //{
+            //    ref TempIconDrawData icon = ref span[i];
+            //    if (_iconSet.TryGetAtlasIcon(icon.IconId, out DynAtlasIcon atlasIcon))
+            //    {
+            //        data.DrawList.AddImage(textureRef, icon.Boundaries.Min, icon.Boundaries.Max, atlasIcon.UVs.Minimum, atlasIcon.UVs.Maximum, icon.Color);
+            //    }
+            //}
         }
         #endregion
 

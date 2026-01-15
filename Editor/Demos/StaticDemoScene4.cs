@@ -1,16 +1,7 @@
-﻿using Arch.Core;
-using Primary.Assets;
+﻿using Primary.Assets;
 using Primary.Components;
-using Primary.Rendering.Data;
 using Primary.Scenes;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
-using Vortice.DXGI;
 
 namespace Editor.Demos
 {

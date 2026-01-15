@@ -1,36 +1,40 @@
-﻿using Primary.RHI;
-using SDL;
+﻿using Primary.RHI2;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 
 namespace Primary.Rendering
 {
-    public class SwapChainCache : IDisposable
+    public sealed class SwapChainCache : IDisposable
     {
-        private GraphicsDevice _graphicsDevice;
-        private Dictionary<SDL_WindowID, SwapChainData> _swapChains;
+        private readonly RenderingManager _manager;
+
+        private Dictionary<uint, SwapChainData> _swapChains;
 
         private bool _disposedValue;
 
-        internal SwapChainCache(GraphicsDevice graphicsDevice)
+        internal SwapChainCache(RenderingManager manager)
         {
-            _graphicsDevice = graphicsDevice;
-            _swapChains = new Dictionary<SDL_WindowID, SwapChainData>();
+            _manager = manager;
+
+            _swapChains = new Dictionary<uint, SwapChainData>();
+
+            Engine.GlobalSingleton.WindowManager.WindowDestroyed += WindowDestroyedEvent;
         }
 
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             if (!_disposedValue)
             {
                 if (disposing)
                 {
-                    foreach (SwapChainData swapChainData in _swapChains.Values)
+                    foreach (var kvp in _swapChains)
                     {
-                        swapChainData.SwapChain.Dispose();
-                        swapChainData.Window.WindowResized -= swapChainData.ResizedCallback;
+                        kvp.Value.Window.WindowResized -= kvp.Value.ResizeEvent;
+                        kvp.Value.SwapChain.Dispose();
                     }
 
                     _swapChains.Clear();
+
+                    Engine.GlobalSingleton.WindowManager.WindowDestroyed -= WindowDestroyedEvent;
                 }
 
                 _disposedValue = true;
@@ -43,45 +47,40 @@ namespace Primary.Rendering
             GC.SuppressFinalize(this);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public SwapChain? GetIfExists(Window window)
+        private void WindowDestroyedEvent(Window window)
         {
-            if (_swapChains.TryGetValue(window.ID, out SwapChainData swapChainData))
-                return swapChainData.SwapChain;
-            return null;
-        }
-
-
-        public SwapChain GetOrAddDefault(Window window)
-        {
-            if (!_swapChains.TryGetValue(window.ID, out SwapChainData swapChainData))
+            if (_swapChains.TryGetValue(window.WindowId, out SwapChainData data))
             {
-                SwapChain sw = _graphicsDevice.CreateSwapChain(window.ClientSize, window.NativeWindowHandle);
-
-                swapChainData = new SwapChainData(
-                    sw,
-                    window,
-                    (x) => sw.Resize(x));
-
-                window.WindowResized += swapChainData.ResizedCallback;
-
-                _swapChains.TryAdd(window.ID, swapChainData);
-            }
-
-            return swapChainData.SwapChain;
-        }
-
-        public void DestroySwapChain(Window window)
-        {
-            if (_swapChains.TryGetValue(window.ID, out SwapChainData swapChainData))
-            {
-                swapChainData.SwapChain.Dispose();
-                swapChainData.Window.WindowResized -= swapChainData.ResizedCallback;
-
-                _swapChains.Remove(window.ID);
+                data.SwapChain.Dispose();
+                _swapChains.Remove(window.WindowId);
             }
         }
 
-        private record struct SwapChainData(SwapChain SwapChain, Window Window, Action<Vector2> ResizedCallback);
+        /// <summary>Not thread-safe</summary>
+        public RHISwapChain GetForWindow(Window window, bool createIfNull = true)
+        {
+            if (_swapChains.TryGetValue(window.WindowId, out SwapChainData data))
+                return data.SwapChain;
+
+            RHISwapChain swapChain = _manager.GraphicsDevice.CreateSwapChain(new RHISwapChainDescription
+            {
+                WindowHandle = window.NativeWindowHandle,
+                WindowSize = window.ClientSize,
+
+                BackBufferFormat = RHIFormat.RGBA8_UNorm,
+                BackBufferCount = 2
+            }) ?? throw new NullReferenceException();
+
+            Action<Vector2> resizeEvent = (x) => swapChain.Resize(x);
+
+            data = new SwapChainData(window, swapChain, resizeEvent);
+            _swapChains[window.WindowId] = data;
+
+            window.WindowResized += resizeEvent;
+
+            return swapChain;
+        }
+
+        private readonly record struct SwapChainData(Window Window, RHISwapChain SwapChain, Action<Vector2> ResizeEvent);
     }
 }

@@ -2,10 +2,6 @@
 using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Components;
-using Primary.Rendering;
-using Primary.Rendering.Data;
-using Primary.Rendering.Pass;
-using Primary.Rendering.Raw;
 using Primary.Scenes;
 using System.Diagnostics;
 using System.Numerics;

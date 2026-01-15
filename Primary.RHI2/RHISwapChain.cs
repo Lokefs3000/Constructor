@@ -1,11 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Numerics;
-using System.Text;
+﻿using System.Numerics;
 
 namespace Primary.RHI2
 {
-    public unsafe abstract class RHISwapChain : IDisposable, AsNativeObject<RHISwapChainNative>
+    public unsafe abstract class RHISwapChain : IDisposable, IAsNativeObject<RHISwapChainNative>
     {
         protected RHISwapChainDescription _description;
 

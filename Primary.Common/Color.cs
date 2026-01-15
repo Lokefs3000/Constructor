@@ -1,10 +1,12 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
 
 namespace Primary.Common
 {
-    public struct Color
+    public struct Color : IEquatable<Color>
     {
         public float R;
         public float G;
@@ -35,6 +37,11 @@ namespace Primary.Common
             A = rgba.W;
         }
 
+        public Color(Color color)
+        {
+            this = color;
+        }
+
         public Color(uint rgba)
         {
             const float ConvertTo01 = 1.0f / 255.0f;
@@ -50,16 +57,32 @@ namespace Primary.Common
         public Vector4 AsVector4() => new Vector4(R, G, B, A);
         public Vector3 AsVector3() => new Vector3(R, G, B);
 
+        public Vector128<float> AsVector128() => Unsafe.ReadUnaligned<Vector128<float>>(ref Unsafe.As<Color, byte>(ref this));
+
         public Color32 ToColor32()
         {
-            return new Color32(Clamp(R * 255.0f), Clamp(G * 255.0f), Clamp(B * 255.0f), Clamp(A * 255.0f));
+            Vector128<float> min = Vector128.Create(0.0f, 0.0f, 0.0f, 0.0f);
+            Vector128<float> max = Vector128.Create(255.0f, 255.0f, 255.0f, 255.0f);
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static byte Clamp(float v) => (byte)MathF.Min(MathF.Max(v, 0.0f), 255.0f);
+            Vector128<float> vector = Vector128.Truncate(Vector128.Clamp(AsVector128() * max, min, max));
+            Vector128<int> ints = Vector128.ConvertToInt32(vector);
+
+            return new Color32(ints.GetElement(0), ints.GetElement(1), ints.GetElement(2), ints.GetElement(3));
         }
+
+        public override bool Equals([NotNullWhen(true)] object? obj) => obj is Color color && Equals(color);
+        public bool Equals(Color color) => Vector128.EqualsAll(AsVector128(), color.AsVector128());
+
+        public override int GetHashCode() => HashCode.Combine(R, G, B, A);
+        public override string ToString() => $"<{R},{G},{B},{A}>";
 
         public static Color Black => new Color(0.0f);
         public static Color White => new Color(1.0f);
+
+        public static Color Red => new Color(1.0f, 0.0f, 0.0f);
+        public static Color Green => new Color(0.0f, 1.0f, 0.0f);
+        public static Color Blue => new Color(0.0f, 0.0f, 1.0f);
+        public static Color Yellow => new Color(1.0f, 1.0f, 0.0f);
 
         public static Color TransparentWhite => new Color(1.0f, 0.0f);
         public static Color TransparentBlack => new Color(0.0f, 0.0f);

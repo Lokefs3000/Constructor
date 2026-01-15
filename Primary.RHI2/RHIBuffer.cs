@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Primary.RHI2
+﻿namespace Primary.RHI2
 {
-    public unsafe abstract class RHIBuffer : RHIResource, AsNativeObject<RHIBufferNative>
+    public unsafe abstract class RHIBuffer : RHIResource, IAsNativeObject<RHIBufferNative>
     {
         protected RHIBufferDescription _description;
 

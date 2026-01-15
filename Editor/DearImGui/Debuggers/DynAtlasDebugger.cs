@@ -1,14 +1,6 @@
 ﻿using Editor.Gui;
 using Hexa.NET.ImGui;
-using Primary.Common;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using TerraFX.Interop.Windows;
 
 namespace Editor.DearImGui.Debuggers
 {
@@ -106,7 +98,7 @@ namespace Editor.DearImGui.Debuggers
 
                 drawList.PopClipRect();
 
-                drawList.AddImage(ImGuiUtility.GetTextureRef(subAtlas.AtlasTexture.Handle), cursor, cursor + imageSize);
+                //drawList.AddImage(ImGuiUtility.GetTextureRef(subAtlas.AtlasTexture.Handle), cursor, cursor + imageSize);
 
                 if (hoveredSet == null)
                 {

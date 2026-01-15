@@ -1,15 +1,9 @@
-﻿using Primary.Rendering2;
-using Primary.Rendering2.Assets;
-using Primary.Rendering2.Data;
-using Primary.Rendering2.Recording;
-using Primary.Rendering2.Resources;
-using Primary.Rendering2.Structures;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using Primary.Rendering;
+using Primary.Rendering.Data;
+using Primary.Rendering.Recording;
+using Primary.Rendering.Resources;
+using Primary.Rendering.Structures;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.R2.ForwardPlus.Passes
 {

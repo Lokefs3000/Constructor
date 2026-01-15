@@ -1,13 +1,6 @@
-﻿using Interop.D3D12MemAlloc;
-using Primary.Common;
-using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using System.Text;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
 
 namespace Primary.RHI2.Direct3D12
 {
@@ -49,10 +42,11 @@ namespace Primary.RHI2.Direct3D12
 
         protected override void SetDebugName(string? debugName)
         {
-            
+
         }
 
         public override unsafe RHISamplerNative* GetAsNative() => (RHISamplerNative*)_nativeRep;
+        public override unsafe RHIResourceNative* GetBaseAsNative() => (RHIResourceNative*)_nativeRep;
 
         public override RHIResourceType Type => RHIResourceType.Sampler;
     }

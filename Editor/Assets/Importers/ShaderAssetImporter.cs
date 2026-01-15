@@ -1,28 +1,26 @@
-﻿using Collections.Pooled;
+﻿using CommunityToolkit.HighPerformance;
 using Editor.Processors;
+using Editor.Shaders;
 using Editor.Storage;
 using Primary.Assets;
+using Primary.Assets.Loaders;
 using Primary.Assets.Types;
+using Primary.Common;
+using Primary.Utility;
+using System.Runtime.CompilerServices;
 using Tomlyn;
 using Tomlyn.Model;
-using static Schedulers.JobScheduler;
-using RHI = Primary.RHI;
 
 namespace Editor.Assets.Importers
 {
-    internal class ShaderAssetImporter : IAssetImporter
+    internal sealed class ShaderAssetImporter : IAssetImporter
     {
-        private ShaderProcessor _processor;
-
         public ShaderAssetImporter()
         {
-            _processor = new ShaderProcessor();
-        }
-
-        public void Dispose()
-        {
 
         }
+
+        public void Dispose() { }
 
         public bool Import(AssetPipeline pipeline, ProjectSubFilesystem filesystem, string fullFilePath, string outputFilePath, string localOutputFile)
         {
@@ -46,57 +44,171 @@ namespace Editor.Assets.Importers
                 pipeline.Associator.ClearAssocations(id);
 
             TomlTable root = Toml.ToModel<TomlTable>(File.ReadAllText(tomlFile));
-            if (root.TryGetValue("use_new_shader_pipeline", out object? val) && val is bool useNewShaderPipeline && useNewShaderPipeline)
+            NewShaderProcessorArgs args = new NewShaderProcessorArgs
             {
-                return false;
-            }
+                SourceFilepath = fullFilePath,
+                OutputFilepath = outputFilePath,
 
-            ShaderProcessorArgs args = new ShaderProcessorArgs
-            {
-                AbsoluteFilepath = fullFilePath,
-                AbsoluteOutputPath = outputFilePath,
-
-                ContentSearchDirs = [EditorFilepaths.ContentPath, EditorFilepaths.SourcePath, Path.GetDirectoryName(EditorFilepaths.EnginePath)!, Path.GetDirectoryName(EditorFilepaths.EditorPath)!],
+                IncludeDirectories = [
+                    EditorFilepaths.ContentPath,
+                    Path.GetDirectoryName(EditorFilepaths.EditorPath) ?? EditorFilepaths.EditorPath,
+                    Path.GetDirectoryName(EditorFilepaths.EnginePath) ?? EditorFilepaths.EnginePath,
+                    Path.GetDirectoryName(fullFilePath) ?? string.Empty
+                ],
 
                 Logger = EdLog.Assets,
 
-                Target = RHI.GraphicsAPI.Direct3D12,
+                //HACK: implement dynamic switching here instead
+                Targets = Shaders.ShaderCompileTarget.Direct3D12,
 
-                Description = DecodeDescription(root),
-                Blends = !root.ContainsKey("blends") ? Array.Empty<BlendDescriptionArgs>() : DecodeBlends((TomlTableArray)root["blends"])
+                TopologyType = DecodeTopologyType(root),
+                Rasterizer = DecodeRasterizer(root),
+                DepthStencil = DecodeDepthStencil(root),
+                Blend = DecodeBlend(root),
+                Blends = DecodeBlends(root)
             };
 
-            ShaderProcessor processor = new ShaderProcessor();
-
-            bool r = processor.Execute(args);
-
-            if (!r)
+            Processors.ShaderProcessor processor = new Processors.ShaderProcessor();
+            ShaderProcesserResult? resultNullable = processor.Execute(args);
+            if (!resultNullable.HasValue)
             {
-                EdLog.Assets.Error("Failed to import shader: {local}", fullFilePath.Substring(Editor.GlobalSingleton.ProjectPath.Length));
                 return false;
             }
 
-            Editor.GlobalSingleton.ProjectShaderLibrary.AddFileToMapping(localInputFile, localOutputFile);
+            ShaderProcesserResult result = resultNullable.Value;
+
             filesystem.RemapFile(localInputFile, localOutputFile);
 
-            using PooledList<AssetId> ids = new PooledList<AssetId>(processor.ReadFiles.Length);
-            for (int i = 0; i < processor.ReadFiles.Length; i++)
+            if (result.IncludedFiles.Length > 0)
             {
-                AssetId readId = pipeline.Identifier.GetOrRegisterAsset(processor.ReadFiles[i]);
-                if (!readId.IsInvalid)
-                    ids.Add(readId);
+                using RentedArray<AssetId> ids = RentedArray<AssetId>.Rent(result.IncludedFiles.Length);
+                int realFiles = 0;
+
+                foreach (string readFile in result.IncludedFiles)
+                {
+                    AssetId readFileId = pipeline.Identifier.GetOrRegisterAsset(readFile);
+                    if (readFileId.IsInvalid)
+                        EdLog.Assets.Error("[{s}]: Failed to find or register id for file read by shader: {f}", localInputFile, readFile);
+                    else
+                        ids[realFiles++] = readFileId;
+                }
+
+                if (realFiles > 0)
+                    pipeline.Associator.MakeAssocations(id, ids.Span);
                 else
-                    EdLog.Assets.Warning("Failed to get id for shader include: {sf}", processor.ReadFiles[i]);
+                    pipeline.Associator.ClearAssocations(id);
+            }
+            else
+                pipeline.Associator.ClearAssocations(id);
+
+            pipeline.ReloadAsset(id);
+
+            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localInputFile, true));
+            return false;
+
+            static SBCPrimitiveTopology DecodeTopologyType(TomlTable root) => Enum.Parse<SBCPrimitiveTopology>((string)root["primitive_topology"]);
+            static SBCRasterizer DecodeRasterizer(TomlTable root)
+            {
+                TomlTable rasterizer = (TomlTable)root["rasterizer"];
+                return new SBCRasterizer
+                {
+                    FillMode = Enum.Parse<SBCFillMode>((string)rasterizer["fill_mode"]),
+                    CullMode = Enum.Parse<SBCCullMode>((string)rasterizer["cull_mode"]),
+                    FrontCounterClockwise = (bool)rasterizer["front_counter_clockwise"],
+                    DepthBias = (int)(long)rasterizer["depth_bias"],
+                    DepthBiasClamp = (float)(double)rasterizer["depth_bias_clamp"],
+                    SlopeScaledDepthBias = (float)(double)rasterizer["slope_scaled_depth_bias"],
+                    DepthClipEnable = (bool)rasterizer["depth_clip_enable"],
+                    ConservativeRaster = (bool)rasterizer["conservative_raster"],
+                };
+            }
+            static SBCDepthStencil DecodeDepthStencil(TomlTable root)
+            {
+                TomlTable depthStencil = (TomlTable)root["depth_stencil"];
+
+                TomlTable frontFace = (TomlTable)depthStencil["front_face"];
+                TomlTable backFace = (TomlTable)depthStencil["back_face"];
+                return new SBCDepthStencil
+                {
+                    DepthEnable = (bool)depthStencil["depth_enable"],
+                    WriteMask = Enum.Parse<SBCDepthWriteMask>((string)depthStencil["depth_write_mask"]),
+                    DepthFunc = Enum.Parse<SBCComparisonFunc>((string)depthStencil["depth_func"]),
+                    StencilEnable = (bool)depthStencil["stencil_enable"],
+                    StencilReadMask = (byte)(long)depthStencil["stencil_read_mask"],
+                    StencilWriteMask = (byte)(long)depthStencil["stencil_write_mask"],
+                    FrontFace = new SBCDepthStencilFace
+                    {
+                        Fail = Enum.Parse<SBCStencilOp>((string)frontFace["stencil_fail_op"]),
+                        DepthFail = Enum.Parse<SBCStencilOp>((string)frontFace["stencil_depth_fail_op"]),
+                        Pass = Enum.Parse<SBCStencilOp>((string)frontFace["stencil_pass_op"]),
+                        Func = Enum.Parse<SBCComparisonFunc>((string)frontFace["stencil_func"]),
+                    },
+                    BackFace = new SBCDepthStencilFace
+                    {
+                        Fail = Enum.Parse<SBCStencilOp>((string)backFace["stencil_fail_op"]),
+                        DepthFail = Enum.Parse<SBCStencilOp>((string)backFace["stencil_depth_fail_op"]),
+                        Pass = Enum.Parse<SBCStencilOp>((string)backFace["stencil_pass_op"]),
+                        Func = Enum.Parse<SBCComparisonFunc>((string)backFace["stencil_func"]),
+                    }
+                };
+            }
+            static SBCBlend DecodeBlend(TomlTable root)
+            {
+                TomlTable blend = (TomlTable)root["blend"];
+                return new SBCBlend
+                {
+                    AlphaToCoverageEnable = (bool)blend["alpha_to_coverage_enable"],
+                    IndependentBlendEnable = (bool)blend["independent_blend_enable"],
+                };
+            }
+            static SBCRenderTargetBlend[] DecodeBlends(TomlTable root)
+            {
+                TomlTable blend = (TomlTable)root["blend"];
+                TomlTableArray rtBlends = (TomlTableArray)blend["rtblends"];
+
+                if (rtBlends.Count == 0)
+                    return Array.Empty<SBCRenderTargetBlend>();
+
+                SBCRenderTargetBlend[] array = new SBCRenderTargetBlend[rtBlends.Count];
+                for (int i = 0; i < array.Length; i++)
+                {
+                    TomlTable rtBlend = rtBlends[i];
+                    array[i] = new SBCRenderTargetBlend
+                    {
+                        BlendEnable = (bool)rtBlend["blend_enable"],
+                        Source = Enum.Parse<SBCBlendSource>((string)rtBlend["src_blend"]),
+                        Destination = Enum.Parse<SBCBlendSource>((string)rtBlend["dst_blend"]),
+                        Operation = Enum.Parse<SBCBlendOp>((string)rtBlend["blend_op"]),
+                        SourceAlpha = Enum.Parse<SBCBlendSource>((string)rtBlend["src_blend_alpha"]),
+                        DestinationAlpha = Enum.Parse<SBCBlendSource>((string)rtBlend["dst_blend_alpha"]),
+                        OperationAlpha = Enum.Parse<SBCBlendOp>((string)rtBlend["blend_op_alpha"]),
+                        WriteMask = (byte)(long)rtBlend["render_target_write_mask"]
+                    };
+                }
+
+                return array;
+            }
+        }
+
+        public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
+        {
+            AssetId id = pipeline.Identifier.GetOrRegisterAsset(localFilePath);
+            using Stream? stream = filesystem.OpenStream(localFilePath);
+
+            if (stream == null || stream.Length < Unsafe.SizeOf<SBCHeader>())
+            {
+                Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localFilePath, false));
+                return;
             }
 
-            if (ids.Count > 0)
-                pipeline.Associator.MakeAssocations(id, ids.Span);
+            SBCHeader header = stream.Read<SBCHeader>();
+            if (header.Header != SBCHeader.ConstHeader || header.Version != SBCHeader.ConstVersion)
+            {
+                Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localFilePath, false));
+                return;
+            }
 
-            if (processor.ShaderPath != null)
-                pipeline.ReloadAsset(pipeline.Identifier.GetOrRegisterAsset(localInputFile));
-
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localInputFile), localInputFile, true));
-            return true;
+            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localFilePath, true));
         }
 
         public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
@@ -104,111 +216,18 @@ namespace Editor.Assets.Importers
             using Stream? stream = filesystem.OpenStream(localFilePath);
 
             if (stream == null)
-            {
-                return pipeline.Configuration.DoesFileHaveConfig(localFilePath, "Shader") || filesystem.Exists(Path.ChangeExtension(localFilePath, ".toml"));
-            }
-            if (stream.Length < 8)
+                return pipeline.Configuration.DoesFileHaveConfig(localFilePath, "Shader");
+
+            if (stream.Length < Unsafe.SizeOf<SBCHeader>())
                 return false;
 
-            using BinaryReader br = new BinaryReader(stream);
-
-
-            if (br.ReadUInt32() != ShaderProcessor.HeaderId)
-                return false;
-            if (br.ReadUInt32() != ShaderProcessor.HeaderVersion)
+            SBCHeader header = stream.Read<SBCHeader>();
+            if (header.Header != SBCHeader.ConstHeader || header.Version != SBCHeader.ConstVersion)
                 return false;
 
             return true;
         }
 
-        public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
-        {
-            if (!ValidateFile(localFilePath, filesystem, pipeline))
-            {
-                Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, false));
-                return;
-            }
-
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, true));
-        }
-
-        public string CustomFileIcon => "Editor/Textures/Icons/FileShader.png";
-
-        private static ShaderDescriptionArgs DecodeDescription(TomlTable document)
-        {
-            TomlTable stencilFrontFace = (TomlTable)document["front_face"];
-            TomlTable stencilBackFace = (TomlTable)document["back_face"];
-
-            return new ShaderDescriptionArgs
-            {
-                FillMode = Enum.Parse<RHI.FillMode>((string)document["fill_mode"]),
-                CullMode = Enum.Parse<RHI.CullMode>((string)document["cull_mode"]),
-
-                FrontCounterClockwise = (bool)document["front_counter_clockwise"],
-
-                DepthBias = (int)(long)document["depth_bias"],
-                DepthBiasClamp = (float)(double)document["depth_bias_clamp"],
-                SlopeScaledDepthBias = (float)(double)document["slope_scaled_depth_bias"],
-                DepthClipEnable = (bool)document["depth_clip_enable"],
-
-                ConservativeRaster = (bool)document["conservative_raster"],
-
-                DepthEnable = (bool)document["depth_enable"],
-                DepthWriteMask = Enum.Parse<RHI.DepthWriteMask>((string)document["depth_write_mask"]),
-                DepthFunc = Enum.Parse<RHI.ComparisonFunc>((string)document["depth_func"]),
-
-                StencilEnable = (bool)document["stencil_enable"],
-                StencilReadMask = (byte)(long)document["stencil_read_mask"],
-                StencilWriteMask = (byte)(long)document["stencil_write_mask"],
-
-                PrimitiveTopology = Enum.Parse<RHI.PrimitiveTopologyType>((string)document["primitive_topology"]),
-
-                AlphaToCoverageEnable = (bool)document["alpha_to_coverage_enable"],
-                IndependentBlendEnable = (bool)document["independent_blend_enable"],
-
-                LogicOpEnable = (bool)document["logic_op_enable"],
-                LogicOp = Enum.Parse<RHI.LogicOp>((string)document["logic_op"]),
-
-                FrontFace = new StencilFaceDescriptionArgs
-                {
-                    FailOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_fail_op"]),
-                    DepthFailOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_depth_fail_op"]),
-                    PassOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_pass_op"]),
-                    Func = Enum.Parse<RHI.ComparisonFunc>((string)stencilFrontFace["stencil_func"])
-                },
-                BackFace = new StencilFaceDescriptionArgs
-                {
-                    FailOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_fail_op"]),
-                    DepthFailOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_depth_fail_op"]),
-                    PassOp = Enum.Parse<RHI.StencilOp>((string)stencilFrontFace["stencil_pass_op"]),
-                    Func = Enum.Parse<RHI.ComparisonFunc>((string)stencilFrontFace["stencil_func"])
-                }
-            };
-        }
-
-        private static BlendDescriptionArgs[] DecodeBlends(TomlTableArray blendsTable)
-        {
-            BlendDescriptionArgs[] blends = new BlendDescriptionArgs[blendsTable.Count];
-            for (int i = 0; i < blendsTable.Count; i++)
-            {
-                TomlTable blendTable = blendsTable[i];
-                blends[i] = new BlendDescriptionArgs
-                {
-                    BlendEnable = (bool)blendTable["blend_enable"],
-
-                    SourceBlend = Enum.Parse<RHI.Blend>((string)blendTable["src_blend"]),
-                    DestinationBlend = Enum.Parse<RHI.Blend>((string)blendTable["dst_blend"]),
-                    BlendOp = Enum.Parse<RHI.BlendOp>((string)blendTable["blend_op"]),
-
-                    SourceBlendAlpha = Enum.Parse<RHI.Blend>((string)blendTable["src_blend_alpha"]),
-                    DestinationBlendAlpha = Enum.Parse<RHI.Blend>((string)blendTable["dst_blend_alpha"]),
-                    BlendOpAlpha = Enum.Parse<RHI.BlendOp>((string)blendTable["blend_op_alpha"]),
-
-                    RenderTargetWriteMask = (byte)(long)blendTable["render_target_write_mask"]
-                };
-            }
-
-            return blends;
-        }
+        public string? CustomFileIcon => "Editor/Textures/Icons/FileShader2.png";
     }
 }

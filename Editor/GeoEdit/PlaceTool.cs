@@ -1,5 +1,4 @@
 ﻿using Editor.Assets.Types;
-using Editor.DearImGui;
 using Editor.Geometry;
 using Editor.Geometry.Shapes;
 using Editor.Interaction;
@@ -11,13 +10,7 @@ using Primary.Common;
 using Primary.Input;
 using Primary.Input.Devices;
 using Primary.Mathematics;
-using SharpGen.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.GeoEdit
 {
@@ -100,121 +93,121 @@ namespace Editor.GeoEdit
 
         }
 
-        public void Render(ref readonly GeoToolRenderInterface @interface)
-        {
-            SceneView sceneView = Editor.GlobalSingleton.SceneView;
-            if (_temporaryShape == null)
-            {
-                if (_isPlacingBrush)
-                {
-                    Ray ray = sceneView.CameraMouseRay;
-                    float hitDist = InfinitePlane.Intersect(new InfinitePlane(_startPlacement, _startPlacementNormal), ray);
-
-                    if (hitDist >= 0.0f)
-                    {
-                        Vector3 hit = ray.AtDistance(hitDist);
-                        if (ToolManager.IsSnappingActive)
-                            hit = Vector3.Round(hit / ToolManager.SnapScale) * ToolManager.SnapScale;
-
-                        Vector3 min = Vector3.Min(_startPlacement, hit);
-                        Vector3 max = Vector3.Max(_startPlacement, hit);
-
-                        DrawShape(in @interface, _editorView.Shape, new AABB(min, max));
-                    }
-                }
-            }
-            else
-            {
-                _temporaryShape.ForceDirty();
-                GeoShapePickResult result = _brushPickResult.GetValueOrDefault(new GeoShapePickResult(Vector3.Zero, Vector3.Zero, -1));
-
-                SelectedGeoBoxShape? selected = SelectionManager.FindSelected<SelectedGeoBoxShape>((x) => x.Shape == _temporaryShape);
-                
-                GeoMesh mesh = _temporaryShape.GenerateMesh();
-                //_computedShape = GeoGenerator.Transform(mesh, _temporaryBrush!.Transform, false);
-
-                Vector3 pivotOffset = _temporaryBrush!.Transform.Position + Vector3.Lerp(mesh.Boundaries.Minimum, mesh.Boundaries.Maximum, _temporaryBrush!.Transform.Origin);
-
-                for (int i = 0; i < mesh.Faces.Length; i++)
-                {
-                    ref GeoFace face = ref mesh.Faces[i];
-                    if (face.Type == GeoFaceType.Triangle)
-                    {
-                        Vector3 v0 = mesh.Vertices[face.Triangle.Point0.Index] + pivotOffset;
-                        Vector3 v1 = mesh.Vertices[face.Triangle.Point1.Index] + pivotOffset;
-                        Vector3 v2 = mesh.Vertices[face.Triangle.Point2.Index] + pivotOffset;
-
-                        uint color;
-                        {
-                            Vector3 normal = Vector3.Normalize(Vector3.Cross(v1 - v0, v2 - v0));
-                            float dot = Vector3.Dot(normal, Vector3.Normalize(sceneView.CameraTranslation));
-                            color = new Color32(new Vector3(dot * 0.5f + 0.5f), 0.5f).ARGB;
-
-                            if (i == result.FaceIndex || i == (selected?.FaceIndex ?? -1))
-                            {
-                                color = (color & ~0x0000ffffu);
-                            }
-                        }
-
-                        @interface.AddTriangle(v0, v1, v2, color);
-                    }
-                    else
-                    {
-                        Vector3 v0 = mesh.Vertices[face.Quad.Point0.Index] + pivotOffset;
-                        Vector3 v1 = mesh.Vertices[face.Quad.Point1.Index] + pivotOffset;
-                        Vector3 v2 = mesh.Vertices[face.Quad.Point2.Index] + pivotOffset;
-                        Vector3 v3 = mesh.Vertices[face.Quad.Point3.Index] + pivotOffset;
-
-                        uint color;
-                        {
-                            Vector3 normal = Vector3.Normalize(Vector3.Cross(v1 - v0, v2 - v0));
-                            color = new Color32(new Vector3(1.0f * 0.5f + 0.5f), 0.5f).ARGB;
-
-                            if (i == result.FaceIndex || i == (selected?.FaceIndex ?? -1))
-                            {
-                                color = (color & ~0x0000ffffu);
-                            }
-                        }
-
-                        @interface.AddTriangle(v3, v2, v0, color);
-                        @interface.AddTriangle(v1, v3, v0, color);
-                    }
-                }
-
-                DrawShape(in @interface, _editorView.Shape, new AABB(mesh.Boundaries.Minimum + pivotOffset, mesh.Boundaries.Maximum + pivotOffset));
-            }
-
-            void DrawShape(ref readonly GeoToolRenderInterface @interface, GeoEditorView.PlaceShape shape, AABB minmax)
-            {
-                const uint LineColor = 0xffffa080;
-
-                Vector3 min = minmax.Minimum;
-                Vector3 max = minmax.Maximum;
-
-                switch (shape)
-                {
-                    case GeoEditorView.PlaceShape.Box:
-                        {
-                            @interface.AddLine(min, new Vector3(max.X, min.Y, min.Z), LineColor);
-                            @interface.AddLine(new Vector3(min.X, min.Y, max.Z), new Vector3(max.X, min.Y, max.Z), LineColor);
-                            @interface.AddLine(min, new Vector3(min.X, min.Y, max.Z), LineColor);
-                            @interface.AddLine(new Vector3(max.X, min.Y, min.Z), new Vector3(max.X, min.Y, max.Z), LineColor);
-
-                            @interface.AddLine(new Vector3(min.X, max.Y, min.Z), new Vector3(max.X, max.Y, min.Z), LineColor);
-                            @interface.AddLine(new Vector3(min.X, max.Y, max.Z), new Vector3(max.X, max.Y, max.Z), LineColor);
-                            @interface.AddLine(new Vector3(min.X, max.Y, min.Z), new Vector3(min.X, max.Y, max.Z), LineColor);
-                            @interface.AddLine(new Vector3(max.X, max.Y, min.Z), new Vector3(max.X, max.Y, max.Z), LineColor);
-
-                            @interface.AddLine(new Vector3(min.X, min.Y, min.Z), new Vector3(min.X, max.Y, min.Z), LineColor);
-                            @interface.AddLine(new Vector3(min.X, min.Y, max.Z), new Vector3(min.X, max.Y, max.Z), LineColor);
-                            @interface.AddLine(new Vector3(max.X, min.Y, min.Z), new Vector3(max.X, max.Y, min.Z), LineColor);
-                            @interface.AddLine(new Vector3(max.X, min.Y, max.Z), new Vector3(max.X, max.Y, max.Z), LineColor);
-
-                            break;
-                        }
-                }
-            }
-        }
+        //public void Render(ref readonly GeoToolRenderInterface @interface)
+        //{
+        //    SceneView sceneView = Editor.GlobalSingleton.SceneView;
+        //    if (_temporaryShape == null)
+        //    {
+        //        if (_isPlacingBrush)
+        //        {
+        //            Ray ray = sceneView.CameraMouseRay;
+        //            float hitDist = InfinitePlane.Intersect(new InfinitePlane(_startPlacement, _startPlacementNormal), ray);
+        //
+        //            if (hitDist >= 0.0f)
+        //            {
+        //                Vector3 hit = ray.AtDistance(hitDist);
+        //                if (ToolManager.IsSnappingActive)
+        //                    hit = Vector3.Round(hit / ToolManager.SnapScale) * ToolManager.SnapScale;
+        //
+        //                Vector3 min = Vector3.Min(_startPlacement, hit);
+        //                Vector3 max = Vector3.Max(_startPlacement, hit);
+        //
+        //                DrawShape(in @interface, _editorView.Shape, new AABB(min, max));
+        //            }
+        //        }
+        //    }
+        //    else
+        //    {
+        //        _temporaryShape.ForceDirty();
+        //        GeoShapePickResult result = _brushPickResult.GetValueOrDefault(new GeoShapePickResult(Vector3.Zero, Vector3.Zero, -1));
+        //
+        //        SelectedGeoBoxShape? selected = SelectionManager.FindSelected<SelectedGeoBoxShape>((x) => x.Shape == _temporaryShape);
+        //
+        //        GeoMesh mesh = _temporaryShape.GenerateMesh();
+        //        //_computedShape = GeoGenerator.Transform(mesh, _temporaryBrush!.Transform, false);
+        //
+        //        Vector3 pivotOffset = _temporaryBrush!.Transform.Position + Vector3.Lerp(mesh.Boundaries.Minimum, mesh.Boundaries.Maximum, _temporaryBrush!.Transform.Origin);
+        //
+        //        for (int i = 0; i < mesh.Faces.Length; i++)
+        //        {
+        //            ref GeoFace face = ref mesh.Faces[i];
+        //            if (face.Type == GeoFaceType.Triangle)
+        //            {
+        //                Vector3 v0 = mesh.Vertices[face.Triangle.Point0.Index] + pivotOffset;
+        //                Vector3 v1 = mesh.Vertices[face.Triangle.Point1.Index] + pivotOffset;
+        //                Vector3 v2 = mesh.Vertices[face.Triangle.Point2.Index] + pivotOffset;
+        //
+        //                uint color;
+        //                {
+        //                    Vector3 normal = Vector3.Normalize(Vector3.Cross(v1 - v0, v2 - v0));
+        //                    float dot = Vector3.Dot(normal, Vector3.Normalize(sceneView.CameraTranslation));
+        //                    color = new Color32(new Vector3(dot * 0.5f + 0.5f), 0.5f).ARGB;
+        //
+        //                    if (i == result.FaceIndex || i == (selected?.FaceIndex ?? -1))
+        //                    {
+        //                        color = (color & ~0x0000ffffu);
+        //                    }
+        //                }
+        //
+        //                @interface.AddTriangle(v0, v1, v2, color);
+        //            }
+        //            else
+        //            {
+        //                Vector3 v0 = mesh.Vertices[face.Quad.Point0.Index] + pivotOffset;
+        //                Vector3 v1 = mesh.Vertices[face.Quad.Point1.Index] + pivotOffset;
+        //                Vector3 v2 = mesh.Vertices[face.Quad.Point2.Index] + pivotOffset;
+        //                Vector3 v3 = mesh.Vertices[face.Quad.Point3.Index] + pivotOffset;
+        //
+        //                uint color;
+        //                {
+        //                    Vector3 normal = Vector3.Normalize(Vector3.Cross(v1 - v0, v2 - v0));
+        //                    color = new Color32(new Vector3(1.0f * 0.5f + 0.5f), 0.5f).ARGB;
+        //
+        //                    if (i == result.FaceIndex || i == (selected?.FaceIndex ?? -1))
+        //                    {
+        //                        color = (color & ~0x0000ffffu);
+        //                    }
+        //                }
+        //
+        //                @interface.AddTriangle(v3, v2, v0, color);
+        //                @interface.AddTriangle(v1, v3, v0, color);
+        //            }
+        //        }
+        //
+        //        DrawShape(in @interface, _editorView.Shape, new AABB(mesh.Boundaries.Minimum + pivotOffset, mesh.Boundaries.Maximum + pivotOffset));
+        //    }
+        //
+        //    void DrawShape(ref readonly GeoToolRenderInterface @interface, GeoEditorView.PlaceShape shape, AABB minmax)
+        //    {
+        //        const uint LineColor = 0xffffa080;
+        //
+        //        Vector3 min = minmax.Minimum;
+        //        Vector3 max = minmax.Maximum;
+        //
+        //        switch (shape)
+        //        {
+        //            case GeoEditorView.PlaceShape.Box:
+        //                {
+        //                    @interface.AddLine(min, new Vector3(max.X, min.Y, min.Z), LineColor);
+        //                    @interface.AddLine(new Vector3(min.X, min.Y, max.Z), new Vector3(max.X, min.Y, max.Z), LineColor);
+        //                    @interface.AddLine(min, new Vector3(min.X, min.Y, max.Z), LineColor);
+        //                    @interface.AddLine(new Vector3(max.X, min.Y, min.Z), new Vector3(max.X, min.Y, max.Z), LineColor);
+        //
+        //                    @interface.AddLine(new Vector3(min.X, max.Y, min.Z), new Vector3(max.X, max.Y, min.Z), LineColor);
+        //                    @interface.AddLine(new Vector3(min.X, max.Y, max.Z), new Vector3(max.X, max.Y, max.Z), LineColor);
+        //                    @interface.AddLine(new Vector3(min.X, max.Y, min.Z), new Vector3(min.X, max.Y, max.Z), LineColor);
+        //                    @interface.AddLine(new Vector3(max.X, max.Y, min.Z), new Vector3(max.X, max.Y, max.Z), LineColor);
+        //
+        //                    @interface.AddLine(new Vector3(min.X, min.Y, min.Z), new Vector3(min.X, max.Y, min.Z), LineColor);
+        //                    @interface.AddLine(new Vector3(min.X, min.Y, max.Z), new Vector3(min.X, max.Y, max.Z), LineColor);
+        //                    @interface.AddLine(new Vector3(max.X, min.Y, min.Z), new Vector3(max.X, max.Y, min.Z), LineColor);
+        //                    @interface.AddLine(new Vector3(max.X, min.Y, max.Z), new Vector3(max.X, max.Y, max.Z), LineColor);
+        //
+        //                    break;
+        //                }
+        //        }
+        //    }
+        //}
 
         private void Event_MouseDown(ImGuiMouseButton button)
         {

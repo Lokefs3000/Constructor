@@ -12,7 +12,7 @@ namespace Interop.D3D12MemAlloc
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?GetDesc@Pool@D3D12MA@@QEBA?AUPOOL_DESC@2@XZ", ExactSpelling = true)]
         [return: NativeTypeName("D3D12MA::POOL_DESC")]
-        public static extern  POOL_DESC GetDesc(Pool* pThis);
+        public static extern POOL_DESC GetDesc(Pool* pThis);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?GetStatistics@Pool@D3D12MA@@QEAAXPEAUStatistics@2@@Z", ExactSpelling = true)]
         public static extern void GetStatistics(Pool* pThis, [NativeTypeName("D3D12MA::Statistics *")] Statistics* pStats);
@@ -25,7 +25,7 @@ namespace Interop.D3D12MemAlloc
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?GetName@Pool@D3D12MA@@QEBAPEB_WXZ", ExactSpelling = true)]
         [return: NativeTypeName("LPCWSTR")]
-        public static extern  ushort* GetName(Pool* pThis);
+        public static extern ushort* GetName(Pool* pThis);
 
         [DllImport("d3d12ma", CallingConvention = CallingConvention.ThisCall, EntryPoint = "?BeginDefragmentation@Pool@D3D12MA@@QEAAJPEBUDEFRAGMENTATION_DESC@2@PEAPEAVDefragmentationContext@2@@Z", ExactSpelling = true)]
         [return: NativeTypeName("HRESULT")]

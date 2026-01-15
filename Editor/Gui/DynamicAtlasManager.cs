@@ -1,13 +1,13 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
 using Primary.Common;
-using Primary.RenderLayer;
+using Primary.RHI2;
 using StbImageSharp;
 using System.Collections.Concurrent;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace Editor.Gui
+namespace Editor.UI
 {
     public sealed class DynamicAtlasManager : IDisposable
     {
@@ -302,7 +302,7 @@ namespace Editor.Gui
         public override int GetHashCode() => _uniqueHash;
 
         internal DynamicSubAtlas? SubAtlas => _subAtlas;
-        public GfxTexture AtlasTexture => _subAtlas?.AtlasTexture ?? GfxTexture.Null;
+        public RHITexture? AtlasTexture => _subAtlas?.AtlasTexture;
 
         public ReadOnlySpan<string> Icons => _iconSet.AsSpan();
         public int UniqueHash => _uniqueHash;

@@ -19,4 +19,13 @@
     <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="D3D12\D3D12Core.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="D3D12\d3d12SDKLayers.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

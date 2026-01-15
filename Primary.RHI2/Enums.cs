@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Primary.RHI2
+﻿namespace Primary.RHI2
 {
     public enum RHIResourceUsage : byte
     {
@@ -220,7 +216,7 @@ namespace Primary.RHI2
         None = 0,
         All
     }
-    
+
     public enum RHIPrimitiveTopologyType : byte
     {
         Triangle = 0,
@@ -304,6 +300,11 @@ namespace Primary.RHI2
         Single2,
         Single3,
         Single4,
+
+        UInt1,
+        UInt2,
+        UInt3,
+        UInt4,
 
         Byte4,
     }

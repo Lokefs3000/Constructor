@@ -1,14 +1,10 @@
-﻿using Arch.Core;
-using CommunityToolkit.HighPerformance;
+﻿using CommunityToolkit.HighPerformance;
 using Editor.DearImGui;
 using Editor.Interaction.Controls;
-using Primary.Components;
 using Primary.Input;
 using Primary.Input.Devices;
 using Primary.Mathematics;
-using Primary.Scenes;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 
 namespace Editor.Interaction.Tools
@@ -259,7 +255,7 @@ namespace Editor.Interaction.Tools
             SceneView sceneView = Editor.GlobalSingleton.SceneView;
             if (!InputSystem.Pointer.IsButtonHeld(MouseButton.Left) || !sceneView.IsViewVisible)
                 _hasBegunDragging = false;
-            
+
             Vector3 absoluteMin = Vector3.Zero;
             Vector3 absoluteMax = Vector3.Zero;
 

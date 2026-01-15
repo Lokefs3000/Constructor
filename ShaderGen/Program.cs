@@ -4,7 +4,6 @@ using Editor.Shaders.Attributes;
 using Editor.Shaders.Data;
 using Primary.Common;
 using Serilog;
-using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
@@ -44,7 +43,7 @@ namespace ShaderGen
 
             long startTS = Stopwatch.GetTimestamp();
 
-            ShaderProcessor processor = new ShaderProcessor(logger, ShaderAttributeSettings.Default);
+            ShaderProcessor processor = new ShaderProcessor(logger, ShaderAttributeSettings.Graphics);
             ShaderProcesserResult? result = processor.Process(args);
 
             double elapsed = (Stopwatch.GetTimestamp() - startTS) / (double)Stopwatch.Frequency;

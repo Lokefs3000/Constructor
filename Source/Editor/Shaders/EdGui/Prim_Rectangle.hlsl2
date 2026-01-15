@@ -1,0 +1,57 @@
+#include "Shared.hlsl2"
+
+struct RectMetadata
+{
+    float4 UVTransform;
+
+    uint IsRounded;
+    float2 BoxSize;
+    float4 Rounding;
+
+    float PixelHeight;
+
+    float Infill;
+};
+
+[vertex]
+DefaultPsInput VertexMain(VsInput input)
+{
+    input.MetadataOffset += cbGlobals.MetadataOffset;
+
+    RectMetadata metadata = baMetadata.Load<RectMetadata>(input.MetadataOffset);
+
+    DefaultPsInput output =
+    {
+        mul(cbGlobals.Model, float4(input.Position, 0.0, 1.0)),
+        input.UV * metadata.UVTransform.xy + metadata.UVTransform.zw,
+        input.Color,
+
+        input.MetadataOffset
+    };
+	
+    return output;
+}
+
+//https://iquilezles.org/articles/distfunctions2d/
+//https://raphlinus.github.io/graphics/2020/04/21/blurred-rounded-rects.html
+float sdRoundedBox(float2 p, float2 b, float r)
+{
+    float2 q = abs(p) - b + r;
+    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+}
+
+[pixel]
+float4 PixelMain(DefaultPsInput input) : SV_Target
+{
+    RectMetadata metadata = baMetadata.Load<RectMetadata>(input.MetadataOffset);
+    
+    if (!metadata.IsRounded)
+        return input.Color;
+
+    float dist = sdRoundedBox(input.UV, metadata.BoxSize, metadata.Rounding.x);
+    if (dist > 1.0)
+        discard;
+
+    dist = lerp(1.0 - sign(dist), 1.0, 1.0 - smoothstep(0.0, 3.0, (abs(dist) - 0.003) * metadata.PixelHeight));
+    return float4(input.Color.rgb, input.Color.a * dist);
+}

@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 
 namespace Primary.Common
 {
@@ -23,6 +24,12 @@ namespace Primary.Common
             Maximum = maximum;
         }
 
+        public Boundaries(Vector4 minMax)
+        {
+            Minimum = new Vector2(minMax.X, minMax.Y);
+            Maximum = new Vector2(minMax.Z, minMax.W);
+        }
+
         public Boundaries(Vector128<float> vector)
         {
             Minimum = new Vector2(vector.GetElement(0), vector.GetElement(1));
@@ -38,13 +45,20 @@ namespace Primary.Common
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsIntersecting(Boundaries boundaries)
         {
-            return Vector128.GreaterThanOrEqualAll(Vector128.Create(boundaries.Maximum.X, boundaries.Maximum.Y, Maximum.X, Maximum.Y), Vector128.Create(Minimum.X, Minimum.Y, boundaries.Minimum.X, boundaries.Minimum.Y));
+            Vector128<float> a = AsVector128();
+            if (Sse.IsSupported) //TODO: VALIDATE IF THIS IS INLINED CORRECTLY
+                a = Sse.Shuffle(a, a, s_intersectShuffle);
+            else
+                throw new NotImplementedException(); //TODO: add fallback for no SIMD support
+
+            Vector128<float> b = -boundaries.AsVector128();
+            return Vector128.LessThanOrEqualAll(b, a);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(Boundaries other)
         {
-            return Vector128.EqualsAll(Vector128.Create(Minimum.X, Minimum.Y, Maximum.X, Maximum.Y), Vector128.Create(other.Minimum.X, other.Minimum.Y, other.Maximum.X, other.Maximum.Y));
+            return Vector128.EqualsAll(AsVector128(), other.AsVector128());
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -75,9 +89,22 @@ namespace Primary.Common
             return new Boundaries(Vector128.Add(boundaries.AsVector128(), Vector128.Create(offset.X, offset.Y, offset.X, offset.Y)));
         }
 
+        public static Boundaries Combine(Boundaries a, Boundaries b)
+        {
+            Vector128<float> aVector = new Boundaries(a.Minimum, -a.Maximum).AsVector128();
+            Vector128<float> bVector = new Boundaries(b.Minimum, -b.Maximum).AsVector128();
+
+            Boundaries bounds = new Boundaries(Vector128.Min(aVector, bVector));
+            bounds.Maximum = -bounds.Maximum;
+
+            return bounds;
+        }
+
         public Vector2 Size => Maximum - Minimum;
         public Vector2 Center => Vector2.Lerp(Minimum, Maximum, 0.5f);
 
         public static readonly Boundaries Zero = new Boundaries();
+
+        private static readonly byte s_intersectShuffle = SimdUtility.CreateShuffleMask(1, 0, 3, 2);
     }
 }

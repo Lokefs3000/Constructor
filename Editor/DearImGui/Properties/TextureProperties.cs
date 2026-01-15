@@ -1,5 +1,4 @@
 ﻿using CommunityToolkit.HighPerformance;
-using CsToml;
 using Editor.Assets;
 using Editor.Assets.Importers;
 using Editor.Processors;
@@ -303,7 +302,7 @@ namespace Editor.DearImGui.Properties
                         new Vector2((float)_texture.Width / (float)_texture.Height * avail.Y, avail.Y) :
                         new Vector2(avail.X, (float)_texture.Height / (float)_texture.Width * avail.X)) * 0.5f;
 
-                    drawList.AddImage(ImGuiUtility.GetTextureRef(_texture.Handle), center - halfAspectCorrect, center + halfAspectCorrect);
+                    //drawList.AddImage(ImGuiUtility.GetTextureRef(_texture.Handle), center - halfAspectCorrect, center + halfAspectCorrect);
                 }
 
                 if (_query.HasValue)

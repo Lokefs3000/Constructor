@@ -4,7 +4,6 @@ using Editor.Storage;
 using Hexa.NET.ImGui;
 using Primary.Assets;
 using Primary.Assets.Types;
-using Primary.Common;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
@@ -105,12 +104,12 @@ namespace Editor.DearImGui.Popups
                 if (_iconSet.TryGetAtlasIcon("Editor/Textures/Icons/ImportIcon.png", out DynAtlasIcon atlasIcon))
                 {
                     ImDrawListPtr drawList = ImGui.GetWindowDrawList();
-                    ImTextureRef @ref = ImGuiUtility.GetTextureRef(_iconSet.AtlasTexture.Handle);
-                    for (int i = 0; i < _iconBoundaries.Count; i++)
-                    {
-                        (Vector2 pos, float sz, uint color) = _iconBoundaries[i];
-                        drawList.AddImage(@ref, pos, pos + new Vector2(sz), atlasIcon.UVs.Minimum, atlasIcon.UVs.Maximum, color);
-                    }
+                    //ImTextureRef @ref = ImGuiUtility.GetTextureRef(_iconSet.AtlasTexture.Handle);
+                    //for (int i = 0; i < _iconBoundaries.Count; i++)
+                    //{
+                    //    (Vector2 pos, float sz, uint color) = _iconBoundaries[i];
+                    //    drawList.AddImage(@ref, pos, pos + new Vector2(sz), atlasIcon.UVs.Minimum, atlasIcon.UVs.Maximum, color);
+                    //}
                 }
 
                 ImGui.EndPopup();

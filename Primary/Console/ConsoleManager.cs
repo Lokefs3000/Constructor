@@ -1,13 +1,9 @@
 ﻿using CommunityToolkit.HighPerformance;
 using CommunityToolkit.HighPerformance.Enumerables;
 using Primary.Common;
-using Primary.Rendering;
-using Primary.Rendering.Tree;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Numerics;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 
 namespace Primary.Console
 {
@@ -19,8 +15,8 @@ namespace Primary.Console
         {
             _variables = new Dictionary<string, ConsoleVariable>();
 
-            ScanClassForCVars(typeof(RenderingCVars));
-            ScanClassForCVars(typeof(TreeCVars));
+            //ScanClassForCVars(typeof(RenderingCVars));
+            //ScanClassForCVars(typeof(TreeCVars));
 
             EngLog.Console.Information("Found #{c} cvars in classes..", _variables.Count);
         }

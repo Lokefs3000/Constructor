@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Primary.RHI2
+﻿namespace Primary.RHI2
 {
-    public unsafe abstract class RHITexture : RHIResource, AsNativeObject<RHITextureNative>
+    public unsafe abstract class RHITexture : RHIResource, IAsNativeObject<RHITextureNative>
     {
         protected RHITextureDescription _description;
-        
+
         public ref readonly RHITextureDescription Description => ref _description;
 
         public abstract RHITextureNative* GetAsNative();

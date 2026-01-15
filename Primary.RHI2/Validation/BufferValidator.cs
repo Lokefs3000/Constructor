@@ -1,8 +1,5 @@
 ﻿using Primary.Common;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Primary.RHI2.Validation
 {
@@ -62,7 +59,7 @@ namespace Primary.RHI2.Validation
                     case RHIBufferMode.Raw:
                         {
                             long elementCount = (description.Stride == 0 || description.ElementCount > 0) ? description.ElementCount : description.Width;
-                            
+
                             if (description.Stride > 2)
                             {
                                 logger?.Error("[r:{n}]: A buffer intended for use as a raw shader resource/unordered access must have a stride of 1 or 0", resourceName);
@@ -82,7 +79,7 @@ namespace Primary.RHI2.Validation
 
             if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.ConstantBuffer))
             {
-                
+
             }
 
             if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.VertexInput))

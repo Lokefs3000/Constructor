@@ -1,5 +1,4 @@
-﻿using Primary.Common;
-using SDL;
+﻿using SDL;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using static SDL.SDL3;

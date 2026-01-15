@@ -6,28 +6,29 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Xml.Linq;
 
 namespace Editor.Shaders.Processors
 {
     internal ref struct SourceAugmenter
     {
         private readonly ShaderProcessor _processor;
+        private readonly ShaderData _data;
 
         private bool _encounteredErrors;
 
         private string _diagFile;
 
-        internal SourceAugmenter(ShaderProcessor processor, string sourceFileName)
+        internal SourceAugmenter(ShaderProcessor processor, ShaderData data, string sourceFileName)
         {
             _processor = processor;
+            _data = data;
 
             _encounteredErrors = false;
 
             _diagFile = sourceFileName;
         }
 
-        internal string? Augment(string orignalSource)
+        internal string? Augment(string orignalSource, int primaryFunctionIndex)
         {
             using RentedArray<char> augment = RentedArray<char>.Rent(orignalSource.Length);
             orignalSource.CopyTo(augment.Span);
@@ -39,6 +40,8 @@ namespace Editor.Shaders.Processors
             int variableCount = CountTotalVariablesUsed();
             using RentedArray<RawVariableData> variableDatas = RentedArray<RawVariableData>.Rent(variableCount);
 
+            HashSet<ReferenceIndex> referenceIndices = CreateReferenceIndexSet(primaryFunctionIndex);
+
             FillAndSortVariables(variableDatas.Span, out features);
             CalculateHeaderBinding(variableDatas.Span, out headerBytesize, out areConstantsSolo);
 
@@ -47,23 +50,26 @@ namespace Editor.Shaders.Processors
             RemoveOldDirectives(augment.Span);
             RegenerateStructs(sb);
             RegenerateStaticSamplers(sb);
-            GenerateNewHeader(sb, features, headerBytesize, areConstantsSolo, variableDatas.Span, out int additionalOffset);
+            GenerateNewHeader(sb, features, headerBytesize, areConstantsSolo, variableDatas.Span, referenceIndices, out int additionalOffset);
 
             sb.Append(augment.Span);
             string str = AppendBindlessResources(sb, sb.ToString(), additionalOffset, areConstantsSolo, variableDatas.Span);
 
-            _processor.AreConstantsSeparated = areConstantsSolo;
-            _processor.HeaderBytesize = headerBytesize;
+            _data.AreConstantsSeparated = areConstantsSolo;
+            _data.HeaderBytesize = headerBytesize;
 
             return _encounteredErrors ? null : str;
         }
 
         private void RemoveOldDirectives(Span<char> source)
         {
-            foreach (ref readonly FunctionData function in _processor.Functions)
+            foreach (ref readonly FunctionData function in _data.Functions)
             {
                 foreach (ref readonly AttributeData attribute in function.Attributes.AsSpan())
                 {
+                    if (attribute.Signature is AttributeNumThreads)
+                        continue;
+
                     for (int i = attribute.DeclerationRange.Start; i < attribute.DeclerationRange.End; i++)
                     {
                         if (!char.IsWhiteSpace(source[i]))
@@ -72,7 +78,7 @@ namespace Editor.Shaders.Processors
                 }
             }
 
-            foreach (ref readonly ResourceData resource in _processor.Resources)
+            foreach (ref readonly ResourceData resource in _data.Resources)
             {
                 for (int i = resource.DeclerationRange.Start; i < resource.DeclerationRange.End; i++)
                 {
@@ -90,7 +96,7 @@ namespace Editor.Shaders.Processors
                 }
             }
 
-            foreach (ref readonly PropertyData property in _processor.Properties)
+            foreach (ref readonly PropertyData property in _data.Properties)
             {
                 //for (int i = property.DeclerationRange.Start; i < property.DeclerationRange.End; i++)
                 //{
@@ -108,7 +114,7 @@ namespace Editor.Shaders.Processors
                 }
             }
 
-            foreach (ref readonly StructData @struct in _processor.Structs)
+            foreach (ref readonly StructData @struct in _data.Structs)
             {
                 for (int i = @struct.DeclerationRange.Start; i < @struct.DeclerationRange.End; i++)
                 {
@@ -126,7 +132,7 @@ namespace Editor.Shaders.Processors
                 }
             }
 
-            foreach (ref readonly StaticSamplerData staticSampler in _processor.StaticSamplers)
+            foreach (ref readonly StaticSamplerData staticSampler in _data.StaticSamplers)
             {
                 //bool doClear = false;
                 //for (int i = staticSampler.DeclerationRange.Start; i < staticSampler.DeclerationRange.End; i++)
@@ -162,7 +168,7 @@ namespace Editor.Shaders.Processors
 
         private void RegenerateStructs(StringBuilder sb)
         {
-            foreach (ref readonly StructData @struct in _processor.Structs)
+            foreach (ref readonly StructData @struct in _data.Structs)
             {
                 sb.Append("struct ");
                 sb.AppendLine(@struct.Name);
@@ -197,7 +203,7 @@ namespace Editor.Shaders.Processors
         private void RegenerateStaticSamplers(StringBuilder sb)
         {
             int i = 0;
-            foreach (ref readonly StaticSamplerData staticSampler in _processor.StaticSamplers)
+            foreach (ref readonly StaticSamplerData staticSampler in _data.StaticSamplers)
             {
                 sb.Append("SamplerState ");
                 sb.Append(staticSampler.Name);
@@ -209,7 +215,7 @@ namespace Editor.Shaders.Processors
             sb.AppendLine();
         }
 
-        private void GenerateNewHeader(StringBuilder sb, HeaderFeatures features, int headerBytesize, bool areConstantsSolo, Span<RawVariableData> span, out int additionalOffset)
+        private void GenerateNewHeader(StringBuilder sb, HeaderFeatures features, int headerBytesize, bool areConstantsSolo, Span<RawVariableData> span, HashSet<ReferenceIndex> usedReferences, out int additionalOffset)
         {
             additionalOffset = -1;
 
@@ -219,6 +225,14 @@ namespace Editor.Shaders.Processors
 
                 foreach (ref readonly RawVariableData varData in span)
                 {
+                    if (!usedReferences.Contains(varData.AsReferenceIndex()))
+                    {
+                        if (varData.Usage == RawVariableUsage.Constants)
+                            areConstantsSolo = false;
+
+                        continue;
+                    }
+
                     sb.Append("    ");
 
                     switch (varData.Usage)
@@ -234,7 +248,7 @@ namespace Editor.Shaders.Processors
                                             ValueDataRef generic = varData.Generic;
                                             if (generic.Generic == ValueGeneric.Custom)
                                             {
-                                                ref readonly StructData @struct = ref _processor.GetRefSource(generic);
+                                                ref readonly StructData @struct = ref _data.GetRefSource(generic);
                                                 if (Unsafe.IsNullRef(in @struct))
                                                 {
                                                     ReportErrorMessage("Failed to find struct for global data: {d}", varData.Name);
@@ -266,7 +280,7 @@ namespace Editor.Shaders.Processors
                                         }
                                     case RawVariableDataType.Property:
                                         {
-                                            if (_processor.GeneratePropertiesInHeader)
+                                            if (_data.GeneratePropertiesInHeader)
                                             {
                                                 SerializeGeneric(sb, varData.Generic, varData.Name);
                                             }
@@ -284,7 +298,7 @@ namespace Editor.Shaders.Processors
                                 ValueDataRef generic = varData.Generic;
                                 if (generic.Generic == ValueGeneric.Custom)
                                 {
-                                    ref readonly StructData @struct = ref _processor.GetRefSource(generic);
+                                    ref readonly StructData @struct = ref _data.GetRefSource(generic);
                                     if (Unsafe.IsNullRef(in @struct))
                                     {
                                         ReportErrorMessage("Failed to find struct for global data: {d}", varData.Name);
@@ -342,7 +356,7 @@ namespace Editor.Shaders.Processors
                 ValueDataRef generic = varData.Generic;
                 if (generic.Generic == ValueGeneric.Custom)
                 {
-                    ref readonly StructData @struct = ref _processor.GetRefSource(generic);
+                    ref readonly StructData @struct = ref _data.GetRefSource(generic);
                     if (Unsafe.IsNullRef(in @struct))
                     {
                         ReportErrorMessage("Failed to find struct for global data: {d}", varData.Name);
@@ -392,13 +406,13 @@ namespace Editor.Shaders.Processors
             }
 
             HashSet<string> found = new HashSet<string>();
-            foreach (ref readonly FunctionData function in _processor.Functions)
+            foreach (ref readonly FunctionData function in _data.Functions)
             {
                 found.Clear();
                 ReadOnlySpan<char> interestingPortion = @string.AsSpan().Slice(function.BodyRange.Start + additionalOffset, function.BodyRange.End - function.BodyRange.Start);
                 SearchForVariables(interestingPortion);
 
-                if (_processor.PropertySourceTemplate != null)
+                if (_data.PropertySourceTemplate != null)
                 {
                     if (Array.Exists(function.Attributes, (x) => x.Signature is AttributePixel))
                     {
@@ -407,7 +421,7 @@ namespace Editor.Shaders.Processors
                         {
                             if (varData.Type == RawVariableDataType.Property)
                             {
-                                string template = ResolvePropertyTemplate(_processor.PropertySourceTemplate, in varData, in function);
+                                string template = ResolvePropertyTemplate(_data.PropertySourceTemplate, in varData, in function);
                                 SearchForVariables(template);
 
                                 sb2.Append(varData.Name);
@@ -433,15 +447,16 @@ namespace Editor.Shaders.Processors
                                 continue;
 
                             SerializeGeneric(sb, varData.Generic, varData.Name);
+                            sb.Append(' ');
                             sb.Append(varData.Name);
-                            sb.Append(" = __HEADER_CB.CON_");
-                            sb.Append(varData.Name);
-                            sb.Append(';');
+                            sb.Append(" = __HEADER_CB.CON_Raw;");
                         }
                         else if (varData.Usage != RawVariableUsage.Property)
                         {
-                            ref readonly ResourceData resourceData = ref _processor.Resources[varData.Index];
+                            ref readonly ResourceData resourceData = ref _data.Resources[varData.Index];
 
+                            if (resourceData.IsReadWrite)
+                                sb.Append("RW");
                             sb.Append(resourceData.Type.ToString());
                             if (varData.Generic.IsSpecified)
                             {
@@ -452,6 +467,8 @@ namespace Editor.Shaders.Processors
                             sb.Append(' ');
                             sb.Append(varData.Name);
                             sb.Append(" = (");
+                            if (resourceData.IsReadWrite)
+                                sb.Append("RW");
                             sb.Append(resourceData.Type.ToString());
                             if (varData.Generic.IsSpecified)
                             {
@@ -506,7 +523,7 @@ namespace Editor.Shaders.Processors
             }
         }
 
-        private int CountTotalVariablesUsed() => _processor.Resources.Length + _processor.Properties.Length;
+        private int CountTotalVariablesUsed() => _data.Resources.Length + _data.Properties.Length;
         private void FillAndSortVariables(Span<RawVariableData> variableDatas, out HeaderFeatures features)
         {
             features = HeaderFeatures.None;
@@ -516,7 +533,7 @@ namespace Editor.Shaders.Processors
             int offset = 0;
             int i = 0;
 
-            foreach (ref readonly ResourceData resource in _processor.Resources)
+            foreach (ref readonly ResourceData resource in _data.Resources)
             {
                 RawVariableUsage usage = RawVariableUsage.Resource;
                 int bindGroup = 0;
@@ -551,7 +568,7 @@ namespace Editor.Shaders.Processors
 
             i = 0;
 
-            foreach (ref readonly PropertyData property in _processor.Properties)
+            foreach (ref readonly PropertyData property in _data.Properties)
             {
                 RawVariableUsage usage = RawVariableUsage.Property;
                 int bindGroup = 0;
@@ -590,12 +607,12 @@ namespace Editor.Shaders.Processors
 
             int constantsSize = 0;
 
-            foreach (ref readonly ResourceData resource in _processor.Resources)
+            foreach (ref readonly ResourceData resource in _data.Resources)
             {
                 AttributeData data = Array.Find(resource.Attributes, (x) => x.Signature is AttributeConstants);
                 if (data != default)
                 {
-                    constantsSize += _processor.CalculateSize(resource.Value);
+                    constantsSize += _data.CalculateSize(resource.Value);
                 }
                 else
                 {
@@ -603,11 +620,11 @@ namespace Editor.Shaders.Processors
                 }
             }
 
-            if (_processor.GeneratePropertiesInHeader)
+            if (_data.GeneratePropertiesInHeader)
             {
-                foreach (ref readonly PropertyData property in _processor.Properties)
+                foreach (ref readonly PropertyData property in _data.Properties)
                 {
-                    headerBytesize += _processor.CalculateSize(property.Generic);
+                    headerBytesize += _data.CalculateSize(property.Generic);
                 }
             }
 
@@ -620,6 +637,44 @@ namespace Editor.Shaders.Processors
             {
                 headerBytesize += constantsSize;
                 areConstantsSolo = false;
+            }
+        }
+
+        private HashSet<ReferenceIndex> CreateReferenceIndexSet(int primaryFunctionIndex)
+        {
+            HashSet<ReferenceIndex> indices = new HashSet<ReferenceIndex>();
+
+            if (primaryFunctionIndex == -1)
+            {
+                foreach (ref readonly FunctionData function in _data.Functions)
+                {
+                    foreach (AttributeData attribute in function.Attributes)
+                    {
+                        if (attribute.Signature is AttributeVertex or AttributePixel)
+                        {
+                            RecursiveIncludeTravel(_data, function.IncludeData);
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                RecursiveIncludeTravel(_data, _data.Functions[primaryFunctionIndex].IncludeData);
+            }
+
+            return indices;
+
+            void RecursiveIncludeTravel(ShaderData data, FunctionIncludeData includeData)
+            {
+                foreach (ReferenceIndex index in includeData.UsedResourceIndices)
+                {
+                    switch (index.Type)
+                    {
+                        case ReferenceType.Function: RecursiveIncludeTravel(data, data.Functions[index.Index].IncludeData); break;
+                        default: indices.Add(index); break;
+                    }
+                }
             }
         }
 
@@ -647,7 +702,7 @@ namespace Editor.Shaders.Processors
                 }
                 else if (subsection.Equals("SV_INSTANCEID", StringComparison.OrdinalIgnoreCase))
                 {
-                    string? path = SearchForSemanticPath(_processor, SemanticName.SV_InstanceId, function.Arguments);
+                    string? path = SearchForSemanticPath(_data, SemanticName.SV_InstanceId, function.Arguments);
                     if (path == null)
                     {
                         ReportErrorMessage("Failed to find a variable with a \"SV_InstanceID\" semantic decleration in function {f} input arguments.", function.Name);
@@ -666,7 +721,7 @@ namespace Editor.Shaders.Processors
 
             return copy;
 
-            static string? SearchForSemanticPath(ShaderProcessor processor, SemanticName semanticName, Span<VariableData> variables, string? previousPath = null)
+            static string? SearchForSemanticPath(ShaderData shaderData, SemanticName semanticName, Span<VariableData> variables, string? previousPath = null)
             {
                 foreach (ref readonly VariableData data in variables)
                 {
@@ -676,11 +731,11 @@ namespace Editor.Shaders.Processors
                     }
                     else if (data.Generic.Generic == ValueGeneric.Custom)
                     {
-                        ref readonly StructData @struct = ref processor.GetRefSource(data.Generic);
+                        ref readonly StructData @struct = ref shaderData.GetRefSource(data.Generic);
                         if (Unsafe.IsNullRef(in @struct))
                             continue;
 
-                        string? ret = SearchForSemanticPath(processor, semanticName, @struct.Variables, data.Name + ".");
+                        string? ret = SearchForSemanticPath(shaderData, semanticName, @struct.Variables, data.Name + ".");
                         if (ret != null)
                             return ret;
                     }
@@ -696,7 +751,7 @@ namespace Editor.Shaders.Processors
             {
                 if (generic.Generic == ValueGeneric.Custom)
                 {
-                    ref readonly StructData @struct = ref _processor.GetRefSource(generic);
+                    ref readonly StructData @struct = ref _data.GetRefSource(generic);
                     if (Unsafe.IsNullRef(in @struct))
                     {
                         ReportErrorMessage("Failed to find struct for global data: {d}", name);
@@ -727,7 +782,7 @@ namespace Editor.Shaders.Processors
             {
                 if (generic.Generic == ValueGeneric.Custom)
                 {
-                    ref readonly StructData @struct = ref _processor.GetRefSource(generic);
+                    ref readonly StructData @struct = ref _data.GetRefSource(generic);
                     if (Unsafe.IsNullRef(in @struct))
                     {
                         ReportErrorMessage("Failed to find struct for global data: {d}", name);
@@ -782,6 +837,18 @@ namespace Editor.Shaders.Processors
                 if ((x = Usage.CompareTo(other.Usage)) != 0) return x;
                 if ((x = Type.CompareTo(other.Type)) != 0) return x;
                 return Name.CompareTo(other.Name, StringComparison.Ordinal);
+            }
+
+            public ReferenceIndex AsReferenceIndex()
+            {
+                switch (Type)
+                {
+                    case RawVariableDataType.Property: return new ReferenceIndex(ReferenceType.Property, Index);
+                    case RawVariableDataType.Struct: return new ReferenceIndex(ReferenceType.Property, Index);
+                    case RawVariableDataType.Resource: return new ReferenceIndex(ReferenceType.Resource, Index);
+                }
+
+                throw new NotImplementedException();
             }
         }
 

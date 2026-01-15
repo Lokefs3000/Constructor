@@ -12,6 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
-    <ProjectReference Include="..\Primary.RHI\Primary.RHI.csproj" />
+    <ProjectReference Include="..\Primary.RHI2\Primary.RHI2.csproj" />
   </ItemGroup>
 </Project>

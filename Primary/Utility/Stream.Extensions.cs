@@ -1,7 +1,4 @@
-﻿using CommunityToolkit.HighPerformance;
-using SharpGen.Runtime;
-using System.Numerics;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace Primary.Utility
 {
@@ -24,7 +21,7 @@ namespace Primary.Utility
         {
             if (count == 0)
                 return Array.Empty<T>();
-           
+
             T[] array = new T[count];
             fixed (T* ptr = array)
             {

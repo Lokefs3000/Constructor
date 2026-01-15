@@ -1,15 +1,9 @@
-﻿using CsToml;
-using Editor.Assets;
-using Editor.Assets.Importers;
-using Editor.Processors;
+﻿using Editor.Assets;
 using Hexa.NET.ImGui;
 using Primary.Assets;
-using Primary.Assets.Loaders;
 using Primary.Assets.Types;
 using Primary.Common;
-using Primary.Utility;
 using System.Diagnostics;
-using System.Globalization;
 using System.Numerics;
 using System.Text;
 using Tomlyn;
@@ -42,18 +36,18 @@ namespace Editor.DearImGui.Properties
 
                 ImGui.Separator();
 
-                foreach (var kvp in _material.Properties)
-                {
-                    MaterialProperty property = kvp.Value;
-                    switch (property.Type)
-                    {
-                        case MaterialVariableType.Texture:
-                            {
-                                ImGuiWidgets.SelectorAsset(kvp.Key, _material.GetResource(kvp.Key) as TextureAsset, (x) => _material.SetResource(kvp.Key, x));
-                                break;
-                            }
-                    }
-                }
+                //foreach (var kvp in _material.Properties)
+                //{
+                //    MaterialProperty property = kvp.Value;
+                //    switch (property.Type)
+                //    {
+                //        case MaterialVariableType.Texture:
+                //            {
+                //                ImGuiWidgets.SelectorAsset(kvp.Key, _material.GetResource(kvp.Key) as TextureAsset, (x) => _material.SetResource(kvp.Key, x));
+                //                break;
+                //            }
+                //    }
+                //}
             }
 
             if (_isImported)
@@ -227,11 +221,11 @@ namespace Editor.DearImGui.Properties
                 root["shader"] = _material.Shader!.Id.Value;
 
                 TomlTable properties = new TomlTable();
-                foreach (var kvp in _material.Properties)
-                {
-                    if (_material.GetResource(kvp.Key) is IAssetDefinition asset)
-                        properties[kvp.Key] = asset.Id.Value;
-                }
+                //foreach (var kvp in _material.Properties)
+                //{
+                //    if (_material.GetResource(kvp.Key) is IAssetDefinition asset)
+                //        properties[kvp.Key] = asset.Id.Value;
+                //}
 
                 root["properties"] = properties;
 

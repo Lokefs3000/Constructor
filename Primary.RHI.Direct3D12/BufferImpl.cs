@@ -8,9 +8,8 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Vortice.Direct3D12;
 using Vortice.DXGI;
-
-using Terra = TerraFX.Interop.DirectX;
 using D3D12MemAlloc = Interop.D3D12MemAlloc;
+using Terra = TerraFX.Interop.DirectX;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -496,6 +495,6 @@ namespace Primary.RHI.Direct3D12
         public ID3D12Resource Resource => Unsafe.As<BufferImpl>(Buffer).D3D12Resource;
         public CpuDescriptorHandle CpuDescriptorHandle => Unsafe.As<BufferImpl>(Buffer).CpuDescriptor;
 
-        public static implicit operator BufferInternal(Buffer buffer) => new BufferInternal(buffer); 
+        public static implicit operator BufferInternal(Buffer buffer) => new BufferInternal(buffer);
     }
 }

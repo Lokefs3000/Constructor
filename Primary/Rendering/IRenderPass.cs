@@ -1,11 +1,7 @@
-﻿using Primary.Rendering.Pass;
-
-namespace Primary.Rendering
+﻿namespace Primary.Rendering
 {
-    public interface IRenderPass : IDisposable
+    public interface IRenderPass
     {
-        public void PrepareFrame(IRenderPath path, RenderPassData passData);
-        public void ExecutePass(IRenderPath path, RenderPassData passData);
-        public void CleanupFrame(IRenderPath path, RenderPassData passData);
+        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context);
     }
 }

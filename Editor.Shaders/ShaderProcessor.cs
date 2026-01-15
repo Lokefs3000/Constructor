@@ -6,13 +6,8 @@ using Primary.Common;
 using Serilog;
 using SharpGen.Runtime;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 using Vortice.Dxc;
 
 namespace Editor.Shaders
@@ -24,22 +19,6 @@ namespace Editor.Shaders
         private readonly ShaderAttributeSettings _settings;
         private readonly IDxcCompiler3 _compiler;
 
-        private Dictionary<int, int> _valueRefTable;
-
-        private List<FunctionData> _functions;
-        private List<ResourceData> _resources;
-        private List<PropertyData> _properties;
-        private List<StructData> _structs;
-        private List<StaticSamplerData> _staticSamplers;
-
-        private string? _propertySourceTemplate;
-        private string? _processedSource;
-
-        private bool _generatePropertiesInHeader;
-
-        private bool _areConstantsSeparated;
-        private int _headerBytesize;
-
         private bool _disposedValue;
 
         public ShaderProcessor(ILogger logger, ShaderAttributeSettings settings)
@@ -48,22 +27,6 @@ namespace Editor.Shaders
 
             _settings = settings;
             _compiler = Dxc.CreateDxcCompiler<IDxcCompiler3>();
-
-            _valueRefTable = new Dictionary<int, int>();
-
-            _functions = new List<FunctionData>();
-            _resources = new List<ResourceData>();
-            _properties = new List<PropertyData>();
-            _structs = new List<StructData>();
-            _staticSamplers = new List<StaticSamplerData>();
-
-            _propertySourceTemplate = "__HEADER_CB.RAW_$PNAME$";
-            _processedSource = null;
-
-            _generatePropertiesInHeader = true;
-
-            _areConstantsSeparated = false;
-            _headerBytesize = 0;
         }
 
         private void Dispose(bool disposing)
@@ -114,9 +77,11 @@ namespace Editor.Shaders
                 }
             }
 
+            ShaderData data = new ShaderData();
+
             //2. parse the new source
 
-            SourceParser parser = new SourceParser(this, source, fileName);
+            SourceParser parser = new SourceParser(this, data, source, fileName);
             bool r = parser.Parse();
 
             if (!r)
@@ -125,19 +90,19 @@ namespace Editor.Shaders
             }
 
             //3. generate final source
-            
-            SourceAugmenter generator = new SourceAugmenter(this, fileName);
-            source = generator.Augment(source)!;
+
+            SourceAugmenter generator = new SourceAugmenter(this, data, fileName);
+            source = generator.Augment(source, -1)!;
 
             if (source == null)
             {
                 return null;
             }
 
-            _processedSource = source;
+            data.ProcessedSource = source;
 
             //4. compile for targets
-            ShaderCompileStage stages = CountAllStages();
+            ShaderCompileStage stages = CountAllStages(data);
             ShaderBytecode[] bytecodes = new ShaderBytecode[int.PopCount((int)args.Targets) * int.PopCount((int)stages)];
 
             int offset = 0;
@@ -153,27 +118,148 @@ namespace Editor.Shaders
                         _ => throw new NotImplementedException()
                     };
 
-                    if (!CompileForTarget(ref source, presetArgs, bytecodes, target, stages, ref offset))
+                    if (!CompileForTarget(ref source, data, presetArgs, bytecodes, target, stages, ref offset, 0))
                         return null;
                 }
             }
 
-            return new ShaderProcesserResult(MakeBytecodeTarget(args.Targets, stages), bytecodes, includedFiles);
+            return new ShaderProcesserResult(MakeBytecodeTarget(args.Targets, stages, 0), bytecodes, includedFiles, data);
         }
 
-        private bool CompileForTarget(ref string source, string[] initialArgs, ShaderBytecode[] bytecodes, ShaderCompileTarget target, ShaderCompileStage stages, ref int offset)
+        public ShaderProcesserResult? ProcessCompute(ComputeShaderProcessorArgs args)
         {
-            for (int i = 0; i < 2; i++)
+            string source = args.InputSource;
+            string fileName = args.SourceFileName ?? "hlsl.hlsl";
+
+            string[] includedFiles = Array.Empty<string>();
+
+            //1. preprocess source
+            {
+                using (ShaderIncludeHandler includeHandler = new ShaderIncludeHandler(args.IncludeDirectories))
+                using (IDxcResult result = _compiler.Compile(source, s_preprocessPreset, includeHandler))
+                {
+                    string errors = result.GetErrors();
+                    if (errors.Length > 0)
+                    {
+                        throw new ShaderCompileException(errors); //temp
+                    }
+
+                    using IDxcBlob blob = result.GetResult();
+                    unsafe
+                    {
+                        //ANYTHING to avoid using Marshal
+                        source = new string((sbyte*)blob.BufferPointer);
+                    }
+
+                    includedFiles = includeHandler.GetReadFiles();
+                }
+            }
+
+            ShaderData data = new ShaderData();
+
+            //2. parse the new source
+
+            SourceParser parser = new SourceParser(this, data, source, fileName);
+            bool r = parser.Parse();
+
+            if (!r)
+            {
+                return null;
+            }
+
+            //3. generate and compile for each kernel
+            data.KernelCount = CountKernels(data);
+            ShaderBytecode[] bytecodes = new ShaderBytecode[int.PopCount((int)args.Targets) * data.KernelCount];
+
+            int offset = 0;
+            for (int j = 0; j < data.KernelCount; j++)
+            {
+                int functionIndex = 0;
+                {
+                    int remaining = j;
+
+                    foreach (ref readonly FunctionData function in data.Functions)
+                    {
+                        if (Array.Exists(function.Attributes, (x) => x.Signature is AttributeKernel))
+                        {
+                            if (remaining > 0)
+                                --remaining;
+                            else
+                                break;
+                        }
+
+                        ++functionIndex;
+                    }
+                }
+
+                //4.1. generate final source
+
+                SourceAugmenter generator = new SourceAugmenter(this, data, fileName);
+                source = generator.Augment(source, functionIndex)!;
+
+                if (source == null)
+                {
+                    return null;
+                }
+
+                data.ProcessedSource = source;
+
+                //4.2. compile for targets
+
+                for (int i = 0; i < 2; i++)
+                {
+                    ShaderCompileTarget target = (ShaderCompileTarget)(1 << i);
+                    if (FlagUtility.HasFlag(args.Targets, target))
+                    {
+                        string[] presetArgs = target switch
+                        {
+                            ShaderCompileTarget.Direct3D12 => s_d3d12Preset,
+                            ShaderCompileTarget.Vulkan => s_vulkanPreset,
+                            _ => throw new NotImplementedException()
+                        };
+
+                        if (!CompileForTarget(ref source, data, presetArgs, bytecodes, target, ShaderCompileStage.Compute, ref offset, j))
+                            return null;
+                    }
+                }
+            }
+
+            return new ShaderProcesserResult(MakeBytecodeTarget(args.Targets, ShaderCompileStage.Compute, 0), bytecodes, includedFiles, data);
+        }
+
+        private bool CompileForTarget(ref string source, ShaderData data, string[] initialArgs, ShaderBytecode[] bytecodes, ShaderCompileTarget target, ShaderCompileStage stages, ref int offset, int kernelSkipIndex)
+        {
+            for (int i = 0; i < 3; i++)
             {
                 ShaderCompileStage stage = (ShaderCompileStage)(1 << i);
                 if (FlagUtility.HasFlag(stages, stage))
                 {
-                    string entryPoint = _functions.Find((x) => stage switch
+                    int startIndex = stage == ShaderCompileStage.Compute ? kernelSkipIndex : 0;
+
+                    int index = 0;
                     {
-                        ShaderCompileStage.Vertex => Array.Exists(x.Attributes, (x) => x.Signature is AttributeVertex),
-                        ShaderCompileStage.Pixel => Array.Exists(x.Attributes, (x) => x.Signature is AttributePixel),
-                        _ => throw new NotImplementedException()
-                    }).Name;
+                        int startIndexCounter = startIndex;
+                        foreach (ref readonly FunctionData function in data.Functions)
+                        {
+                            if (stage switch
+                            {
+                                ShaderCompileStage.Vertex => Array.Exists(function.Attributes, (x) => x.Signature is AttributeVertex),
+                                ShaderCompileStage.Pixel => Array.Exists(function.Attributes, (x) => x.Signature is AttributePixel),
+                                ShaderCompileStage.Compute => Array.Exists(function.Attributes, (x) => x.Signature is AttributeKernel),
+                                _ => throw new NotImplementedException()
+                            })
+                            {
+                                if (startIndexCounter > 0)
+                                    --startIndexCounter;
+                                else
+                                    break;
+                            }
+
+                            ++index;
+                        }
+                    }
+
+                    string entryPoint = data.Functions[index].Name;
 
                     string[] newArgs = initialArgs.Concat([
 
@@ -181,6 +267,7 @@ namespace Editor.Shaders
                         "-T", stage switch {
                             ShaderCompileStage.Vertex => "vs_6_6",
                             ShaderCompileStage.Pixel => "ps_6_6",
+                            ShaderCompileStage.Compute => "cs_6_6",
                             _ => throw new NotImplementedException()
                         }
 
@@ -202,7 +289,7 @@ namespace Editor.Shaders
                     }
                     else
                     {
-                        bytecodes[offset++] = new ShaderBytecode(MakeBytecodeTarget(target, stage), bytecodeBlob.AsBytes());
+                        bytecodes[offset++] = new ShaderBytecode(MakeBytecodeTarget(target, stage, startIndex), bytecodeBlob.AsBytes());
                     }
                 }
             }
@@ -210,10 +297,10 @@ namespace Editor.Shaders
             return true;
         }
 
-        private ShaderCompileStage CountAllStages()
+        private ShaderCompileStage CountAllStages(ShaderData data)
         {
             ShaderCompileStage stages = ShaderCompileStage.None;
-            foreach (ref readonly FunctionData function in Functions)
+            foreach (ref readonly FunctionData function in data.Functions)
             {
                 foreach (ref readonly AttributeData attribute in function.Attributes.AsSpan())
                 {
@@ -227,82 +314,27 @@ namespace Editor.Shaders
             return stages;
         }
 
+        private int CountKernels(ShaderData data)
+        {
+            int count = 0;
+            foreach (ref readonly FunctionData function in data.Functions)
+            {
+                if (Array.Exists(function.Attributes, (x) => x.Signature is AttributeKernel))
+                    count++;
+            }
+
+            return count;
+        }
+
         internal AttributeSignature? FindAttributeSignature(ReadOnlySpan<char> name)
         {
             _settings.TryGetSignature(name.ToString(), out AttributeSignature? signature);
             return signature;
         }
 
-        internal int FindRefIndexFor(int code)
-        {
-            if (_valueRefTable.TryGetValue(code, out int idx))
-                return idx;
-            return -1;
-        }
-
-        internal bool HasValueRef(int code) => _valueRefTable.ContainsKey(code);
-
-        internal void AddNewValueRef(int code) => _valueRefTable.Add(code, _structs.Count);
-
-        internal void AddFunction(FunctionData data) => _functions.Add(data);
-        internal void AddResource(ResourceData data) => _resources.Add(data);
-        internal void AddProperty(PropertyData data) => _properties.Add(data);
-        internal void AddStruct(StructData data) => _structs.Add(data);
-        internal void AddStaticSampler(StaticSamplerData data) => _staticSamplers.Add(data);
-
-        public ref readonly StructData GetRefSource(ValueDataRef dataRef)
-        {
-            if (dataRef.Generic != ValueGeneric.Custom)
-                return ref Unsafe.NullRef<StructData>();
-
-            return ref Structs[dataRef.Index];
-        }
-
-        public int CalculateSize(ValueDataRef generic)
-        {
-            if (generic.Generic == ValueGeneric.Custom)
-            {
-                ref readonly StructData @struct = ref GetRefSource(generic);
-                Debug.Assert(!Unsafe.IsNullRef(in @struct));
-
-                int size = 0;
-                foreach (ref readonly VariableData variable in @struct.Variables.AsSpan())
-                {
-                    size += CalculateSize(variable.Generic);
-                }
-
-                return size;
-            }
-            else
-            {
-                return generic.Generic switch
-                {
-                    ValueGeneric.Float => sizeof(float),
-                    ValueGeneric.Double => sizeof(double),
-                    ValueGeneric.UInt => sizeof(uint),
-                    ValueGeneric.Int => sizeof(int),
-                    _ => throw new NotSupportedException()
-                } * generic.Rows * generic.Columns;
-            }
-        }
-
         internal ILogger Logger => _logger;
 
-        public ReadOnlySpan<FunctionData> Functions => _functions.AsSpan();
-        public ReadOnlySpan<ResourceData> Resources => _resources.AsSpan();
-        public ReadOnlySpan<PropertyData> Properties => _properties.AsSpan();
-        public ReadOnlySpan<StructData> Structs => _structs.AsSpan();
-        public ReadOnlySpan<StaticSamplerData> StaticSamplers => _staticSamplers.AsSpan();
-
-        public string? PropertySourceTemplate { get => _propertySourceTemplate; internal set => _propertySourceTemplate = value; }
-        public string? ProcessedSource => _processedSource;
-
-        public bool GeneratePropertiesInHeader { get => _generatePropertiesInHeader; internal set => _generatePropertiesInHeader = value; }
-
-        public bool AreConstantsSeparated { get => _areConstantsSeparated; internal set => _areConstantsSeparated = value; }
-        public int HeaderBytesize { get => _headerBytesize; internal set => _headerBytesize = value; }
-
-        private static ushort MakeBytecodeTarget(ShaderCompileTarget target, ShaderCompileStage stage) => (ushort)(((ushort)target) | (((ushort)stage) << 2));
+        private static ushort MakeBytecodeTarget(ShaderCompileTarget target, ShaderCompileStage stage, int index) => (ushort)(((ushort)target) | (((ushort)stage) << 8) | (((ushort)index) << 3));
 
         private static string[] s_preprocessPreset = [
             "-HV", "2021",

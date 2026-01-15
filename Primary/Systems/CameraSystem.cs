@@ -24,7 +24,7 @@ namespace Primary.Systems
             Vector2 clientSize = Vector2.Zero;
             if (true)
             {
-                Window? window = Engine.GlobalSingleton.RenderingManager.DefaultWindow;
+                Window? window = WindowManager.Instance.PrimaryWindow!;
                 if (window != null)
                     clientSize = window.ClientSize;
             }

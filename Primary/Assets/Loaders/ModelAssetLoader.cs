@@ -3,10 +3,10 @@ using K4os.Compression.LZ4.Streams;
 using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
-using Primary.Rendering;
-using Primary.RHI;
+using Primary.RHI2;
 using Primary.Utility;
 using System.Buffers;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -36,8 +36,8 @@ namespace Primary.Assets.Loaders
             if (assetData is not ModelAssetData modelData)
                 throw new ArgumentException(nameof(assetData));
 
-            RHI.Buffer? vertexBuffer = null;
-            RHI.Buffer? indexBuffer = null;
+            RHIBuffer? vertexBuffer = null;
+            RHIBuffer? indexBuffer = null;
 
             try
             {
@@ -189,33 +189,29 @@ namespace Primary.Assets.Loaders
                     //vertex buffer
                     fixed (byte* ptr = vertexData)
                     {
-                        vertexBuffer = RenderingManager.Device.CreateBuffer(new BufferDescription
+                        vertexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
                         {
-                            ByteWidth = (uint)vertexData.Length,
+                            Width = (uint)vertexData.Length,
                             Stride = 12 * sizeof(float) + 2 * sizeof(float),
 
-                            Memory = MemoryUsage.Immutable,
-                            Usage = BufferUsage.VertexBuffer,
-                            Mode = BufferMode.None,
-                            CpuAccessFlags = CPUAccessFlags.None
+                            Usage = RHIResourceUsage.VertexInput,
                         }, (nint)ptr);
                     }
 
                     //index buffer
                     fixed (byte* ptr = indexData)
                     {
-                        indexBuffer = RenderingManager.Device.CreateBuffer(new BufferDescription
+                        indexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
                         {
-                            ByteWidth = (uint)indexData.Length,
-                            Stride = FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? 4u : 2u,
+                            Width = (uint)indexData.Length,
+                            Stride = FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? 4 : 2,
 
-                            Memory = MemoryUsage.Immutable,
-                            Usage = BufferUsage.IndexBuffer,
-                            Mode = BufferMode.None,
-                            CpuAccessFlags = CPUAccessFlags.None
+                            Usage = RHIResourceUsage.IndexInput
                         }, (nint)ptr);
                     }
                 }
+
+                Debug.Assert(vertexBuffer != null && indexBuffer != null);
 
                 modelData.UpdateAssetData(model, meshes, rootNodeChildren[0], vertexBuffer, indexBuffer);
 

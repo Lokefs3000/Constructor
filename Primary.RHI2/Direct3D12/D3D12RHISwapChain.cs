@@ -4,23 +4,14 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using TerraFX.Interop.DirectX;
 using TerraFX.Interop.Windows;
-
-using static Interop.D3D12MemAlloc.ALLOCATION_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
 using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
 using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
-using static TerraFX.Interop.DirectX.D3D12_HEAP_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_HEAP_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_DIMENSION;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_TEXTURE_LAYOUT;
 using static TerraFX.Interop.DirectX.DXGI_ALPHA_MODE;
 using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 using static TerraFX.Interop.DirectX.DXGI_SCALING;
 using static TerraFX.Interop.DirectX.DXGI_SWAP_CHAIN_FLAG;
 using static TerraFX.Interop.DirectX.DXGI_SWAP_EFFECT;
-
-using D3D12MA = Interop.D3D12MemAlloc;
 
 namespace Primary.RHI2.Direct3D12
 {
@@ -88,16 +79,15 @@ namespace Primary.RHI2.Direct3D12
                 };
             }
 
-            _activeBufferIndex = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
-
             {
                 _nativeRep = (D3D12RHISwapChainNative*)NativeMemory.Alloc((nuint)Unsafe.SizeOf<D3D12RHISwapChainNative>());
                 _nativeRep->Base = new RHISwapChainNative
                 {
                     Description = description,
                 };
+                _nativeRep->SwapChain = (ComPtr<IDXGISwapChain4>*)Unsafe.AsPointer(ref _swapChain);
                 _nativeRep->Buffers = _buffers;
-                _nativeRep->ActiveBufferIndex = (int*)Unsafe.AsPointer(ref _activeBufferIndex);
+                _nativeRep->ActiveBufferIndex = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
             }
         }
 
@@ -154,7 +144,7 @@ namespace Primary.RHI2.Direct3D12
                 throw new Exception(hr.ToString());
             }
 
-            _activeBufferIndex = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
+            _nativeRep->ActiveBufferIndex = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
         }
 
         public override void Resize(Vector2 newSize)
@@ -178,7 +168,7 @@ namespace Primary.RHI2.Direct3D12
             {
                 fixed (uint* ptr2 = nodeMasks)
                 {
-                    HRESULT hr = _swapChain.Get()->ResizeBuffers1((uint)_description.BackBufferCount, (uint)newSize.X, (uint)newSize.Y, DXGI_FORMAT_UNKNOWN, DXGI.DXGI_PRESENT_ALLOW_TEARING, ptr2, ptr1);
+                    HRESULT hr = _swapChain.Get()->ResizeBuffers1((uint)_description.BackBufferCount, (uint)newSize.X, (uint)newSize.Y, DXGI_FORMAT_UNKNOWN, (uint)DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING, ptr2, ptr1);
                     if (hr.FAILED)
                     {
                         //TODO: exception handling
@@ -207,7 +197,11 @@ namespace Primary.RHI2.Direct3D12
 
             _description.WindowSize = newSize;
             _nativeRep->Base.Description.WindowSize = newSize;
+
+            _nativeRep->ActiveBufferIndex = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
         }
+
+        public ComPtr<IDXGISwapChain4> SwapChain => _swapChain;
 
         public override unsafe RHISwapChainNative* GetAsNative() => (RHISwapChainNative*)_nativeRep;
     }
@@ -216,8 +210,10 @@ namespace Primary.RHI2.Direct3D12
     {
         public RHISwapChainNative Base;
 
+        public ComPtr<IDXGISwapChain4>* SwapChain;
+
         public D3D12RHISwapChainBuffer* Buffers;
-        public int* ActiveBufferIndex;
+        public int ActiveBufferIndex;
 
         public static implicit operator RHISwapChainNative(D3D12RHISwapChainNative native) => native.Base;
     }

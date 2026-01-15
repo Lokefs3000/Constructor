@@ -7,9 +7,8 @@ using System.Runtime.InteropServices;
 using Vortice.Direct3D12;
 using Vortice.DXGI;
 using Vortice.Mathematics;
-
-using Terra = TerraFX.Interop.DirectX;
 using D3D12MemAlloc = Interop.D3D12MemAlloc;
+using Terra = TerraFX.Interop.DirectX;
 
 namespace Primary.RHI.Direct3D12
 {

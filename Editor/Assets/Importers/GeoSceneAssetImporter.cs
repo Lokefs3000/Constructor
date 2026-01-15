@@ -1,11 +1,6 @@
 ﻿using Editor.Assets.Types;
 using Editor.Storage;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace Editor.Assets.Importers
 {
@@ -18,7 +13,7 @@ namespace Editor.Assets.Importers
 
         public void Dispose()
         {
-            
+
         }
 
         public bool Import(AssetPipeline pipeline, ProjectSubFilesystem filesystem, string fullFilePath, string outputFilePath, string localOutputFile)
@@ -53,7 +48,7 @@ namespace Editor.Assets.Importers
             catch (Exception)
             {
             }
-            
+
             return true;
         }
 

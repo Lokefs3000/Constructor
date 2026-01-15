@@ -1,10 +1,6 @@
-﻿using Editor.Assets;
-using Editor.Storage;
+﻿using Editor.Storage;
 using Hexa.NET.ImGui;
-using System;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Text;
 
 namespace Editor.DearImGui.Debuggers
 {

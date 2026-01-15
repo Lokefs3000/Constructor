@@ -80,13 +80,22 @@ namespace Editor.Assets
             }
         }
 
-        internal void RemapFile(string filePath, string remapPath)
+        internal void RemapFile(string filePath, string? remapPath)
         {
             filePath = filePath.Replace('\\', '/');
-            remapPath = remapPath.Replace('\\', '/');
 
-            _fileRemappings.AddOrUpdate(filePath, remapPath, (_, _) => remapPath);
-            _mappingsModified = true;
+            if (remapPath == null)
+            {
+                _fileRemappings.TryRemove(filePath, out remapPath);
+                _mappingsModified = true;
+            }
+            else
+            {
+                remapPath = remapPath.Replace('\\', '/');
+
+                _fileRemappings.AddOrUpdate(filePath, remapPath, (_, _) => remapPath);
+                _mappingsModified = true;
+            }
         }
 
         internal void FlushFileRemappings()
@@ -155,6 +164,8 @@ namespace Editor.Assets
             string absolutePath = string.Empty;
             string localPath = path.ToString();
 
+            bool isRemapped = false;
+
             AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
             if (_fileRemappings.TryGetValue(localPath, out string? remap))
             {
@@ -170,6 +181,7 @@ namespace Editor.Assets
                 }
 
                 absolutePath = Path.Combine(Editor.GlobalSingleton.ProjectPath, remap);
+                isRemapped = true;
             }
             else if (pipeline != null)
             {
@@ -188,6 +200,7 @@ namespace Editor.Assets
                         {
                             absolutePath = Path.Combine(Editor.GlobalSingleton.ProjectPath, remap);
                             hasNewRemap = true;
+                            isRemapped = true;
                         }
                     }
                 }
@@ -199,7 +212,15 @@ namespace Editor.Assets
                 absolutePath = Path.Combine(_absolutePath, localPath);
 
             if (!File.Exists(absolutePath))
+            {
+                if (isRemapped)
+                {
+                    RemapFile(localPath, null);
+                    return OpenStream(path);
+                }
+
                 return null;
+            }
 
             return FileUtility.TryWaitOpenNoThrow(absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         }

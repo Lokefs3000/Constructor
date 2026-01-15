@@ -20,9 +20,9 @@ namespace Primary.Components
             SceneEntityManager.Register<LightRenderingData>();
             SceneEntityManager.Register<EntityScene>();
             SceneEntityManager.Register<RenderBounds>();
-            SceneEntityManager.Register<RenderTreeAdditionalInfo>();
             SceneEntityManager.Register<DontSerializeTag>();
             SceneEntityManager.Register<PostProcessingVolume>();
+            SceneEntityManager.Register<RenderOctantInfo>();
 
             SceneEntityManager.BuildRequirementHierchies();
         }

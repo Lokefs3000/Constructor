@@ -1,14 +1,9 @@
 ﻿using Primary.Assets;
 using Primary.R2.ForwardPlus.Passes;
-using Primary.Rendering2;
-using Primary.Rendering2.Assets;
-using Primary.Rendering2.Batching;
-using System;
-using System.Collections.Generic;
+using Primary.Rendering;
+using Primary.Rendering.Assets;
+using Primary.Rendering.Batching;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Primary.R2.ForwardPlus
 {
@@ -31,7 +26,7 @@ namespace Primary.R2.ForwardPlus
             _isInstalled = true;
 
             _primaryRenderList = manager.BatchingManager.CreateRenderList();
-            _primaryRenderList.DefaultMaterial = AssetManager.LoadAsset<MaterialAsset2>("Engine/Materials/ForwardPlus/MissingDefMat.mat2", true);
+            _primaryRenderList.DefaultMaterial = AssetManager.LoadAsset<MaterialAsset>("Engine/Materials/ForwardPlus/MissingDefMat.mat2", true);
 
             manager.RenderPassManager.AddRenderPass<ResourcesPass>();
             manager.RenderPassManager.AddRenderPass<DepthPrePass>();

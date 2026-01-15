@@ -3,15 +3,13 @@ using Primary.RHI.Direct3D12.Descriptors;
 using Primary.RHI.Direct3D12.Helpers;
 using Primary.RHI.Direct3D12.Interfaces;
 using Primary.RHI.Direct3D12.Utility;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Vortice.Direct3D12;
 using Vortice.DXGI;
 using Vortice.Mathematics;
-
-using Terra = TerraFX.Interop.DirectX;
 using D3D12MemAlloc = Interop.D3D12MemAlloc;
+using Terra = TerraFX.Interop.DirectX;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -117,7 +115,7 @@ namespace Primary.RHI.Direct3D12
             D3D12MemAlloc.Allocation* ptr = null;
             void* outPtr = null;
             Guid guid = typeof(ID3D12Resource).GUID;
-            
+
             ResultChecker.ThrowIfUnhandled(D3D12MemAlloc.Allocator.CreateResource(device.D3D12MAAllocator, &allocDesc, (Terra.D3D12_RESOURCE_DESC*)&resDesc, (Terra.D3D12_RESOURCE_STATES)usingState, null, &ptr, &guid, &outPtr), device);
 
             _allocation = ptr;

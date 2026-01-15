@@ -5,14 +5,9 @@ using Editor.Geometry;
 using Editor.Geometry.Shapes;
 using Editor.Interaction;
 using Primary.Assets;
-using Primary.Rendering;
-using Primary.Rendering.Pass;
-using Primary.Rendering.Raw;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-
-using RHI = Primary.RHI;
 
 namespace Editor.Rendering
 {

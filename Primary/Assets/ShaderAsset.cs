@@ -1,219 +1,189 @@
 ﻿using Primary.Assets.Types;
-using Primary.Rendering;
+using Primary.Rendering.Assets;
+using Primary.RHI2;
 using System.Collections.Frozen;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 
 namespace Primary.Assets
 {
-    public sealed class ShaderAsset : IAssetDefinition
+    public sealed class ShaderAsset : BaseAssetDefinition<ShaderAsset, ShaderAssetData>, IShaderResourceSource
     {
-        private readonly ShaderAssetData _assetData;
-
-        internal ShaderAsset(ShaderAssetData assetData)
+        internal ShaderAsset(ShaderAssetData assetData) : base(assetData)
         {
-            _assetData = assetData;
         }
 
-        public override int GetHashCode()
+        public PropertyBlock? CreatePropertyBlock()
         {
-            return _assetData.HashCode;
+            if (Status != ResourceStatus.Success)
+                return null;
+
+            return new PropertyBlock(this);
         }
 
-        internal ShaderBindGroupVariable[] GetVariablesForBindGroup(string bindGroup) => _assetData.GetVariablesForBindGroup(bindGroup);
-        internal int GetIndexForBindGroup(string bindGroup) => _assetData.GetIndexForBindGroup(bindGroup);
+        public ReadOnlySpan<ShaderProperty> Properties => AssetData.Properties;
+        public IReadOnlyDictionary<int, int> RemappingTable => AssetData.RemappingTable;
 
-        public ShaderBindGroup CreateDefaultBindGroup() => new ShaderBindGroup(this, "__Default");
+        public int PropertyBlockSize => AssetData.PropertyBlockSize;
+        public int HeaderBlockSize => AssetData.HeaderBlockSize;
 
-        internal ShaderAssetData AssetData => _assetData;
+        public ShHeaderFlags HeaderFlags => AssetData.HeaderFlags;
 
-        internal RHI.GraphicsPipeline? GraphicsPipeline => _assetData.GraphicsPipeline;
-        internal int HashCode => _assetData.HashCode;
+        public RHIGraphicsPipeline? GraphicsPipeline => AssetData.GraphicsPipeline;
 
-        internal FrozenDictionary<string, ShaderVariable> Variables => _assetData.Variables;
-
-        public ResourceStatus Status => _assetData.Status;
-
-        public string Name => _assetData.Name;
-        public AssetId Id => _assetData.Id;
+        public int ResourceCount => AssetData.ResourceCount;
     }
 
-    internal sealed class ShaderAssetData : IInternalAssetData
+    public sealed class ShaderAssetData : BaseInternalAssetData<ShaderAsset>
     {
-        private readonly WeakReference _asset;
+        private ShaderProperty[] _properties;
+        private FrozenDictionary<int, int> _remappingTable;
 
-        private ResourceStatus _status;
+        private int _propertyBlockSize;
+        private int _headerBlockSize;
 
-        private readonly AssetId _id;
-        private string _name;
+        private ShHeaderFlags _headerFlags;
 
-        private RHI.GraphicsPipeline? _graphicsPipeline;
-        private int _hashCode;
+        private RHIGraphicsPipeline? _graphicsPipeline;
 
-        private FrozenDictionary<string, ShaderVariable> _variables;
-        private FrozenDictionary<string, int> _bindGroupIndices;
+        private int _resourceCount;
 
-        internal ShaderAssetData(AssetId id)
+        internal ShaderAssetData(AssetId id) : base(id)
         {
-            _asset = new WeakReference(null);
+            _properties = Array.Empty<ShaderProperty>();
+            _remappingTable = FrozenDictionary<int, int>.Empty;
 
-            _status = ResourceStatus.Pending;
-
-            _id = id;
-            _name = string.Empty;
+            _propertyBlockSize = 0;
+            _headerBlockSize = 0;
 
             _graphicsPipeline = null;
-            _hashCode = 0;
-
-            _variables = FrozenDictionary<string, ShaderVariable>.Empty;
-            _bindGroupIndices = FrozenDictionary<string, int>.Empty;
         }
 
-        public void Dispose()
+        public void UpdateAssetData(ShaderAsset asset, ShaderProperty[] properties, FrozenDictionary<int, int> remappingTable, int propertyBlockSize, int headerBlockSize, ShHeaderFlags headerFlags, RHIGraphicsPipeline graphicsPipeline)
         {
-            _status = ResourceStatus.Disposed;
+            UpdateAssetData(asset);
 
-            _graphicsPipeline = null;
-            _hashCode = 0;
+            _properties = properties;
+            _remappingTable = remappingTable;
 
-            _variables = FrozenDictionary<string, ShaderVariable>.Empty;
-            _bindGroupIndices = FrozenDictionary<string, int>.Empty;
+            _propertyBlockSize = propertyBlockSize;
+            _headerBlockSize = headerBlockSize;
 
-            _asset.Target = null;
-        }
-
-        public void SetAssetInternalStatus(ResourceStatus status)
-        {
-            _status = status;
-        }
-
-        public void SetAssetInternalName(string name)
-        {
-            _name = name;
-        }
-
-        internal void UpdateAssetData(ShaderAsset asset, RHI.GraphicsPipeline graphicsPipeline, int hashCode, Dictionary<string, ShaderVariable> variables)
-        {
-            _asset.Target = asset;
-
-            _status = ResourceStatus.Success;
+            _headerFlags = headerFlags;
 
             _graphicsPipeline = graphicsPipeline;
-            _hashCode = hashCode;
 
-            _variables = variables.ToFrozenDictionary();
-
-            Dictionary<string, int> indices = new Dictionary<string, int>();
-            SortedSet<string> sortedGroups = new SortedSet<string>(new CompareStringsInvariant());
-
-            foreach (var value in _variables.Values)
-                sortedGroups.Add(value.BindGroup);
-
-            int index = 0;
-            foreach (string group in sortedGroups)
+            _resourceCount = 0;
+            foreach (ref readonly ShaderProperty property in properties.AsSpan())
             {
-                int count = 0;
-                foreach (var value in _variables.Values)
-                {
-                    if (value.BindGroup == group)
-                        count++;
-                }
-
-                indices.Add(group, index);
-                index += count;
-            }
-
-            _bindGroupIndices = indices.ToFrozenDictionary();
-        }
-
-        internal void UpdateAssetFailed(ShaderAsset asset)
-        {
-            _asset.Target = asset;
-
-            _status = ResourceStatus.Error;
-        }
-
-        internal ShaderBindGroupVariable[] GetVariablesForBindGroup(string bindGroup)
-        {
-            if (!_bindGroupIndices.ContainsKey(bindGroup))
-                return Array.Empty<ShaderBindGroupVariable>();
-
-            int countInGroup = 0;
-            foreach (string key in _variables.Keys)
-                if (_variables.GetValueRefOrNullRef(key).BindGroup == bindGroup)
-                    countInGroup++;
-
-            ShaderBindGroupVariable[] variables = new ShaderBindGroupVariable[countInGroup];
-
-            int index = 0;
-            foreach (string key in _variables.Keys)
-            {
-                ref readonly ShaderVariable shaderVar = ref _variables.GetValueRefOrNullRef(key);
-                if (shaderVar.BindGroup == bindGroup)
-                {
-                    variables[index++] = new ShaderBindGroupVariable
-                    {
-                        Type = shaderVar.Type,
-                        Name = shaderVar.Name,
-                        BindIndex = shaderVar.Index
-                    };
-                }
-            }
-
-            Debug.Assert(index == variables.Length);
-            return variables;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal int GetIndexForBindGroup(string bindGroup)
-        {
-            if (!_bindGroupIndices.TryGetValue(bindGroup, out int index))
-                index = -1;
-            return index;
-        }
-
-        internal RHI.GraphicsPipeline? GraphicsPipeline => _graphicsPipeline;
-        internal int HashCode => _hashCode;
-
-        internal ResourceStatus Status => _status;
-
-        internal AssetId Id => _id;
-        internal string Name => _name;
-
-        public int LoadIndex => 0;
-
-        internal FrozenDictionary<string, ShaderVariable> Variables => _variables;
-
-        public Type AssetType => typeof(ShaderAsset);
-        public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
-
-        AssetId IInternalAssetData.Id => Id;
-        ResourceStatus IInternalAssetData.Status => Status;
-        string IInternalAssetData.Name => Name;
-
-        private struct CompareStringsInvariant : IComparer<string>
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public int Compare(string? x, string? y)
-            {
-                return string.Compare(x, y, StringComparison.InvariantCulture);
+                if (property.Type == ShPropertyType.Buffer || property.Type == ShPropertyType.Texture || property.Type == ShPropertyType.Sampler)
+                    _resourceCount++;
             }
         }
+
+        internal ReadOnlySpan<ShaderProperty> Properties => _properties;
+        internal FrozenDictionary<int, int> RemappingTable => _remappingTable;
+
+        internal int PropertyBlockSize => _propertyBlockSize;
+        internal int HeaderBlockSize => _headerBlockSize;
+
+        internal ShHeaderFlags HeaderFlags => _headerFlags;
+
+        internal RHIGraphicsPipeline? GraphicsPipeline => _graphicsPipeline;
+
+        internal int ResourceCount => _resourceCount;
     }
 
-    public record struct ShaderBindGroupVariable
-    {
-        public ShaderVariableType Type;
-        public string Name;
-        public byte BindIndex;
-        public byte LocalIndex;
+    public readonly record struct ShaderProperty(string Name, ushort IndexOrByteOffset, ushort ByteWidth, ushort ChildIndex, ShPropertyType Type, ShPropertyDefault Default, ShPropertyStages Stages, ShPropertyFlags Flags, ShPropertyDisplay Display);
+    public readonly record struct ShaderResource(string Name, ShResourceType Type, ShPropertyStages Stages, ShResourceFlags Flags);
 
-        public ShaderBindGroupVariable(ShaderVariableType type, string name)
-        {
-            Type = type;
-            Name = name;
-            BindIndex = 0;
-            LocalIndex = 0;
-        }
+    public enum ShPropertyType : byte
+    {
+        Buffer = 0,
+        Texture,
+
+        Sampler,
+
+        Single,
+        Double,
+
+        UInt32,
+        Int32,
+
+        Vector2,
+        Vector3,
+        Vector4,
+
+        Matrix4x4,
+
+        Struct
+    }
+
+    public enum ShPropertyStages : byte
+    {
+        None = 0,
+
+        VertexShading,
+        PixelShading,
+        ComputeShading,
+        AllShading
+    }
+
+    public enum ShResourceType : byte
+    {
+        Unknown = 0,
+
+        Texture1D,
+        Texture2D,
+        Texture3D,
+        TextureCube,
+        ConstantBuffer,
+        StructuredBuffer,
+        ByteAddressBuffer,
+        SamplerState
+    }
+
+    public enum ShResourceFlags : byte
+    {
+        None = 0,
+
+        Property = 1 << 0,
+        ReadWrite = 1 << 1
+    }
+
+    public enum ShPropertyDisplay : byte
+    {
+        Default = 0,
+        Color
+    }
+
+    public enum ShPropertyFlags : byte
+    {
+        None = 0,
+
+        Constants = 1 << 0,
+        Global = 1 << 1,
+        Sampled = 1 << 2,
+        HasParent = 1 << 3,
+        Property = 1 << 4,
+        ReadWrite = 1 << 5
+    }
+
+    public enum ShPropertyDefault : byte
+    {
+        NumOne = 0,
+        NumZero,
+        NumIdentity,
+
+        TexWhite,
+        TexBlack,
+        TexMask,
+        TexNormal
+    }
+
+    public enum ShHeaderFlags : byte
+    {
+        None = 0,
+
+        ExternalProperties = 1 << 0,
+        HeaderIsBuffer = 1 << 1,
     }
 }

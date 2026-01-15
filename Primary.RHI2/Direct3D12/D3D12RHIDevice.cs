@@ -1,31 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Primary.RHI2.Validation;
+using Serilog;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
+using System.Runtime.Versioning;
 using TerraFX.Interop.DirectX;
 using TerraFX.Interop.Windows;
-using System.Runtime.Versioning;
-using Serilog;
-using Primary.Common;
-
-using static TerraFX.Interop.DirectX.DXGI;
-using static TerraFX.Interop.DirectX.D3D12;
-using static TerraFX.Interop.DirectX.DXGI_GPU_PREFERENCE;
+using static Interop.D3D12MemAlloc.ALLOCATOR_FLAGS;
 using static TerraFX.Interop.DirectX.D3D_FEATURE_LEVEL;
-using static TerraFX.Interop.DirectX.D3D12_FEATURE;
 using static TerraFX.Interop.DirectX.D3D_SHADER_MODEL;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_BINDING_TIER;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_HEAP_TIER;
-using static TerraFX.Interop.DirectX.D3D12_MESSAGE_SEVERITY;
 using static TerraFX.Interop.DirectX.D3D12_COMMAND_LIST_TYPE;
 using static TerraFX.Interop.DirectX.D3D12_COMMAND_QUEUE_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_COMMAND_QUEUE_PRIORITY;
-using static Interop.D3D12MemAlloc.ALLOCATOR_FLAGS;
-
+using static TerraFX.Interop.DirectX.D3D12_FEATURE;
+using static TerraFX.Interop.DirectX.D3D12_MESSAGE_SEVERITY;
+using static TerraFX.Interop.DirectX.D3D12_RESOURCE_BINDING_TIER;
+using static TerraFX.Interop.DirectX.D3D12_RESOURCE_HEAP_TIER;
+using static TerraFX.Interop.DirectX.DXGI;
+using static TerraFX.Interop.DirectX.DXGI_GPU_PREFERENCE;
 using D3D12MA = Interop.D3D12MemAlloc;
-using Primary.RHI2.Validation;
-using System.Collections.Frozen;
 
 namespace Primary.RHI2.Direct3D12
 {
@@ -51,13 +43,17 @@ namespace Primary.RHI2.Direct3D12
 
         private D3D12RHIDeviceNative* _nativeRep;
 
-        private Queue<Action> _pendingFreeCallbacks;
+        private Queue<(Action, ulong)> _pendingFreeCallbacks;
 
         private int _debugMessageWidth;
         private void* _debugMessageData;
 
+        private ulong _frameIndex;
+
         internal D3D12RHIDevice(RHIDeviceDescription description, ILogger? logger)
         {
+            s_instance.Target = this;
+
             _logger = logger;
 
             //DXGI
@@ -108,11 +104,11 @@ namespace Primary.RHI2.Direct3D12
             {
                 ID3D12Device14* device = _device.Get();
 
-                AssertFeatureSupport<D3D12_FEATURE_DATA_SHADER_MODEL>(D3D12_FEATURE_SHADER_MODEL, (x) =>
-                {
-                    if (x.HighestShaderModel < D3D_SHADER_MODEL_6_6)
-                        throw new RHIException("Shader model 6.6 support not found!");
-                });
+                //AssertFeatureSupport<D3D12_FEATURE_DATA_SHADER_MODEL>(D3D12_FEATURE_SHADER_MODEL, (x) =>
+                //{
+                //    if (x.HighestShaderModel < D3D_SHADER_MODEL_6_6)
+                //        throw new RHIException("Shader model 6.6 support not found!");
+                //});
 
                 AssertFeatureSupport<D3D12_FEATURE_DATA_D3D12_OPTIONS>(D3D12_FEATURE_D3D12_OPTIONS, (x) =>
                 {
@@ -155,6 +151,7 @@ namespace Primary.RHI2.Direct3D12
                             }
                         };
 
+                        _infoQueue.Get()->ClearStorageFilter();
                         _infoQueue.Get()->PushStorageFilter(&filter);
                     }
                 }
@@ -229,16 +226,19 @@ namespace Primary.RHI2.Direct3D12
                 _nativeRep->D3D12MAllocator = _d3d12Allocator;
             }
 
-            _pendingFreeCallbacks = new Queue<Action>();
+            _pendingFreeCallbacks = new Queue<(Action, ulong)>();
 
             _debugMessageWidth = 0;
             _debugMessageData = null;
+
+            _frameIndex = 0;
         }
 
         protected override void Dispose(bool disposing)
         {
             if (!_disposedValue)
             {
+                _frameIndex = ulong.MaxValue;
                 HandlePendingUpdates();
 
                 if (_nativeRep != null)
@@ -268,15 +268,22 @@ namespace Primary.RHI2.Direct3D12
 
         public override void HandlePendingUpdates()
         {
-            while (_pendingFreeCallbacks.TryDequeue(out Action? action))
+            while (_pendingFreeCallbacks.TryPeek(out (Action, ulong) action))
             {
-                action();
+                if (action.Item2 >= _frameIndex)
+                {
+                    action.Item1();
+                    _pendingFreeCallbacks.Dequeue();
+                }
+                else
+                    break;
             }
 
             FlushPendingMessages();
+            ++_frameIndex;
         }
 
-        public override RHIBuffer? CreateBuffer(in RHIBufferDescription description, string? debugName = null)
+        public override RHIBuffer? CreateBuffer(in RHIBufferDescription description, nint rawData, [CallerMemberName] string? debugName = "")
         {
             if (!BufferValidator.Validate(in description, _logger, debugName))
                 return null;
@@ -288,7 +295,7 @@ namespace Primary.RHI2.Direct3D12
             return buffer;
         }
 
-        public override RHITexture? CreateTexture(in RHITextureDescription description, string? debugName = null)
+        public override RHITexture? CreateTexture(in RHITextureDescription description, Span<nint> planeSlices, [CallerMemberName] string? debugName = "")
         {
             if (!TextureValidator.Validate(in description, _logger, debugName))
                 return null;
@@ -298,6 +305,54 @@ namespace Primary.RHI2.Direct3D12
                 texture.DebugName = debugName;
 
             return texture;
+        }
+
+        public override RHISampler? CreateSampler(in RHISamplerDescription description, [CallerMemberName] string? debugName = "")
+        {
+            if (!SamplerValidator.Validate(in description, _logger, debugName))
+                return null;
+
+            D3D12RHISampler sampler = new D3D12RHISampler(this, description);
+            if (debugName != null)
+                sampler.DebugName = debugName;
+
+            return sampler;
+        }
+
+        public override RHISwapChain? CreateSwapChain(in RHISwapChainDescription description, [CallerMemberName] string? debugName = "")
+        {
+            if (!SwapChainValidator.Validate(in description, _logger, debugName))
+                return null;
+
+            D3D12RHISwapChain swapChain = new D3D12RHISwapChain(this, description);
+            if (debugName != null)
+                swapChain.DebugName = debugName;
+
+            return swapChain;
+        }
+
+        public override RHIGraphicsPipeline? CreateGraphicsPipeline(in RHIGraphicsPipelineDescription description, in RHIGraphicsPipelineBytecode bytecode, [CallerMemberName] string? debugName = "")
+        {
+            if (!GraphicsPipelineValidator.Validate(in description, in bytecode, _logger, debugName))
+                return null;
+
+            D3D12RHIGraphicsPipeline graphicsPipeline = new D3D12RHIGraphicsPipeline(this, description, bytecode);
+            if (debugName != null)
+                graphicsPipeline.DebugName = debugName;
+
+            return graphicsPipeline;
+        }
+
+        public override RHIComputePipeline? CreateComputePipeline(in RHIComputePipelineDescription description, in RHIComputePipelineBytecode bytecode, [CallerMemberName] string? debugName = "")
+        {
+            if (!ComputePipelineValidator.Validate(in description, in bytecode, _logger, debugName))
+                return null;
+
+            D3D12RHIComputePipeline computePipeline = new D3D12RHIComputePipeline(this, description, bytecode);
+            if (debugName != null)
+                computePipeline.DebugName = debugName;
+
+            return computePipeline;
         }
 
         public override void FlushPendingMessages()
@@ -348,10 +403,12 @@ namespace Primary.RHI2.Direct3D12
 
         internal void AddResourceFreeNextFrame(Action callback)
         {
-            _pendingFreeCallbacks.Enqueue(callback);
+            _pendingFreeCallbacks.Enqueue((callback, _frameIndex + 1));
         }
 
         public override unsafe RHIDeviceNative* GetAsNative() => (RHIDeviceNative*)_nativeRep;
+
+        public ILogger? Logger => _logger;
 
         public ComPtr<IDXGIFactory7> Factory => _factory;
 

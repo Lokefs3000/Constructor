@@ -6,7 +6,7 @@ using Editor.Gui;
 using Hexa.NET.ImGui;
 using Primary.Assets.Types;
 using Primary.Common;
-using Primary.RenderLayer;
+using Primary.RHI2;
 using Primary.Scenes;
 using SDL;
 using System.Collections.Frozen;
@@ -73,13 +73,13 @@ namespace Editor.DearImGui
                 {
                     float height = ImGui.GetFrameHeight();
 
-                    GfxTexture atlas = _iconSet.AtlasTexture;
+                    RHITexture? atlas = _iconSet.AtlasTexture;
                     _iconSet.TryGetAtlasIcon("Editor/Textures/Icons/HierchyArrow.png", out DynAtlasIcon icon);
 
                     ImDrawListPtr drawList = ImGui.GetWindowDrawList();
                     ImGuiStylePtr style = ImGui.GetStyle();
 
-                    ImTextureRef texture = ImGuiUtility.GetTextureRef(atlas.Handle);
+                    //ImTextureRef texture = ImGuiUtility.GetTextureRef(atlas.Handle);
 
                     if (DrawIconLogic(1,
                         new Vector2(icon.UVs.Maximum.X, icon.UVs.Minimum.Y),
@@ -163,16 +163,16 @@ namespace Editor.DearImGui
                         if (((bgColor >> 24) & 0xff) > 0)
                             drawList.AddRectFilled(bb.Min, bb.Max, bgColor);
 
-                        drawList.AddImageQuad(texture,
-                            screenPos,
-                            new Vector2(screenExtent.X, screenPos.Y),
-                            screenExtent,
-                            new Vector2(screenPos.X, screenExtent.Y),
-                            uv0,
-                            uv1,
-                            uv2,
-                            uv3,
-                            disabled ? 0x80ffffff : 0xffffffff);
+                        //drawList.AddImageQuad(texture,
+                        //    screenPos,
+                        //    new Vector2(screenExtent.X, screenPos.Y),
+                        //    screenExtent,
+                        //    new Vector2(screenPos.X, screenExtent.Y),
+                        //    uv0,
+                        //    uv1,
+                        //    uv2,
+                        //    uv3,
+                        //    disabled ? 0x80ffffff : 0xffffffff);
 
                         return pressed;
                     }
@@ -206,15 +206,15 @@ namespace Editor.DearImGui
                     {
                         unsafe
                         {
-                            ImTextureRef texId = new ImTextureRef(null, new ImTextureID(_iconBuilder.Texture!.Handle));
-
-                            ImDrawListPtr drawList = ImGui.GetWindowDrawList();
-                            for (int i = 0; i < _deferredIconStack.Count; i++)
-                            {
-                                DeferredIcon icon = _deferredIconStack[i];
-                                if (_iconBuilder.TryGetIcon(icon.IconId, out Boundaries uvBounds))
-                                    drawList.AddImage(texId, icon.Min, icon.Max, uvBounds.Minimum, uvBounds.Maximum, 0xffffffff);
-                            }
+                            //ImTextureRef texId = new ImTextureRef(null, new ImTextureID(_iconBuilder.Texture!.Handle));
+                            //
+                            //ImDrawListPtr drawList = ImGui.GetWindowDrawList();
+                            //for (int i = 0; i < _deferredIconStack.Count; i++)
+                            //{
+                            //    DeferredIcon icon = _deferredIconStack[i];
+                            //    if (_iconBuilder.TryGetIcon(icon.IconId, out Boundaries uvBounds))
+                            //        drawList.AddImage(texId, icon.Min, icon.Max, uvBounds.Minimum, uvBounds.Maximum, 0xffffffff);
+                            //}
                         }
                     }
 
@@ -387,9 +387,9 @@ namespace Editor.DearImGui
                                         ImGui.MenuItem("Importing.."u8, false, false);
                                     else
                                         if (ImGui.MenuItem("Reimport"))
-                                        {
-                                            Editor.GlobalSingleton.AssetPipeline.ImportChangesOrGetRunning(assetId);
-                                        }
+                                    {
+                                        Editor.GlobalSingleton.AssetPipeline.ImportChangesOrGetRunning(assetId);
+                                    }
                                 }
                                 else
                                 {
@@ -475,8 +475,8 @@ namespace Editor.DearImGui
 
                             unsafe
                             {
-                                if (_iconBuilder.TryGetIcon(iconId, out Boundaries iconUVs))
-                                    tooltipDrawList.AddImage(new ImTextureRef(null, new ImTextureID(_iconBuilder.Texture!.Handle)), tooltipScreen + new Vector2(2.0f), tooltipScreen + new Vector2(totalImageSize - 4.0f), iconUVs.Minimum, iconUVs.Maximum);
+                                //if (_iconBuilder.TryGetIcon(iconId, out Boundaries iconUVs))
+                                //    tooltipDrawList.AddImage(new ImTextureRef(null, new ImTextureID(_iconBuilder.Texture!.Handle)), tooltipScreen + new Vector2(2.0f), tooltipScreen + new Vector2(totalImageSize - 4.0f), iconUVs.Minimum, iconUVs.Maximum);
 
                             }
 
