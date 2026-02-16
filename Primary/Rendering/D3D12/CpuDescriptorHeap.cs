@@ -164,7 +164,7 @@ namespace Primary.Rendering.D3D12
                         {
                             D3D12RHITextureNative* native = (D3D12RHITextureNative*)resource.Native;
 
-                            Debug.Assert(FlagUtility.HasFlag(native->Base.Description.Usage, RHIResourceUsage.RenderTarget));
+                            Debug.Assert(Flags.HasFlag(native->Base.Description.Usage, RHIResourceUsage.RenderTarget));
 
                             D3D12_RENDER_TARGET_VIEW_DESC desc = new D3D12_RENDER_TARGET_VIEW_DESC
                             {
@@ -184,7 +184,7 @@ namespace Primary.Rendering.D3D12
                         {
                             D3D12RHITextureNative* native = (D3D12RHITextureNative*)resource.Native;
 
-                            Debug.Assert(FlagUtility.HasFlag(native->Base.Description.Usage, RHIResourceUsage.RenderTarget));
+                            Debug.Assert(Flags.HasFlag(native->Base.Description.Usage, RHIResourceUsage.RenderTarget));
 
                             D3D12_DEPTH_STENCIL_VIEW_DESC desc = new D3D12_DEPTH_STENCIL_VIEW_DESC
                             {
@@ -211,7 +211,7 @@ namespace Primary.Rendering.D3D12
                             FrameGraphTexture texture = resources.FindFGTexture(resource);
 
                             Debug.Assert(texture.Index >= 0);
-                            Debug.Assert(FlagUtility.HasFlag(texture.Description.Usage, FGTextureUsage.RenderTarget));
+                            Debug.Assert(Flags.HasFlag(texture.Description.Usage, FGTextureUsage.RenderTarget));
 
                             D3D12_RENDER_TARGET_VIEW_DESC desc = new D3D12_RENDER_TARGET_VIEW_DESC
                             {
@@ -232,7 +232,7 @@ namespace Primary.Rendering.D3D12
                             FrameGraphTexture texture = resources.FindFGTexture(resource);
 
                             Debug.Assert(texture.Index >= 0);
-                            Debug.Assert(FlagUtility.HasFlag(texture.Description.Usage, FGTextureUsage.DepthStencil));
+                            Debug.Assert(Flags.HasFlag(texture.Description.Usage, FGTextureUsage.DepthStencil));
 
                             D3D12_DEPTH_STENCIL_VIEW_DESC desc = new D3D12_DEPTH_STENCIL_VIEW_DESC
                             {

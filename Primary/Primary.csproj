@@ -34,7 +34,6 @@
     <Folder Include="Networking\" />
     <Folder Include="Expression\" />
     <Folder Include="Physics\" />
-    <Folder Include="Pooling\Concurrent\" />
     <Folder Include="Scripting\" />
   </ItemGroup>
   <ItemGroup>

@@ -152,6 +152,7 @@
         {
             RHIFormat.RGBA8_UNorm => true,
             RHIFormat.RGBA8_UNorm_sRGB => true,
+            RHIFormat.RGB10A2_UNorm => true,
             _ => false
         };
 

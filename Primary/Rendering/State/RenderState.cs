@@ -1,12 +1,14 @@
-﻿using Primary.Assets;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets;
 using Primary.Common;
-using Primary.Rendering.Assets;
-using Primary.Rendering.Memory;
+using Primary.Common.Memory;
+using Primary.Rendering.Assets; 
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.RHI2;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -24,6 +26,7 @@ namespace Primary.Rendering.State
         private int _constantsDataSize;
 
         private PropertyChangeFlags _changeFlags;
+        private bool _hasConstantsSeparated;
 
         private bool _disposedValue;
 
@@ -37,6 +40,7 @@ namespace Primary.Rendering.State
             _constantsDataSize = 0;
 
             _changeFlags = PropertyChangeFlags.None;
+            _hasConstantsSeparated = false;
         }
 
         protected abstract void DisposeInternal(bool disposing);
@@ -71,20 +75,49 @@ namespace Primary.Rendering.State
             _dataBlock.Clear();
         }
 
-        internal virtual bool CommitState(SequentialLinearAllocator allocator, CommandRecorder recorder)
+        internal virtual void SoftResetForNextPass()
+        {
+
+        }
+
+        internal void SetPipelineLimits(RHIGraphicsPipeline pipeline)
+        {
+            ref readonly RHIGraphicsPipelineDescription desc = ref pipeline.Description;
+
+            _constantsDataSize = desc.Expected32BitConstants * 4;
+            _hasConstantsSeparated = desc.UseBufferForHeader;
+
+            _changeFlags |= PropertyChangeFlags.All;
+        }
+
+        internal void SetPipelineLimits(RHIComputePipeline pipeline)
+        {
+            ref readonly RHIComputePipelineDescription desc = ref pipeline.Description;
+
+            _constantsDataSize = desc.Expected32BitConstants * 4;
+            _hasConstantsSeparated = desc.UseBufferForHeader;
+
+            _changeFlags |= PropertyChangeFlags.All;
+        }
+
+        internal virtual bool CommitState(LinearBlockAllocator allocator, CommandRecorder recorder)
         {
             if (_dataBlock.IsDirty || (_dataBlock.Value != null && (_dataBlock.Value.IsOutOfDate || _dataBlock.Value.UpdateIndex != _lastDataBlockUpdateIndex)))
             {
                 PropertyBlock block = _dataBlock.Value!;
 
                 if (block.IsOutOfDate)
-                {
                     block.Reload();
+                if (_dataBlock.IsDirty)
+                    _lastDataBlockUpdateIndex = long.MinValue;
 
+                if (block.UpdateIndex != _lastDataBlockUpdateIndex)
+                {
                     recorder.AddCommand(RecCommandType.SetResourcesInfo, new CmdSetResourcesInfo
                     {
                         HeaderFlags = block.Shader?.HeaderFlags ?? ShHeaderFlags.None,
-                        DataSizeRequired = block.ResourceCount * sizeof(uint) + block.BlockSize + _constantsDataSize
+                        ConstantsSize = _constantsDataSize,
+                        DataSizeRequired = block.ResourceCount * sizeof(uint) + block.BlockSize + (_hasConstantsSeparated ? 0 : _constantsDataSize)
                     });
                 }
 
@@ -98,7 +131,7 @@ namespace Primary.Rendering.State
 
                     recorder.AddCommand(RecCommandType.SetRawData, new CmdSetRawData
                     {
-                        DataOffset = _constantsDataSize,
+                        DataOffset = _hasConstantsSeparated ? 0 : _constantsDataSize,
                         DataSize = block.BlockSize,
                         DataPointer = blockPointer
                     });
@@ -109,7 +142,7 @@ namespace Primary.Rendering.State
                 {
                     //TODO: Add validation to ensure a non read write resource gets bound to a read write property
 
-                    int dataBaseOffset = block.BlockSize + _constantsDataSize;
+                    int dataBaseOffset = block.BlockSize + (_hasConstantsSeparated ? 0 : _constantsDataSize);
 
                     ShaderGlobalsManager globalsManager = ShaderGlobalsManager.Instance;
                     foreach (ref readonly ShaderProperty property in resourceSource.Properties)
@@ -117,7 +150,7 @@ namespace Primary.Rendering.State
                         if (property.Type == ShPropertyType.Texture || property.Type == ShPropertyType.Buffer || property.Type == ShPropertyType.Sampler)
                         {
                             PropertyData data = default;
-                            if (!FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Global))
+                            if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
                             {
                                 data = block.GetPropertyValue(property.IndexOrByteOffset);
                             }
@@ -200,6 +233,7 @@ namespace Primary.Rendering.State
                                 }
                             }
 
+                            recorder.AddResourceToSet(data.Resource);
                             recorder.AddCommand(RecCommandType.SetResource, new CmdSetResource
                             {
                                 Stages = property.Stages,
@@ -216,8 +250,17 @@ namespace Primary.Rendering.State
 
                 _dataBlock.IsDirty = false;
             }
+            else
+            {
+                recorder.AddCommand(RecCommandType.SetResourcesInfo, new CmdSetResourcesInfo
+                {
+                    HeaderFlags = ShHeaderFlags.None,
+                    ConstantsSize = 0,
+                    DataSizeRequired = 0
+                });
+            }
 
-            if (FlagUtility.HasFlag(_changeFlags, PropertyChangeFlags.Constants) && _constantsDataSize > 0)
+            if (Flags.HasFlag(_changeFlags, PropertyChangeFlags.Constants) && _constantsDataSetSize > 0)
             {
                 nint dataPtr = allocator.Allocate(_constantsDataSize);
                 NativeMemory.Copy(_constantsData.ToPointer(), dataPtr.ToPointer(), (nuint)_constantsDataSize);
@@ -229,11 +272,31 @@ namespace Primary.Rendering.State
                 });
             }
 
+            if (_changeFlags > 0)
+            {
+                recorder.AddBlankCommand(RecCommandType.CommitResources);
+            }
+
             _changeFlags = PropertyChangeFlags.None;
             return true;
         }
 
-        internal void SetPropertyBlock(PropertyBlock block) => _dataBlock.Value = block;
+        internal void SetPropertyBlock(PropertyBlock block)
+        {
+            _dataBlock.Value = block;
+            _changeFlags |= PropertyChangeFlags.Block;
+        }
+
+        internal void SetConstants(ReadOnlySpan<uint> constants)
+        {
+            if (constants.Length > 32)
+                throw new ArgumentOutOfRangeException(nameof(constants));
+
+            _constantsDataSetSize = constants.Length * sizeof(uint);
+            NativeMemory.Copy(Unsafe.AsPointer(ref constants.DangerousGetReference()), _constantsData.ToPointer(), (uint)_constantsDataSetSize);
+
+            _changeFlags |= PropertyChangeFlags.Constants;
+        }
 
         private readonly record struct PropertyResourceData(FrameGraphResource Resource, ShPropertyStages Stages, ShPropertyFlags Flags);
 
@@ -242,7 +305,9 @@ namespace Primary.Rendering.State
             None = 0,
 
             Block = 1 << 0,
-            Constants = 1 << 2
+            Constants = 1 << 2,
+
+            All = Block | Constants,
         }
     }
 

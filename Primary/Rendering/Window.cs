@@ -42,9 +42,9 @@ namespace Primary.Rendering
             SDL_SetNumberProperty(_props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, (long)clientSize.X);
             SDL_SetNumberProperty(_props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, (long)clientSize.Y);
 
-            if (FlagUtility.HasFlag(flags, CreateWindowFlags.Borderless))
+            if (Flags.HasFlag(flags, CreateWindowFlags.Borderless))
                 SDL_SetBooleanProperty(_props, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
-            if (FlagUtility.HasFlag(flags, CreateWindowFlags.Resizable))
+            if (Flags.HasFlag(flags, CreateWindowFlags.Resizable))
                 SDL_SetBooleanProperty(_props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
 
             _window = (nint)SDL_CreateWindowWithProperties(_props);
@@ -57,7 +57,7 @@ namespace Primary.Rendering
             SDL_GetWindowPosition((SDL_Window*)_window, &x, &y);
             _position = new Vector2(x, y);
 
-            _isFocused = FlagUtility.HasFlag(SDL_GetWindowFlags((SDL_Window*)_window), SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS);
+            _isFocused = Flags.HasFlag(SDL_GetWindowFlags((SDL_Window*)_window), SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS);
 
             Engine.GlobalSingleton.EventManager.AddHandler(this);
         }

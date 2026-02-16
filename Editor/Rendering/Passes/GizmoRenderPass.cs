@@ -1,6 +1,7 @@
 ﻿using Primary.Assets;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
+using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
@@ -73,7 +74,7 @@ namespace Editor.Rendering.Passes
 
             Gizmos gizmos = Gizmos.Instance;
 
-            data.Block!.SetResource(PropertyBlock.GetID("cbGlobals"), data.GlobalBuffer);
+            data.Block!.SetResource("cbGlobals", data.GlobalBuffer);
 
             cmd.Upload(data.VertexBuffer, gizmos.Vertices);
 

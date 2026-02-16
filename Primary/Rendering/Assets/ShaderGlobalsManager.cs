@@ -42,7 +42,7 @@ namespace Primary.Rendering.Assets
 
         internal void SetBuffer(string name, FrameGraphBuffer buffer)
         {
-            if (!FlagUtility.HasFlag(buffer.Description.Usage, FGBufferUsage.Global))
+            if (!Flags.HasFlag(buffer.Description.Usage, FGBufferUsage.Global))
                 return;
 
             _globalProperties[name] = new PropertyData(buffer);
@@ -56,7 +56,7 @@ namespace Primary.Rendering.Assets
 
         internal void SetTexture(string name, FrameGraphTexture texture)
         {
-            if (!FlagUtility.HasFlag(texture.Description.Usage, FGTextureUsage.Global))
+            if (!Flags.HasFlag(texture.Description.Usage, FGTextureUsage.Global))
                 return;
 
             _globalProperties[name] = new PropertyData(texture);

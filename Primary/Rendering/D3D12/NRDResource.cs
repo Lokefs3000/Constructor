@@ -1,4 +1,5 @@
 ﻿using Primary.Common;
+using Primary.RHI2;
 using Primary.RHI2.Direct3D12;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
@@ -51,6 +52,8 @@ namespace Primary.Rendering.D3D12
             _ => throw new NullReferenceException()
         };
 
+        public RHIResourceNative* GetRHINative() => IsExternal ? (RHIResourceNative*)Native : null;
+
         public bool Equals(NRDResource other) => EncId == other.EncId && (IsExternal ? Native == other.Native : Index == other.Index);
         public override bool Equals([NotNullWhen(true)] object? obj) => obj is NRDResource && Equals((NRDResource)obj);
 
@@ -60,8 +63,8 @@ namespace Primary.Rendering.D3D12
 
         public NRDResourceId Id => (NRDResourceId)((int)EncId & 0b01111111);
 
-        public bool IsExternal => FlagUtility.HasFlag(EncId, NRDResourceId.External);
-        public bool IsTransient => !FlagUtility.HasFlag(EncId, NRDResourceId.External);
+        public bool IsExternal => Flags.HasFlag(EncId, NRDResourceId.External);
+        public bool IsTransient => !Flags.HasFlag(EncId, NRDResourceId.External);
 
         public bool IsNull => IsExternal ? Native == null : Index < 0;
 

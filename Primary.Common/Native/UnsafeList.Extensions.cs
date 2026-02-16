@@ -1,5 +1,8 @@
 ﻿using Arch.LowLevel;
+using CommunityToolkit.HighPerformance;
+using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Primary.Common.Native
 {
@@ -16,6 +19,20 @@ namespace Primary.Common.Native
 #endif
             intArray[intCount] = value;
             (*(int*)Unsafe.AsPointer(ref intCount))++;
+        }
+
+        public static void AddRange<T>(this UnsafeList<T> @this, ReadOnlySpan<T> values) where T : unmanaged
+        {
+            if (@this.Count + values.Length > @this.Capacity)
+            {
+                @this.EnsureCapacity((int)BitOperations.RoundUpToPowerOf2((uint)(@this.Count + values.Length)));
+            }
+
+            ref T last = ref Unsafe.Add(ref @this.AsSpan().DangerousGetReference(), @this.Count);
+            values.CopyTo(MemoryMarshal.CreateSpan(ref last, @this.Capacity - @this.Count));
+
+            //HACK: actually terrible
+            *(int*)(((byte*)&@this) + Unsafe.SizeOf<UnsafeArray<T>>()) += values.Length;
         }
     }
 }

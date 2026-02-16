@@ -18,6 +18,12 @@ namespace Editor.UI.Datatypes
             Y = UIValue.Zero;
         }
 
+        public UIValue2(int absoluteX, float relativeX, int absoluteY, float relativeY)
+        {
+            X = new UIValue(absoluteX, relativeX);
+            Y = new UIValue(absoluteY, relativeY);
+        }
+
         public UIValue2(int absoluteX, int absoluteY)
         {
             X = new UIValue(absoluteX);

@@ -2,6 +2,7 @@
 using Primary.Profiling;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Batching;
+using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Debuggable;
 using Primary.Rendering.NRD;
@@ -190,7 +191,7 @@ namespace Primary.Rendering
                     passData.Source = source;
                 }
 
-                desc.UseResource(FGResourceUsage.Read, cameraData.ColorTexture);
+                desc.UseResource(FGResourceUsage.Read | FGResourceUsage.NoShaderAccess, cameraData.ColorTexture);
                 desc.UseResource(FGResourceUsage.Read | FGResourceUsage.NoShaderAccess, source);
 
                 desc.UseRenderTarget(source);
@@ -203,17 +204,17 @@ namespace Primary.Rendering
             {
                 RasterCommandBuffer cmd = context.CommandBuffer;
 
-                //blit compatible format
-                {
-                    passData.Block!.SetResource(PropertyBlock.GetID("txFinalTexture"), passData.Texture);
+                ////blit compatible format
+                //{
+                //    passData.Block!.SetResource("txFinalTexture", passData.Texture);
+                //
+                //    cmd.SetRenderTarget(0, passData.Source);
+                //    cmd.SetPipeline(passData.Shader!.GraphicsPipeline!);
+                //    cmd.SetProperties(passData.Block!);
+                //    cmd.DrawInstanced(new FGDrawInstancedDesc(3));
+                //}
 
-                    cmd.SetRenderTarget(0, passData.Source);
-                    cmd.SetPipeline(passData.Shader!.GraphicsPipeline!);
-                    cmd.SetProperties(passData.Block!);
-                    cmd.DrawInstanced(new FGDrawInstancedDesc(3));
-                }
-
-                cmd.PresentOnWindow(passData.PresentWindow!, passData.Source);
+                cmd.PresentOnWindow(passData.PresentWindow!, passData.Texture);
             }
         }
 

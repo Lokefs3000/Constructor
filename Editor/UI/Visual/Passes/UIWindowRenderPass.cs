@@ -1,7 +1,9 @@
-﻿using Primary.Assets;
+﻿using Editor.UI.Assets;
+using Primary.Assets;
 using Primary.Common;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
+using Primary.Rendering.Commands;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.Rendering.Structures;
@@ -9,6 +11,7 @@ using Primary.RHI2;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -18,16 +21,20 @@ namespace Editor.UI.Visual.Passes
     internal sealed class UIWindowRenderPass : IRenderPass
     {
         private ShaderAsset[] _shaders;
-
-        private PropertyBlock _dataBlock;
+        private PropertyBlock[] _dataBlocks;
 
         public UIWindowRenderPass()
         {
-            _shaders = new ShaderAsset[Enum.GetValues<UIDrawType>().Length];
+            _shaders = new ShaderAsset[Enum.GetValues<ShaderPolyType>().Length];
+            _dataBlocks = new PropertyBlock[Enum.GetValues<DataBlockPolyType>().Length];
 
-            _shaders[(int)UIDrawType.Rectangle] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Prim_Rectangle.hlsl2");
+            _shaders[(int)ShaderPolyType.Rectangle] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/Rectangle.shader");
+            _shaders[(int)ShaderPolyType.Traingle] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/Triangle.shader");
+            _shaders[(int)ShaderPolyType.Circle] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/Circle.shader");
+            _shaders[(int)ShaderPolyType.Text] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/Text.shader");
 
-            _dataBlock = _shaders[0].WaitIfNotLoaded().CreatePropertyBlock()!;
+            _dataBlocks[(int)DataBlockPolyType.Default] = _shaders[(int)ShaderPolyType.Rectangle].WaitIfNotLoaded().CreatePropertyBlock()!;
+            _dataBlocks[(int)DataBlockPolyType.Text] = _shaders[(int)ShaderPolyType.Text].WaitIfNotLoaded().CreatePropertyBlock()!;
         }
 
         public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
@@ -37,12 +44,14 @@ namespace Editor.UI.Visual.Passes
             {
                 BlackboardData blackboard = renderPass.Blackboard.Add<BlackboardData>()!;
 
+                UIGenGradientsRenderPass.BlackboardData? gradientsBlackboard = renderPass.Blackboard.Get<UIGenGradientsRenderPass.BlackboardData>();
+
                 using (RasterPassDescription desc = renderPass.SetupRasterPass("UI-DrawWnds", out PassData data))
                 {
                     data.Renderer = renderer;
 
                     data.Shaders = _shaders;
-                    data.DataBlock = _dataBlock;
+                    data.DataBlocks = _dataBlocks;
 
                     data.Redraws = ArrayPool<WindowRedrawData>.Shared.Rent(renderer.WindowQueueSize);
                     data.RedrawCount = renderer.WindowQueueSize;
@@ -59,6 +68,7 @@ namespace Editor.UI.Visual.Passes
                     while (renderer.TryDequeueQueuedWindow(out UIWindowRedraw redraw))
                     {
                         Vector2 size = redraw.Region.Size;
+                        Debug.Assert(size != Vector2.Zero);
 
                         FrameGraphTexture texture = desc.CreateTexture(new FrameGraphTextureDesc
                         {
@@ -107,16 +117,21 @@ namespace Editor.UI.Visual.Passes
                         Usage = FGBufferUsage.ConstantBuffer | FGBufferUsage.GenericShader | FGBufferUsage.PixelShader
                     }, "UI-GlobalData");
 
-                    data.MetadataBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                    data.MetadataBuffer = metadataSize == 0 ? FrameGraphBuffer.Invalid : desc.CreateBuffer(new FrameGraphBufferDesc
                     {
                         Width = (uint)metadataSize,
                         Usage = FGBufferUsage.Raw | FGBufferUsage.GenericShader | FGBufferUsage.PixelShader
                     }, "UI-Metadata");
 
+                    data.GradientsTexture = gradientsBlackboard?.Gradients ?? FrameGraphTexture.Invalid;
+
                     desc.UseResource(FGResourceUsage.ReadWrite, data.VertexBuffer);
                     desc.UseResource(FGResourceUsage.ReadWrite, data.IndexBuffer);
                     desc.UseResource(FGResourceUsage.ReadWrite, data.GlobalBuffer);
-                    desc.UseResource(FGResourceUsage.ReadWrite, data.MetadataBuffer);
+                    if (!data.MetadataBuffer.IsNull)
+                        desc.UseResource(FGResourceUsage.ReadWrite, data.MetadataBuffer);
+                    if (!data.GradientsTexture.IsNull)
+                        desc.UseResource(FGResourceUsage.Read, data.GradientsTexture);
 
                     desc.SetRenderFunction<PassData>(PassFunction);
                 }
@@ -127,8 +142,14 @@ namespace Editor.UI.Visual.Passes
         {
             RasterCommandBuffer cmd = context.CommandBuffer;
 
-            data.DataBlock!.SetResource(PropertyBlock.GetID("cbGlobals"), data.GlobalBuffer);
-            data.DataBlock!.SetResource(PropertyBlock.GetID("baMetadata"), data.MetadataBuffer);
+            for (int i = 0; i < data.DataBlocks!.Length; ++i)
+            {
+                PropertyBlock block = data.DataBlocks[i];
+
+                block.SetResource("cbGlobals", data.GlobalBuffer);
+                block.SetResource("baMetadata", data.MetadataBuffer);
+                block.SetResource("txGradients", data.GradientsTexture);
+            }
 
             {
                 int localVtxOffset = 0;
@@ -144,7 +165,8 @@ namespace Editor.UI.Visual.Passes
                     cmd.Upload(new FGBufferUploadDesc(data.VertexBuffer, (uint)localVtxOffset), bakedCmd.Vertices);
                     cmd.Upload(new FGBufferUploadDesc(data.IndexBuffer, (uint)localIdxOffset), bakedCmd.Indices);
 
-                    cmd.Upload(new FGBufferUploadDesc(data.MetadataBuffer, (uint)localMetadataOffset), bakedCmd.Metadata);
+                    if (!data.MetadataBuffer.IsNull)
+                        cmd.Upload(new FGBufferUploadDesc(data.MetadataBuffer, (uint)localMetadataOffset), bakedCmd.Metadata);
 
                     localVtxOffset += bakedCmd.Vertices.Length * Unsafe.SizeOf<UIDrawVertex>();
                     localIdxOffset += bakedCmd.Indices.Length * Unsafe.SizeOf<ushort>();
@@ -178,15 +200,51 @@ namespace Editor.UI.Visual.Passes
 
                 cmd.SetRenderTarget(0, redrawData.Texture);
 
-                UIDrawType lastDrawType = unchecked((UIDrawType)(-1));
+                UIDrawSection lastDrawSection = new UIDrawSection(unchecked((UIDrawType)(-1)), 0, 0, 0, null);
                 foreach (UIDrawSection section in bakedCmd.Sections)
                 {
-                    if (lastDrawType != section.Type)
+                    if (!section.Equals(lastDrawSection))
                     {
-                        cmd.SetPipeline(data.Shaders![(int)section.Type].GraphicsPipeline!);
-                        cmd.SetProperties(data.DataBlock);
+                        ShaderPolyType polyType = section.Type switch
+                        {
+                            UIDrawType.Rectangle => ShaderPolyType.Rectangle,
+                            UIDrawType.Triangle => ShaderPolyType.Traingle,
+                            UIDrawType.Circle => ShaderPolyType.Circle,
 
-                        lastDrawType = section.Type;
+                            UIDrawType.ShapedText => ShaderPolyType.Text,
+                            UIDrawType.SimpleText => ShaderPolyType.Text,
+
+                            _ => throw new NotImplementedException(),
+                        };
+
+                        DataBlockPolyType blockType = section.Type switch
+                        {
+                            UIDrawType.Rectangle => DataBlockPolyType.Default,
+                            UIDrawType.Triangle => DataBlockPolyType.Default,
+                            UIDrawType.Circle => DataBlockPolyType.Default,
+
+                            UIDrawType.ShapedText => DataBlockPolyType.Text,
+                            UIDrawType.SimpleText => DataBlockPolyType.Text,
+
+                            _ => throw new NotImplementedException(),
+                        };
+
+                        switch (blockType)
+                        {
+                            case DataBlockPolyType.Text:
+                                {
+                                    PropertyBlock block = data.DataBlocks[(int)DataBlockPolyType.Text];
+                                    UIFontStyle style = Unsafe.As<UIFontStyle>(section.Aux!);
+
+                                    block.SetResource("txFontAtlas", style.AtlasTexture!);
+                                    break;
+                                }
+                        }
+
+                        cmd.SetPipeline(data.Shaders![(int)polyType].GraphicsPipeline!);
+                        cmd.SetProperties(data.DataBlocks![(int)blockType]);
+
+                        lastDrawSection = section;
                     }
 
                     cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc((uint)section.IndexCount, 1, (uint)(section.IndexOffset + globalIdxOffset), section.BaseVertex + globalVtxOffset));
@@ -204,7 +262,7 @@ namespace Editor.UI.Visual.Passes
             public UIRenderer? Renderer;
 
             public ShaderAsset[]? Shaders;
-            public PropertyBlock? DataBlock;
+            public PropertyBlock[]? DataBlocks;
 
             public WindowRedrawData[]? Redraws;
             public int RedrawCount;
@@ -215,6 +273,8 @@ namespace Editor.UI.Visual.Passes
             public FrameGraphBuffer GlobalBuffer;
             public FrameGraphBuffer MetadataBuffer;
 
+            public FrameGraphTexture GradientsTexture;
+
             public void Clear()
             {
                 if (Redraws?.Length > 0)
@@ -223,13 +283,18 @@ namespace Editor.UI.Visual.Passes
                 Renderer = null;
 
                 Shaders = null;
-                DataBlock = null;
+                DataBlocks = null;
 
                 Redraws = null;
                 RedrawCount = 0;
 
                 VertexBuffer = FrameGraphBuffer.Invalid;
                 IndexBuffer = FrameGraphBuffer.Invalid;
+
+                GlobalBuffer = FrameGraphBuffer.Invalid;
+                MetadataBuffer = FrameGraphBuffer.Invalid;
+
+                GradientsTexture = FrameGraphTexture.Invalid;
             }
         }
 
@@ -250,6 +315,20 @@ namespace Editor.UI.Visual.Passes
 
         private record struct WindowRedrawData(UIWindow Window, UIBakedCommandBuffer CommandBuffer, Boundaries Region, FrameGraphTexture Texture);
         private readonly record struct GlobalBufferData(Matrix4x4 Model, uint MetadataOffset);
+
+        private enum ShaderPolyType : byte
+        {
+            Rectangle = 0,
+            Traingle,
+            Circle,
+            Text
+        }
+
+        private enum DataBlockPolyType : byte
+        {
+            Default = 0,
+            Text
+        }
     }
 
     internal readonly record struct UICompositeRegion(UIDockHost Host, FrameGraphTexture Texture, Boundaries Region);

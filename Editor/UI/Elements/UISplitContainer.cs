@@ -1,24 +1,22 @@
 ﻿using Editor.UI.Datatypes;
 using Primary.Common;
-using Primary.Components;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using TerraFX.Interop.WinRT;
 
 namespace Editor.UI.Elements
 {
-    public class UISplitContainer : UIElement
+    public class UISplitContainer : UIFrame
     {
         private List<UISplitPanel> _splitPanels;
+
+        private UIColor _splitColor;
 
         public UISplitContainer()
         {
             _splitPanels = new List<UISplitPanel>();
+
+            _splitColor = Color.Black;
         }
 
         public UISplitPanel AddSplit(UISplitPanel? panelToSplit, UISplitDirection direction)
@@ -49,7 +47,7 @@ namespace Editor.UI.Elements
             IReadOnlyList<UIElement> panels = panel?.OwnedSplits ?? Children;
             int count = panels.Count((x) => Unsafe.As<UISplitPanel>(x).SplitOwner == panel);
 
-            Vector2 size = (panel?.GetParentRenderBoundaries() ?? GetParentRenderBoundaries()).Size;
+            Vector2 size = panel?.GetParentSize() ?? GetParentSize();
             if (size.X == 0.0f || size.Y == 0.0f)
                 return;
 
@@ -173,22 +171,19 @@ namespace Editor.UI.Elements
             }
         }
 
-        public override UIRecalcLayoutStatus RecalculateLayout(UILayoutManager manager, UIRecalcType type)
+        public override void MeasureSize(UILayoutManager manager)
         {
-            base.RecalculateLayout(manager, type);
+            base.MeasureSize(manager);
 
-            if (type == UIRecalcType.Descending && Children.Count > 0)
+            if (Children.Count > 0)
             {
-                Boundaries parentBounds = GetParentRenderBoundaries();
-                Vector2 parentSize = parentBounds.Size;
+                Vector2 parentSize = Transform.RealSize;
 
                 EnsureMinimumSizes(null);
 
                 UISplitPanel first = Unsafe.As<UISplitPanel>(Children.First());
-                IteratePanels(first.Direction, Children, null, parentBounds.Minimum, parentSize);
+                IteratePanels(first.Direction, Children, null, Vector2.Zero, parentSize);
             }
-
-            return UIRecalcLayoutStatus.Finished;
         }
 
         private void IteratePanels(UISplitDirection direction, IReadOnlyList<UIElement> panels, UISplitPanel? splitOwner, Vector2 parentOffset, Vector2 parentSize)
@@ -222,7 +217,7 @@ namespace Editor.UI.Elements
                             int offset = currentPosition;
                             int height = nextPanel == null ? (int)(parentSize.Y - offset) : (int)(panel.Position * parentSize.Y - currentPosition);
 
-                            currentPosition = (int)(panel.Position * parentSize.Y);
+                            currentPosition = (int)(panel.Position * parentSize.Y) + 1;
 
                             transform.Position = new UIValue2((int)parentOffset.X, (int)(offset + parentOffset.Y));
                             transform.Size = new UIValue2((int)parentSize.X, height);
@@ -262,7 +257,7 @@ namespace Editor.UI.Elements
                             int offset = currentPosition;
                             int width = nextPanel == null ? (int)(parentSize.X - offset) : (int)(panel.Position * parentSize.X - currentPosition);
 
-                            currentPosition = (int)(panel.Position * parentSize.X);
+                            currentPosition = (int)(panel.Position * parentSize.X) + 1;
 
                             transform.Position = new UIValue2((int)(offset + parentOffset.X), (int)parentOffset.Y);
                             transform.Size = new UIValue2(width, (int)parentSize.Y);
@@ -280,6 +275,8 @@ namespace Editor.UI.Elements
                     }
             }
         }
+
+        public UIColor SplitColor { get => _splitColor; set { _splitColor = value; InvalidateSelf(UIInvalidationFlags.Visual); } }
 
         public const int MaxPanelGraceArea = 14;
     }

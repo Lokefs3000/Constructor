@@ -422,7 +422,7 @@ namespace Editor.Processors
                 bw.Write(node.Name);
 
                 bw.Write(node.Transform.Features);
-                if (FlagUtility.HasFlag(node.Transform.Features, PMFTransformFeatures.Position))
+                if (Flags.HasFlag(node.Transform.Features, PMFTransformFeatures.Position))
                 {
                     if (useHalfPrecision)
                     {
@@ -434,7 +434,7 @@ namespace Editor.Processors
                         bw.Write(node.Transform.Position);
                 }
 
-                if (FlagUtility.HasFlag(node.Transform.Features, PMFTransformFeatures.Rotation))
+                if (Flags.HasFlag(node.Transform.Features, PMFTransformFeatures.Rotation))
                 {
                     if (useHalfPrecision)
                     {
@@ -447,14 +447,14 @@ namespace Editor.Processors
                         bw.Write(node.Transform.Rotation);
                 }
 
-                if (FlagUtility.HasFlag(node.Transform.Features, PMFTransformFeatures.UniformScale))
+                if (Flags.HasFlag(node.Transform.Features, PMFTransformFeatures.UniformScale))
                 {
                     if (useHalfPrecision)
                         bw.Write((Half)node.Transform.Scale.X);
                     else
                         bw.Write(node.Transform.Scale.X);
                 }
-                else if (FlagUtility.HasFlag(node.Transform.Features, PMFTransformFeatures.Scale))
+                else if (Flags.HasFlag(node.Transform.Features, PMFTransformFeatures.Scale))
                 {
                     if (useHalfPrecision)
                     {

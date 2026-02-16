@@ -16,7 +16,7 @@ namespace Primary.Rendering.Assets
         private IShaderResourceSource? _shader;
         private int _loadIndex;
 
-        private FrozenDictionary<int, PropertyRemapData> _remapDict;
+        private FrozenDictionary<FastStringHash, PropertyRemapData> _remapDict;
         private int _propertyBlockSize;
 
         private nint _propertyData;
@@ -33,7 +33,7 @@ namespace Primary.Rendering.Assets
             _shader = null;
             _loadIndex = -1;
 
-            _remapDict = FrozenDictionary<int, PropertyRemapData>.Empty;
+            _remapDict = FrozenDictionary<FastStringHash, PropertyRemapData>.Empty;
             _propertyBlockSize = 0;
 
             _propertyData = nint.Zero;
@@ -97,7 +97,7 @@ namespace Primary.Rendering.Assets
                 if (_propertyData != nint.Zero)
                     NativeMemory.Free(_propertyData.ToPointer());
 
-                _remapDict = FrozenDictionary<int, PropertyRemapData>.Empty;
+                _remapDict = FrozenDictionary<FastStringHash, PropertyRemapData>.Empty;
                 _propertyBlockSize = 0;
 
                 _propertyData = nint.Zero;
@@ -107,7 +107,7 @@ namespace Primary.Rendering.Assets
             }
             else
             {
-                if (FlagUtility.HasFlag(_shader.HeaderFlags, ShHeaderFlags.ExternalProperties))
+                if (Flags.HasFlag(_shader.HeaderFlags, ShHeaderFlags.ExternalProperties))
                 {
                     _propertyBlockSize = 0;
                 }
@@ -131,17 +131,17 @@ namespace Primary.Rendering.Assets
                 _resourceCount = 0;
 
                 if (_shader.Properties.IsEmpty)
-                    _remapDict = FrozenDictionary<int, PropertyRemapData>.Empty;
+                    _remapDict = FrozenDictionary<FastStringHash, PropertyRemapData>.Empty;
                 else
                 {
-                    Dictionary<int, PropertyRemapData> remapDict = new Dictionary<int, PropertyRemapData>();
+                    Dictionary<FastStringHash, PropertyRemapData> remapDict = new Dictionary<FastStringHash, PropertyRemapData>();
 
                     int index = 0;
                     foreach (ref readonly ShaderProperty property in _shader.Properties)
                     {
-                        if (!FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Global))
+                        if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
                         {
-                            remapDict[property.Name.GetDjb2HashCode()] = new PropertyRemapData
+                            remapDict[property.Name] = new PropertyRemapData
                             {
                                 Type = property.Type,
                                 IndexOrByteOffset = (ushort)(property.Type <= ShPropertyType.Texture ? index++ : property.IndexOrByteOffset),
@@ -160,7 +160,7 @@ namespace Primary.Rendering.Assets
             ++_updateIndex;
         }
 
-        private T GetRawPropertyValue<T>(int id, ShPropertyType type, T @default = default) where T : unmanaged
+        private T GetRawPropertyValue<T>(string id, ShPropertyType type, T @default = default) where T : unmanaged
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -174,7 +174,7 @@ namespace Primary.Rendering.Assets
             return @default;
         }
 
-        private void SetRawPropertyValue<T>(int id, ShPropertyType type, T value) where T : unmanaged
+        private void SetRawPropertyValue<T>(string id, ShPropertyType type, T value) where T : unmanaged
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -189,7 +189,7 @@ namespace Primary.Rendering.Assets
 
         #region Resources
         /// <summary>Not thread-safe</summary>
-        public void SetResource(int id, FrameGraphBuffer buffer)
+        public void SetResource(string id, FrameGraphBuffer buffer)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -203,7 +203,7 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public void SetResource(int id, FrameGraphTexture texture)
+        public void SetResource(string id, FrameGraphTexture texture)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -219,7 +219,7 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public void SetResource(int id, RHIBuffer buffer)
+        public void SetResource(string id, RHIBuffer buffer)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -233,7 +233,7 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public void SetResource(int id, RHITexture texture)
+        public void SetResource(string id, RHITexture texture)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -249,7 +249,7 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public void SetResource(int id, TextureAsset texture)
+        public void SetResource(string id, TextureAsset texture)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -269,7 +269,7 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public FrameGraphBuffer GetFrameGraphBuffer(int id)
+        public FrameGraphBuffer GetFrameGraphBuffer(string id)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -285,7 +285,7 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public RHIBuffer? GetRHIBuffer(int id)
+        public RHIBuffer? GetRHIBuffer(string id)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -301,7 +301,7 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public FrameGraphTexture GetFrameGraphTexture(int id)
+        public FrameGraphTexture GetFrameGraphTexture(string id)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -317,7 +317,7 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public RHITexture? GetRHITexture(int id)
+        public RHITexture? GetRHITexture(string id)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -333,7 +333,7 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public TextureAsset? GetTextureAsset(int id)
+        public TextureAsset? GetTextureAsset(string id)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -351,23 +351,23 @@ namespace Primary.Rendering.Assets
 
         #region Values
         /// <summary>Not thread-safe</summary>
-        public void SetSingle(int id, float value) => SetRawPropertyValue(id, ShPropertyType.Single, value);
+        public void SetSingle(string id, float value) => SetRawPropertyValue(id, ShPropertyType.Single, value);
         /// <summary>Not thread-safe</summary>
-        public void SetDouble(int id, double value) => SetRawPropertyValue(id, ShPropertyType.Double, value);
+        public void SetDouble(string id, double value) => SetRawPropertyValue(id, ShPropertyType.Double, value);
         /// <summary>Not thread-safe</summary>
-        public void SetUInt(int id, uint value) => SetRawPropertyValue(id, ShPropertyType.UInt32, value);
+        public void SetUInt(string id, uint value) => SetRawPropertyValue(id, ShPropertyType.UInt32, value);
         /// <summary>Not thread-safe</summary>
-        public void SetInt(int id, int value) => SetRawPropertyValue(id, ShPropertyType.Int32, value);
+        public void SetInt(string id, int value) => SetRawPropertyValue(id, ShPropertyType.Int32, value);
         /// <summary>Not thread-safe</summary>
-        public void SetVector2(int id, Vector2 value) => SetRawPropertyValue(id, ShPropertyType.Vector2, value);
+        public void SetVector2(string id, Vector2 value) => SetRawPropertyValue(id, ShPropertyType.Vector2, value);
         /// <summary>Not thread-safe</summary>
-        public void SetVector3(int id, Vector3 value) => SetRawPropertyValue(id, ShPropertyType.Vector3, value);
+        public void SetVector3(string id, Vector3 value) => SetRawPropertyValue(id, ShPropertyType.Vector3, value);
         /// <summary>Not thread-safe</summary>
-        public void SetVector4(int id, Vector4 value) => SetRawPropertyValue(id, ShPropertyType.Vector4, value);
+        public void SetVector4(string id, Vector4 value) => SetRawPropertyValue(id, ShPropertyType.Vector4, value);
         /// <summary>Not thread-safe</summary>
-        public void SetMatrix4x4(int id, Matrix4x4 value) => SetRawPropertyValue(id, ShPropertyType.Matrix4x4, value);
+        public void SetMatrix4x4(string id, Matrix4x4 value) => SetRawPropertyValue(id, ShPropertyType.Matrix4x4, value);
         /// <summary>Not thread-safe</summary>
-        public void SetStruct<T>(int id, T value) where T : unmanaged
+        public void SetStruct<T>(string id, T value) where T : unmanaged
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -383,23 +383,23 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public float GetSingle(int id) => GetRawPropertyValue(id, ShPropertyType.Single, 0.0f);
+        public float GetSingle(string id) => GetRawPropertyValue(id, ShPropertyType.Single, 0.0f);
         /// <summary>Not thread-safe</summary>
-        public double GetDouble(int id) => GetRawPropertyValue(id, ShPropertyType.Double, 0.0);
+        public double GetDouble(string id) => GetRawPropertyValue(id, ShPropertyType.Double, 0.0);
         /// <summary>Not thread-safe</summary>
-        public uint GetUInt(int id) => GetRawPropertyValue(id, ShPropertyType.UInt32, 0u);
+        public uint GetUInt(string id) => GetRawPropertyValue(id, ShPropertyType.UInt32, 0u);
         /// <summary>Not thread-safe</summary>
-        public int GetInt(int id) => GetRawPropertyValue(id, ShPropertyType.Int32, 0);
+        public int GetInt(string id) => GetRawPropertyValue(id, ShPropertyType.Int32, 0);
         /// <summary>Not thread-safe</summary>
-        public Vector2 GetVector2(int id) => GetRawPropertyValue(id, ShPropertyType.Vector2, Vector2.Zero);
+        public Vector2 GetVector2(string id) => GetRawPropertyValue(id, ShPropertyType.Vector2, Vector2.Zero);
         /// <summary>Not thread-safe</summary>
-        public Vector3 GetVector3(int id) => GetRawPropertyValue(id, ShPropertyType.Vector3, Vector3.Zero);
+        public Vector3 GetVector3(string id) => GetRawPropertyValue(id, ShPropertyType.Vector3, Vector3.Zero);
         /// <summary>Not thread-safe</summary>
-        public Vector4 GetVector4(int id) => GetRawPropertyValue(id, ShPropertyType.Vector4, Vector4.Zero);
+        public Vector4 GetVector4(string id) => GetRawPropertyValue(id, ShPropertyType.Vector4, Vector4.Zero);
         /// <summary>Not thread-safe</summary>
-        public Matrix4x4 GetMatrix4x4(int id) => GetRawPropertyValue(id, ShPropertyType.Matrix4x4, new Matrix4x4());
+        public Matrix4x4 GetMatrix4x4(string id) => GetRawPropertyValue(id, ShPropertyType.Matrix4x4, new Matrix4x4());
         /// <summary>Not thread-safe</summary>
-        public T GetStruct<T>(int id) where T : unmanaged
+        public T GetStruct<T>(string id) where T : unmanaged
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -433,8 +433,6 @@ namespace Primary.Rendering.Assets
 
         public bool IsOutOfDate => (_shader?.LoadIndex ?? -1) != _loadIndex;
         public int UpdateIndex => _updateIndex;
-
-        public static int GetID(ReadOnlySpan<char> id) => id.GetDjb2HashCode();
     }
 
     public interface IShaderResourceSource

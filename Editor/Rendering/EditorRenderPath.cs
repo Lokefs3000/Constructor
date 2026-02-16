@@ -18,6 +18,7 @@ namespace Editor.Rendering
 
             passes.AddRenderPass<GizmoRenderPass>();
             renderer.InstallRenderPasses(passes);
+            passes.AddRenderPass<DearImGuiRenderPass>();
         }
 
         public void Uinstall(RenderingManager manager)
@@ -29,6 +30,7 @@ namespace Editor.Rendering
 
             passes.RemoveRenderPass<GizmoRenderPass>();
             renderer.UninstallRenderPasses(passes);
+            passes.RemoveRenderPass<DearImGuiRenderPass>();
         }
 
         public void PreRenderPassSetup(RenderingManager manager)

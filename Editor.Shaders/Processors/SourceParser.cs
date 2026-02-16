@@ -872,7 +872,7 @@ namespace Editor.Shaders.Processors
                 ref readonly AttributeVariable varSignature = ref signature.Signature[i];
                 ref readonly AttributeVarData varData = ref varDatas[i];
 
-                if (FlagUtility.HasFlag(varSignature.Flags, AttributeFlags.Required) && varData.SourceIndex == -1)
+                if (Flags.HasFlag(varSignature.Flags, AttributeFlags.Required) && varData.SourceIndex == -1)
                 {
                     ReportErrorMessage("Attribute required variable: {v} ({idx}) has not been provided", varSignature.Name, i);
                     return;
@@ -991,12 +991,14 @@ namespace Editor.Shaders.Processors
                         {
                             functionRange.End = i;
                             resourceRange.Start = i;
+                            resourceRange.End = i;
                             break;
                         }
                     case ReferenceType.Resource:
                         {
                             resourceRange.End = i;
                             propertyRange.Start = i;
+                            propertyRange.End = i;
                             break;
                         }
                     case ReferenceType.Property:
@@ -1241,7 +1243,7 @@ namespace Editor.Shaders.Processors
                 ref AttributeData attribData = ref attributes[i];
                 AttributeSignature signature = attribData.Signature;
 
-                if (!FlagUtility.HasEither(signature.Usage, usage))
+                if (!Flags.HasEither(signature.Usage, usage))
                 {
                     ReportErrorMessage("Attribute: {n} is incompatible with usage: {u}", signature.Name, usage);
                     return false;

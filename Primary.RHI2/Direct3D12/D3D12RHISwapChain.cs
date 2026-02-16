@@ -61,7 +61,7 @@ namespace Primary.RHI2.Direct3D12
                     throw new RHIException($"Failed to query DXGI swap chain 4: {hr}");
                 }
             }
-
+            
             _buffers = (D3D12RHISwapChainBuffer*)NativeMemory.AllocZeroed((nuint)description.BackBufferCount, (nuint)Unsafe.SizeOf<D3D12RHISwapChainBuffer>());
 
             for (int i = 0; i < description.BackBufferCount; i++)
@@ -85,7 +85,7 @@ namespace Primary.RHI2.Direct3D12
                 {
                     Description = description,
                 };
-                _nativeRep->SwapChain = (ComPtr<IDXGISwapChain4>*)Unsafe.AsPointer(ref _swapChain);
+                _nativeRep->SwapChain = _swapChain.Get();
                 _nativeRep->Buffers = _buffers;
                 _nativeRep->ActiveBufferIndex = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
             }
@@ -136,7 +136,7 @@ namespace Primary.RHI2.Direct3D12
         public override void Present()
         {
             DXGI_PRESENT_PARAMETERS @params = default;
-            HRESULT hr = _swapChain.Get()->Present1(0, DXGI.DXGI_PRESENT_ALLOW_TEARING, &@params);
+            HRESULT hr = _swapChain.Get()->Present1(1, 0, &@params);
 
             if (hr.FAILED)
             {
@@ -210,7 +210,7 @@ namespace Primary.RHI2.Direct3D12
     {
         public RHISwapChainNative Base;
 
-        public ComPtr<IDXGISwapChain4>* SwapChain;
+        public IDXGISwapChain4* SwapChain;
 
         public D3D12RHISwapChainBuffer* Buffers;
         public int ActiveBufferIndex;

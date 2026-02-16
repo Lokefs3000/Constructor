@@ -3,6 +3,7 @@ using Editor.UI.Visual;
 using Primary.Common;
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Text;
 
 namespace Editor.UI.Elements
@@ -33,10 +34,14 @@ namespace Editor.UI.Elements
         public override bool DrawVisual(UICommandBuffer commandBuffer)
         {
             commandBuffer.AddRectangle(ZIndex, Transform.RenderCoordinates, _fillColor, _cornerRadius, _cornerRounding);
-            if (_strokeWeight > 0.0f)
-                commandBuffer.AddBorder(ZIndex, Transform.RenderCoordinates, _strokeColor, _strokePosition, _strokeWeight, _cornerRadius, _cornerRounding);
 
-            return true;
+            if (_strokeWeight > 0.0f)
+            {
+                Boundaries bounds = UILayoutManager.GetStrokeBoundaries(Transform.RenderCoordinates, _strokePosition, _strokeWeight);
+                commandBuffer.AddStroke(ZIndex, bounds, _strokeColor, _strokeWeight, _cornerRadius, _cornerRounding);
+            }
+
+            return base.DrawVisual(commandBuffer);
         }
 
         public float CornerRadius { get => _cornerRadius; set { _cornerRadius = value; InvalidateSelf(UIInvalidationFlags.Visual); } }

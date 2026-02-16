@@ -54,7 +54,7 @@ namespace Editor.UI.Text
                             }
                             else
                             {
-                                size.X += glyph.Advance;
+                                size.X += glyph.Advance + info.LetterSpacing;
                             }
 
                             size.Y = MathF.Max(size.Y, glyph.Offset.Y + glyph.Size.Y);
@@ -103,7 +103,7 @@ namespace Editor.UI.Text
                             }
                             else
                             {
-                                size.X += glyph.Advance;
+                                size.X += glyph.Advance + info.LetterSpacing;
                             }
 
                             size.Y = MathF.Max(size.Y, glyph.Offset.Y + glyph.Size.Y);
@@ -170,7 +170,7 @@ namespace Editor.UI.Text
                             }
                             else
                             {
-                                glyphWidth = glyph.Advance;
+                                glyphWidth = glyph.Advance + info.LetterSpacing;
                             }
 
                             glyphHeight = MathF.Max(size.Y, glyph.Offset.Y + glyph.Size.Y);

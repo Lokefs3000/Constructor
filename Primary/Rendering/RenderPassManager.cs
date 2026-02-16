@@ -1,10 +1,11 @@
 ﻿using CommunityToolkit.HighPerformance;
+using Primary.Common.Memory;
 using Primary.Profiling;
 using Primary.Rendering.Data;
-using Primary.Rendering.Memory;
 using Primary.Rendering.Pass;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
+using Primary.Rendering.State;
 using Primary.RHI2;
 using Primary.Utility;
 
@@ -20,7 +21,10 @@ namespace Primary.Rendering
         private FrameGraphState _state;
         private FrameGraphSetup _setup;
 
-        private SequentialLinearAllocator _intermediateAllocator;
+        private RasterState _rasterState;
+        private ComputeState _computeState;
+
+        private LinearBlockAllocator _intermediateAllocator;
         private RenderPassErrorReporter _errorReporter;
         private RasterPassContext _rasterContext;
         private ComputePassContext _computeContext;
@@ -40,10 +44,13 @@ namespace Primary.Rendering
             _state = new FrameGraphState();
             _setup = new FrameGraphSetup();
 
-            _intermediateAllocator = new SequentialLinearAllocator(ushort.MaxValue /*65kb*/);
+            _rasterState = new RasterState();
+            _computeState = new ComputeState();
+
+            _intermediateAllocator = new LinearBlockAllocator(ushort.MaxValue /*65kb*/);
             _errorReporter = new RenderPassErrorReporter();
-            _rasterContext = new RasterPassContext(_errorReporter, _intermediateAllocator, _resources, manager.ContextContainer);
-            _computeContext = new ComputePassContext(_errorReporter, _intermediateAllocator, _resources, manager.ContextContainer);
+            _rasterContext = new RasterPassContext(_errorReporter, _intermediateAllocator, _resources, manager.ContextContainer, _rasterState);
+            _computeContext = new ComputePassContext(_errorReporter, _intermediateAllocator, _resources, manager.ContextContainer, _computeState);
 
             _activePasses = new List<IRenderPass>();
             _commands = new List<FrameGraphCommands>();
@@ -82,6 +89,9 @@ namespace Primary.Rendering
             _setup.ClearForFrame();
             _intermediateAllocator.Reset();
             _commands.Clear();
+
+            _rasterState.ClearState();
+            _computeState.ClearState();
         }
 
         internal void SetupPasses(RenderContextContainer contextContainer)
@@ -119,9 +129,9 @@ namespace Primary.Rendering
 
                         stateData.SetupState(in desc);
                         _rasterContext.SetupContext(stateData, recorder);
+                        _rasterState.SoftResetForNextPass();
 
                         submittedPasses[passIndex].Function?.Invoke(_rasterContext, _renderPass.GetPassData(desc.PassDataType!) ?? throw new NullReferenceException());
-                        recorder.FinishRecording();
 
                         _commands.Add(new FrameGraphCommands(recorder));
                     }
@@ -132,9 +142,9 @@ namespace Primary.Rendering
 
                         stateData.SetupState(in desc);
                         _computeContext.SetupContext(stateData, recorder);
+                        _computeState.SoftResetForNextPass();
 
                         submittedPasses[passIndex].Function?.Invoke(_computeContext, _renderPass.GetPassData(desc.PassDataType!) ?? throw new NullReferenceException());
-                        recorder.FinishRecording();
 
                         _commands.Add(new FrameGraphCommands(recorder));
                     }

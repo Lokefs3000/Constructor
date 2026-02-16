@@ -10,24 +10,28 @@ namespace Primary.Common
         public WeakRef()
         {
             _ref = null;
+            throw new InvalidOperationException();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public WeakRef(ref T @ref)
         {
             _ref = (T*)Unsafe.AsPointer(ref @ref);
+            throw new InvalidOperationException();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public WeakRef(T* @ref)
         {
             _ref = @ref;
+            throw new InvalidOperationException();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public WeakRef(Ptr<T> ptr)
         {
             _ref = ptr.Pointer;
+            throw new InvalidOperationException();
         }
 
         public ref T Ref => ref Unsafe.AsRef<T>(_ref);

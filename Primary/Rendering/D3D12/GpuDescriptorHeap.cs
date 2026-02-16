@@ -302,7 +302,7 @@ namespace Primary.Rendering.D3D12
                         {
                             RHIBufferDescription bufDesc = ((D3D12RHIBufferNative*)resource.Native)->Base.Description;
 
-                            if (FlagUtility.HasFlag(bufDesc.Usage, RHIResourceUsage.ConstantBuffer))
+                            if (Flags.HasFlag(bufDesc.Usage, RHIResourceUsage.ConstantBuffer))
                             {
                                 Debug.Assert(!bindAsUnorderedAccess);
 
@@ -314,7 +314,7 @@ namespace Primary.Rendering.D3D12
 
                                 _device.Device->CreateConstantBufferView(&desc, dstDescriptor);
                             }
-                            else if (FlagUtility.HasFlag(bufDesc.Usage, RHIResourceUsage.ShaderResource))
+                            else if (Flags.HasFlag(bufDesc.Usage, RHIResourceUsage.ShaderResource))
                             {
                                 if (bindAsUnorderedAccess)
                                 {
@@ -386,7 +386,7 @@ namespace Primary.Rendering.D3D12
                             FrameGraphBuffer fg = _device.ResourceManager.FindFGBuffer(resource);
                             ref readonly FrameGraphBufferDesc bufDesc = ref fg.Description;
 
-                            if (FlagUtility.HasFlag(bufDesc.Usage, FGBufferUsage.ConstantBuffer))
+                            if (Flags.HasFlag(bufDesc.Usage, FGBufferUsage.ConstantBuffer))
                             {
                                 Debug.Assert(!bindAsUnorderedAccess);
 
@@ -398,7 +398,7 @@ namespace Primary.Rendering.D3D12
 
                                 _device.Device->CreateConstantBufferView(&desc, dstDescriptor);
                             }
-                            else if (FlagUtility.HasFlag(bufDesc.Usage, FGBufferUsage.Structured))
+                            else if (Flags.HasFlag(bufDesc.Usage, FGBufferUsage.Structured))
                             {
                                 if (bindAsUnorderedAccess)
                                 {
@@ -438,7 +438,7 @@ namespace Primary.Rendering.D3D12
                                     _device.Device->CreateShaderResourceView(res, &desc, dstDescriptor);
                                 }
                             }
-                            else if (FlagUtility.HasFlag(bufDesc.Usage, FGBufferUsage.Raw))
+                            else if (Flags.HasFlag(bufDesc.Usage, FGBufferUsage.Raw))
                             {
                                 if (bindAsUnorderedAccess)
                                 {

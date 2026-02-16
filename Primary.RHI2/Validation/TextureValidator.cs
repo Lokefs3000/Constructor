@@ -87,8 +87,8 @@ namespace Primary.RHI2.Validation
                 return false;
             }
 
-            bool unorderedAccess = FlagUtility.HasFlag(description.Usage, RHIResourceUsage.UnorderedAccess);
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.ShaderResource))
+            bool unorderedAccess = Flags.HasFlag(description.Usage, RHIResourceUsage.UnorderedAccess);
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.ShaderResource))
             {
                 if (!description.Format.IsShaderCapable())
                 {
@@ -97,25 +97,25 @@ namespace Primary.RHI2.Validation
                 }
             }
 
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.ConstantBuffer))
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.ConstantBuffer))
             {
                 logger?.Error("[r:{n}]: A texture cannot be used as a constant buffer", resourceName);
                 return false;
             }
 
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.VertexInput))
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.VertexInput))
             {
                 logger?.Error("[r:{n}]: A texture cannot be used as a vertex buffer", resourceName);
                 return false;
             }
 
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.IndexInput))
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.IndexInput))
             {
                 logger?.Error("[r:{n}]: A texture cannot be used as a index buffer", resourceName);
                 return false;
             }
 
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.RenderTarget))
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.RenderTarget))
             {
                 if (description.Dimension != RHIDimension.Texture2D)
                 {
@@ -136,7 +136,7 @@ namespace Primary.RHI2.Validation
                 }
             }
 
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.DepthStencil))
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.DepthStencil))
             {
                 if (description.Dimension != RHIDimension.Texture2D)
                 {

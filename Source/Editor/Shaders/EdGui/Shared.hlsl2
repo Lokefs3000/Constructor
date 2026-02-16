@@ -24,3 +24,7 @@ struct CbGlobalData
 
 ConstantBuffer<CbGlobalData> cbGlobals;
 ByteAddressBuffer baMetadata;
+
+Texture2D<float4> txGradients;
+
+static SamplerState ssDefaultLinear : defaultLinear;

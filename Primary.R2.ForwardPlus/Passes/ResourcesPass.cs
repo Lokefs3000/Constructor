@@ -4,6 +4,7 @@ using Primary.Common;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Batching;
+using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
@@ -102,13 +103,16 @@ namespace Primary.R2.ForwardPlus.Passes
                 {
                     using FGMappedSubresource<byte> rawData = commandBuffer.Map<byte>(passData.RawDataBuffer);
 
-                    nint dataPtr = (nint)Unsafe.AsPointer(in rawData.Span.DangerousGetReference());
-                    foreach (MaterialAsset material in materials)
+                    fixed (byte* ptr = rawData.Span)
                     {
-                        ROPropertyBlock block = material.PropertyBlock;
+                        byte* dataPtr = ptr;
+                        foreach (MaterialAsset material in materials)
+                        {
+                            ROPropertyBlock block = material.PropertyBlock;
 
-                        block.CopyBlockDataTo(dataPtr);
-                        dataPtr += block.BlockSize;
+                            block.CopyBlockDataTo((nint)dataPtr);
+                            dataPtr += block.BlockSize;
+                        }
                     }
                 }
             }

@@ -319,11 +319,11 @@ namespace Primary.RHI.Direct3D12
 
         public override void SynchronizeDevice(SynchronizeDeviceTargets targets)
         {
-            if (FlagUtility.HasFlag(targets, SynchronizeDeviceTargets.Graphics))
+            if (Flags.HasFlag(targets, SynchronizeDeviceTargets.Graphics))
                 WaitForFenceOnQueue(_graphicsQueue, _synchronizeFence);
-            if (FlagUtility.HasFlag(targets, SynchronizeDeviceTargets.Compute))
+            if (Flags.HasFlag(targets, SynchronizeDeviceTargets.Compute))
                 WaitForFenceOnQueue(_computeQueue, _synchronizeFence);
-            if (FlagUtility.HasFlag(targets, SynchronizeDeviceTargets.Copy))
+            if (Flags.HasFlag(targets, SynchronizeDeviceTargets.Copy))
                 WaitForFenceOnQueue(_copyQueue, _synchronizeFence);
 
             void WaitForFenceOnQueue(ID3D12CommandQueue queue, ID3D12Fence fence)
@@ -580,7 +580,7 @@ namespace Primary.RHI.Direct3D12
                 }
             });
 
-            return FlagUtility.HasFlag((int)support1, (int)FormatSupport1.RenderTarget);
+            return Flags.HasFlag((int)support1, (int)FormatSupport1.RenderTarget);
         }
 
         public override bool IsSupported(DepthStencilFormat format)
@@ -603,7 +603,7 @@ namespace Primary.RHI.Direct3D12
                 }
             });
 
-            return FlagUtility.HasFlag(support1, FormatSupport1.DepthStencil);
+            return Flags.HasFlag(support1, FormatSupport1.DepthStencil);
         }
 
         public override bool IsSupported(TextureFormat format, TextureDimension dimension)
@@ -626,7 +626,7 @@ namespace Primary.RHI.Direct3D12
                 }
             });
 
-            return FlagUtility.HasFlag(support1, dimension switch
+            return Flags.HasFlag(support1, dimension switch
             {
                 TextureDimension.Texture1D => FormatSupport1.Texture1D,
                 TextureDimension.Texture2D => FormatSupport1.Texture2D,

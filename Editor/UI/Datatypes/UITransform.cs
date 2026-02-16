@@ -18,6 +18,8 @@ namespace Editor.UI.Datatypes
 
         private Vector2 _anchor;
 
+        private Vector2 _realSize;
+        private Vector2 _relativePosition;
         private Boundaries _renderCoordinates;
 
         private bool _hasChangedSinceLast;
@@ -36,13 +38,12 @@ namespace Editor.UI.Datatypes
             _hasChangedSinceLast = false;
         }
 
-        public bool Recalculate(Boundaries parentCoords)
+        public bool Recalculate(Vector2 parentSize)
         {
+            _hasChangedSinceLast = true;
             if (_hasChangedSinceLast)
             {
                 _hasChangedSinceLast = false;
-
-                Vector2 parentSize = parentCoords.Size;
 
                 Vector2 basePosition = _offset.Evaluate(parentSize);
                 Vector2 baseSize = _size.Evaluate(parentSize);
@@ -71,15 +72,25 @@ namespace Editor.UI.Datatypes
                 if (_anchor.X != 0.0f && verticalAlign != UITransformAlign.FillVertical)
                     basePosition.Y += _anchor.Y * baseSize.Y;
 
-                basePosition += parentCoords.Minimum;
-                baseSize += basePosition;
-
-                _renderCoordinates = new Boundaries(basePosition, baseSize);
+                _realSize = baseSize;
+                _relativePosition = basePosition;
 
                 return true;
             }
 
             return false;
+        }
+
+        internal void ComputeBoundaries(Vector2 offset)
+        {
+            Vector2 position = _relativePosition + offset;
+            _renderCoordinates = new Boundaries(position, position + _realSize);
+        }
+
+        internal void ResetCalculatedData()
+        {
+            _relativePosition = Vector2.Zero;
+            _realSize = Vector2.Zero;
         }
 
         public UITransformAlign Align { get => _align; set { _align = value; _owner?.InvalidateSelf(UIInvalidationFlags.Layout); _hasChangedSinceLast = true; } }
@@ -88,6 +99,9 @@ namespace Editor.UI.Datatypes
         public UIValue2 Size { get => _size; set { _size = value; _owner?.InvalidateSelf(UIInvalidationFlags.Layout); _hasChangedSinceLast = true; } }
 
         public Vector2 Anchor { get => _anchor; set { _anchor = value; _owner?.InvalidateSelf(UIInvalidationFlags.Layout); _hasChangedSinceLast = true; } }
+
+        public Vector2 RealSize { get => _realSize; set => _realSize = value; }
+        public Vector2 RelativePosition { get => _relativePosition; set => _relativePosition = value; }
 
         public Boundaries RenderCoordinates => _renderCoordinates;
 

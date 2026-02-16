@@ -151,6 +151,8 @@ namespace Primary.Rendering.D3D12
                             {
                                 ref readonly FrameGraphTextureDesc texDesc = ref location.Resource.TextureDesc;
 
+                                Debug.Assert(texDesc.Width > 0 && texDesc.Height > 0 && texDesc.Depth > 0);
+
                                 resDesc = new D3D12_RESOURCE_DESC1
                                 {
                                     Dimension = texDesc.Dimension switch
@@ -172,7 +174,7 @@ namespace Primary.Rendering.D3D12
                                     SamplerFeedbackMipRegion = default
                                 };
 
-                                if (FlagUtility.HasFlag(texDesc.Usage, FGTextureUsage.RenderTarget))
+                                if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.RenderTarget))
                                 {
                                     resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
@@ -182,7 +184,7 @@ namespace Primary.Rendering.D3D12
                                     isClearValueCompatible = true;
                                 }
 
-                                if (FlagUtility.HasFlag(texDesc.Usage, FGTextureUsage.DepthStencil))
+                                if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.DepthStencil))
                                 {
                                     resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
@@ -190,7 +192,7 @@ namespace Primary.Rendering.D3D12
                                     isClearValueCompatible = true;
                                 }
 
-                                if (FlagUtility.HasFlag(texDesc.Usage, FGTextureUsage.UnorderedAccess))
+                                if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.UnorderedAccess))
                                 {
                                     resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
                                 }
@@ -200,6 +202,8 @@ namespace Primary.Rendering.D3D12
                         case FGResourceId.Buffer:
                             {
                                 ref readonly FrameGraphBufferDesc bufDesc = ref location.Resource.BufferDesc;
+
+                                Debug.Assert(bufDesc.Width > 0);
 
                                 resDesc = new D3D12_RESOURCE_DESC1
                                 {
@@ -216,7 +220,7 @@ namespace Primary.Rendering.D3D12
                                     SamplerFeedbackMipRegion = default
                                 };
 
-                                if (FlagUtility.HasFlag(bufDesc.Usage, FGBufferUsage.UnorderedAccess))
+                                if (Flags.HasFlag(bufDesc.Usage, FGBufferUsage.UnorderedAccess))
                                 {
                                     resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
                                 }
@@ -342,7 +346,7 @@ namespace Primary.Rendering.D3D12
                 else
                 {
                     D3D12RHITextureNative* native = (D3D12RHITextureNative*)resource.Native;
-                    if (native->IsInitialized || !FlagUtility.HasEither(native->Base.Description.Usage, RHIResourceUsage.RenderTarget | RHIResourceUsage.DepthStencil))
+                    if (native->IsInitialized || !Flags.HasEither(native->Base.Description.Usage, RHIResourceUsage.RenderTarget | RHIResourceUsage.DepthStencil))
                     {
                         native->IsInitialized = true;
                         return;
@@ -385,11 +389,11 @@ namespace Primary.Rendering.D3D12
                     FrameGraphTexture fgTexture = FindFGTexture(resource);
                     ref readonly FrameGraphTextureDesc desc = ref fgTexture.Description;
 
-                    if (FlagUtility.HasFlag(desc.Usage, FGTextureUsage.RenderTarget))
+                    if (Flags.HasFlag(desc.Usage, FGTextureUsage.RenderTarget))
                     {
                         _device.BarrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
                     }
-                    else if (FlagUtility.HasFlag(desc.Usage, FGTextureUsage.DepthStencil))
+                    else if (Flags.HasFlag(desc.Usage, FGTextureUsage.DepthStencil))
                     {
                         _device.BarrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
                     }
@@ -405,7 +409,7 @@ namespace Primary.Rendering.D3D12
                     D3D12RHITextureNative* native = (D3D12RHITextureNative*)resource.Native;
                     ref readonly RHITextureDescription desc = ref native->Base.Description;
 
-                    if (FlagUtility.HasFlag(desc.Usage, RHIResourceUsage.RenderTarget))
+                    if (Flags.HasFlag(desc.Usage, RHIResourceUsage.RenderTarget))
                     {
 #if DEBUG
                         _device.BarrierManager.DbgEnsureState(resource, cmdList, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
@@ -414,7 +418,7 @@ namespace Primary.Rendering.D3D12
                         Color color = new Color(0.0f);
                         cmdList->ClearRenderTargetView(_device.RTVDescriptorHeap.GetDescriptorHandle(resource), (float*)&color, 0, null);
                     }
-                    else if (FlagUtility.HasFlag(desc.Usage, RHIResourceUsage.DepthStencil))
+                    else if (Flags.HasFlag(desc.Usage, RHIResourceUsage.DepthStencil))
                     {
 #if DEBUG
                         _device.BarrierManager.DbgEnsureState(resource, cmdList, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
@@ -430,7 +434,7 @@ namespace Primary.Rendering.D3D12
                     FrameGraphTexture fgTexture = FindFGTexture(resource);
                     ref readonly FrameGraphTextureDesc desc = ref fgTexture.Description;
 
-                    if (FlagUtility.HasFlag(desc.Usage, FGTextureUsage.RenderTarget))
+                    if (Flags.HasFlag(desc.Usage, FGTextureUsage.RenderTarget))
                     {
 #if DEBUG
                         _device.BarrierManager.DbgEnsureState(resource, cmdList, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
@@ -439,7 +443,7 @@ namespace Primary.Rendering.D3D12
                         Color color = new Color(0.0f);
                         cmdList->ClearRenderTargetView(_device.RTVDescriptorHeap.GetDescriptorHandle(resource), (float*)&color, 0, null);
                     }
-                    else if (FlagUtility.HasFlag(desc.Usage, FGTextureUsage.DepthStencil))
+                    else if (Flags.HasFlag(desc.Usage, FGTextureUsage.DepthStencil))
                     {
 #if DEBUG
                         _device.BarrierManager.DbgEnsureState(resource, cmdList, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
@@ -485,12 +489,12 @@ namespace Primary.Rendering.D3D12
                             Flags = D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT
                         };
 
-                        if (FlagUtility.HasFlag(texDesc.Usage, FGTextureUsage.RenderTarget))
+                        if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.RenderTarget))
                         {
                             resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
                         }
 
-                        if (FlagUtility.HasFlag(texDesc.Usage, FGTextureUsage.DepthStencil))
+                        if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.DepthStencil))
                         {
                             resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
                         }

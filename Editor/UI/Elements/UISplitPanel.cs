@@ -1,10 +1,12 @@
-﻿using System;
+﻿using Editor.UI.Visual;
+using Primary.Common;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Editor.UI.Elements
 {
-    public class UISplitPanel : UIElement
+    public class UISplitPanel : UIFrame
     {
         private UISplitPanel? _owningSplit;
         private List<UISplitPanel> _ownedSplits;
@@ -19,6 +21,8 @@ namespace Editor.UI.Elements
 
             _direction = direction;
             _position = 0.2f;
+
+            FillColor = Color.TransparentBlack;
         }
 
         internal void AddSplit(UISplitPanel panel) => _ownedSplits.Add(panel);
@@ -33,6 +37,11 @@ namespace Editor.UI.Elements
             panel?.AddSplit(this);
 
             _owningSplit = panel;
+        }
+
+        public override bool DrawVisual(UICommandBuffer commandBuffer)
+        {
+            return base.DrawVisual(commandBuffer);
         }
 
         public UISplitPanel? SplitOwner { get => _owningSplit; }

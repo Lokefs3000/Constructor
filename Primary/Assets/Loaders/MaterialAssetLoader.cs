@@ -67,7 +67,7 @@ namespace Primary.Assets.Loaders
                 bool hasActualProperties = false;
                 foreach (ref readonly ShaderProperty property in shader.Properties)
                 {
-                    if (FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Property) && !FlagUtility.HasEither(property.Flags, ShPropertyFlags.Global | ShPropertyFlags.HasParent))
+                    if (Flags.HasFlag(property.Flags, ShPropertyFlags.Property) && !Flags.HasEither(property.Flags, ShPropertyFlags.Global | ShPropertyFlags.HasParent))
                     {
                         hasActualProperties = true;
                         break;
@@ -80,7 +80,7 @@ namespace Primary.Assets.Loaders
 
                     foreach (ref readonly ShaderProperty property in shader.Properties)
                     {
-                        if (!FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Property) || FlagUtility.HasEither(property.Flags, ShPropertyFlags.Global | ShPropertyFlags.HasParent))
+                        if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Property) || Flags.HasEither(property.Flags, ShPropertyFlags.Global | ShPropertyFlags.HasParent))
                             continue;
 
                         switch (property.Type)
@@ -91,7 +91,7 @@ namespace Primary.Assets.Loaders
                                     {
                                         EngLog.Assets.Error("[a:{path}]: Failed to find property: {prop}", sourcePath, property.Name);
 
-                                        block.SetResource(property.Name.GetDjb2HashCode(), property.Default switch
+                                        block.SetResource(property.Name, property.Default switch
                                         {
                                             ShPropertyDefault.NumOne => AssetManager.Static.DefaultWhite,
                                             ShPropertyDefault.NumZero => AssetManager.Static.DefaultBlack,
@@ -105,7 +105,7 @@ namespace Primary.Assets.Loaders
                                     }
                                     else
                                     {
-                                        block.SetResource(property.Name.GetDjb2HashCode(), assetId is string ?
+                                        block.SetResource(property.Name, assetId is string ?
                                             AssetManager.LoadAsset<TextureAsset>((string)assetId) :
                                             AssetManager.LoadAsset<TextureAsset>(new AssetId((ulong)(long)assetId)));
                                     }
@@ -118,7 +118,7 @@ namespace Primary.Assets.Loaders
                                     {
                                         EngLog.Assets.Error("[a:{path}]: Failed to find property: {prop}", sourcePath, property.Name);
 
-                                        block.SetSingle(property.Name.GetDjb2HashCode(), property.Default switch
+                                        block.SetSingle(property.Name, property.Default switch
                                         {
                                             ShPropertyDefault.NumOne => 1.0f,
                                             ShPropertyDefault.NumZero => 0.0f,
@@ -128,7 +128,7 @@ namespace Primary.Assets.Loaders
                                     }
                                     else
                                     {
-                                        block.SetSingle(property.Name.GetDjb2HashCode(), (float)(double)assetId);
+                                        block.SetSingle(property.Name, (float)(double)assetId);
                                     }
 
                                     break;
@@ -139,7 +139,7 @@ namespace Primary.Assets.Loaders
                                     {
                                         EngLog.Assets.Error("[a:{path}]: Failed to find property: {prop}", sourcePath, property.Name);
 
-                                        block.SetDouble(property.Name.GetDjb2HashCode(), property.Default switch
+                                        block.SetDouble(property.Name, property.Default switch
                                         {
                                             ShPropertyDefault.NumOne => 1.0,
                                             ShPropertyDefault.NumZero => 0.0,
@@ -149,7 +149,7 @@ namespace Primary.Assets.Loaders
                                     }
                                     else
                                     {
-                                        block.SetDouble(property.Name.GetDjb2HashCode(), (double)assetId);
+                                        block.SetDouble(property.Name, (double)assetId);
                                     }
 
                                     break;
@@ -160,7 +160,7 @@ namespace Primary.Assets.Loaders
                                     {
                                         EngLog.Assets.Error("[a:{path}]: Failed to find property: {prop}", sourcePath, property.Name);
 
-                                        block.SetUInt(property.Name.GetDjb2HashCode(), property.Default switch
+                                        block.SetUInt(property.Name, property.Default switch
                                         {
                                             ShPropertyDefault.NumOne => 1,
                                             ShPropertyDefault.NumZero => 0,
@@ -170,7 +170,7 @@ namespace Primary.Assets.Loaders
                                     }
                                     else
                                     {
-                                        block.SetUInt(property.Name.GetDjb2HashCode(), (uint)(long)assetId);
+                                        block.SetUInt(property.Name, (uint)(long)assetId);
                                     }
 
                                     break;
@@ -181,7 +181,7 @@ namespace Primary.Assets.Loaders
                                     {
                                         EngLog.Assets.Error("[a:{path}]: Failed to find property: {prop}", sourcePath, property.Name);
 
-                                        block.SetInt(property.Name.GetDjb2HashCode(), property.Default switch
+                                        block.SetInt(property.Name, property.Default switch
                                         {
                                             ShPropertyDefault.NumOne => 1,
                                             ShPropertyDefault.NumZero => 0,
@@ -191,7 +191,7 @@ namespace Primary.Assets.Loaders
                                     }
                                     else
                                     {
-                                        block.SetInt(property.Name.GetDjb2HashCode(), (int)(long)assetId);
+                                        block.SetInt(property.Name, (int)(long)assetId);
                                     }
 
                                     break;
@@ -202,7 +202,7 @@ namespace Primary.Assets.Loaders
                                     {
                                         EngLog.Assets.Error("[a:{path}]: Failed to find property: {prop}", sourcePath, property.Name);
 
-                                        block.SetVector2(property.Name.GetDjb2HashCode(), property.Default switch
+                                        block.SetVector2(property.Name, property.Default switch
                                         {
                                             ShPropertyDefault.NumOne => Vector2.One,
                                             ShPropertyDefault.NumZero => Vector2.Zero,
@@ -213,7 +213,7 @@ namespace Primary.Assets.Loaders
                                     else
                                     {
                                         TomlArray castArray = (TomlArray)array;
-                                        block.SetVector2(property.Name.GetDjb2HashCode(), new Vector2((float)(double)castArray[0]!, (float)(double)castArray[1]!));
+                                        block.SetVector2(property.Name, new Vector2((float)(double)castArray[0]!, (float)(double)castArray[1]!));
                                     }
 
                                     break;
@@ -224,7 +224,7 @@ namespace Primary.Assets.Loaders
                                     {
                                         EngLog.Assets.Error("[a:{path}]: Failed to find property: {prop}", sourcePath, property.Name);
 
-                                        block.SetVector3(property.Name.GetDjb2HashCode(), property.Default switch
+                                        block.SetVector3(property.Name, property.Default switch
                                         {
                                             ShPropertyDefault.NumOne => Vector3.One,
                                             ShPropertyDefault.NumZero => Vector3.Zero,
@@ -235,7 +235,7 @@ namespace Primary.Assets.Loaders
                                     else
                                     {
                                         TomlArray castArray = (TomlArray)array;
-                                        block.SetVector3(property.Name.GetDjb2HashCode(), new Vector3((float)(double)castArray[0]!, (float)(double)castArray[1]!, (float)(double)castArray[2]!));
+                                        block.SetVector3(property.Name, new Vector3((float)(double)castArray[0]!, (float)(double)castArray[1]!, (float)(double)castArray[2]!));
                                     }
 
                                     break;
@@ -246,7 +246,7 @@ namespace Primary.Assets.Loaders
                                     {
                                         EngLog.Assets.Error("[a:{path}]: Failed to find property: {prop}", sourcePath, property.Name);
 
-                                        block.SetVector4(property.Name.GetDjb2HashCode(), property.Default switch
+                                        block.SetVector4(property.Name, property.Default switch
                                         {
                                             ShPropertyDefault.NumOne => Vector4.One,
                                             ShPropertyDefault.NumZero => Vector4.Zero,
@@ -257,7 +257,7 @@ namespace Primary.Assets.Loaders
                                     else
                                     {
                                         TomlArray castArray = (TomlArray)array;
-                                        block.SetVector4(property.Name.GetDjb2HashCode(), new Vector4((float)(double)castArray[0]!, (float)(double)castArray[1]!, (float)(double)castArray[2]!, (float)(double)castArray[3]!));
+                                        block.SetVector4(property.Name, new Vector4((float)(double)castArray[0]!, (float)(double)castArray[1]!, (float)(double)castArray[2]!, (float)(double)castArray[3]!));
                                     }
 
                                     break;

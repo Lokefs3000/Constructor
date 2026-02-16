@@ -15,6 +15,12 @@ namespace Primary.Rendering.State
             _value = value;
         }
 
+        public void Reset(T value)
+        {
+            _previous = value;
+            _value = value;
+        }
+
         public T Value { get => _value; set => _value = value; }
         public bool IsDirty
         {
@@ -22,11 +28,11 @@ namespace Primary.Rendering.State
             {
                 if (typeof(T).IsValueType)
                 {
-                    return _previous!.Equals(_value);
+                    return !_previous!.Equals(_value);
                 }
                 else
                 {
-                    return _previous?.Equals(_value) ?? _value == null;
+                    return !_previous?.Equals(_value) ?? _value == null;
                 }
             }
             set => _previous = _value;

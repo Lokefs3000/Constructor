@@ -86,8 +86,8 @@ namespace Primary.Input.Devices
         public bool IsKeyPressed(KeyCode key) => _newlyUpdatedStates.TryGetValue(key, out KeyState state) && state == KeyState.Pressed;
         public bool IsKeyReleased(KeyCode key) => _newlyUpdatedStates.TryGetValue(key, out KeyState state) && state == KeyState.Released;
 
-        public bool IsAnyKeyPressed => FlagUtility.HasFlag(_anyKeyState, AnyState.Pressed);
-        public bool IsAnyKeyReleased => FlagUtility.HasFlag(_anyKeyState, AnyState.Released);
+        public bool IsAnyKeyPressed => Flags.HasFlag(_anyKeyState, AnyState.Pressed);
+        public bool IsAnyKeyReleased => Flags.HasFlag(_anyKeyState, AnyState.Released);
 
         private static KeyCode TranslateKey(SDL_Keycode keycode) => keycode switch
         {

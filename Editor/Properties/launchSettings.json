@@ -3,7 +3,7 @@
     "Editor": {
       "commandName": "Project",
       "commandLineArgs": "D:\\source\\repos\\Constructor\\Source\\DemoGame1 --s-show-imports --fg-nocull",
-      "nativeDebugging": true,
+      "nativeDebugging": false,
       "hotReloadEnabled": true
     }
   }

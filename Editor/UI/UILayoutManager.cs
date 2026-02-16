@@ -1,12 +1,16 @@
 ﻿using Editor.UI.Elements;
 using Editor.UI.Layout;
+using Editor.UI.Modifiers;
 using Editor.UI.Text;
+using Editor.UI.Visual;
 using Primary.Common;
+using Primary.Pooling;
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Text;
+using System.Xml.Linq;
 using TerraFX.Interop.Windows;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Editor.UI
 {
@@ -14,9 +18,13 @@ namespace Editor.UI
     {
         private UITextShaper _textShaper;
 
+        private ObjectPool<LayoutHandler> _handlers;
+
         internal UILayoutManager()
         {
             _textShaper = new UITextShaper();
+
+            _handlers = new ObjectPool<LayoutHandler>(new LayoutHandler.Policy(this));
         }
 
         internal void RecalculateLayout(UIDockHost host)
@@ -25,7 +33,7 @@ namespace Editor.UI
 
             foreach (UIWindow window in host.TabbedWindows)
             {
-                if (FlagUtility.HasFlag(window.InvalidFlags, UIInvalidationFlags.Layout))
+                if (Flags.HasFlag(window.InvalidFlags, UIInvalidationFlags.Layout))
                 {
                     window.RemoveInvalidFlags(UIInvalidationFlags.Layout);
                     RecalculateLayout(window);
@@ -34,7 +42,7 @@ namespace Editor.UI
 
             foreach (UIDockHost dockedHost in host.DockedHosts)
             {
-                if (FlagUtility.HasFlag(dockedHost.InvalidationFlags, UIInvalidationFlags.Layout))
+                if (Flags.HasFlag(dockedHost.InvalidationFlags, UIInvalidationFlags.Layout))
                 {
                     dockedHost.RemoveInvalidFlags(UIInvalidationFlags.Layout);
                     RecalculateLayout(dockedHost);
@@ -44,73 +52,31 @@ namespace Editor.UI
 
         internal void RecalculateLayout(UIWindow window)
         {
-            Queue<UIElement> fwdElements = new Queue<UIElement>();
-            Stack<ReverseData> revElements = new Stack<ReverseData>();
+            LayoutHandler handler = _handlers.Get();
+            handler.Handle(window.RootElement);
 
-            fwdElements.Enqueue(window.RootElement);
-
-            while (fwdElements.TryDequeue(out UIElement? element))
-            {
-                UIRecalcLayoutStatus status = element.RecalculateLayout(this, UIRecalcType.Descending);
-                if (status == UIRecalcLayoutStatus.Finished || status == UIRecalcLayoutStatus.PartiallyFinished)
-                {
-                    if (status == UIRecalcLayoutStatus.Finished)
-                        element.RemoveInvalidFlag(UIInvalidationFlags.Layout);
-
-                    bool needsRevTiming = false;
-                    foreach (IUILayoutModifier modifiers in element.LayoutModifiers)
-                    {
-                        if (FlagUtility.HasFlag(modifiers.Timing, IUILayoutModiferTime.Acending))
-                            needsRevTiming = true;
-                        if (FlagUtility.HasFlag(modifiers.Timing, IUILayoutModiferTime.Descending))
-                            modifiers.ModifyElement(IUILayoutModiferTime.Descending);
-                    }
-
-                    revElements.Push(new ReverseData(element, status == UIRecalcLayoutStatus.PartiallyFinished ? UIReverseHandling.Full : (needsRevTiming ? UIReverseHandling.OnlyMods : UIReverseHandling.None)));
-
-                    foreach (UIElement child in element.Children)
-                    {
-                        if (FlagUtility.HasFlag(child.InvalidFlags, UIInvalidationFlags.Layout))
-                            fwdElements.Enqueue(child);
-                    }
-                }
-            }
-
-            while (revElements.TryPop(out ReverseData data))
-            {
-                if (data.Handling >= UIReverseHandling.OnlyMods)
-                {
-                    foreach (IUILayoutModifier modifiers in data.Element.LayoutModifiers)
-                    {
-                        if (FlagUtility.HasFlag(modifiers.Timing, IUILayoutModiferTime.Acending))
-                            modifiers.ModifyElement(IUILayoutModiferTime.Acending);
-                    }
-                }
-
-                if (data.Handling >= UIReverseHandling.Full || FlagUtility.HasFlag(data.Element.InvalidFlags, UIInvalidationFlags.Layout))
-                {
-                    data.Element.RecalculateLayout(this, UIRecalcType.Ascending);
-                    data.Element.RemoveInvalidFlag(UIInvalidationFlags.Layout);
-                }
-
-                {
-                    Boundaries bounds = data.Element.Transform.RenderCoordinates;
-                    if (data.Element.Children.Count > 0)
-                    {
-                        foreach (UIElement child in data.Element.Children)
-                        {
-                            bounds = Boundaries.Combine(bounds, child.Transform.RenderCoordinates);
-                        }
-                    }
-
-                    data.Element.SetTreeBounds(bounds);
-                }
-            }
+            _handlers.Return(handler);
         }
 
         public UITextShaper TextShaper => _textShaper;
 
-        private readonly record struct ReverseData(UIElement Element, UIReverseHandling Handling);
+        public static Boundaries GetStrokeBoundaries(Boundaries boundaries, UIStrokePosition position, float weight)
+        {
+            switch (position)
+            {
+                case UIStrokePosition.Inside: return boundaries;
+                case UIStrokePosition.Center:
+                    {
+                        float halfWeight = weight * 0.5f;
+                        return new Boundaries(boundaries.Minimum - new Vector2(halfWeight), boundaries.Maximum + new Vector2(halfWeight));
+                    }
+                case UIStrokePosition.Outside: return new Boundaries(boundaries.Minimum - new Vector2(weight), boundaries.Maximum + new Vector2(weight));
+            }
+
+            return boundaries;
+        }
+
+        
     }
 
     public enum UIRecalcLayoutStatus : byte

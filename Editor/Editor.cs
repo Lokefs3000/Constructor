@@ -26,6 +26,9 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using Editor.UI.Assets;
+using Editor.DearImGui;
+using Editor.ExtConsole;
+using Editor.Gui.Windows;
 
 namespace Editor
 {
@@ -44,8 +47,8 @@ namespace Editor
         private AssetDatabase _assetDatabase;
         private AssetPipeline _assetPipeline;
 
-        //private DearImGuiStateManager _dearImGuiStateManager;
-        //private DearImGuiWindowManager _dearImGuiWindowManager;
+        private DearImGuiStateManager _dearImGuiStateManager;
+        private DearImGuiWindowManager _dearImGuiWindowManager;
         //private EditorGuiManager _guiManager;
         private SelectionManager _selectionManager;
         private ToolManager _toolManager;
@@ -54,6 +57,8 @@ namespace Editor
         private DynamicAtlasManager _guiAtlasManager;
 
         private UIManager _uiManager;
+
+        private ExtConsoleManager? _extConsoleManager;
 
         //private ProfilerView2 _profilerView2;
         //private HierchyView _hierchyView;
@@ -131,8 +136,8 @@ namespace Editor
 
             RegisterComponentsDefault.RegisterDefault();
 
-            //_dearImGuiStateManager = new DearImGuiStateManager(this);
-            //_dearImGuiWindowManager = new DearImGuiWindowManager();
+            _dearImGuiStateManager = new DearImGuiStateManager(this);
+            _dearImGuiWindowManager = new DearImGuiWindowManager();
             //_guiManager = new EditorGuiManager();
             _selectionManager = new SelectionManager();
             _toolManager = new ToolManager();
@@ -141,6 +146,9 @@ namespace Editor
             _guiAtlasManager = new DynamicAtlasManager();
 
             _uiManager = new UIManager(EdLog.Gui);
+
+            if (AppArguments.HasArgument("--with-extcon"))
+                _extConsoleManager = new ExtConsoleManager(ui);
 
             //_profilerView2 = new ProfilerView2(_guiAtlasManager);
             //_hierchyView = new HierchyView();
@@ -167,10 +175,12 @@ namespace Editor
 
         public override void Dispose()
         {
+            _extConsoleManager?.Dispose();
+
             _guiAtlasManager.Dispose();
 
             _editorRenderManager.Dispose();
-            //_dearImGuiStateManager.Dispose();
+            _dearImGuiStateManager.Dispose();
             _assetPipeline.Dispose();
 
             base.Dispose();
@@ -198,14 +208,19 @@ namespace Editor
             Window window = WindowManager.CreateWindow("Primary", new Vector2(1336, 726), CreateWindowFlags.Resizable);
             UIDockHost centralHost = _uiManager.CreateHostedDock(window);
 
-            _uiManager.OpenWindow<UIDesigner>(centralHost);
+            //UIDockHost bottomHost = _uiManager.CreateDockedHost(centralHost, UIDockSide.Bottom);
+            //bottomHost.SetHostSize(window.ClientSize.Y * 0.5f);
+
+            //_uiManager.OpenWindow<UIDesigner>(centralHost);
+            _uiManager.OpenWindow<AssetBrowser>(centralHost);
 
             RenderingManager.SetNewRenderPath(new EditorRenderPath());
 
-            //_dearImGuiStateManager.InitWindow(window);
+            _dearImGuiStateManager.InitWindow(window);
 
             //_dearImGuiWindowManager.Open<FrameGraphViewer>();
             //_dearImGuiWindowManager.Open<RenderPassInspector>();
+            _dearImGuiWindowManager.Open<UILayoutDebugger>();
 
             _guiAtlasManager.TriggerRebuild();
 
@@ -241,6 +256,8 @@ namespace Editor
             Time.BeginNewFrame();
             ProfilingManager.StartProfilingForFrame();
 
+            _extConsoleManager?.PollUpdates();
+
             _editorRenderManager.PrepareFrame();
 
             _assetDatabase.HandlePendingUpdates();
@@ -265,7 +282,7 @@ namespace Editor
         {
             using (new ProfilingScope("EditorGui"))
             {
-                //_dearImGuiStateManager.BeginFrame();
+                _dearImGuiStateManager.BeginFrame();
 
                 /*if (ImGui.Begin("Profiler"))
                 {
@@ -321,7 +338,9 @@ namespace Editor
                 //drawList.AddText(new Vector2(20.0f, 44.0f), 0xffffffff, $"Jit: il:{(JitInfo.GetCompiledILBytes() / 1024.0).ToString("F2", CultureInfo.InvariantCulture)}kb  mc:{JitInfo.GetCompiledMethodCount()}  ct:{JitInfo.GetCompilationTime()}");
                 //drawList.AddText(new Vector2(20.0f, 56.0f), 0xffffffff, $"GC: {(GC.GetTotalMemory(false) / (1024.0 * 1024.0)).ToString("F6")}mb");
 
-                //_dearImGuiStateManager.EndFrame();
+                _dearImGuiWindowManager.RenderOpenWindows();
+
+                _dearImGuiStateManager.EndFrame();
 
                 _timer += Time.DeltaTime;
                 if (_timer > 2.0f)
@@ -363,8 +382,11 @@ namespace Editor
         public AssetDatabase AssetDatabase => _assetDatabase;
         public AssetPipeline AssetPipeline => _assetPipeline;
         public DynamicAtlasManager GuiAtlasManager => _guiAtlasManager;
+        public UIManager UIManager => _uiManager;
         public SelectionManager SelectionManager => _selectionManager;
         public ToolManager ToolManager => _toolManager;
+
+        public DearImGuiWindowManager DearImGuiWindowManager => _dearImGuiWindowManager;
 
         //internal PropertiesView PropertiesView => _propertiesView;
         //internal SceneView SceneView => _sceneView;

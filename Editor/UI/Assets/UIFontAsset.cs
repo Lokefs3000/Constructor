@@ -1,4 +1,5 @@
-﻿using Editor.Interop.Ed;
+﻿using CommunityToolkit.HighPerformance;
+using Editor.Interop.Ed;
 using Primary.Assets.Types;
 using Primary.Common;
 using Primary.RHI2;
@@ -148,6 +149,8 @@ namespace Editor.UI.Assets
         private float _tabAdvance;
         private float _lineHeight;
 
+        private List<UIGlyphData> _data;
+
         private Dictionary<char, UIGlyph> _glyphs;
         private List<UIGlyphSpace> _spaces;
 
@@ -169,6 +172,8 @@ namespace Editor.UI.Assets
             _spaceAdvance = spaceAdvance;
             _tabAdvance = tabAdvance;
             _lineHeight = lineHeight;
+
+            _data = new List<UIGlyphData>();
 
             _glyphs = new Dictionary<char, UIGlyph>();
             _spaces = new List<UIGlyphSpace>();
@@ -224,6 +229,22 @@ namespace Editor.UI.Assets
             return new UIGlyph(metrics.Offset, metrics.Size, Boundaries.Zero, metrics.Advance);
         }
 
+        internal void AddGlyph(UIGlyphData data) => _data.Add(data);
+
+        internal void GenerateUVsForGlyphs()
+        {
+            ReadOnlySpan<UIGlyphData> span = _data.AsSpan();
+            for (int i = 0; i < _data.Count; i++)
+            {
+                ref readonly UIGlyphData glyph = ref span.DangerousGetReferenceAt(i);
+
+                Vector2 uvMin = glyph.BitmapOffset / _atlasSize;
+                Vector2 uvMax = (glyph.BitmapOffset + glyph.BitmapSize) / _atlasSize;
+
+                _glyphs[glyph.Codepoint] = new UIGlyph(glyph.Offset, glyph.Size, new Boundaries(uvMin, uvMax), glyph.Advance);
+            }
+        }
+
         public UIFontAsset Font => _assetDef;
         internal UIFontAssetData FontData => _assetData;
 
@@ -253,4 +274,5 @@ namespace Editor.UI.Assets
     }
 
     internal readonly record struct UIShapedGlyph(Vector2 Offset, Vector2 Size, float Advance);
+    internal readonly record struct UIGlyphData(char Codepoint, Vector2 Offset, Vector2 Size, Vector2 BitmapOffset, Vector2 BitmapSize, float Advance);
 }

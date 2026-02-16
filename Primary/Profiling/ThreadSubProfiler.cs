@@ -89,7 +89,7 @@ namespace Primary.Profiling
         internal void ClearDataForNextFrame()
         {
             _timestamps.Clear();
-            _collectAllocated = FlagUtility.HasFlag(ProfilingManager.Options, ProfilingOptions.CollectAllocation);
+            _collectAllocated = Flags.HasFlag(ProfilingManager.Options, ProfilingOptions.CollectAllocation);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

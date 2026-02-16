@@ -2,6 +2,7 @@
 using Primary.Rendering;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Batching;
+using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;

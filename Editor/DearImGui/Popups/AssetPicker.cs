@@ -1,6 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
-using Editor.Gui;
 using Editor.Storage;
+using Editor.UI;
 using Hexa.NET.ImGui;
 using Primary.Assets;
 using Primary.Assets.Types;
@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 
 namespace Editor.DearImGui.Popups
 {
-    internal sealed class AssetPicker : IPopup
+    internal sealed class AssetPicker : IDearImGuiPopup
     {
         private static DynamicIconSet? _iconSet;
 
@@ -26,7 +26,7 @@ namespace Editor.DearImGui.Popups
 
         private bool _isFirstFrame;
 
-        internal AssetPicker(Type type, AssetId current, Action<IAssetDefinition>? callback, Action<AssetId>? callback2)
+        public AssetPicker(Type type, AssetId current, Action<IAssetDefinition>? callback, Action<AssetId>? callback2)
         {
             _refId = current;
             _type = type;
@@ -44,7 +44,7 @@ namespace Editor.DearImGui.Popups
             SelectAssetsBasedOnSearch(ReadOnlySpan<char>.Empty);
         }
 
-        public bool Render()
+        public void Render(ref bool windowOpen)
         {
             if (_iconSet == null)
             {
@@ -55,7 +55,7 @@ namespace Editor.DearImGui.Popups
                 atlasManager.TriggerRebuild();
             }
 
-            if (ImGui.BeginPopup("Asset picker", ImGuiWindowFlags.NoMove))
+            if (ImGui.BeginPopupModal("Asset picker", ref windowOpen))
             {
                 if (_isFirstFrame)
                     ImGui.SetKeyboardFocusHere();
@@ -115,14 +115,10 @@ namespace Editor.DearImGui.Popups
                 ImGui.EndPopup();
             }
 
-            if (_isFirstFrame)
-            {
-                ImGui.OpenPopup("Asset picker");
-                _isFirstFrame = !ImGui.IsPopupOpen("Asset picker");
-            }
-
-            return _isFirstFrame || ImGui.IsPopupOpen("Asset picker");
+            _isFirstFrame = false;
         }
+
+        public void OpenPopup() => ImGui.OpenPopup("Asset picker");
 
         private void SelectAssetsBasedOnSearch(ReadOnlySpan<char> search)
         {
@@ -209,6 +205,8 @@ namespace Editor.DearImGui.Popups
 
             return pressed;
         }
+
+        public DearImGuiPopupFlags Flags => DearImGuiPopupFlags.None;
 
         private readonly record struct Cached(string LocalPath, AssetId Id, bool IsImported);
     }

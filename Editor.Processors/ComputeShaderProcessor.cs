@@ -75,9 +75,9 @@ namespace Editor.Processors
         {
             CBCTarget target = CBCTarget.None;
 
-            if (FlagUtility.HasFlag(result.Targets, ShaderCompileTarget.Direct3D12))
+            if (Flags.HasFlag(result.Targets, ShaderCompileTarget.Direct3D12))
                 target |= CBCTarget.Direct3D12;
-            if (FlagUtility.HasFlag(result.Targets, ShaderCompileTarget.Vulkan))
+            if (Flags.HasFlag(result.Targets, ShaderCompileTarget.Vulkan))
                 target |= CBCTarget.Vulkan;
 
             CBCHeader header = new CBCHeader
@@ -107,7 +107,7 @@ namespace Editor.Processors
                 numThreads = Array.Find(function.Attributes, (x) => x.Signature is AttributeNumThreads);
                 if (kernelIndex > 0)
                     --kernelIndex;
-                else
+                else if (numThreads.Signature != null)
                     break;
             }
 
@@ -421,11 +421,11 @@ namespace Editor.Processors
                 long current = bw.BaseStream.Position;
 
                 bw.BaseStream.Seek(backup, SeekOrigin.Begin);
-                bw.Write((ushort)(FlagUtility.HasFlag(flags, CBCPropertyFlags.Global) ? globalByteOffset : localByteOffset));
+                bw.Write((ushort)(Flags.HasFlag(flags, CBCPropertyFlags.Global) ? globalByteOffset : localByteOffset));
                 bw.Write(flags);
                 bw.BaseStream.Seek(current, SeekOrigin.Begin);
 
-                if (FlagUtility.HasFlag(flags, CBCPropertyFlags.Global))
+                if (Flags.HasFlag(flags, CBCPropertyFlags.Global))
                     globalByteOffset += size;
                 else
                     localByteOffset += size;

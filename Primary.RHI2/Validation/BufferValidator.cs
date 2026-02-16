@@ -27,8 +27,8 @@ namespace Primary.RHI2.Validation
                 return false;
             }
 
-            bool unorderedAccess = FlagUtility.HasFlag(description.Usage, RHIResourceUsage.UnorderedAccess);
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.ShaderResource) || unorderedAccess)
+            bool unorderedAccess = Flags.HasFlag(description.Usage, RHIResourceUsage.UnorderedAccess);
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.ShaderResource) || unorderedAccess)
             {
                 switch (description.Mode)
                 {
@@ -77,28 +77,28 @@ namespace Primary.RHI2.Validation
                 }
             }
 
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.ConstantBuffer))
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.ConstantBuffer))
             {
 
             }
 
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.VertexInput))
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.VertexInput))
             {
 
             }
 
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.IndexInput))
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.IndexInput))
             {
 
             }
 
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.RenderTarget))
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.RenderTarget))
             {
                 logger?.Error("[r:{n}]: A buffer cannot be used as a render target", resourceName);
                 return false;
             }
 
-            if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.DepthStencil))
+            if (Flags.HasFlag(description.Usage, RHIResourceUsage.DepthStencil))
             {
                 logger?.Error("[r:{n}]: A buffer cannot be used as a render target", resourceName);
                 return false;

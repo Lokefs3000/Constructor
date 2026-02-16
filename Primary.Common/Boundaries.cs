@@ -36,13 +36,11 @@ namespace Primary.Common
             Maximum = new Vector2(vector.GetElement(2), vector.GetElement(3));
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsWithin(Vector2 point)
         {
             return Vector128.GreaterThanOrEqualAll(Vector128.Create(point.X, point.Y, Maximum.X, Maximum.Y), Vector128.Create(Minimum.X, Minimum.Y, point.X, point.Y));
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsIntersecting(Boundaries boundaries)
         {
             Vector128<float> a = AsVector128();
@@ -55,35 +53,27 @@ namespace Primary.Common
             return Vector128.LessThanOrEqualAll(b, a);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(Boundaries other)
         {
             return Vector128.EqualsAll(AsVector128(), other.AsVector128());
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
             return Minimum.GetHashCode() ^ Maximum.GetHashCode();
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public string ToString([StringSyntax(StringSyntaxAttribute.NumericFormat)] string? format, IFormatProvider? formatProvider)
         {
             return $"{Minimum.ToString(format, formatProvider)} - {Maximum.ToString(format, formatProvider)}";
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override string ToString() => ToString("G", CultureInfo.CurrentCulture);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public string ToString([StringSyntax(StringSyntaxAttribute.NumericFormat)] string? format) => ToString(format, CultureInfo.CurrentCulture);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Vector4 AsVector4() => new Vector4(Minimum.X, Minimum.Y, Maximum.X, Maximum.Y);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Vector128<float> AsVector128() => Vector128.Create(Minimum.X, Minimum.Y, Maximum.X, Maximum.Y);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Boundaries Offset(Boundaries boundaries, Vector2 offset)
         {
             return new Boundaries(Vector128.Add(boundaries.AsVector128(), Vector128.Create(offset.X, offset.Y, offset.X, offset.Y)));
@@ -100,11 +90,25 @@ namespace Primary.Common
             return bounds;
         }
 
+        public static Vector2 OnEdge(Boundaries b, Vector2 p)
+        {
+            return Vector2.Clamp(p, b.Minimum, b.Maximum);
+        }
+
+        public static Boundaries Clip(Boundaries a, Boundaries b)
+        {
+            //TODO: Vectorize to use Vector128 instead of 2 Vector2s
+            return new Boundaries(Vector2.Max(a.Minimum, b.Minimum), Vector2.Min(a.Maximum, b.Maximum));
+        }
+
         public Vector2 Size => Maximum - Minimum;
         public Vector2 Center => Vector2.Lerp(Minimum, Maximum, 0.5f);
 
         public static readonly Boundaries Zero = new Boundaries();
 
         private static readonly byte s_intersectShuffle = SimdUtility.CreateShuffleMask(1, 0, 3, 2);
+
+        public static bool operator ==(Boundaries a, Boundaries b) => a.Equals(b);
+        public static bool operator !=(Boundaries a, Boundaries b) => !a.Equals(b);
     }
 }

@@ -51,12 +51,12 @@ namespace Primary.RHI2.Direct3D12
                     SamplerFeedbackMipRegion = default
                 };
 
-                if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.UnorderedAccess))
+                if (Flags.HasFlag(description.Usage, RHIResourceUsage.UnorderedAccess))
                     desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-                if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.RenderTarget))
+                if (Flags.HasFlag(description.Usage, RHIResourceUsage.RenderTarget))
                     desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-                if (FlagUtility.HasFlag(description.Usage, RHIResourceUsage.DepthStencil))
+                if (Flags.HasFlag(description.Usage, RHIResourceUsage.DepthStencil))
                     desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
                 D3D12MA.ALLOCATION_DESC alloc = new D3D12MA.ALLOCATION_DESC
@@ -78,8 +78,8 @@ namespace Primary.RHI2.Direct3D12
                 _allocation = temp;
             }
 
-            _barrierSync = D3D12_BARRIER_SYNC_NONE;
-            _barrierAccess = D3D12_BARRIER_ACCESS_COMMON;
+            _barrierSync = D3D12_BARRIER_SYNC_ALL;
+            _barrierAccess = D3D12_BARRIER_ACCESS_NO_ACCESS;
             _barrierLayout = D3D12_BARRIER_LAYOUT_UNDEFINED;
 
             {
@@ -90,9 +90,9 @@ namespace Primary.RHI2.Direct3D12
                 };
                 _nativeRep->Resource = _resource;
                 _nativeRep->Memory = _allocation;
-                _nativeRep->BarrierSync = (D3D12_BARRIER_SYNC*)Unsafe.AsPointer(ref _barrierSync);
-                _nativeRep->BarrierAccess = (D3D12_BARRIER_ACCESS*)Unsafe.AsPointer(ref _barrierAccess);
-                _nativeRep->BarrierLayout = (D3D12_BARRIER_LAYOUT*)Unsafe.AsPointer(ref _barrierLayout);
+                _nativeRep->BarrierSync = _barrierSync;
+                _nativeRep->BarrierAccess = _barrierAccess;
+                _nativeRep->BarrierLayout = _barrierLayout;
                 _nativeRep->IsInitialized = false;
             }
         }
@@ -108,9 +108,11 @@ namespace Primary.RHI2.Direct3D12
                     _nativeRep = null;
 
                     if (_allocation != null)
-                        _allocation->Base.Dispose();
+                        _allocation->Base.Release();
                     _allocation = null;
                     _resource.Reset();
+
+                    _device.UploadManager.RemoveWithResource(this);
                 });
 
                 _disposedValue = true;
@@ -129,6 +131,8 @@ namespace Primary.RHI2.Direct3D12
         public override unsafe RHIResourceNative* GetBaseAsNative() => (RHIResourceNative*)_nativeRep;
 
         public override RHIResourceType Type => RHIResourceType.Texture;
+
+        public ComPtr<ID3D12Resource2> Resource => _resource;
     }
 
     public unsafe struct D3D12RHITextureNative
@@ -138,9 +142,9 @@ namespace Primary.RHI2.Direct3D12
         public ID3D12Resource2* Resource;
         public D3D12MA.Allocation* Memory;
 
-        public D3D12_BARRIER_SYNC* BarrierSync;
-        public D3D12_BARRIER_ACCESS* BarrierAccess;
-        public D3D12_BARRIER_LAYOUT* BarrierLayout;
+        public D3D12_BARRIER_SYNC BarrierSync;
+        public D3D12_BARRIER_ACCESS BarrierAccess;
+        public D3D12_BARRIER_LAYOUT BarrierLayout;
 
         public bool IsInitialized;
 

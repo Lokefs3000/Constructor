@@ -60,7 +60,7 @@ namespace Primary.Rendering.Recording
             if (Unsafe.IsNullRef(ref val))
                 return false;
 
-            return FlagUtility.HasFlag(val.Usage, resourceAccess);
+            return Flags.HasFlag(val.Usage, resourceAccess);
         }
     }
 

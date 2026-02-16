@@ -27,6 +27,8 @@ namespace Editor.Shaders.Data
 
             if (idx == -1)
                 return false;
+            if (typeof(T).IsValueType && Data[idx].Value == null)
+                return false;
 
             result = (T?)Data[idx].Value;
             return true;

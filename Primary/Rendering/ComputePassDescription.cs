@@ -51,9 +51,9 @@ namespace Primary.Rendering
                 for (int i = start; i >= 0; i--)
                 {
                     FGTextureUsage usage = (FGTextureUsage)(1 << i);
-                    if (FlagUtility.HasFlag(desc.Usage, usage))
+                    if (Flags.HasFlag(desc.Usage, usage))
                     {
-                        if (FlagUtility.HasFlag(desc.Usage, ~s_textureUsageMap.DangerousGetReferenceAt(i)))
+                        if (Flags.HasFlag(desc.Usage, ~s_textureUsageMap.DangerousGetReferenceAt(i)))
                         {
                             _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.IncompatibleUsage, debugName);
                             return FrameGraphTexture.Invalid;
@@ -195,9 +195,9 @@ namespace Primary.Rendering
                 for (int i = start; i >= 0; i--)
                 {
                     FGBufferUsage usage = (FGBufferUsage)(1 << i);
-                    if (FlagUtility.HasFlag(desc.Usage, usage))
+                    if (Flags.HasFlag(desc.Usage, usage))
                     {
-                        if (FlagUtility.HasFlag(desc.Usage, ~s_bufferUsageMap.DangerousGetReferenceAt(i)))
+                        if (Flags.HasFlag(desc.Usage, ~s_bufferUsageMap.DangerousGetReferenceAt(i)))
                         {
                             _renderPass.ReportError(RPErrorSource.CreateBuffer, RPErrorType.IncompatibleUsage, debugName);
                             return FrameGraphBuffer.Invalid;
@@ -207,7 +207,7 @@ namespace Primary.Rendering
             }
 
             //Not a bug but a D3D12 limitation
-            if (FlagUtility.HasFlag(desc.Usage, FGBufferUsage.ConstantBuffer))
+            if (Flags.HasFlag(desc.Usage, FGBufferUsage.ConstantBuffer))
                 desc.Width = Math.Max(desc.Width, 256);
 
             FrameGraphBuffer buffer = new FrameGraphResource(_renderPass.GetNewResourceIndex(), desc, debugName).AsBuffer();
@@ -220,23 +220,23 @@ namespace Primary.Rendering
         {
             //validate
             {
-                if (FlagUtility.HasFlag(usage, FGResourceUsage.Read))
+                if (Flags.HasFlag(usage, FGResourceUsage.Read))
                 {
-                    if (!FlagUtility.HasEither(resource.Description.Usage, FGTextureUsage.GenericShader | FGTextureUsage.PixelShader))
+                    if (!Flags.HasEither(resource.Description.Usage, FGTextureUsage.GenericShader | FGTextureUsage.PixelShader))
                     {
-                        if (!FlagUtility.HasFlag(usage, FGResourceUsage.NoShaderAccess))
+                        if (!Flags.HasFlag(usage, FGResourceUsage.NoShaderAccess))
                             _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
                     }
                 }
 
-                if (FlagUtility.HasFlag(usage, FGResourceUsage.Write))
+                if (Flags.HasFlag(usage, FGResourceUsage.Write))
                 {
-                    if (!FlagUtility.HasEither(resource.Description.Usage, FGTextureUsage.GenericShader | FGTextureUsage.PixelShader))
+                    if (!Flags.HasEither(resource.Description.Usage, FGTextureUsage.GenericShader | FGTextureUsage.PixelShader))
                     {
                         _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
                     }
 
-                    if (!FlagUtility.HasEither(resource.Description.Usage, FGTextureUsage.RenderTarget | FGTextureUsage.DepthStencil | FGTextureUsage.UnorderedAccess))
+                    if (!Flags.HasEither(resource.Description.Usage, FGTextureUsage.RenderTarget | FGTextureUsage.DepthStencil | FGTextureUsage.UnorderedAccess))
                     {
                         _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.InvalidUsage, resource.ToString());
                     }
@@ -254,7 +254,7 @@ namespace Primary.Rendering
                 {
                     case FGResourceUsage.Read:
                         {
-                            if (!FlagUtility.HasEither(resource.Description.Usage, FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.VertexBuffer | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer))
+                            if (!Flags.HasEither(resource.Description.Usage, FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.VertexBuffer | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer))
                             {
                                 _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
                             }
@@ -263,7 +263,7 @@ namespace Primary.Rendering
                         }
                     case FGResourceUsage.Write:
                         {
-                            if (!FlagUtility.HasEither(resource.Description.Usage, FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.VertexBuffer | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer))
+                            if (!Flags.HasEither(resource.Description.Usage, FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.VertexBuffer | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer))
                             {
                                 _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
                             }
@@ -300,7 +300,7 @@ namespace Primary.Rendering
                     return;
                 }
 
-                if (!FlagUtility.HasFlag(renderTarget.Description.Usage, FGTextureUsage.RenderTarget))
+                if (!Flags.HasFlag(renderTarget.Description.Usage, FGTextureUsage.RenderTarget))
                 {
                     _renderPass.ReportError(RPErrorSource.UseRenderTarget, RPErrorType.MissingUsageFlag, renderTarget.ToString());
                     return;
@@ -320,7 +320,7 @@ namespace Primary.Rendering
                     return;
                 }
 
-                if (!FlagUtility.HasFlag(depthStencil.Description.Usage, FGTextureUsage.DepthStencil))
+                if (!Flags.HasFlag(depthStencil.Description.Usage, FGTextureUsage.DepthStencil))
                 {
                     _renderPass.ReportError(RPErrorSource.UseDepthStencil, RPErrorType.MissingUsageFlag, depthStencil.ToString());
                     return;

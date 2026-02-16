@@ -152,7 +152,7 @@ namespace Editor.UI.Visual
                         {
                             foreach (UIElement child in element.Children)
                             {
-                                if (true || FlagUtility.HasFlag(child.InvalidFlags, UIInvalidationFlags.Visual))
+                                if (true || Flags.HasFlag(child.InvalidFlags, UIInvalidationFlags.Visual))
                                 {
                                     searchQueue.Enqueue(child);
                                 }
@@ -167,7 +167,7 @@ namespace Editor.UI.Visual
                         {
                             foreach (UIElement child in element.Children)
                             {
-                                if (true || FlagUtility.HasFlag(child.InvalidFlags, UIInvalidationFlags.Visual))
+                                if (true || Flags.HasFlag(child.InvalidFlags, UIInvalidationFlags.Visual))
                                     bounds = Boundaries.Combine(bounds, child.InvalidVisualRegion);
                             }
                         }
@@ -176,7 +176,7 @@ namespace Editor.UI.Visual
                     }
                 }
 
-                Boundaries invalidRegion = window.InvalidVisualRegion;
+                Boundaries invalidRegion = Boundaries.Clip(window.InvalidVisualRegion, new Boundaries(Vector2.Zero, window.ClientSize));
                 commandBuffer.ClearCommands(invalidRegion);
 
                 while (drawQueue.TryDequeue(out UIElement? element))
@@ -187,11 +187,16 @@ namespace Editor.UI.Visual
                     {
                         foreach (UIElement child in element.Children)
                         {
-                            if (true || FlagUtility.HasFlag(child.InvalidFlags, UIInvalidationFlags.Visual))
+                            if (true || Flags.HasFlag(child.InvalidFlags, UIInvalidationFlags.Visual))
                                 drawQueue.Enqueue(child);
                         }
                     }
                 }
+
+                UIManager manager = UIManager.Instance;
+                manager.FontManager.RenderPendingFonts();
+
+                CommandBufferFinished?.Invoke(window, commandBuffer);
 
                 if (!_pooledBakedCmdBuffers.TryDequeue(out UIBakedCommandBuffer? bakedCommandBuffer))
                     bakedCommandBuffer = new UIBakedCommandBuffer();
@@ -207,6 +212,8 @@ namespace Editor.UI.Visual
                 }
 
                 bakedCommandBuffer.Bake(this, commandBuffer);
+
+                CommandBufferBaked?.Invoke(window, bakedCommandBuffer);
 
                 _queuedWindowRedraws.Enqueue(new UIWindowRedraw(window, bakedCommandBuffer, invalidRegion));
 
@@ -240,6 +247,9 @@ namespace Editor.UI.Visual
         public int CompositerQueueSize => _uncompositedDockHosts.Count;
 
         internal HashSet<UIDockHost> UncompositedHosts => _uncompositedDockHosts;
+
+        internal event Action<UIWindow, UICommandBuffer>? CommandBufferFinished;
+        internal event Action<UIWindow, UIBakedCommandBuffer>? CommandBufferBaked;
 
         private readonly record struct SearchElementData(UIElement Element, Boundaries VisualRegion);
     }

@@ -4,11 +4,13 @@ using Primary.Assets;
 using Primary.Common;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
+using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.Rendering.Structures;
 using Primary.RHI2;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -21,19 +23,30 @@ namespace Editor.Rendering.Passes
         private PropertyBlock _propertyBlock;
 
         private Dictionary<nint, RHITexture> _activeTextures;
+        private RHITexture? _primaryTexture;
 
-        internal DearImGuiRenderPass()
+        public DearImGuiRenderPass()
         {
-            _dearImGuiShader = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/DearImGui.hlsl2", true);
+            _dearImGuiShader = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/DearImGui/DearImGui.shader", true);
             _propertyBlock = _dearImGuiShader.CreatePropertyBlock()!;
 
             _activeTextures = new Dictionary<nint, RHITexture>();
+            _primaryTexture = null;
+
+            unsafe
+            {
+                ImGuiIOPtr io = ImGui.GetIO();
+                io.BackendFlags |= ImGuiBackendFlags.RendererHasTextures | ImGuiBackendFlags.RendererHasVtxOffset;
+            }
         }
 
         public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
         {
             RenderCameraData cameraData = context.Get<RenderCameraData>()!;
             ImDrawDataPtr drawData = ImGui.GetDrawData();
+
+            if (!drawData.Valid || drawData.TotalVtxCount <= 0 || drawData.TotalIdxCount <= 0)
+                return;
 
             using (RasterPassDescription desc = renderPass.SetupRasterPass("DearImGui", out PassData passData))
             {
@@ -44,20 +57,20 @@ namespace Editor.Rendering.Passes
                     Width = (uint)(drawData.TotalVtxCount * Unsafe.SizeOf<ImDrawVert>()),
                     Stride = Unsafe.SizeOf<ImDrawVert>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.VertexBuffer
-                });
+                }, "DearImGui-Vtx");
                 passData.IndexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
                 {
                     Width = (uint)(drawData.TotalIdxCount * Unsafe.SizeOf<ushort>()),
                     Stride = Unsafe.SizeOf<ushort>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.IndexBuffer
-                });
+                }, "DearImGui-Idx");
 
                 passData.VertexData = desc.CreateBuffer(new FrameGraphBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<Matrix4x4>(),
                     Stride = Unsafe.SizeOf<Matrix4x4>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.ConstantBuffer
-                });
+                }, "DearImGui-Cb");
 
                 passData.Shader = _dearImGuiShader;
                 passData.Block = _propertyBlock;
@@ -85,15 +98,22 @@ namespace Editor.Rendering.Passes
                 int offsetVtx = 0;
                 int offsetIdx = 0;
 
-                for (int i = 0; i < drawData.CmdListsCount; i++)
+                fixed (ImDrawVert* ptr1 = vertices.Span)
+                fixed (ushort* ptr2 = indices.Span)
                 {
-                    ImDrawListPtr list = drawData.CmdLists[i];
+                    for (int i = 0; i < drawData.CmdListsCount; i++)
+                    {
+                        ImDrawListPtr list = drawData.CmdLists[i];
 
-                    NativeMemory.Copy(list.VtxBuffer.Data, Unsafe.AsPointer(ref vertices.Span[offsetVtx]), (nuint)(list.VtxBuffer.Size * Unsafe.SizeOf<ImDrawVert>()));
-                    NativeMemory.Copy(list.IdxBuffer.Data, Unsafe.AsPointer(ref indices.Span[offsetVtx]), (nuint)(list.IdxBuffer.Size * Unsafe.SizeOf<ushort>()));
+                        Debug.Assert(offsetVtx + list.VtxBuffer.Size <= vertices.Span.Length);
+                        Debug.Assert(offsetIdx + list.IdxBuffer.Size <= indices.Span.Length);
 
-                    offsetVtx += list.VtxBuffer.Size;
-                    offsetIdx += list.IdxBuffer.Size;
+                        NativeMemory.Copy(list.VtxBuffer.Data, ptr1 + offsetVtx, (nuint)(list.VtxBuffer.Size * Unsafe.SizeOf<ImDrawVert>()));
+                        NativeMemory.Copy(list.IdxBuffer.Data, ptr2 + offsetIdx, (nuint)(list.IdxBuffer.Size * Unsafe.SizeOf<ushort>()));
+
+                        offsetVtx += list.VtxBuffer.Size;
+                        offsetIdx += list.IdxBuffer.Size;
+                    }
                 }
             }
 
@@ -119,7 +139,7 @@ namespace Editor.Rendering.Passes
 
             cmd.SetPipeline(passData.Shader!.GraphicsPipeline!);
 
-            passData.Block!.SetResource(PropertyBlock.GetID("cbVertex"), passData.VertexData);
+            passData.Block!.SetResource("cbVertex", passData.VertexData);
 
             int vtxOffset = 0;
             int idxOffset = 0;
@@ -134,7 +154,7 @@ namespace Editor.Rendering.Passes
                     {
                         if (draw.TexRef.TexData->BackendUserData == null)
                             continue;
-                        //passData.Block!.SetResource(PropertyBlock.GetID("txTexture"), (nint)draw.TexRef.TexData->BackendUserData, RHIResourceType.Texture);
+                        passData.Block!.SetResource("txTexture", passData.ActiveTextures![(nint)draw.TexRef.TexData->BackendUserData]);
                     }
                     else
                     {
@@ -142,7 +162,7 @@ namespace Editor.Rendering.Passes
                             continue;
 
                         nint native = (nint)draw.TexRef.TexID.Handle;
-                        //passData.Block!.SetResource(PropertyBlock.GetID("txTexture"), native, RHIResourceType.Texture);
+                        passData.Block!.SetResource("txTexture", passData.ActiveTextures![native]);
                     }
 
                     cmd.SetScissor(0, new FGRect((int)draw.ClipRect.X, (int)draw.ClipRect.Y, (int)draw.ClipRect.Z, (int)draw.ClipRect.W));
@@ -203,16 +223,19 @@ namespace Editor.Rendering.Passes
 
                             ImTextureRect updateRect = textureData.UpdateRect;
 
-                            //using FGMappedSubresource<byte> pixels = cmd.Map<byte>(new FGMapTextureDesc(texture, new FGBox(updateRect.X, updateRect.Y, 0, updateRect.W, updateRect.H, 1)));
-                            nint dataPointer = nint.Zero;//(nint)Unsafe.AsPointer(ref pixels.Span.DangerousGetReference());
+                            int paddedRowSlice = updateRect.W * 4;//(updateRect.W + (-updateRect.W & 255)) * 4;
+                            byte[] memory = new byte[paddedRowSlice * updateRect.H * 4];
 
-                            ExceptionUtility.Assert(dataPointer != 0);
-
-                            int sliceSize = updateRect.W * 4;
-                            for (int j = 0; j < updateRect.H; j++)
+                            fixed (byte* dataPointer = memory)
                             {
-                                NativeMemory.Copy(textureData.GetPixelsAt(updateRect.X, updateRect.Y + j), (dataPointer + sliceSize * j).ToPointer(), (uint)sliceSize);
+                                int sliceSize = updateRect.W * 4;
+                                for (int j = 0; j < updateRect.H; j++)
+                                {
+                                    NativeMemory.Copy(textureData.GetPixelsAt(updateRect.X, updateRect.Y + j), (dataPointer + paddedRowSlice * j), (uint)sliceSize);
+                                }
                             }
+
+                            cmd.Upload(new FGTextureUploadDesc(texture, new FGBox(updateRect.X, updateRect.Y, 0, updateRect.W, updateRect.H, 1), 0, paddedRowSlice), memory);
 
                             textureData.SetStatus(ImTextureStatus.Ok);
                         }
@@ -251,7 +274,17 @@ namespace Editor.Rendering.Passes
 
             public void Clear()
             {
-                throw new NotImplementedException();
+                OutColor = FrameGraphTexture.Invalid;
+
+                VertexBuffer = FrameGraphBuffer.Invalid;
+                IndexBuffer = FrameGraphBuffer.Invalid;
+
+                VertexData = FrameGraphBuffer.Invalid;
+
+                Shader = null;
+                Block = null;
+
+                ActiveTextures = null;
             }
         }
     }

@@ -63,7 +63,7 @@ namespace Editor.Assets
                 try
                 {
                     FileAttributes attributes = File.GetAttributes(b.FullPath);
-                    if (FlagUtility.HasFlag(attributes, FileAttributes.Directory))
+                    if (Flags.HasFlag(attributes, FileAttributes.Directory))
                     {
                         string localDirectory = b.FullPath.Substring(_rootDirectory.Length + 1).Replace('\\', '/');
                         AddLocalDirectory(null, b.FullPath, localDirectory);
@@ -131,7 +131,7 @@ namespace Editor.Assets
                 try
                 {
                     FileAttributes attributes = File.GetAttributes(b.FullPath);
-                    if (FlagUtility.HasFlag(attributes, FileAttributes.Directory))
+                    if (Flags.HasFlag(attributes, FileAttributes.Directory))
                     {
                         string oldLocalDirectory = b.OldFullPath.Substring(_rootDirectory.Length + 1).Replace('\\', '/');
                         string newLocalDirectory = b.FullPath.Substring(_rootDirectory.Length + 1).Replace('\\', '/');
@@ -174,7 +174,7 @@ namespace Editor.Assets
                 try
                 {
                     FileAttributes attributes = File.GetAttributes(b.FullPath);
-                    if (!FlagUtility.HasFlag(attributes, FileAttributes.Directory))
+                    if (!Flags.HasFlag(attributes, FileAttributes.Directory))
                     {
                         string localFile = b.FullPath.Substring(_rootDirectory.Length + 1).Replace('\\', '/');
                         if (_activeFiles.TryGetValue(localFile, out AssetFile file))

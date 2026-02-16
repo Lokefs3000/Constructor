@@ -13,11 +13,11 @@ namespace Primary.Rendering.Assets
             _block = block;
         }
 
-        public FrameGraphBuffer GetFrameGraphBuffer(int id) => _block?.GetFrameGraphBuffer(id) ?? FrameGraphBuffer.Invalid;
-        public RHIBuffer? GetRHIBuffer(int id) => _block?.GetRHIBuffer(id);
-        public FrameGraphTexture GetFrameGraphTexture(int id) => _block?.GetFrameGraphTexture(id) ?? FrameGraphTexture.Invalid;
-        public RHITexture? GetRHITexture(int id) => _block?.GetRHITexture(id);
-        public TextureAsset? GetTextureAsset(int id) => _block?.GetTextureAsset(id);
+        public FrameGraphBuffer GetFrameGraphBuffer(string id) => _block?.GetFrameGraphBuffer(id) ?? FrameGraphBuffer.Invalid;
+        public RHIBuffer? GetRHIBuffer(string id) => _block?.GetRHIBuffer(id);
+        public FrameGraphTexture GetFrameGraphTexture(string id) => _block?.GetFrameGraphTexture(id) ?? FrameGraphTexture.Invalid;
+        public RHITexture? GetRHITexture(string id) => _block?.GetRHITexture(id);
+        public TextureAsset? GetTextureAsset(string id) => _block?.GetTextureAsset(id);
 
         public void CopyBlockDataTo(nint nativePtr) => _block?.CopyBlockDataTo(nativePtr);
 

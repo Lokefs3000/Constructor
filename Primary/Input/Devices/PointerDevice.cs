@@ -24,7 +24,7 @@ namespace Primary.Input.Devices
                 MouseButton button = TranslateButton(@event.button.Button);
                 if (button != MouseButton.Unknown)
                 {
-                    if (!FlagUtility.HasFlag(_states[(int)button - 1], ButtonState.Held))
+                    if (!Flags.HasFlag(_states[(int)button - 1], ButtonState.Held))
                     {
                         _states[(int)button - 1] |= ButtonState.Held | ButtonState.Updated;
                         return true;
@@ -36,7 +36,7 @@ namespace Primary.Input.Devices
                 MouseButton button = TranslateButton(@event.button.Button);
                 if (button != MouseButton.Unknown)
                 {
-                    if (FlagUtility.HasFlag(_states[(int)button - 1], ButtonState.Held))
+                    if (Flags.HasFlag(_states[(int)button - 1], ButtonState.Held))
                     {
                         _states[(int)button - 1] = ButtonState.Updated;
                         return true;
@@ -64,7 +64,7 @@ namespace Primary.Input.Devices
         {
             for (int i = 0; i < _states.Length; i++)
             {
-                _states[i] = FlagUtility.RemoveFlags(_states[i], ButtonState.Updated);
+                _states[i] = Flags.RemoveFlags(_states[i], ButtonState.Updated);
             }
 
             _mouseDelta = Vector2.Zero;
@@ -95,22 +95,22 @@ namespace Primary.Input.Devices
             ValueCode code = new ValueCode(valueId);
             switch (code.Type)
             {
-                case CodeType.Button: return new DeviceValue(FlagUtility.HasFlag(_states[(int)code.Button - 1], ButtonState.Held));
+                case CodeType.Button: return new DeviceValue(Flags.HasFlag(_states[(int)code.Button - 1], ButtonState.Held));
                 case CodeType.Motion: return new DeviceValue(_mouseDelta);
                 case CodeType.Wheel: return new DeviceValue(_wheelDelta);
                 default: return default;
             }
         }
 
-        public bool IsButtonHeld(MouseButton button) => FlagUtility.HasFlag(_states[(int)button - 1], ButtonState.Held);
-        public bool IsButtonPressed(MouseButton button) => FlagUtility.HasFlag(_states[(int)button - 1], ButtonState.Held | ButtonState.Updated);
-        public bool IsButtonReleased(MouseButton button) => FlagUtility.HasFlag(_states[(int)button - 1], ButtonState.Updated);
+        public bool IsButtonHeld(MouseButton button) => Flags.HasFlag(_states[(int)button - 1], ButtonState.Held);
+        public bool IsButtonPressed(MouseButton button) => Flags.HasFlag(_states[(int)button - 1], ButtonState.Held | ButtonState.Updated);
+        public bool IsButtonReleased(MouseButton button) => Flags.HasFlag(_states[(int)button - 1], ButtonState.Updated);
 
         public Vector2 MousePosition => _mousePosition;
         public Vector2 MouseDelta => _mouseDelta;
         public Vector2 WheelDelta => _wheelDelta;
 
-        private static MouseButton TranslateButton(SDLButton button) => button switch
+        public static MouseButton TranslateButton(SDLButton button) => button switch
         {
             SDLButton.SDL_BUTTON_LEFT => MouseButton.Left,
             SDLButton.SDL_BUTTON_MIDDLE => MouseButton.Middle,

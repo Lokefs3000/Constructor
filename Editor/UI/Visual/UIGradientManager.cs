@@ -92,7 +92,8 @@ namespace Editor.UI.Visual
         {
             if (!_registeredGradients.TryGetValue(gradient, out int index))
             {
-                _registeredGradients.Add(gradient, _registeredGradients.Count);
+                index = _registeredGradients.Count;
+                _registeredGradients.Add(gradient, index);
             }
 
             return index;

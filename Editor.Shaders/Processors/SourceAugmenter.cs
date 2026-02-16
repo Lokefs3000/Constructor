@@ -2,10 +2,13 @@
 using Editor.Shaders.Attributes;
 using Editor.Shaders.Data;
 using Primary.Common;
+using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using TerraFX.Interop.Windows;
+using TerraFX.Interop.WinRT;
 
 namespace Editor.Shaders.Processors
 {
@@ -53,7 +56,7 @@ namespace Editor.Shaders.Processors
             GenerateNewHeader(sb, features, headerBytesize, areConstantsSolo, variableDatas.Span, referenceIndices, out int additionalOffset);
 
             sb.Append(augment.Span);
-            string str = AppendBindlessResources(sb, sb.ToString(), additionalOffset, areConstantsSolo, variableDatas.Span);
+            string str = AppendBindlessResources(sb, sb.ToString(), additionalOffset, areConstantsSolo, variableDatas.Span, referenceIndices);
 
             _data.AreConstantsSeparated = areConstantsSolo;
             _data.HeaderBytesize = headerBytesize;
@@ -395,22 +398,18 @@ namespace Editor.Shaders.Processors
             additionalOffset = sb.Length;
         }
 
-        private string AppendBindlessResources(StringBuilder sb, string @string, int additionalOffset, bool areConstantsSolo, Span<RawVariableData> span)
+        private string AppendBindlessResources(StringBuilder sb, string @string, int additionalOffset, bool areConstantsSolo, Span<RawVariableData> span, HashSet<ReferenceIndex> usedReferences)
         {
             StringBuilder sb2 = new StringBuilder();
 
-            Dictionary<string, RawVariableData> existing = new Dictionary<string, RawVariableData>();
-            for (int i = 0; i < span.Length; i++)
-            {
-                existing[span[i].Name] = span[i];
-            }
+            Dictionary<int, RawVariableData> vars = new Dictionary<int, RawVariableData>();
 
-            HashSet<string> found = new HashSet<string>();
             foreach (ref readonly FunctionData function in _data.Functions)
             {
-                found.Clear();
+                vars.Clear();
+
                 ReadOnlySpan<char> interestingPortion = @string.AsSpan().Slice(function.BodyRange.Start + additionalOffset, function.BodyRange.End - function.BodyRange.Start);
-                SearchForVariables(interestingPortion);
+                SearchForVariables(_data, span, interestingPortion);
 
                 if (_data.PropertySourceTemplate != null)
                 {
@@ -422,7 +421,7 @@ namespace Editor.Shaders.Processors
                             if (varData.Type == RawVariableDataType.Property)
                             {
                                 string template = ResolvePropertyTemplate(_data.PropertySourceTemplate, in varData, in function);
-                                SearchForVariables(template);
+                                SearchForVariables(_data, span, template);
 
                                 sb2.Append(varData.Name);
                                 sb2.Append(" = ");
@@ -434,17 +433,20 @@ namespace Editor.Shaders.Processors
                 }
 
                 sb.Clear();
-                if (found.Count > 0)
+                if (vars.Count > 0)
                 {
-                    foreach (string foundVar in found)
+                    foreach (var kvp in vars)
                     {
-                        ref readonly RawVariableData varData = ref CollectionsMarshal.GetValueRefOrNullRef(existing, foundVar);
-                        Debug.Assert(!Unsafe.IsNullRef(in varData));
+                        RawVariableData varData = kvp.Value;
+                        bool isActuallyReferenced = usedReferences.Contains(new ReferenceIndex(ReferenceType.Resource, varData.Index));
 
                         if (varData.Usage == RawVariableUsage.Constants)
                         {
                             if (areConstantsSolo)
                                 continue;
+
+                            if (!isActuallyReferenced)
+                                throw new NotImplementedException();
 
                             SerializeGeneric(sb, varData.Generic, varData.Name);
                             sb.Append(' ');
@@ -476,8 +478,14 @@ namespace Editor.Shaders.Processors
                                 SerializeGeneric(sb, varData.Generic, varData.Name);
                                 sb.Append('>');
                             }
-                            sb.Append(resourceData.Type == ResourceType.SamplerState ? ")SamplerDescriptorHeap[__HEADER_CB.IDX_" : ")ResourceDescriptorHeap[__HEADER_CB.IDX_");
-                            sb.Append(varData.Name);
+                            sb.Append(resourceData.Type == ResourceType.SamplerState ? ")SamplerDescriptorHeap[" : ")ResourceDescriptorHeap[");
+                            if (isActuallyReferenced)
+                            {
+                                sb.Append("__HEADER_CB.IDX_");
+                                sb.Append(varData.Name);
+                            }
+                            else
+                                sb.Append('0');
                             sb.Append("];");
                         }
                     }
@@ -497,27 +505,88 @@ namespace Editor.Shaders.Processors
 
             return @string;
 
-            void SearchForVariables(ReadOnlySpan<char> interestingPortion)
+            void SearchForVariables(ShaderData data, Span<RawVariableData> span, ReadOnlySpan<char> interestingPortion)
             {
-                foreach (var kvp in existing)
+                for (int i = 0; i < interestingPortion.Length;)
                 {
-                    string varName = kvp.Key;
+                    int start = i;
+                    char c = interestingPortion[i++];
 
-                    int index = interestingPortion.IndexOf(varName, StringComparison.Ordinal);
-                    ReadOnlySpan<char> subsection = interestingPortion;
-
-                    while (index > -1)
+                    if (char.IsLetter(c))
                     {
-                        subsection = subsection.Slice(index);
-                        index = 0;
+                        while (char.IsLetterOrDigit(interestingPortion[i]) || interestingPortion[i] == '_')
+                            ++i;
 
-                        if (varName.Length == subsection.Length || !char.IsLetterOrDigit(subsection[varName.Length]))
+                        ReadOnlySpan<char> identifier = interestingPortion.Slice(start, i - start);
+
+                        bool found = false;
+
+                        start = i;
+                        while (char.IsWhiteSpace(interestingPortion[i]))
                         {
-                            found.Add(varName);
+                            if (++i >= interestingPortion.Length)
+                                break;
+
+                            if (interestingPortion[i] == '/')
+                            {
+                                MoveUntilOutOfComment(interestingPortion, ref i);
+                            }
                         }
 
-                        subsection = subsection.Slice(1);
-                        index = subsection.IndexOf(varName, StringComparison.Ordinal);
+                        if (i < interestingPortion.Length)
+                            found = interestingPortion[i] == '=';
+
+                        if (!found && data.TryFindReference(identifier.ToString(), out ReferenceIndex index) && index.Type == ReferenceType.Resource && !vars.ContainsKey((int)index.Data))
+                        {
+                            bool eventuallyFound = false;
+                            for (int j = 0; j < span.Length; j++)
+                            {
+                                ref RawVariableData rvd = ref span.DangerousGetReferenceAt(j);
+                                if (rvd.Type == RawVariableDataType.Resource && rvd.Index == index.Index)
+                                {
+                                    vars.Add((int)index.Data, rvd);
+                                    eventuallyFound = true;
+                                    break;
+                                }
+                            }
+
+                            //if (!eventuallyFound)
+                            //{
+                            //    ReportErrorMessage("Failed to find suitable variable for reference: {ref}", index);
+                            //}
+                        }
+                    }
+                }
+
+                static void MoveUntilOutOfComment(ReadOnlySpan<char> source, ref int index)
+                {
+                    int followingIndex = index + 1;
+                    if (followingIndex >= source.Length)
+                        return;
+
+                    char nextChar = source[followingIndex];
+                    if (nextChar == '/')
+                    {
+                        index = followingIndex;
+                        do
+                        {
+                            index++;
+                        } while (index < source.Length && source[index] != '\n');
+                    }
+                    else if (nextChar == '*')
+                    {
+                        index = followingIndex;
+                        do
+                        {
+                            if (source[index] == '*')
+                            {
+                                followingIndex = index + 1;
+                                if (followingIndex < source.Length && source[followingIndex] == '/')
+                                    break;
+                            }
+
+                            index++;
+                        } while (index < source.Length);
                     }
                 }
             }
@@ -667,11 +736,16 @@ namespace Editor.Shaders.Processors
 
             void RecursiveIncludeTravel(ShaderData data, FunctionIncludeData includeData)
             {
-                foreach (ReferenceIndex index in includeData.UsedResourceIndices)
+                foreach (ReferenceIndex index in includeData.Indices)
                 {
                     switch (index.Type)
                     {
-                        case ReferenceType.Function: RecursiveIncludeTravel(data, data.Functions[index.Index].IncludeData); break;
+                        case ReferenceType.Function:
+                            {
+                                indices.Add(index);
+                                RecursiveIncludeTravel(data, data.Functions[index.Index].IncludeData);
+                                break;
+                            }
                         default: indices.Add(index); break;
                     }
                 }

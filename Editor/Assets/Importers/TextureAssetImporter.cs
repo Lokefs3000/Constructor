@@ -63,7 +63,7 @@ namespace Editor.Assets.Importers
 
                 for (int i = 0, j = 0; i < 4; i++)
                 {
-                    if (FlagUtility.HasFlag(comp.Channels, (TextureCompositeChannel)(1 << i)))
+                    if (Flags.HasFlag(comp.Channels, (TextureCompositeChannel)(1 << i)))
                     {
                         TextureCompositeChannelArgs channelArgs = default;
 
@@ -262,22 +262,22 @@ namespace Editor.Assets.Importers
                 Channels = (TextureCompositeChannel)(long)root["channels"],
             };
 
-            if (FlagUtility.HasFlag(args.Channels, TextureCompositeChannel.Red))
+            if (Flags.HasFlag(args.Channels, TextureCompositeChannel.Red))
                 args.Red = ReadChannel((TomlTable)root["red"]);
             else
                 args.Red = new TextureCompositeChannelArgs();
 
-            if (FlagUtility.HasFlag(args.Channels, TextureCompositeChannel.Green))
+            if (Flags.HasFlag(args.Channels, TextureCompositeChannel.Green))
                 args.Green = ReadChannel((TomlTable)root["green"]);
             else
                 args.Green = new TextureCompositeChannelArgs();
 
-            if (FlagUtility.HasFlag(args.Channels, TextureCompositeChannel.Blue))
+            if (Flags.HasFlag(args.Channels, TextureCompositeChannel.Blue))
                 args.Blue = ReadChannel((TomlTable)root["blue"]);
             else
                 args.Blue = new TextureCompositeChannelArgs();
 
-            if (FlagUtility.HasFlag(args.Channels, TextureCompositeChannel.Alpha))
+            if (Flags.HasFlag(args.Channels, TextureCompositeChannel.Alpha))
                 args.Alpha = ReadChannel((TomlTable)root["alpha"]);
             else
                 args.Alpha = new TextureCompositeChannelArgs();

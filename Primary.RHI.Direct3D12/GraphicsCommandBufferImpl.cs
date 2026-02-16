@@ -686,7 +686,7 @@ namespace Primary.RHI.Direct3D12
 
                 for (int i = 0; i < limit; i++)
                 {
-                    if (!FlagUtility.HasFlag(buffers[i].Description.Usage, BufferUsage.VertexBuffer))
+                    if (!Flags.HasFlag(buffers[i].Description.Usage, BufferUsage.VertexBuffer))
                     {
                         GraphicsDeviceImpl.Logger.Warning("SetVertexBuffers: {arg1}[{idx}] does not have BufferUsage.{usage} usage flag set.", nameof(buffers), i, BufferUsage.VertexBuffer);
                     }
@@ -725,7 +725,7 @@ namespace Primary.RHI.Direct3D12
             {
                 if (buffer != null)
                 {
-                    if (!FlagUtility.HasFlag(buffer.Description.Usage, BufferUsage.IndexBuffer))
+                    if (!Flags.HasFlag(buffer.Description.Usage, BufferUsage.IndexBuffer))
                     {
                         GraphicsDeviceImpl.Logger.Warning("SetIndexBuffer: {arg1} does not have BufferUsage.{usage} usage flag set.", nameof(buffer), BufferUsage.IndexBuffer);
                     }

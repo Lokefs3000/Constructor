@@ -2,7 +2,7 @@
   "Primary": {
     "_files": {
       "D:\\source\\repos\\Constructor\\Primary\\Assets\\Loaders\\MaterialAssetLoader.cs": {
-        "TimeSpent": "01:12:10.0892550"
+        "TimeSpent": "01:13:38.5417903"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Components\\MeshRenderer.cs": {
         "TimeSpent": "00:19:01.9431275"
@@ -17,10 +17,10 @@
         "TimeSpent": "01:41:50.7226360"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\RenderingManager.cs": {
-        "TimeSpent": "02:15:20.5277887"
+        "TimeSpent": "02:17:40.3954033"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\RenderPassManager.cs": {
-        "TimeSpent": "00:42:30.0487047"
+        "TimeSpent": "00:47:35.8824421"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\IRenderPass.cs": {
         "TimeSpent": "00:03:33.7881875"
@@ -35,7 +35,7 @@
         "TimeSpent": "01:29:08.2634325"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Assets\\Loaders\\ShaderAssetLoader.cs": {
-        "TimeSpent": "01:13:05.9673807"
+        "TimeSpent": "01:14:11.4413544"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\IRenderPath.cs": {
         "TimeSpent": "00:02:54.6975284"
@@ -53,7 +53,7 @@
         "TimeSpent": "00:10:40.5405098"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Assets\\AssetManager.cs": {
-        "TimeSpent": "01:45:17.4073667"
+        "TimeSpent": "01:45:29.6744996"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Assets\\ShaderAsset.cs": {
         "TimeSpent": "00:59:26.1242405"
@@ -71,10 +71,10 @@
         "TimeSpent": "01:41:49.7013493"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Assets\\MaterialAsset.cs": {
-        "TimeSpent": "00:44:03.2868491"
+        "TimeSpent": "00:45:58.7839416"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Systems\\TransformSystem.cs": {
-        "TimeSpent": "00:24:27.5417150"
+        "TimeSpent": "00:25:20.8003857"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Scenes\\SceneManager.cs": {
         "TimeSpent": "00:17:40.9142712"
@@ -83,7 +83,7 @@
         "TimeSpent": "00:20:07.7027530"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Profiling\\ThreadSubProfiler.cs": {
-        "TimeSpent": "00:44:45.3860172"
+        "TimeSpent": "00:49:26.4927462"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Timing\\Time.cs": {
         "TimeSpent": "00:03:52.0107488"
@@ -116,7 +116,7 @@
         "TimeSpent": "00:01:28.0140734"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Systems\\SystemManager.cs": {
-        "TimeSpent": "00:01:37.5845275"
+        "TimeSpent": "00:01:40.7392741"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\RenderScene.cs": {
         "TimeSpent": "00:06:14.4413357"
@@ -179,7 +179,7 @@
         "TimeSpent": "01:01:00.2050986"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Scenes\\SceneEntityManager.cs": {
-        "TimeSpent": "01:43:30.0717217"
+        "TimeSpent": "01:43:54.5198086"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Components\\RegisterComponentsDefault.cs": {
         "TimeSpent": "00:14:24.9841708"
@@ -242,16 +242,16 @@
         "TimeSpent": "00:36:42.9194338"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\SwapChainCache.cs": {
-        "TimeSpent": "00:03:04.8544609"
+        "TimeSpent": "00:04:43.8090213"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Assets\\Loaders\\MaterialAssetLoader - Copy.cs": {
         "TimeSpent": "00:00:48.3600595"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Assets\\Loaders\\TextureAssetLoader.cs": {
-        "TimeSpent": "01:54:19.8628146"
+        "TimeSpent": "01:54:38.5953194"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Assets\\TextureAsset.cs": {
-        "TimeSpent": "00:30:24.1785164"
+        "TimeSpent": "00:33:02.7501168"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Batching\\WorldRenderManager.cs": {
         "TimeSpent": "00:00:06.7003341"
@@ -389,10 +389,10 @@
         "TimeSpent": "00:08:41.0714653"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\RenderPass.cs": {
-        "TimeSpent": "00:29:16.0478155"
+        "TimeSpent": "00:30:52.2585807"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\RasterPassDescription.cs": {
-        "TimeSpent": "00:40:11.9682230"
+        "TimeSpent": "00:44:35.9277254"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Raw\\RasterCommandBuffer.cs": {
         "TimeSpent": "00:32:23.9090125"
@@ -761,7 +761,7 @@
         "TimeSpent": "00:04:11.0793133"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Assets\\Texture2DAsset.cs": {
-        "TimeSpent": "00:01:12.2684977"
+        "TimeSpent": "00:01:24.1634504"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Assets\\PostProcessingVolumeAsset.cs": {
         "TimeSpent": "00:11:44.0442455"
@@ -917,28 +917,28 @@
         "TimeSpent": "00:00:37.7215180"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Structures\\RasterCommandBuffer.cs": {
-        "TimeSpent": "00:35:54.0548714"
+        "TimeSpent": "01:11:39.1011022"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Resources\\FGResourceUtility.cs": {
         "TimeSpent": "00:04:14.0380395"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Recording\\ModificationCommands.cs": {
-        "TimeSpent": "00:09:54.5244130"
+        "TimeSpent": "00:10:03.6411583"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\D3D12\\NRDDevice.cs": {
-        "TimeSpent": "00:44:52.7377763"
+        "TimeSpent": "03:05:40.9000302"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Pass\\FrameGraphResources.cs": {
-        "TimeSpent": "00:23:56.8513708"
+        "TimeSpent": "00:27:33.3312859"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\RenderPassErrorReporter.cs": {
-        "TimeSpent": "00:04:53.0053918"
+        "TimeSpent": "00:08:08.5557666"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\D3D12\\ResourceUploader.cs": {
-        "TimeSpent": "00:28:52.5853196"
+        "TimeSpent": "00:34:40.2650261"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Pass\\RenderPassCompiler.cs": {
-        "TimeSpent": "00:09:51.5304045"
+        "TimeSpent": "00:12:13.6032005"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\RenderPassBlackboard.cs": {
         "TimeSpent": "00:01:30.2498094"
@@ -947,19 +947,19 @@
         "TimeSpent": "00:12:53.3055834"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Assets\\PropertyBlock.cs": {
-        "TimeSpent": "00:02:46.0123536"
+        "TimeSpent": "00:05:53.2820993"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\D3D12\\BarrierManager.cs": {
-        "TimeSpent": "00:11:17.8215181"
+        "TimeSpent": "00:47:30.9060207"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Resources\\FrameGraphTexture.cs": {
-        "TimeSpent": "00:00:57.3996879"
+        "TimeSpent": "00:06:13.4915793"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\D3D12\\CpuDescriptorHeap.cs": {
-        "TimeSpent": "00:02:03.7130258"
+        "TimeSpent": "00:05:51.8266666"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\D3D12\\ResourceManager.cs": {
-        "TimeSpent": "00:18:12.3850618"
+        "TimeSpent": "00:25:51.7211970"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Assets\\ComputeShaderAsset.cs": {
         "TimeSpent": "00:13:05.7626137"
@@ -968,10 +968,10 @@
         "TimeSpent": "00:28:05.8311270"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Assets\\ROPropertyBlock.cs": {
-        "TimeSpent": "00:00:25.6982745"
+        "TimeSpent": "00:01:10.2320520"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Recording\\CommandRecorder.cs": {
-        "TimeSpent": "00:04:01.9193372"
+        "TimeSpent": "00:16:38.4328448"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\ComputePassDescription.cs": {
         "TimeSpent": "00:08:24.2074724"
@@ -983,16 +983,16 @@
         "TimeSpent": "00:01:37.9112089"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Recording\\ComputePassContext.cs": {
-        "TimeSpent": "00:01:32.9687069"
+        "TimeSpent": "00:01:41.9051886"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Structures\\RasterCommandBuffer - Copy.cs": {
         "TimeSpent": "00:01:17.5748515"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Structures\\ComputeCommandBuffer.cs": {
-        "TimeSpent": "00:05:55.0206478"
+        "TimeSpent": "00:09:50.7779951"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Recording\\RasterPassContext.cs": {
-        "TimeSpent": "00:03:50.4920642"
+        "TimeSpent": "00:05:58.6879509"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\D3D12\\GpuDescriptorHeap.cs": {
         "TimeSpent": "00:06:00.8198151"
@@ -1007,25 +1007,25 @@
         "TimeSpent": "00:01:13.9097921"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Memory\\SequentialLinearAllocator.cs": {
-        "TimeSpent": "00:01:43.3065233"
+        "TimeSpent": "00:05:37.5329718"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\D3D12\\ResourceUtility.cs": {
-        "TimeSpent": "00:00:47.9433462"
+        "TimeSpent": "00:01:41.3333920"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\State\\RasterState.cs": {
-        "TimeSpent": "00:47:14.1948618"
+        "TimeSpent": "01:17:40.0710678"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\State\\IRenderState.cs": {
         "TimeSpent": "00:00:15.9386879"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\State\\DirtyValue.cs": {
-        "TimeSpent": "00:05:01.8137504"
+        "TimeSpent": "00:05:03.1267871"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\State\\DirtyValue - Copy.cs": {
         "TimeSpent": "00:02:05.6548834"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\State\\DirtyArray.cs": {
-        "TimeSpent": "00:02:13.6081079"
+        "TimeSpent": "00:09:19.9681916"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Structures\\FGScissor.cs": {
         "TimeSpent": "00:00:12.0969900"
@@ -1034,20 +1034,65 @@
         "TimeSpent": "00:00:09.8601161"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\State\\RenderState.cs": {
-        "TimeSpent": "00:35:03.7825327"
+        "TimeSpent": "01:02:55.8108443"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\State\\DirtyClassValue.cs": {
         "TimeSpent": "00:02:39.6230567"
       },
       "D:\\source\\repos\\Constructor\\Primary\\Rendering\\State\\UnmanagedStructs.cs": {
-        "TimeSpent": "00:19:30.0346433"
+        "TimeSpent": "00:38:24.5292217"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\RenderUtils.cs": {
+        "TimeSpent": "00:03:55.7211075"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Commands\\CommandBuffer.cs": {
+        "TimeSpent": "00:25:45.6166450"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Commands\\RSCommandBuffer.cs": {
+        "TimeSpent": "00:13:17.6627236"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Commands\\CSCommandBuffer.cs": {
+        "TimeSpent": "00:05:56.6472978"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\State\\ComputePass.cs": {
+        "TimeSpent": "00:00:40.2132353"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\State\\ComputeState.cs": {
+        "TimeSpent": "00:03:09.9387881"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Resources\\FrameGraphBuffer.cs": {
+        "TimeSpent": "00:09:18.5939923"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\D3D12\\RenderState.cs": {
+        "TimeSpent": "00:11:19.9912539"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Input\\Controls\\Vector3Control.cs": {
+        "TimeSpent": "00:00:09.6030118"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Memory\\SingleBlockAllocator.cs": {
+        "TimeSpent": "00:03:16.9216967"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\D3D12\\QueueFence.cs": {
+        "TimeSpent": "00:01:28.0172515"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Pass\\CommandTimeline.cs": {
+        "TimeSpent": "00:01:01.5919883"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Pass\\FrameGraphTimeline.cs": {
+        "TimeSpent": "00:00:47.7791006"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\Resources\\FrameGraphResource.cs": {
+        "TimeSpent": "00:13:51.0465991"
+      },
+      "D:\\source\\repos\\Constructor\\Primary\\Rendering\\D3D12\\NRDResource.cs": {
+        "TimeSpent": "00:00:34.3840125"
       }
     }
   },
   "Editor": {
     "_files": {
       "D:\\source\\repos\\Constructor\\Editor\\Editor.cs": {
-        "TimeSpent": "07:50:38.2732155"
+        "TimeSpent": "08:04:04.3815573"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Rendering\\Gui\\GuiRenderer.cs": {
         "TimeSpent": "02:10:18.2470658"
@@ -1176,7 +1221,7 @@
         "TimeSpent": "04:09:03.5354544"
       },
       "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\DearImGuiStateManager.cs": {
-        "TimeSpent": "00:38:41.2703489"
+        "TimeSpent": "00:40:33.2255114"
       },
       "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\ProfilerView.cs": {
         "TimeSpent": "00:19:21.1818086"
@@ -1191,7 +1236,7 @@
         "TimeSpent": "00:22:01.5184901"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Assets\\AssetPipeline.cs": {
-        "TimeSpent": "06:57:05.3301368"
+        "TimeSpent": "06:57:50.1268223"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Assets\\AssetFilesystemWatcher.cs": {
         "TimeSpent": "01:59:39.9444767"
@@ -1215,10 +1260,10 @@
         "TimeSpent": "00:02:21.7763620"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Assets\\Importers\\ShaderAssetImporter.cs": {
-        "TimeSpent": "01:42:41.6040502"
+        "TimeSpent": "01:43:00.8131126"
       },
       "D:\\source\\repos\\Constructor\\Editor\\EdLog.cs": {
-        "TimeSpent": "00:04:39.2475468"
+        "TimeSpent": "00:05:31.9966248"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Assets\\Importers\\TextureAssetImporter.cs": {
         "TimeSpent": "01:52:48.3230347"
@@ -1356,7 +1401,7 @@
         "TimeSpent": "00:16:26.4739243"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Storage\\AssetDatabase.cs": {
-        "TimeSpent": "00:12:06.8799756"
+        "TimeSpent": "00:12:18.4830824"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Storage\\AssetCategoryDatabase.cs": {
         "TimeSpent": "00:36:25.4692784"
@@ -1485,7 +1530,7 @@
         "TimeSpent": "00:00:56.9222165"
       },
       "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\Popups\\AssetPicker.cs": {
-        "TimeSpent": "00:36:13.1208665"
+        "TimeSpent": "00:41:03.0506179"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Assets\\Loaders\\GeoSceneAssetLoader.cs": {
         "TimeSpent": "00:19:48.8068751"
@@ -1665,7 +1710,7 @@
         "TimeSpent": "00:02:24.8146427"
       },
       "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\DearImGuiWindowManager.cs": {
-        "TimeSpent": "00:06:18.4033263"
+        "TimeSpent": "00:07:46.8937368"
       },
       "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\FrameGraphViewer.cs": {
         "TimeSpent": "00:02:45.4800892"
@@ -1695,10 +1740,10 @@
         "TimeSpent": "02:39:08.1799008"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Rendering\\EditorRenderPath.cs": {
-        "TimeSpent": "00:09:10.9908037"
+        "TimeSpent": "00:10:08.3131954"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Rendering\\Passes\\DearImGuiRenderPass.cs": {
-        "TimeSpent": "00:26:48.9294208"
+        "TimeSpent": "00:54:53.6229658"
       },
       "D:\\source\\repos\\Constructor\\Editor\\ProjectConfiguration.cs": {
         "TimeSpent": "00:00:11.7359846"
@@ -1713,13 +1758,13 @@
         "TimeSpent": "00:00:04.8605773"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Gui\\Designer\\UIDesigner.cs": {
-        "TimeSpent": "01:12:03.6260149"
+        "TimeSpent": "01:46:33.6257061"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Rendering\\Passes\\GizmoRenderPass.cs": {
-        "TimeSpent": "00:22:55.1774750"
+        "TimeSpent": "00:26:13.6239502"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\UIDockHost.cs": {
-        "TimeSpent": "00:05:14.4177075"
+        "TimeSpent": "00:15:00.2616285"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Assets\\Importers\\UIFontAssetImporter.cs": {
         "TimeSpent": "00:07:04.3597254"
@@ -1728,55 +1773,55 @@
         "TimeSpent": "00:22:37.4567182"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Assets\\UIFontAsset.cs": {
-        "TimeSpent": "00:03:05.1957098"
+        "TimeSpent": "00:09:09.0926361"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\UIManager.cs": {
-        "TimeSpent": "00:24:50.1855845"
+        "TimeSpent": "00:27:16.1528943"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Text\\UITextShaper.cs": {
-        "TimeSpent": "00:15:48.4934383"
+        "TimeSpent": "00:18:49.9063698"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Text\\UITextShapingData.cs": {
-        "TimeSpent": "00:01:14.7008717"
+        "TimeSpent": "00:01:29.3452299"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Debugging\\UIDebugRenderer.cs": {
         "TimeSpent": "00:04:04.5541866"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\UIFrame.cs": {
-        "TimeSpent": "00:09:22.4508609"
+        "TimeSpent": "00:15:35.5014116"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\UILabel.cs": {
-        "TimeSpent": "00:05:29.4847302"
+        "TimeSpent": "00:34:12.2319008"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\UIElement.cs": {
-        "TimeSpent": "00:19:54.1034106"
+        "TimeSpent": "00:50:01.5663643"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\UIWindow.cs": {
-        "TimeSpent": "00:01:47.4302713"
+        "TimeSpent": "00:13:14.0287342"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\UISplitContainer.cs": {
-        "TimeSpent": "00:00:12.3325594"
+        "TimeSpent": "00:08:30.2204024"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Layout\\UIFitterLayout.cs": {
-        "TimeSpent": "00:01:41.6239387"
+        "TimeSpent": "00:14:23.0503258"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Visual\\UIDrawCommand.cs": {
-        "TimeSpent": "00:11:27.5390461"
+        "TimeSpent": "00:24:21.9130755"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Visual\\UICommandBuffer.cs": {
-        "TimeSpent": "00:08:31.4771706"
+        "TimeSpent": "00:49:44.7556189"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\UILayoutManager.cs": {
-        "TimeSpent": "00:03:28.7735837"
+        "TimeSpent": "00:20:28.0954101"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Datatypes\\UIValue.cs": {
         "TimeSpent": "00:02:45.7666823"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Datatypes\\UIValue2.cs": {
-        "TimeSpent": "00:01:28.8161887"
+        "TimeSpent": "00:01:41.4896299"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\UIFontManager.cs": {
-        "TimeSpent": "01:42:20.0866153"
+        "TimeSpent": "01:57:05.1581368"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\UIWindowManager.cs": {
         "TimeSpent": "00:03:46.3170203"
@@ -1788,43 +1833,268 @@
         "TimeSpent": "00:06:27.6191641"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Visual\\UIRenderer.cs": {
-        "TimeSpent": "01:21:15.3163460"
+        "TimeSpent": "01:25:33.7284444"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Visual\\UIWindowRenderPass.cs": {
         "TimeSpent": "00:28:48.5892347"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Visual\\UIBakedCommandBuffer.cs": {
-        "TimeSpent": "01:03:22.4838768"
+        "TimeSpent": "04:34:58.1459736"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Visual\\Passes\\UIWindowRenderPass.cs": {
-        "TimeSpent": "00:15:30.6855395"
+        "TimeSpent": "01:15:47.5480380"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Visual\\Passes\\UICompositorRenderPass.cs": {
-        "TimeSpent": "00:22:08.5887108"
+        "TimeSpent": "00:29:27.1597580"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Visual\\Passes\\UIUpdateFontsRenderPass.cs": {
-        "TimeSpent": "00:05:40.5325523"
+        "TimeSpent": "00:06:22.0398342"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Visual\\Passes\\UIOverlayRenderPass.cs": {
-        "TimeSpent": "00:05:42.9193096"
+        "TimeSpent": "00:10:24.6368635"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Datatypes\\UITransform.cs": {
-        "TimeSpent": "00:00:54.3799378"
+        "TimeSpent": "00:12:41.5082278"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Datatypes\\UIColor.cs": {
         "TimeSpent": "00:04:44.8232181"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Datatypes\\UIGradientColor.cs": {
-        "TimeSpent": "00:04:45.8252197"
+        "TimeSpent": "00:05:25.8784733"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Visual\\UIGradientManager.cs": {
-        "TimeSpent": "00:20:17.3083799"
+        "TimeSpent": "00:23:31.6352641"
       },
       "D:\\source\\repos\\Constructor\\Editor\\Assets\\Importers\\ComputeShaderAssetImporter.cs": {
         "TimeSpent": "00:02:17.7771786"
       },
       "D:\\source\\repos\\Constructor\\Editor\\UI\\Visual\\Passes\\UIGenGradientsRenderPass.cs": {
-        "TimeSpent": "00:18:26.7665744"
+        "TimeSpent": "00:25:14.3682266"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\UIButton.cs": {
+        "TimeSpent": "00:00:46.8055926"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\UISplitPanel.cs": {
+        "TimeSpent": "00:04:47.3570818"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\UICanvas.cs": {
+        "TimeSpent": "00:04:27.5501609"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Memory\\StringAllocator.cs": {
+        "TimeSpent": "00:00:22.4511398"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Helpers\\StringAllocator.cs": {
+        "TimeSpent": "00:14:04.0346019"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Helpers\\ObjectIndexer.cs": {
+        "TimeSpent": "00:04:11.4716071"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Layout\\UIListLayout.cs": {
+        "TimeSpent": "00:15:32.3217863"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Modifiers\\IUILayoutModifier.cs": {
+        "TimeSpent": "00:01:57.6120559"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Layout\\LayoutHandler.cs": {
+        "TimeSpent": "01:58:18.3247663"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Modifiers\\UIListLayout.cs": {
+        "TimeSpent": "00:12:58.2604281"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Modifiers\\UIFitterLayout.cs": {
+        "TimeSpent": "00:26:38.9625801"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\UILayoutDebugger.cs": {
+        "TimeSpent": "02:35:14.0675635"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\Old\\ContentView.cs": {
+        "TimeSpent": "00:00:29.6923812"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\Old\\Components\\ContentIconBuilder.cs": {
+        "TimeSpent": "00:00:19.6479741"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\UIImage.cs": {
+        "TimeSpent": "00:02:36.9736095"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\LayoutDbg\\IElementInspector.cs": {
+        "TimeSpent": "00:37:27.3139858"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\LayoutDbg\\ElementInspector.cs": {
+        "TimeSpent": "00:11:20.2036088"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\LayoutDbg\\FrameInspector.cs": {
+        "TimeSpent": "00:18:13.0743585"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\LayoutDbg\\ButtonInspector.cs": {
+        "TimeSpent": "00:01:25.3093340"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\LayoutDbg\\CanvasInspector.cs": {
+        "TimeSpent": "00:01:05.6053508"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\LayoutDbg\\ImageInspector.cs": {
+        "TimeSpent": "00:04:03.9179211"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\LayoutDbg\\LabelInspector.cs": {
+        "TimeSpent": "00:15:56.1974812"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\LayoutDbg\\SplitContainerInspector.cs": {
+        "TimeSpent": "00:01:18.4401183"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\LayoutDbg\\SplitPanelInspector.cs": {
+        "TimeSpent": "00:01:44.0641624"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\ExtConsole\\ExtConsoleManager.cs": {
+        "TimeSpent": "00:38:28.4766893"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\ExtConsole\\ISubComponent.cs": {
+        "TimeSpent": "00:01:27.2922450"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\ExtConsole\\ProfilerSubComponent.cs": {
+        "TimeSpent": "00:16:07.5806111"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\DearImGui\\Old\\ProfilerView2.cs": {
+        "TimeSpent": "00:07:16.2904637"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Debugging\\LayoutRecorder.cs": {
+        "TimeSpent": "00:19:25.2607341"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\Gui\\Windows\\AssetBrowser.cs": {
+        "TimeSpent": "00:27:40.1062525"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\UISerializer.cs": {
+        "TimeSpent": "00:11:39.1466733"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\SerializationTable.cs": {
+        "TimeSpent": "00:49:44.5096132"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\SerializationGroup.cs": {
+        "TimeSpent": "00:11:49.1561571"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\ElementGroup.cs": {
+        "TimeSpent": "00:12:04.3406646"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\ValueSerializerTable.cs": {
+        "TimeSpent": "00:14:22.9937395"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\IValueSerializer.cs": {
+        "TimeSpent": "00:01:03.9850773"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\Generic\\ByteSerializer.cs": {
+        "TimeSpent": "00:10:58.2871710"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\ValueSerializer.cs": {
+        "TimeSpent": "00:07:50.0681377"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\Generic\\SByteSerializer.cs": {
+        "TimeSpent": "00:00:46.6700266"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\Generic\\ShortSerializer.cs": {
+        "TimeSpent": "00:00:09.1568648"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\GenericSerializers.cs": {
+        "TimeSpent": "00:03:42.8777248"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\Structs\\UIValueSerializer.cs": {
+        "TimeSpent": "00:01:53.4436967"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\Structs\\UIValue2Serializer.cs": {
+        "TimeSpent": "00:06:22.5620935"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\Structs\\UIValue2Serializer - Copy.cs": {
+        "TimeSpent": "00:04:11.8405197"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\Structs\\ColorSerializer.cs": {
+        "TimeSpent": "00:04:50.7589017"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Values\\Structs\\UIColorSerializer.cs": {
+        "TimeSpent": "00:05:56.0179498"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\ButtonGroup.cs": {
+        "TimeSpent": "00:07:13.2980351"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\ButtonGroup - Copy.cs": {
+        "TimeSpent": "00:01:51.5705082"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\CanvasGroup.cs": {
+        "TimeSpent": "00:04:43.7316840"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\FrameGroup.cs": {
+        "TimeSpent": "00:04:04.2642529"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\ElementGroup - Copy.cs": {
+        "TimeSpent": "00:01:03.2675539"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\ImageGroup.cs": {
+        "TimeSpent": "00:03:21.7316646"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\ImageGroup - Copy.cs": {
+        "TimeSpent": "00:00:20.5301506"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\LabelGroup.cs": {
+        "TimeSpent": "00:05:13.6157280"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\SplitContainerGroup.cs": {
+        "TimeSpent": "00:02:43.9852713"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\SplitContainerGroup - Copy.cs": {
+        "TimeSpent": "00:00:32.5658431"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\SplitPanelGroup.cs": {
+        "TimeSpent": "00:09:08.6565099"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Helpers\\EnumGenericHelper.cs": {
+        "TimeSpent": "00:04:52.5189221"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Modifiers\\UIMenuBar.cs": {
+        "TimeSpent": "00:10:08.8462159"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\SerializationModifier.cs": {
+        "TimeSpent": "00:13:58.2662253"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\ISerializationType.cs": {
+        "TimeSpent": "00:00:32.2397513"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Utility\\MappedDictionary.cs": {
+        "TimeSpent": "00:02:01.4499310"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Utility\\SerializationDictionary.cs": {
+        "TimeSpent": "00:05:47.8484558"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Modifiers\\MenuBarModifier.cs": {
+        "TimeSpent": "00:08:49.4368806"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\UITreeView.cs": {
+        "TimeSpent": "02:49:55.3767439"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Serialization\\Groups\\TreeViewGroup.cs": {
+        "TimeSpent": "00:00:31.2233415"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\TreeNodes\\TreeNode.cs": {
+        "TimeSpent": "00:06:38.3495260"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\TreeNodes\\BaseTreeNode.cs": {
+        "TimeSpent": "00:01:49.2075273"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\Tree\\TreeNode.cs": {
+        "TimeSpent": "00:01:13.4975362"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Elements\\Tree\\BaseTreeNode.cs": {
+        "TimeSpent": "00:19:01.9286121"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\UIInteractionManager.cs": {
+        "TimeSpent": "00:11:53.5789934"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Interaction\\HostInteractionManager.cs": {
+        "TimeSpent": "00:23:54.7036509"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Interaction\\InteractionTree.cs": {
+        "TimeSpent": "00:16:55.9948439"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Interaction\\UIEvent.cs": {
+        "TimeSpent": "00:05:42.8083372"
+      },
+      "D:\\source\\repos\\Constructor\\Editor\\UI\\Helpers\\TemporyAllocator.cs": {
+        "TimeSpent": "00:08:55.1738026"
       }
     }
   },
@@ -1953,10 +2223,10 @@
         "TimeSpent": "00:07:24.4088977"
       },
       "D:\\source\\repos\\Constructor\\Primary.Common\\Color.cs": {
-        "TimeSpent": "00:12:07.5876315"
+        "TimeSpent": "00:12:20.2955267"
       },
       "D:\\source\\repos\\Constructor\\Primary.Common\\WeakRef.cs": {
-        "TimeSpent": "00:03:49.4272246"
+        "TimeSpent": "00:07:22.3638574"
       },
       "D:\\source\\repos\\Constructor\\Primary.Common\\Unsafe\\NativeArray.cs": {
         "TimeSpent": "00:05:45.1383725"
@@ -1965,7 +2235,7 @@
         "TimeSpent": "00:04:24.6463852"
       },
       "D:\\source\\repos\\Constructor\\Primary.Common\\Native\\UnsafeList.Extensions.cs": {
-        "TimeSpent": "00:06:35.8324489"
+        "TimeSpent": "00:09:59.8827837"
       },
       "D:\\source\\repos\\Constructor\\Primary.Common\\DebugCallbacks.cs": {
         "TimeSpent": "00:00:15.5621263"
@@ -2013,7 +2283,7 @@
         "TimeSpent": "01:55:26.8832277"
       },
       "D:\\source\\repos\\Constructor\\Primary.Common\\RentedArray.cs": {
-        "TimeSpent": "01:39:57.7026761"
+        "TimeSpent": "01:40:41.9510856"
       },
       "D:\\source\\repos\\Constructor\\Primary.Common\\ReadOnlySpan.Extensions.cs": {
         "TimeSpent": "00:01:12.5605804"
@@ -2026,6 +2296,24 @@
       },
       "D:\\source\\repos\\Constructor\\Primary.Common\\SimdUtility.cs": {
         "TimeSpent": "00:01:53.5999721"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.Common\\Flags.cs": {
+        "TimeSpent": "00:00:39.8421592"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.Common\\Memory\\SequentialLinearAllocator.cs": {
+        "TimeSpent": "00:00:45.3654646"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.Common\\Memory\\SingleBlockAllocator.cs": {
+        "TimeSpent": "00:00:37.9247654"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.Common\\Memory\\LinearBlockAllocator.cs": {
+        "TimeSpent": "00:00:24.8731837"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.Common\\Memory\\LinearResizingAllocator.cs": {
+        "TimeSpent": "00:06:20.7253736"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.Common\\PreciseWait.cs": {
+        "TimeSpent": "00:28:47.2411798"
       }
     }
   },
@@ -2854,13 +3142,43 @@
       },
       "C:\\Users\\Loke\\AppData\\Local\\SourceServer\\bad62d25fea0cbb5561e31b437a4b1d835c80549a22da34833aea54a2b179496\\src\\runtime\\src\\libraries\\System.Private.CoreLib\\src\\System\\Runtime\\InteropServices\\NativeMemory.cs": {
         "TimeSpent": "00:00:03.0914555"
+      },
+      "D:\\source\\repos\\Timeline\\Visual\\Mesh\\TextShaper.cs": {
+        "TimeSpent": "00:00:02.3382557"
+      },
+      "C:\\Users\\Loke\\AppData\\Local\\Temp\\MetadataAsSource\\aefbe654a6424c3bbe4f6c14395d20c8\\DecompilationMetadataAsSourceFileProvider\\dff36078e7c549ba88fe0556aabb3261\\LL.cs": {
+        "TimeSpent": "00:00:28.0006081"
+      },
+      "C:\\Users\\Loke\\AppData\\Local\\SourceServer\\c160e5bfe8bd3e536a2d1204cf949089d7bf7389b6cb1e3fcf79540ed96bc21b\\Socket.cs": {
+        "TimeSpent": "00:00:00.0229466"
+      },
+      "C:\\Users\\Loke\\AppData\\Local\\SourceServer\\09990046bfa75a4ffd90fb4e936e4c858631253e124ef55cbe27bb99de545464\\src\\runtime\\src\\libraries\\System.Private.CoreLib\\src\\System\\ReadOnlySpan.cs": {
+        "TimeSpent": "00:00:33.5520232"
+      },
+      "C:\\Users\\Loke\\AppData\\Local\\Temp\\.vsdbgsrc\\b02652430e487e7a0939085f764ba1c144ed492fd886323a18dbfb95443c4840\\DirtyArray.cs": {
+        "TimeSpent": "00:02:12.1856723"
+      },
+      "C:\\Users\\Loke\\AppData\\Local\\Temp\\.vsdbgsrc\\313cfb89c85b69f81b65a3334da4d83e7f17d02cc4f428ec99bc1fbbfca4a000\\RasterState.cs": {
+        "TimeSpent": "00:01:42.2221840"
+      },
+      "C:\\Users\\Loke\\AppData\\Local\\Temp\\.vsdbgsrc\\04f66d71e76c1d90ab1d8e8a2d456157693b2cd208ccdb3cd50a765d17e5ec2f\\RSCommandBuffer.cs": {
+        "TimeSpent": "00:00:44.4852970"
+      },
+      "C:\\Users\\Loke\\AppData\\Local\\Temp\\.vsdbgsrc\\6ae33823fcf19876607fd9812f823754dc61ce808035aaa0a10985d2227d6880\\RasterCommandBuffer.cs": {
+        "TimeSpent": "00:00:35.7006351"
+      },
+      "C:\\Users\\Loke\\AppData\\Local\\Temp\\.vsdbgsrc\\07d0090ea662c8ee67d2ff9b3317dcb750e48ebc315b576023d699bd7dcd0ea0\\FrameGraphResource.cs": {
+        "TimeSpent": "00:00:18.7512480"
+      },
+      "C:\\Users\\Loke\\AppData\\Local\\SourceServer\\ca1c7270f363713af490b544436ac844e82141515240837638005f584e16614b\\src\\runtime\\src\\coreclr\\System.Private.CoreLib\\src\\System\\Delegate.CoreCLR.cs": {
+        "TimeSpent": "00:00:20.8414156"
       }
     }
   },
   "Editor.Processors": {
     "_files": {
       "D:\\source\\repos\\Constructor\\Editor.Processors\\ShaderProcessor.cs": {
-        "TimeSpent": "02:42:44.4310530"
+        "TimeSpent": "02:47:54.8506380"
       },
       "D:\\source\\repos\\Constructor\\Editor.Processors\\Shaders\\ShaderParseResult.cs": {
         "TimeSpent": "00:17:59.2805633"
@@ -2893,13 +3211,13 @@
         "TimeSpent": "01:56:00.6400030"
       },
       "D:\\source\\repos\\Constructor\\Editor.Processors\\TextureProcessor_NVTT.cs": {
-        "TimeSpent": "02:35:25.7186643"
+        "TimeSpent": "02:36:45.8648501"
       },
       "D:\\source\\repos\\Constructor\\Editor.Processors\\NewShaderProcessor.cs": {
         "TimeSpent": "03:15:19.8154646"
       },
       "D:\\source\\repos\\Constructor\\Editor.Processors\\ComputeShaderProcessor.cs": {
-        "TimeSpent": "00:33:45.5173873"
+        "TimeSpent": "00:34:31.1419753"
       }
     }
   },
@@ -3093,7 +3411,7 @@
         "TimeSpent": "00:01:18.6087795"
       },
       "D:\\source\\repos\\Constructor\\Native\\EditorInterop\\MSDFGenInterop.cpp": {
-        "TimeSpent": "01:47:12.7335927"
+        "TimeSpent": "01:48:04.4294027"
       },
       "D:\\source\\repos\\Constructor\\Native\\EditorInterop\\msdfgen\\msdfgen.h": {
         "TimeSpent": "00:02:33.0437855"
@@ -3232,7 +3550,7 @@
         "TimeSpent": "00:01:44.4704546"
       },
       "D:\\source\\repos\\Constructor\\Interop.D3D12MemAlloc\\IUnknownImpl.cs": {
-        "TimeSpent": "00:05:31.7336237"
+        "TimeSpent": "00:06:33.9145858"
       },
       "D:\\source\\repos\\Constructor\\Interop.D3D12MemAlloc\\CVIRTUAL_ALLOCATION_DESC.cs": {
         "TimeSpent": "00:01:06.4718596"
@@ -3570,16 +3888,16 @@
         "TimeSpent": "00:09:13.6540752"
       },
       "D:\\source\\repos\\Constructor\\Primary.R2.ForwardPlus\\Passes\\OpaquePass.cs": {
-        "TimeSpent": "00:42:59.4611779"
+        "TimeSpent": "00:50:37.5670182"
       },
       "D:\\source\\repos\\Constructor\\Primary.R2.ForwardPlus\\Passes\\DepthPrePass.cs": {
         "TimeSpent": "00:11:47.5171014"
       },
       "D:\\source\\repos\\Constructor\\Primary.R2.ForwardPlus\\Passes\\ResourcesPass.cs": {
-        "TimeSpent": "03:56:32.2132121"
+        "TimeSpent": "03:59:49.2614257"
       },
       "D:\\source\\repos\\Constructor\\Primary.R2.ForwardPlus\\Passes\\TestPass.cs": {
-        "TimeSpent": "00:04:31.5365789"
+        "TimeSpent": "00:05:03.9643422"
       }
     }
   },
@@ -3646,7 +3964,7 @@
         "TimeSpent": "00:05:30.5634492"
       },
       "D:\\source\\repos\\Constructor\\Editor.Shaders\\Data\\AttributeData.cs": {
-        "TimeSpent": "00:04:07.2108773"
+        "TimeSpent": "00:06:16.9469060"
       },
       "D:\\source\\repos\\Constructor\\Editor.Shaders\\Enums.cs": {
         "TimeSpent": "00:10:57.3682014"
@@ -3673,10 +3991,10 @@
         "TimeSpent": "00:03:51.8045950"
       },
       "D:\\source\\repos\\Constructor\\Editor.Shaders\\Processors\\SourceParser.cs": {
-        "TimeSpent": "02:41:55.6860713"
+        "TimeSpent": "02:48:46.3522715"
       },
       "D:\\source\\repos\\Constructor\\Editor.Shaders\\Processors\\SourceAugmenter.cs": {
-        "TimeSpent": "03:28:15.4212875"
+        "TimeSpent": "03:47:10.0689683"
       },
       "D:\\source\\repos\\Constructor\\Editor.Shaders\\ShaderProcessorArgs.cs": {
         "TimeSpent": "00:03:05.5110467"
@@ -3712,10 +4030,10 @@
         "TimeSpent": "00:00:03.2289806"
       },
       "D:\\source\\repos\\Constructor\\Editor.Shaders\\Data\\FunctionIncludeData.cs": {
-        "TimeSpent": "00:03:10.1501799"
+        "TimeSpent": "00:03:27.4617797"
       },
       "D:\\source\\repos\\Constructor\\Editor.Shaders\\Data\\ShaderData.cs": {
-        "TimeSpent": "00:10:47.2441076"
+        "TimeSpent": "00:12:07.4477736"
       },
       "D:\\source\\repos\\Constructor\\Editor.Shaders\\Data\\ReferenceIndex.cs": {
         "TimeSpent": "00:04:30.9754034"
@@ -3777,7 +4095,7 @@
         "TimeSpent": "00:00:29.0802487"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHIDevice.cs": {
-        "TimeSpent": "00:14:35.9994218"
+        "TimeSpent": "00:17:49.0139866"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHIBuffer.cs": {
         "TimeSpent": "00:23:59.2039627"
@@ -3786,7 +4104,7 @@
         "TimeSpent": "00:26:03.0890453"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHIDevice.cs": {
-        "TimeSpent": "01:30:17.6478107"
+        "TimeSpent": "01:50:17.8607112"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\UuidOf.cs": {
         "TimeSpent": "00:00:23.9132915"
@@ -3795,22 +4113,22 @@
         "TimeSpent": "00:02:13.2035383"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHIBuffer.cs": {
-        "TimeSpent": "00:32:50.1915496"
+        "TimeSpent": "00:37:09.9400649"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\ResourceHelper.cs": {
-        "TimeSpent": "00:15:37.2967146"
+        "TimeSpent": "00:17:14.9818458"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHITexture.cs": {
         "TimeSpent": "00:34:23.0403411"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\ConversionHelper.cs": {
-        "TimeSpent": "00:38:46.0029329"
+        "TimeSpent": "00:39:27.0256386"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHIBuffer - Copy.cs": {
         "TimeSpent": "00:01:12.5497524"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHITexture.cs": {
-        "TimeSpent": "00:13:43.2729574"
+        "TimeSpent": "00:18:10.4062876"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Validation\\BufferValidator.cs": {
         "TimeSpent": "00:19:36.6732302"
@@ -3840,19 +4158,19 @@
         "TimeSpent": "00:04:06.5307845"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHISwapChain.cs": {
-        "TimeSpent": "00:26:46.1396304"
+        "TimeSpent": "00:37:16.6823487"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\RHIGraphicsPipeline.cs": {
         "TimeSpent": "00:23:26.9222215"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHIGraphicsPipeline.cs": {
-        "TimeSpent": "01:16:42.9666150"
+        "TimeSpent": "01:22:48.6210945"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Validation\\SamplerValidator.cs": {
         "TimeSpent": "00:03:48.3690973"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Validation\\SwapChainValidator.cs": {
-        "TimeSpent": "00:10:45.1044403"
+        "TimeSpent": "00:11:04.2505506"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Validation\\SamplerValidator - Copy.cs": {
         "TimeSpent": "00:04:09.7601144"
@@ -3870,26 +4188,113 @@
         "TimeSpent": "00:03:40.9132768"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\D3D12RHIComputePipeline.cs": {
-        "TimeSpent": "00:04:24.5644674"
+        "TimeSpent": "00:07:35.2425084"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Validation\\GraphicsPipelineValidator - Copy.cs": {
         "TimeSpent": "00:01:03.2938077"
       },
       "D:\\source\\repos\\Constructor\\Primary.RHI2\\Validation\\ComputePipelineValidator.cs": {
         "TimeSpent": "00:00:58.1454823"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\Helpers\\UploadManager.cs": {
+        "TimeSpent": "00:00:01.8379474"
+      },
+      "D:\\source\\repos\\Constructor\\Primary.RHI2\\Direct3D12\\UploadManager.cs": {
+        "TimeSpent": "00:45:19.2608372"
       }
     }
   },
   "ExtConsole": {
     "_files": {
       "D:\\source\\repos\\Constructor\\ExtConsole\\Program.cs": {
-        "TimeSpent": "00:10:07.3197199"
+        "TimeSpent": "00:19:57.2830295"
       },
       "D:\\source\\repos\\Constructor\\ExtConsole\\BackendManager.cs": {
-        "TimeSpent": "00:06:16.5021214"
+        "TimeSpent": "00:12:26.2765831"
       },
       "D:\\source\\repos\\Constructor\\ExtConsole\\WindowManager.cs": {
-        "TimeSpent": "00:03:33.8712762"
+        "TimeSpent": "00:26:34.3718158"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Windows\\ProfilerWindow.cs": {
+        "TimeSpent": "01:12:50.2933111"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\ConsoleHost.cs": {
+        "TimeSpent": "00:00:02.8747327"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\ExtConsoleHost.cs": {
+        "TimeSpent": "00:21:33.9725396"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Net\\NetListener.cs": {
+        "TimeSpent": "00:53:44.6561545"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Net\\ConnectedClient.cs": {
+        "TimeSpent": "00:08:05.0047373"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Net\\MessageParser.cs": {
+        "TimeSpent": "00:01:36.5931440"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Serialization\\MessageSerializer.cs": {
+        "TimeSpent": "00:40:06.4515314"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Serialization\\MessageDeserializer.cs": {
+        "TimeSpent": "00:39:05.4906721"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Serialization\\MessageHeader.cs": {
+        "TimeSpent": "00:02:06.2555142"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Serialization\\MessageMagic.cs": {
+        "TimeSpent": "00:00:16.1642475"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\CommLog.cs": {
+        "TimeSpent": "00:01:33.6999810"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Serialization\\MessageReader.cs": {
+        "TimeSpent": "00:24:54.4727417"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\AppArguments.cs": {
+        "TimeSpent": "00:02:11.7504821"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Net\\NetClient.cs": {
+        "TimeSpent": "00:36:00.6404388"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\ExtConsoleHost - Copy.cs": {
+        "TimeSpent": "00:02:14.0193400"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\ExtConsoleClient.cs": {
+        "TimeSpent": "00:11:18.2118635"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Messages\\IMessage.cs": {
+        "TimeSpent": "00:01:49.6272216"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Serialization\\MessageWriter.cs": {
+        "TimeSpent": "00:15:24.5362328"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Messages\\Profiler\\MsgNewProfilerData.cs": {
+        "TimeSpent": "00:03:36.2958028"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Messages\\Profiler\\MsgProfilerTimestamp.cs": {
+        "TimeSpent": "00:06:53.2440857"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Messages\\RecievedMessage.cs": {
+        "TimeSpent": "00:00:03.0450897"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Messages\\QueuedMessage.cs": {
+        "TimeSpent": "00:00:53.4814048"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Messages\\General\\MsgChangeComponent.cs": {
+        "TimeSpent": "00:01:08.5090235"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Net\\IDataClient.cs": {
+        "TimeSpent": "00:03:20.6417891"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Serialization\\CompressionMetadata.cs": {
+        "TimeSpent": "00:01:34.2597856"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Communication\\Messages\\Profiler\\MsgSetProfilerFeatures.cs": {
+        "TimeSpent": "00:03:03.1766522"
+      },
+      "D:\\source\\repos\\Constructor\\ExtConsole\\Icon.ico": {
+        "TimeSpent": "00:00:05.5476909"
       }
     }
   }

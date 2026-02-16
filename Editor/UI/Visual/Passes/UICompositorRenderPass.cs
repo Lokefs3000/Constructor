@@ -1,6 +1,7 @@
 ﻿using Primary.Assets;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
+using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
@@ -85,24 +86,17 @@ namespace Editor.UI.Visual.Passes
             {
                 UICompositeRegion region = data.Regions![i];
 
-                if (region.Host.IsExternallyHosted)
+                if (region.Host.IsExternallyHosted || region.Host.HostTexture != null)
                     cmd.SetRenderTarget(0, region.Host.HostTexture!);
                 else
                     throw new NotImplementedException();
 
-                Vector2 actualClientSize;
-                {
-                    UIDockHost host = region.Host;
-                    while (host.ParentHost != null)
-                        host = host.ParentHost;
-
-                    actualClientSize = host.ClientSize;
-                }
+                Vector2 actualClientSize = region.Host.TabbedClientBounds.Size;
 
                 Vector2 offset = region.Region.Minimum / actualClientSize;
                 Vector2 scale = region.Region.Size / actualClientSize;
 
-                data.DataBlock!.SetResource(s_pbTexture, region.Texture);
+                data.DataBlock!.SetResource("txTexture", region.Texture);
 
                 cmd.SetProperties(data.DataBlock);
                 cmd.SetConstants(new BlitData(offset, scale));
@@ -111,8 +105,6 @@ namespace Editor.UI.Visual.Passes
 
             data.Renderer!.ClearUncompositedHosts();
         }
-
-        private readonly static int s_pbTexture = PropertyBlock.GetID("txTexture");
 
         private class PassData : IPassData
         {

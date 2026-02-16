@@ -78,7 +78,7 @@ namespace Primary.Assets.Loaders
                 }
 
                 RHIDimension dimension = RHIDimension.Texture2D;
-                if (FlagUtility.HasFlag(header.Flags, TextureFlags.Cubemap))
+                if (Flags.HasFlag(header.Flags, TextureFlags.Cubemap))
                     dimension = RHIDimension.TextureCube;
 
                 RHITexture? rhiTexture = null;

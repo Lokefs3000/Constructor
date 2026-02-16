@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 
 namespace Primary.Rendering
 {
-    public sealed class RenderPass
+    public class RenderPass
     {
         private readonly RenderPassManager _manager;
 

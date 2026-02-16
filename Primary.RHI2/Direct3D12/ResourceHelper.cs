@@ -19,7 +19,10 @@ namespace Primary.RHI2.Direct3D12
                     char* buffer = (char*)NativeMemory.Alloc((nuint)(newName.Length + 1), sizeof(char));
                     Debug.Assert(buffer != null);
 
-                    NativeMemory.Copy(Unsafe.AsPointer(ref newName.DangerousGetReference()), buffer, (nuint)(newName.Length + newName.Length));
+                    fixed (char* ptr = newName)
+                    {
+                        NativeMemory.Copy(ptr, buffer, (nuint)(newName.Length + newName.Length));
+                    }
                     buffer[newName.Length] = '\0';
 
                     bool ret = resource->SetName(buffer).SUCCEEDED;
@@ -32,7 +35,10 @@ namespace Primary.RHI2.Direct3D12
                     char* buffer = stackalloc char[newName.Length + 1];
                     Debug.Assert(buffer != null);
 
-                    NativeMemory.Copy(Unsafe.AsPointer(ref newName.DangerousGetReference()), buffer, (nuint)(newName.Length + newName.Length));
+                    fixed (char* ptr = newName)
+                    {
+                        NativeMemory.Copy(ptr, buffer, (nuint)(newName.Length + newName.Length));
+                    }
                     buffer[newName.Length] = '\0';
 
                     return resource->SetName(buffer).SUCCEEDED;

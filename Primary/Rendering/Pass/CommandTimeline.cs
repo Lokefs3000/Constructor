@@ -1,18 +1,18 @@
-﻿using Primary.Rendering.Memory;
+﻿using Primary.Common.Memory;
 using Primary.Rendering.Recording;
 
 namespace Primary.Rendering.Pass
 {
     internal sealed class CommandTimeline : IDisposable
     {
-        private SequentialLinearAllocator _allocator;
+        private LinearBlockAllocator _allocator;
         private List<TimelineAction> _actions;
 
         private bool _disposedValue;
 
         internal CommandTimeline()
         {
-            _allocator = new SequentialLinearAllocator(2048);
+            _allocator = new LinearBlockAllocator(2048);
             _actions = new List<TimelineAction>();
         }
 

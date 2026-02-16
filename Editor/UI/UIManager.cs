@@ -27,6 +27,7 @@ namespace Editor.UI
         private UILayoutManager _layoutManager;
         private UIFontManager _fontManager;
         private UIRenderer _renderer;
+        private UIInteractionManager _interactionManager;
 
         private List<UIDockHost> _activeDockHosts;
 
@@ -41,6 +42,7 @@ namespace Editor.UI
             _layoutManager = new UILayoutManager();
             _fontManager = new UIFontManager();
             _renderer = new UIRenderer(this);
+            _interactionManager = new UIInteractionManager(this);
 
             _activeDockHosts = new List<UIDockHost>();
 
@@ -58,7 +60,7 @@ namespace Editor.UI
                         UIDockHost dockHost = _activeDockHosts[i];
                         if (dockHost.ParentHost == null)
                         {
-                            if (FlagUtility.HasFlag(dockHost.InvalidationFlags, UIInvalidationFlags.Layout))
+                            if (Flags.HasFlag(dockHost.InvalidationFlags, UIInvalidationFlags.Layout))
                             {
                                 dockHost.RemoveInvalidFlags(UIInvalidationFlags.Layout);
                                 _layoutManager.RecalculateLayout(dockHost);
@@ -70,7 +72,7 @@ namespace Editor.UI
                 for (int i = 0; i < _activeDockHosts.Count; i++)
                 {
                     UIDockHost dockHost = _activeDockHosts[i];
-                    if (dockHost.ActiveWindow != null && FlagUtility.HasFlag(dockHost.InvalidationFlags, UIInvalidationFlags.Visual))
+                    if (dockHost.ActiveWindow != null && Flags.HasFlag(dockHost.InvalidationFlags, UIInvalidationFlags.Visual))
                     {
                         _renderer.AddHostToRedrawQueue(dockHost);
                     }
@@ -81,9 +83,29 @@ namespace Editor.UI
             }
         }
 
+        private int GetUniqueHostId()
+        {
+            while (true)
+            {
+                int id = (int)Stopwatch.GetTimestamp();
+
+                bool foundMatch = false;
+                foreach (UIDockHost host in _activeDockHosts)
+                {
+                    if (host.UniqueDockHostId == id)
+                    {
+                        foundMatch = true;
+                    }
+                }
+
+                if (!foundMatch)
+                    return id;
+            }
+        }
+
         public UIDockHost CreateHostedDock(Window hostWindow)
         {
-            UIDockHost dockHost = new UIDockHost();
+            UIDockHost dockHost = new UIDockHost(GetUniqueHostId());
             dockHost.SetupAsHosted(hostWindow);
 
             _activeDockHosts.Add(dockHost);
@@ -92,7 +114,7 @@ namespace Editor.UI
 
         public UIDockHost CreateFloatingDock(Vector2 clientSize)
         {
-            UIDockHost dockHost = new UIDockHost();
+            UIDockHost dockHost = new UIDockHost(GetUniqueHostId());
             dockHost.SetupAsFloating(clientSize);
 
             _activeDockHosts.Add(dockHost);
@@ -101,11 +123,22 @@ namespace Editor.UI
 
         public UIDockHost CreateDockedHost(UIDockHost parentHost, UIDockSide side)
         {
-            UIDockHost dockHost = new UIDockHost();
+            UIDockHost dockHost = new UIDockHost(GetUniqueHostId());
             dockHost.SetupAsDocked(parentHost, side);
-
+            
             _activeDockHosts.Add(dockHost);
             return dockHost;
+        }
+
+        public UIDockHost? FindDockHostFromWindowId(uint windowId)
+        {
+            foreach (UIDockHost dockHost in _activeDockHosts)
+            {
+                if (dockHost.Window != null && dockHost.Window.WindowId == windowId)
+                    return dockHost;
+            }
+
+            return null;
         }
 
         public T OpenWindow<T>(UIDockHost? host) where T : UIWindow

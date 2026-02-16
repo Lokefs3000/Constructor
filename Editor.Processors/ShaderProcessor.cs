@@ -72,16 +72,16 @@ namespace Editor.Processors
         {
             SBCTarget target = SBCTarget.None;
 
-            if (FlagUtility.HasFlag(result.Targets, ShaderCompileTarget.Direct3D12))
+            if (Flags.HasFlag(result.Targets, ShaderCompileTarget.Direct3D12))
                 target |= SBCTarget.Direct3D12;
-            if (FlagUtility.HasFlag(result.Targets, ShaderCompileTarget.Vulkan))
+            if (Flags.HasFlag(result.Targets, ShaderCompileTarget.Vulkan))
                 target |= SBCTarget.Vulkan;
 
             SBCStages stages = SBCStages.None;
 
-            if (FlagUtility.HasFlag(result.Stages, ShaderCompileStage.Vertex))
+            if (Flags.HasFlag(result.Stages, ShaderCompileStage.Vertex))
                 stages |= SBCStages.Vertex;
-            if (FlagUtility.HasFlag(result.Stages, ShaderCompileStage.Pixel))
+            if (Flags.HasFlag(result.Stages, ShaderCompileStage.Pixel))
                 stages |= SBCStages.Pixel;
 
             SBCHeaderFlags flags = SBCHeaderFlags.None;
@@ -202,6 +202,7 @@ namespace Editor.Processors
                 {
                     ShPropertyStages.VertexShading => SBCShaderStages.VertexShading,
                     ShPropertyStages.PixelShading => SBCShaderStages.PixelShading,
+                    ShPropertyStages.ComputeShading => SBCShaderStages.ComputeShading,
                     ShPropertyStages.AllShading => SBCShaderStages.AllShading,
                     _ => throw new NotSupportedException()
                 });
@@ -401,11 +402,11 @@ namespace Editor.Processors
                 long current = bw.BaseStream.Position;
 
                 bw.BaseStream.Seek(backup, SeekOrigin.Begin);
-                bw.Write((ushort)(FlagUtility.HasFlag(flags, SBCPropertyFlags.Global) ? globalByteOffset : localByteOffset));
+                bw.Write((ushort)(Flags.HasFlag(flags, SBCPropertyFlags.Global) ? globalByteOffset : localByteOffset));
                 bw.Write(flags);
                 bw.BaseStream.Seek(current, SeekOrigin.Begin);
 
-                if (FlagUtility.HasFlag(flags, SBCPropertyFlags.Global))
+                if (Flags.HasFlag(flags, SBCPropertyFlags.Global))
                     globalByteOffset += size;
                 else
                     localByteOffset += size;

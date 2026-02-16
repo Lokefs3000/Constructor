@@ -78,7 +78,7 @@ namespace Editor.Processors
                     {
                         for (int i = 0, j = 0; i < 4; i++)
                         {
-                            if (FlagUtility.HasFlag(composite.Channels, (TextureCompositeChannel)(1 << i)))
+                            if (Flags.HasFlag(composite.Channels, (TextureCompositeChannel)(1 << i)))
                             {
                                 if (j >= args.Sources.Length)
                                 {
@@ -97,10 +97,13 @@ namespace Editor.Processors
                                 }
 
                                 NvttSurface* tempSurf = NVTT.nvttCreateSurface();
-                                if (NVTT.nvttSurfaceLoadFromMemory(tempSurf, Unsafe.AsPointer(ref imageBytes[0]), (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
+                                fixed (byte* ptr = imageBytes)
                                 {
-                                    args.Logger?.Error("[NVTT]: Failed to load composite channel file: {af} (channel: {c})", absoluteFilepath, (TextureCompositeChannel)(1 << i));
-                                    return false;
+                                    if (NVTT.nvttSurfaceLoadFromMemory(tempSurf, ptr, (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
+                                    {
+                                        args.Logger?.Error("[NVTT]: Failed to load composite channel file: {af} (channel: {c})", absoluteFilepath, (TextureCompositeChannel)(1 << i));
+                                        return false;
+                                    }
                                 }
 
                                 minTextureSizeX = Math.Min(minTextureSizeX, NVTT.nvttSurfaceWidth(tempSurf));
@@ -237,11 +240,14 @@ namespace Editor.Processors
                         }
 
                         surfaces[i] = NVTT.nvttCreateSurface();
-                        if (NVTT.nvttSurfaceLoadFromMemory(surfaces[i], Unsafe.AsPointer(ref imageBytes[0]), (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
+                        fixed (byte* ptr = imageBytes)
                         {
-                            //report error
-                            args.Logger?.Error("[NVTT]: Failed to load surface from image bytes: {af}", args.Sources[i].AbsoluteFilepath);
-                            return false;
+                            if (NVTT.nvttSurfaceLoadFromMemory(surfaces[i], ptr, (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
+                            {
+                                //report error
+                                args.Logger?.Error("[NVTT]: Failed to load surface from image bytes: {af}", args.Sources[i].AbsoluteFilepath);
+                                return false;
+                            }
                         }
 
                         if (i == 0)
@@ -292,11 +298,14 @@ namespace Editor.Processors
                     }
 
                     surfaces = [NVTT.nvttCreateSurface()];
-                    if (NVTT.nvttSurfaceLoadFromMemory(surfaces[0], Unsafe.AsPointer(ref imageBytes[0]), (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
+                    fixed (byte* ptr = imageBytes)
                     {
-                        //report error
-                        args.Logger?.Error("[NVTT]: Failed to load surface from image bytes: {af}", absoluteFilepath);
-                        return false;
+                        if (NVTT.nvttSurfaceLoadFromMemory(surfaces[0], ptr, (ulong)imageBytes.Length, &hasAlpha, NvttBoolean.False, null) != NvttBoolean.True)
+                        {
+                            //report error
+                            args.Logger?.Error("[NVTT]: Failed to load surface from image bytes: {af}", absoluteFilepath);
+                            return false;
+                        }
                     }
                 }
 

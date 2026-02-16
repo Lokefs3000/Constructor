@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Rendering.Resources;
+using Primary.Rendering.State;
 using Primary.Rendering.Structures;
 using Primary.RHI2;
 using Primary.RHI2.Direct3D12;
@@ -30,6 +31,16 @@ namespace Primary.Rendering.D3D12
                 FrameGraphTexture fg = resources.FindFGTexture(texture);
                 return RHIFormatInfo.Query(fg.Description.Format).BytesPerPixel * fg.Description.Width;
             }
+        }
+
+        internal static RHIFormat GetTextureFormat(NRDResource texture, ResourceManager resources)
+        {
+            if (texture.Id != NRDResourceId.Texture)
+                return RHIFormat.Unknown;
+
+            return texture.IsExternal ?
+                ((D3D12RHITextureNative*)texture.Native)->Base.Description.Format :
+                resources.FindFGTexture(texture).Description.Format;
         }
 
         internal static FGBox GetTextureBox(NRDResource texture, ResourceManager resources)
@@ -64,6 +75,13 @@ namespace Primary.Rendering.D3D12
         {
             FGResourceId.Texture => resource.IsExternal ? new NRDResource((D3D12RHITextureNative*)Unsafe.As<D3D12RHITexture>(resource.Resource!).GetAsNative()) : new NRDResource(resource.Index, NRDResourceId.Texture),
             FGResourceId.Buffer => resource.IsExternal ? new NRDResource((D3D12RHIBufferNative*)Unsafe.As<D3D12RHIBuffer>(resource.Resource!).GetAsNative()) : new NRDResource(resource.Index, NRDResourceId.Buffer),
+            _ => NRDResource.Null
+        };
+
+        internal static NRDResource AsNRDResource(CmdDataResource resource) => resource.Type switch
+        {
+            CmdResourceType.Buffer => resource.IsExternal ? new NRDResource((D3D12RHIBufferNative*)resource.Resource) : new NRDResource((int)resource.Resource, NRDResourceId.Buffer),
+            CmdResourceType.Texture => resource.IsExternal ? new NRDResource((D3D12RHITextureNative*)resource.Resource) : new NRDResource((int)resource.Resource, NRDResourceId.Texture),
             _ => NRDResource.Null
         };
 

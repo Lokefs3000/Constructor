@@ -65,7 +65,7 @@ namespace Primary.RHI.Direct3D12
             if (desc.Memory == MemoryUsage.Staging)
                 _defaultState |= ResourceStates.GenericRead;
 
-            if (FlagUtility.HasFlag(desc.CpuAccessFlags, CPUAccessFlags.Read))
+            if (Flags.HasFlag(desc.CpuAccessFlags, CPUAccessFlags.Read))
             {
                 heapType = HeapType.Readback;
                 _defaultState |= ResourceStates.CopySource;
@@ -121,7 +121,7 @@ namespace Primary.RHI.Direct3D12
             _allocation = ptr;
             _resource = new ID3D12Resource((nint)outPtr);
 
-            if (FlagUtility.HasFlag(desc.Usage, TextureUsage.ShaderResource))
+            if (Flags.HasFlag(desc.Usage, TextureUsage.ShaderResource))
             {
                 _descriptor = device.CpuSRVCBVUAVDescriptors.Rent(1);
 

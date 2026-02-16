@@ -8,7 +8,7 @@ using TerraFX.Interop.Windows;
 
 namespace Primary.Rendering.State
 {
-    internal struct DirtyArray<T>
+    internal struct DirtyArray<T> where T : IEquatable<T>
     {
         private T?[] _previous;
         private T[] _value;
@@ -26,11 +26,17 @@ namespace Primary.Rendering.State
             Array.Fill(_value, default);
         }
 
-        public void Fill(T value)
+        public void Fill(T value, bool makeInternalDataDirty)
         {
             Array.Fill(_previous, value);
             Array.Fill(_value, value);
 
+            _changed = (byte)(makeInternalDataDirty ? 0xff : 0);
+        }
+
+        public void FillNew(T value)
+        {
+            Array.Fill(_value, value);
             _changed = 0xff;
         }
 
@@ -44,11 +50,11 @@ namespace Primary.Rendering.State
         {
             if (typeof(T).IsValueType)
             {
-                return _previous[index]!.Equals(_value[index]);
+                return !_previous[index]!.Equals(_value[index]);
             }
             else
             {
-                return _previous[index]?.Equals(_value[index]) ?? _value[index] == null;
+                return !_previous[index]?.Equals(_value[index]) ?? _value[index] == null;
             }
         }
 
@@ -70,7 +76,7 @@ namespace Primary.Rendering.State
         }
 
         public bool IsAnyDirty { get => _changed > 0; set => _changed = (byte)(value ? 0xff : 0); }
-        public int DirtyCount => 8 - BitOperations.LeadingZeroCount(_changed);
+        public int DirtyCount => 32 - BitOperations.LeadingZeroCount(_changed);
 
         public static implicit operator T[](DirtyArray<T> value) => value._value;
     }

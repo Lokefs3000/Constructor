@@ -35,7 +35,7 @@ namespace Editor.UI.Debugging
                     renderer.DrawWireRect(transform.RenderCoordinates.Minimum, transform.RenderCoordinates.Maximum, transform.RenderCoordinates.IsWithin(InputSystem.Pointer.MousePosition) ? Color.Red : Color.Yellow);
                     //renderer.DrawSolidRect(transform.RenderCoordinates.Minimum, transform.RenderCoordinates.Maximum, new Color(transform.RenderCoordinates.IsWithin(InputSystem.Pointer.MousePosition) ? Color.Red : Color.Yellow) { A = 0.1f });
 
-                    if (FlagUtility.HasFlag(element.InvalidFlags, UIInvalidationFlags.Visual))
+                    if (Flags.HasFlag(element.InvalidFlags, UIInvalidationFlags.Visual))
                     {
                         renderer.DrawWireBoundaries(element.InvalidVisualRegion, Color.Green);
                     }

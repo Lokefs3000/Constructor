@@ -49,8 +49,13 @@ namespace Editor.UI.Text
 
         internal void SetTotalSize(Vector2 size) => _totalSize = size;
 
+        public UIFontStyle? Style => _style;
+        public string? Text => _text;
+
         public Vector2 TotalSize => _totalSize;
+
         public ReadOnlySpan<UITextShapingLine> Lines => _lines.AsSpan(0, _lineCount);
+        public int LineCount => _lineCount;
     }
 
     public readonly record struct UITextShapingLine(int LineIndex, Vector2 LineSize, IndexRange TextRange);

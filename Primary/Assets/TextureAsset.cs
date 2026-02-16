@@ -4,31 +4,21 @@ using System.Runtime.CompilerServices;
 
 namespace Primary.Assets
 {
-    public class TextureAsset : IAssetDefinition
+    public class TextureAsset : BaseAssetDefinition<TextureAsset, TextureAssetData>
     {
-        private readonly TextureAssetData _assetData;
-
-        internal TextureAsset(TextureAssetData assetData)
+        public TextureAsset(TextureAssetData assetData) : base(assetData)
         {
-            _assetData = assetData;
         }
 
-        internal TextureAssetData AssetData => _assetData;
+        public RHITexture? RawRHITexture => AssetData.Texture;
+        public RHISampler? RawRHISampler => AssetData.Sampler;
 
-        public RHITexture? RawRHITexture => _assetData.Texture;
-        public RHISampler? RawRHISampler => _assetData.Sampler;
-
-        public ResourceStatus Status => _assetData.Status;
-
-        public string Name => _assetData.Name;
-        public AssetId Id => _assetData.Id;
-
-        public int Width => _assetData.Width;
-        public int Height => _assetData.Height;
-        public RHIFormat Format => _assetData.Format;
+        public int Width => AssetData.Width;
+        public int Height => AssetData.Height;
+        public RHIFormat Format => AssetData.Format;
     }
 
-    internal class TextureAssetData : IInternalAssetData
+    public class TextureAssetData : IInternalAssetData
     {
         private readonly WeakReference _asset;
 

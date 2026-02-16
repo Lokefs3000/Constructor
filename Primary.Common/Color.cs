@@ -21,6 +21,14 @@ namespace Primary.Common
             A = a;
         }
 
+        public Color(int r, int g, int b, int a = 255)
+        {
+            Vector128<float> rgba = Vector128.Create((float)r, (float)g, (float)b, (float)a);
+            rgba /= Vector128.Create(255.0f, 255.0f, 255.0f, 255.0f);
+
+            Unsafe.WriteUnaligned(ref Unsafe.As<Color, byte>(ref this), rgba);
+        }
+
         public Color(float scalar, float a = 1.0f)
         {
             R = scalar;
@@ -86,6 +94,16 @@ namespace Primary.Common
 
         public static Color TransparentWhite => new Color(1.0f, 0.0f);
         public static Color TransparentBlack => new Color(0.0f, 0.0f);
+
+        public static Color Normalize(Color color)
+        {
+            const float ConvertTo01 = 1.0f / 255.0f;
+
+            Vector128<float> convert = Vector128.Create(ConvertTo01, ConvertTo01, ConvertTo01, ConvertTo01);
+            convert *= color.AsVector128();
+
+            return Unsafe.ReadUnaligned<Color>(ref Unsafe.As<Vector128<float>, byte>(ref convert));
+        }
 
         public static Color FromHex(ReadOnlySpan<char> hex)
         {
@@ -189,6 +207,12 @@ namespace Primary.Common
             }
 
             return new Color(R, G, B, a);
+        }
+
+        public static Color Lerp(Color from, Color to, float t)
+        {
+            Vector128<float> v = Vector128.Lerp(from.AsVector128(), to.AsVector128(), Vector128.Create(t, t, t, t));
+            return Unsafe.ReadUnaligned<Color>(ref Unsafe.As<Vector128<float>, byte>(ref v));
         }
     }
 }

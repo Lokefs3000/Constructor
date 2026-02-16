@@ -49,14 +49,14 @@ namespace Primary.Assets.Loaders
                     ThrowException("Invalid version present in file: {version}", header.Version);
 
                 //HACK: Implement dynamic switching
-                if (!FlagUtility.HasFlag(header.Targets, SBCTarget.Direct3D12))
+                if (!Flags.HasFlag(header.Targets, SBCTarget.Direct3D12))
                     ThrowException("Shader does not have a target for current api: {api}", SBCTarget.Direct3D12);
 
                 ShHeaderFlags headerFlags = ShHeaderFlags.None;
 
-                if (FlagUtility.HasFlag(header.Flags, SBCHeaderFlags.ExternalProperties))
+                if (Flags.HasFlag(header.Flags, SBCHeaderFlags.ExternalProperties))
                     headerFlags |= ShHeaderFlags.ExternalProperties;
-                if (FlagUtility.HasFlag(header.Flags, SBCHeaderFlags.HeaderIsBuffer))
+                if (Flags.HasFlag(header.Flags, SBCHeaderFlags.HeaderIsBuffer))
                     headerFlags |= ShHeaderFlags.HeaderIsBuffer;
 
                 using BinaryReader br = new BinaryReader(stream);
@@ -104,13 +104,13 @@ namespace Primary.Assets.Loaders
                             }
 
                             ShPropertyStages resourceStages = ShPropertyStages.None;
-                            if (FlagUtility.HasFlag(stages, SBCStages.Vertex))
+                            if (Flags.HasFlag(stages, SBCStages.Vertex))
                                 resourceStages = ShPropertyStages.VertexShading;
-                            if (FlagUtility.HasFlag(stages, SBCStages.Pixel))
+                            if (Flags.HasFlag(stages, SBCStages.Pixel))
                                 resourceStages = resourceStages == ShPropertyStages.VertexShading ? ShPropertyStages.AllShading : ShPropertyStages.PixelShading;
 
                             ShResourceFlags resourceFlags = ShResourceFlags.None;
-                            if (FlagUtility.HasFlag(flags, SBCResourceFlags.IsReadWrite))
+                            if (Flags.HasFlag(flags, SBCResourceFlags.IsReadWrite))
                                 resourceFlags |= ShResourceFlags.ReadWrite;
                             if ((flags & ~SBCResourceFlags.IsReadWrite) > 0)
                                 resourceFlags |= ShResourceFlags.Property;
@@ -120,7 +120,7 @@ namespace Primary.Assets.Loaders
                             resources[i] = new ShaderResource(name, resourceType, resourceStages, resourceFlags);
 
                             //Must be a property as there are only property-based attributes that can be assigned to a resource
-                            if (FlagUtility.HasFlag(resourceFlags, ShResourceFlags.Property))
+                            if (Flags.HasFlag(resourceFlags, ShResourceFlags.Property))
                             {
                                 ShPropertyFlags propFlags = ShPropertyFlags.Property;
                                 ShPropertyDisplay propDisplay = ShPropertyDisplay.Default;
@@ -129,11 +129,11 @@ namespace Primary.Assets.Loaders
                                 string? customName = null;
                                 object? auxilary = null;
 
-                                if (FlagUtility.HasFlag(flags, SBCResourceFlags.IsReadWrite))
+                                if (Flags.HasFlag(flags, SBCResourceFlags.IsReadWrite))
                                     propFlags |= ShPropertyFlags.ReadWrite;
-                                if (FlagUtility.HasFlag(flags, SBCResourceFlags.Constants))
+                                if (Flags.HasFlag(flags, SBCResourceFlags.Constants))
                                     propFlags |= ShPropertyFlags.Constants;
-                                if (FlagUtility.HasFlag(flags, SBCResourceFlags.Display))
+                                if (Flags.HasFlag(flags, SBCResourceFlags.Display))
                                 {
                                     SBCPropertyDisplay read = stream.Read<SBCPropertyDisplay>();
                                     switch (read)
@@ -143,7 +143,7 @@ namespace Primary.Assets.Loaders
                                         default: ThrowException("Unexpected resource property display value: {t} ({v})", read, (int)read); break;
                                     }
                                 }
-                                if (FlagUtility.HasFlag(flags, SBCResourceFlags.Global))
+                                if (Flags.HasFlag(flags, SBCResourceFlags.Global))
                                 {
                                     propFlags |= ShPropertyFlags.Global;
 
@@ -151,7 +151,7 @@ namespace Primary.Assets.Loaders
                                     if (attribute.HasCustomName)
                                         customName = br.ReadString();
                                 }
-                                if (FlagUtility.HasFlag(flags, SBCResourceFlags.Property))
+                                if (Flags.HasFlag(flags, SBCResourceFlags.Property))
                                 {
                                     SBCAttributeProperty attribute = stream.Read<SBCAttributeProperty>();
                                     propDefault = attribute.Default switch
@@ -169,7 +169,7 @@ namespace Primary.Assets.Loaders
                                     if (attribute.HasCustomName)
                                         customName = br.ReadString();
                                 }
-                                if (FlagUtility.HasFlag(flags, SBCResourceFlags.Sampled))
+                                if (Flags.HasFlag(flags, SBCResourceFlags.Sampled))
                                 {
                                     propFlags |= ShPropertyFlags.Sampled;
 
@@ -269,10 +269,10 @@ namespace Primary.Assets.Loaders
 
                             string? customName = null;
 
-                            if (FlagUtility.HasFlag(flags, SBCPropertyFlags.HasParent))
+                            if (Flags.HasFlag(flags, SBCPropertyFlags.HasParent))
                                 propFlags |= ShPropertyFlags.HasParent;
 
-                            if (FlagUtility.HasFlag(flags, SBCPropertyFlags.Display))
+                            if (Flags.HasFlag(flags, SBCPropertyFlags.Display))
                             {
                                 propDisplay = stream.Read<SBCPropertyDisplay>() switch
                                 {
@@ -281,7 +281,7 @@ namespace Primary.Assets.Loaders
                                     _ => throw new NotImplementedException(),
                                 };
                             }
-                            if (FlagUtility.HasFlag(flags, SBCPropertyFlags.Global))
+                            if (Flags.HasFlag(flags, SBCPropertyFlags.Global))
                             {
                                 flags |= SBCPropertyFlags.Global;
 
@@ -289,7 +289,7 @@ namespace Primary.Assets.Loaders
                                 if (attribute.HasCustomName)
                                     customName = br.ReadString();
                             }
-                            if (FlagUtility.HasFlag(flags, SBCPropertyFlags.Property))
+                            if (Flags.HasFlag(flags, SBCPropertyFlags.Property))
                             {
                                 flags |= SBCPropertyFlags.Property;
 
@@ -335,7 +335,7 @@ namespace Primary.Assets.Loaders
                         for (int i = 0; i < properties.Count; i++)
                         {
                             ref ShaderProperty property = ref span[i];
-                            if (FlagUtility.HasEither(property.Flags, ShPropertyFlags.HasParent | ShPropertyFlags.Constants))
+                            if (Flags.HasEither(property.Flags, ShPropertyFlags.HasParent | ShPropertyFlags.Constants))
                                 continue;
 
                             actualUnique++;
@@ -347,22 +347,22 @@ namespace Primary.Assets.Loaders
                                 type = PsSortDummyType.Property;
 
                             PsSortDummyUsage usage = PsSortDummyUsage.Property;
-                            if (FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Global))
+                            if (Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
                                 usage = PsSortDummyUsage.Global;
-                            else if (FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Constants))
+                            else if (Flags.HasFlag(property.Flags, ShPropertyFlags.Constants))
                                 usage = PsSortDummyUsage.Constants;
 
                             dummies[j++] = new PropertySortDummy(i, property.Name, type, usage);
                         }
                     }
 
-                    if (!FlagUtility.HasFlag(header.Flags, SBCHeaderFlags.ExternalProperties))
+                    if (!Flags.HasFlag(header.Flags, SBCHeaderFlags.ExternalProperties))
                     {
                         Span<ShaderResource> span = resources.AsSpan();
                         for (int i = 0; i < span.Length; i++)
                         {
                             ref ShaderResource resource = ref span[i];
-                            if (!FlagUtility.HasFlag(resource.Flags, ShResourceFlags.Property))
+                            if (!Flags.HasFlag(resource.Flags, ShResourceFlags.Property))
                             {
                                 dummies[j++] = new PropertySortDummy(i | (1 << 31), resource.Name, PsSortDummyType.Resource, PsSortDummyUsage.Resource);
                                 actualUnique++;
@@ -419,7 +419,7 @@ namespace Primary.Assets.Loaders
                         {
                             ref ShaderProperty property = ref oldPropertiesSpan[sourceIndex];
 
-                            WeakRef<int> byteOffsetPtr = FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Global) ? new WeakRef<int>(ref globalByteOffset) : new WeakRef<int>(ref localByteOffset);
+                            WeakRef<int> byteOffsetPtr = Flags.HasFlag(property.Flags, ShPropertyFlags.Global) ? new WeakRef<int>(ref globalByteOffset) : new WeakRef<int>(ref localByteOffset);
                             ref int byteOffset = ref byteOffsetPtr.Ref;
 
                             if (property.Type <= ShPropertyType.Texture)
@@ -448,7 +448,7 @@ namespace Primary.Assets.Loaders
                                 propertyQueue.Enqueue((property.Name, int.MaxValue));
 
                                 headerBlockSize += property.ByteWidth;
-                                if (!FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Global))
+                                if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
                                     propertyBlockSize += property.ByteWidth;
 
                                 outputProperties[outputIdx++] = new ShaderProperty(property.Name, (ushort)byteOffset, property.ByteWidth, ushort.MaxValue, property.Type, property.Default, property.Stages, property.Flags | ShPropertyFlags.Property, property.Display);
@@ -625,7 +625,7 @@ namespace Primary.Assets.Loaders
 
                     void ReadAndCheckBytecode(SBCStages stage, Action<byte[]> callback)
                     {
-                        if (FlagUtility.HasFlag(header.Stages, stage))
+                        if (Flags.HasFlag(header.Stages, stage))
                         {
                             stream.Seek(startOffset + (baseOffset + int.TrailingZeroCount((int)stage) * 2) * sizeof(int), SeekOrigin.Begin);
 
@@ -650,7 +650,7 @@ namespace Primary.Assets.Loaders
                     for (int i = 0; i < outputProperties.Length; i++)
                     {
                         ref ShaderProperty property = ref outputProperties[i];
-                        if (!FlagUtility.HasFlag(property.Flags, ShPropertyFlags.HasParent))
+                        if (!Flags.HasFlag(property.Flags, ShPropertyFlags.HasParent))
                         {
                             propertiesValCount += property.ByteWidth;
                         }
@@ -658,7 +658,7 @@ namespace Primary.Assets.Loaders
 
                     //propertiesValCount /= sizeof(uint);
                     //bool uniqueCb = (propertiesValCount + expectedConstantsSize / sizeof(uint)) > 32;
-                    bool uniqueCb = FlagUtility.HasFlag(header.Flags, SBCHeaderFlags.HeaderIsBuffer);
+                    bool uniqueCb = Flags.HasFlag(header.Flags, SBCHeaderFlags.HeaderIsBuffer);
 
                     RHIGraphicsPipelineDescription pipelineDescription = new RHIGraphicsPipelineDescription
                     {
@@ -1093,6 +1093,7 @@ namespace Primary.Assets.Loaders
 
         VertexShading,
         PixelShading,
+        ComputeShading,
         AllShading
     }
 

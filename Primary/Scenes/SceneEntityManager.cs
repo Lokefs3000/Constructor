@@ -103,7 +103,7 @@ namespace Primary.Scenes
                 type.GetCustomAttribute<ComponentRequirementsAttribute>(),
                 type.GetCustomAttribute<ComponentConnectionsAttribute>(),
                 type.GetCustomAttribute<ComponentUsageAttribute>(),
-                ComponentRegistry.Add(type),
+                ComponentRegistry.Add(type), //TODO: revamp to NOT use pointers
                 static (Entity e, out bool exists) => Unsafe.AsPointer(ref e.TryGetRef<T>(out exists)),
                 static (Entity e) => Unsafe.AsPointer(ref e.AddOrGet(new T())),
                 static (Entity e, IComponent c) => e.Set<T>((T)c),

@@ -17,6 +17,10 @@ namespace Primary.Rendering.Resources
         public FrameGraphResource()
         {
             _index = -1;
+            _resourceId = FGResourceId.Undefined;
+            _resource = null;
+            _union = default;
+
             _debugName = null;
         }
 
@@ -94,10 +98,10 @@ namespace Primary.Rendering.Resources
             return new FrameGraphBuffer(this);
         }
 
-        public override int GetHashCode() => IsExternal ? Resource!.GetHashCode() : Index.GetHashCode();
+        public override int GetHashCode() => (IsExternal ? Resource!.GetHashCode() : Index.GetHashCode()) ^ (int)_resourceId;
         public override string ToString() => _debugName ?? _resource?.ToString() ?? (_index == -1 ? "Invalid" : $"{_resourceId}:{_index}");
 
-        public bool Equals(FrameGraphResource other) => IsExternal == other.IsExternal && IsExternal ? (other.Resource == Resource) : (other.Index == Index);
+        public bool Equals(FrameGraphResource other) => _resourceId == other._resourceId && (IsExternal ? (other._resource == _resource) : (other._index == _index));
 
         public int Index => _index;
         public string? DebugName => _debugName;
@@ -110,12 +114,12 @@ namespace Primary.Rendering.Resources
         internal RHIResource? Resource => _resource;
 
         internal FGResourceId ResourceId => (FGResourceId)((int)_resourceId & 0b01111111);
-        internal bool IsExternal => FlagUtility.HasFlag(_resourceId, FGResourceId.External);
+        internal bool IsExternal => Flags.HasFlag(_resourceId, FGResourceId.External);
 
         internal bool IsValidAndRenderGraph => _resource == null && _index >= 0;
         internal bool IsNull => IsExternal ? _resource == null : _index == -1;
 
-        public static readonly FrameGraphResource Invalid = new FrameGraphResource(-1, default(FrameGraphBufferDesc), null);
+        public static readonly FrameGraphResource Invalid = new FrameGraphResource();
 
         [StructLayout(LayoutKind.Explicit)]
         private readonly struct ResourceUnion
@@ -132,6 +136,8 @@ namespace Primary.Rendering.Resources
 
     public enum FGResourceId : byte
     {
+        Undefined = 0,
+
         Texture,
         Buffer,
         Global,

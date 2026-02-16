@@ -1,12 +1,14 @@
-﻿using Primary.Rendering.D3D12;
-using Primary.Rendering.Memory;
+﻿using Primary.Common.Memory;
+using Primary.Rendering.D3D12;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.Rendering.Structures;
 using Primary.RHI2;
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Text;
+using TerraFX.Interop.Windows;
 
 namespace Primary.Rendering.State
 {
@@ -47,11 +49,29 @@ namespace Primary.Rendering.State
         {
             base.ClearState();
 
-            _renderTargets.Fill(FrameGraphTexture.Invalid);
+            _renderTargets.Fill(FrameGraphTexture.Invalid, false);
+            _depthStencil.Reset(FrameGraphTexture.Invalid);
+
+            _viewports.Fill(null, false);
+            _scissors.Fill(null, false);
+
+            _stencilRef.Reset(0);
+
+            _vertexBuffer.Reset(SetVertexBufferData.Invalid);
+            _indexBuffer.Reset(SetIndexBufferData.Invalid);
+
+            _pipeline.Reset(-1);
+        }
+
+        internal override void SoftResetForNextPass()
+        {
+            base.SoftResetForNextPass();
+
+            _renderTargets.Fill(FrameGraphTexture.Invalid, true);
             _depthStencil.Value = FrameGraphTexture.Invalid;
 
-            _viewports.Fill(null);
-            _scissors.Fill(null);
+            _viewports.Fill(null, false);
+            _scissors.Fill(null, false);
 
             _stencilRef.Value = 0;
 
@@ -61,7 +81,7 @@ namespace Primary.Rendering.State
             _pipeline.Value = -1;
         }
 
-        internal override bool CommitState(SequentialLinearAllocator allocator, CommandRecorder recorder)
+        internal override bool CommitState(LinearBlockAllocator allocator, CommandRecorder recorder)
         {
             if (_pipeline.Value == -1)
                 return false;
@@ -69,6 +89,8 @@ namespace Primary.Rendering.State
             if (_renderTargets.IsAnyDirty)
             {
                 int count = _renderTargets.DirtyCount;
+                int limit = -1;
+
                 for (int i = 0; i < count; ++i)
                 {
                     if (_renderTargets.IsDirty(i))
@@ -81,8 +103,11 @@ namespace Primary.Rendering.State
                             Texture = texture
                         });
 
+                        limit = i;
+
                         if (!texture.IsNull)
                         {
+                            recorder.AddResourceToSet(texture);
                             if (!_viewports.GetWithoutDirty(i).HasValue)
                             {
                                 if (texture.IsExternal)
@@ -114,11 +139,20 @@ namespace Primary.Rendering.State
                     }
                 }
 
+                recorder.AddCommand(RecCommandType.CommitRenderTargets, new CmdCommitRenderTargets
+                {
+                    ActiveCount = (byte)(limit + 1),
+                    DeferSetState = _depthStencil.IsDirty
+                });
+
                 _renderTargets.ClearDirty();
             }
 
             if (_depthStencil.IsDirty)
             {
+                if (!_depthStencil.Value.IsNull)
+                    recorder.AddResourceToSet(_depthStencil.Value);
+
                 recorder.AddCommand(RecCommandType.SetDepthStencil, new CmdSetDepthStencil
                 {
                     Texture = _depthStencil.Value
@@ -130,6 +164,8 @@ namespace Primary.Rendering.State
             if (_viewports.IsAnyDirty)
             {
                 int count = _viewports.DirtyCount;
+                int limit = -1;
+
                 for (int i = 0; i < count; ++i)
                 {
                     if (_viewports.IsDirty(i))
@@ -142,8 +178,18 @@ namespace Primary.Rendering.State
                                 Slot = (byte)i,
                                 Viewport = viewport.Value
                             });
+
+                            limit = i;
                         }
                     }
+                }
+
+                if (limit != -1)
+                {
+                    recorder.AddCommand(RecCommandType.CommitViewports, new CmdCommitViewports
+                    {
+                        ActiveCount = (byte)(limit + 1),
+                    });
                 }
 
                 _viewports.ClearDirty();
@@ -152,6 +198,8 @@ namespace Primary.Rendering.State
             if (_scissors.IsAnyDirty)
             {
                 int count = _scissors.DirtyCount;
+                int limit = -1;
+
                 for (int i = 0; i < count; ++i)
                 {
                     if (_scissors.IsDirty(i))
@@ -164,8 +212,18 @@ namespace Primary.Rendering.State
                                 Slot = (byte)i,
                                 Scissor = scissor.Value
                             });
+
+                            limit = i;
                         }
                     }
+                }
+
+                if (limit != -1)
+                {
+                    recorder.AddCommand(RecCommandType.CommitScissors, new CmdCommitScissors
+                    {
+                        ActiveCount = (byte)(limit + 1),
+                    });
                 }
 
                 _scissors.ClearDirty();
@@ -184,10 +242,14 @@ namespace Primary.Rendering.State
             if (_vertexBuffer.IsDirty)
             {
                 SetVertexBufferData bufferData = _vertexBuffer.Value;
+                if (!bufferData.Buffer.IsNull)
+                    recorder.AddResourceToSet(bufferData.Buffer);
+
                 recorder.AddCommand(RecCommandType.SetVertexBuffer, new CmdSetVertexBuffer
                 {
                     Resource = bufferData.Buffer,
-                    Stride = (ushort)bufferData.Stride
+                    BufferSize = FGResourceUtility.GetWidth(bufferData.Buffer),
+                    Stride = (ushort)(bufferData.Stride == 0 ? FGResourceUtility.GetStride(bufferData.Buffer) : bufferData.Stride)
                 });
 
                 _vertexBuffer.IsDirty = false;
@@ -196,10 +258,14 @@ namespace Primary.Rendering.State
             if (_indexBuffer.IsDirty)
             {
                 SetIndexBufferData bufferData = _indexBuffer.Value;
+                if (!bufferData.Buffer.IsNull)
+                    recorder.AddResourceToSet(bufferData.Buffer);
+
                 recorder.AddCommand(RecCommandType.SetIndexBuffer, new CmdSetIndexBuffer
                 {
                     Resource = bufferData.Buffer,
-                    Stride = (ushort)bufferData.Stride
+                    BufferSize = FGResourceUtility.GetWidth(bufferData.Buffer),
+                    Stride = (ushort)(bufferData.Stride == 0 ? FGResourceUtility.GetStride(bufferData.Buffer) : bufferData.Stride)
                 });
 
                 _indexBuffer.IsDirty = false;

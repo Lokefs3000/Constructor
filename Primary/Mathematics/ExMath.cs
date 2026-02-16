@@ -37,5 +37,11 @@ namespace Primary.Mathematics
 
             return g;
         }
+
+        public static float GetAngleTowards(Vector2 from, Vector2 to)
+        {
+            Vector2 delta = to - from;
+            return MathF.Atan2(delta.Y, delta.X);
+        }
     }
 }

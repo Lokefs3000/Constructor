@@ -9,7 +9,8 @@ namespace Primary.Rendering.Resources
     public static class FGResourceUtility
     {
         public static uint GetWidth(FrameGraphBuffer buffer) => buffer.IsExternal ? Unsafe.As<RHIBuffer>(buffer.Resource!).Description.Width : buffer.Description.Width;
-        
+        public static uint GetStride(FrameGraphBuffer buffer) => (uint)(buffer.IsExternal ? buffer.Resource!.Description.Stride : buffer.Description.Stride);
+
         public static (int, int, int) GetTextureSize(FrameGraphTexture texture)
         {
             if (texture.IsExternal)

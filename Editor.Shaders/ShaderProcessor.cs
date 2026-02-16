@@ -109,7 +109,7 @@ namespace Editor.Shaders
             for (int i = 0; i < 2; i++)
             {
                 ShaderCompileTarget target = (ShaderCompileTarget)(1 << i);
-                if (FlagUtility.HasFlag(args.Targets, target))
+                if (Flags.HasFlag(args.Targets, target))
                 {
                     string[] presetArgs = target switch
                     {
@@ -209,7 +209,7 @@ namespace Editor.Shaders
                 for (int i = 0; i < 2; i++)
                 {
                     ShaderCompileTarget target = (ShaderCompileTarget)(1 << i);
-                    if (FlagUtility.HasFlag(args.Targets, target))
+                    if (Flags.HasFlag(args.Targets, target))
                     {
                         string[] presetArgs = target switch
                         {
@@ -232,7 +232,7 @@ namespace Editor.Shaders
             for (int i = 0; i < 3; i++)
             {
                 ShaderCompileStage stage = (ShaderCompileStage)(1 << i);
-                if (FlagUtility.HasFlag(stages, stage))
+                if (Flags.HasFlag(stages, stage))
                 {
                     int startIndex = stage == ShaderCompileStage.Compute ? kernelSkipIndex : 0;
 

@@ -172,8 +172,8 @@ namespace Primary.RHI2.Direct3D12
                 {
 
                 };
-                _nativeRep->RootSignature = (ComPtr<ID3D12RootSignature>*)Unsafe.AsPointer(ref _rootSignature);
-                _nativeRep->PipelineState = (ComPtr<ID3D12PipelineState>*)Unsafe.AsPointer(ref _pipelineState);
+                _nativeRep->RootSignature = _rootSignature.Get();
+                _nativeRep->PipelineState = _pipelineState.Get();
             }
         }
 
@@ -218,8 +218,8 @@ namespace Primary.RHI2.Direct3D12
     {
         public RHIComputePipelineNative Base;
 
-        public ComPtr<ID3D12RootSignature>* RootSignature;
-        public ComPtr<ID3D12PipelineState>* PipelineState;
+        public ID3D12RootSignature* RootSignature;
+        public ID3D12PipelineState* PipelineState;
 
         public static implicit operator RHIComputePipelineNative(D3D12RHIComputePipelineNative native) => native.Base;
     }

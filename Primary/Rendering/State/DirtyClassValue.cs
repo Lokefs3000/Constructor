@@ -24,7 +24,7 @@ namespace Primary.Rendering.State
         public T? Value { get => _value; set => _value = value; }
         public bool IsDirty
         {
-            get => _previous?.Equals(_value) ?? _value == null;
+            get => !_previous?.Equals(_value) ?? _value == null;
             set => _previous = _value;
         }
 

@@ -32,6 +32,8 @@ namespace Editor.UI.Visual.Passes
             UIGradientManager gradientManager = UIManager.Instance.Renderer.GradientManager;
             if (gradientManager.NeedsGradientsGenerated)
             {
+                BlackboardData blackboard = renderPass.Blackboard.Add<BlackboardData>();
+
                 using (ComputePassDescription desc = renderPass.SetupComputePass<PassData>("UI-GenGradients", out PassData data))
                 {
                     data.GradientManager = gradientManager;
@@ -63,6 +65,8 @@ namespace Editor.UI.Visual.Passes
                         Format = RHIFormat.RGBA8_UNorm,
                         Usage = FGTextureUsage.PixelShader | FGTextureUsage.GenericShader | FGTextureUsage.ShaderResource | FGTextureUsage.UnorderedAccess
                     }, "UI-Gradients");
+
+                    blackboard.Gradients = data.Texture;
 
                     desc.UseResource(FGResourceUsage.ReadWrite, data.LinearGradients);
                     desc.UseResource(FGResourceUsage.ReadWrite, data.GradientKeys);
@@ -106,16 +110,16 @@ namespace Editor.UI.Visual.Passes
 
             if (data.Shader!.TryFindKernel("CSGenLinearGradients", out ComputeShaderKernel? kernel))
             {
-                data.DataBlock!.SetResource(PropertyBlock.GetID("sbLinearGradients"), data.LinearGradients);
-                data.DataBlock.SetResource(PropertyBlock.GetID("baGradientKeyBuffer"), data.GradientKeys);
-                data.DataBlock.SetResource(PropertyBlock.GetID("txGradientOutput"), data.Texture);
+                data.DataBlock!.SetResource("sbLinearGradients", data.LinearGradients);
+                data.DataBlock.SetResource("baGradientKeyBuffer", data.GradientKeys);
+                data.DataBlock.SetResource("txGradientOutput", data.Texture);
 
                 cmd.SetPipeline(kernel.Pipeline);
                 cmd.SetProperties(data.DataBlock);
 
                 cmd.Dispatch(
-                    (uint)(UIGradientManager.LinearGradientWidth / kernel.ThreadSize.X),
-                    (uint)(UIGradientManager.LinearGradientHeight / kernel.ThreadSize.Y),
+                    (uint)((data.Texture.Description.Width / UIGradientManager.LinearGradientWidth)),
+                    (uint)((data.Texture.Description.Height / UIGradientManager.LinearGradientHeight)),
                     (uint)gradients.Length);
             }
         }
@@ -140,6 +144,16 @@ namespace Editor.UI.Visual.Passes
                 DataBlock = null;
 
                 Texture = FrameGraphTexture.Invalid;
+            }
+        }
+
+        internal class BlackboardData : IBlackboardData
+        {
+            public FrameGraphTexture Gradients;
+
+            public void Clear()
+            {
+                Gradients = FrameGraphTexture.Invalid;
             }
         }
 

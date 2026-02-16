@@ -1,11 +1,14 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
 using Primary.Common;
+using Primary.Common.Memory;
 using Primary.Rendering.Assets;
-using Primary.Rendering.Memory;
+using Primary.Rendering.Resources;
 using Primary.RHI2;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Primary.Rendering.Recording
 {
@@ -13,12 +16,10 @@ namespace Primary.Rendering.Recording
     {
         private readonly RenderPassManager _manager;
 
-        private SequentialLinearAllocator _allocator;
-        private List<int> _executionCommandOffsets;
-
-        private RecCommandEffectFlags _currentEffectFlags;
-
+        private LinearResizingAllocator _allocator;
         private int _commandCount;
+
+        private HashSet<FrameGraphResource> _resourceSet;
 
         private bool _disposedValue;
 
@@ -26,12 +27,10 @@ namespace Primary.Rendering.Recording
         {
             _manager = manager;
 
-            _allocator = new SequentialLinearAllocator(2048);
-            _executionCommandOffsets = new List<int>();
-
-            _currentEffectFlags = RecCommandEffectFlags.None;
-
+            _allocator = new LinearResizingAllocator(2048);
             _commandCount = 0;
+
+            _resourceSet = new HashSet<FrameGraphResource>();
         }
 
         private void Dispose(bool disposing)
@@ -56,19 +55,9 @@ namespace Primary.Rendering.Recording
         internal void ResetForNewRecording()
         {
             _allocator.Reset();
-            _executionCommandOffsets.Clear();
-
-            _currentEffectFlags = RecCommandEffectFlags.None;
-
             _commandCount = 0;
-        }
 
-        internal void FinishRecording()
-        {
-            if ((_executionCommandOffsets.Count > 0 ? _executionCommandOffsets[_executionCommandOffsets.Count - 1] : 0) < _allocator.CurrentOffset)
-            {
-                AddExecutionCommand(RecCommandType.Dummy, new UCDummy { });
-            }
+            _resourceSet.Clear();
         }
 
         internal unsafe void AddCommand<T>(RecCommandType commandType, T command) where T : unmanaged
@@ -81,206 +70,35 @@ namespace Primary.Rendering.Recording
 
             if (commandType != RecCommandType.Dummy)
                 _commandCount++;
+
+#if DEBUG
+            AddValidationCommand();
+#endif
         }
 
-        internal unsafe void AddStateChangeCommand<T>(RecCommandType commandType, RecCommandEffectFlags effectFlags, T command) where T : unmanaged, IStateChangeCommand
+        internal unsafe void AddBlankCommand(RecCommandType commandType)
         {
-            int size = Unsafe.SizeOf<T>() + Unsafe.SizeOf<UnmanagedCommandMeta>();
+            int size = Unsafe.SizeOf<RecCommandType>();
             nint ptr = _allocator.Allocate(size);
 
-            Unsafe.WriteUnaligned(ptr.ToPointer(), new UnmanagedCommandMeta { Type = commandType });
-            Unsafe.WriteUnaligned((ptr + Unsafe.SizeOf<UnmanagedCommandMeta>()).ToPointer(), command);
+            *(RecCommandType*)ptr = commandType;
 
             if (commandType != RecCommandType.Dummy)
                 _commandCount++;
+
+#if DEBUG
+            AddValidationCommand();
+#endif
         }
 
-        internal unsafe void AddExecutionCommand<T>(RecCommandType commandType, T command) where T : unmanaged, IExecutionCommand
+        [Conditional("DEBUG")]
+        private unsafe void AddValidationCommand()
         {
-            int currentOffset = _allocator.CurrentOffset;
-
-            int size = Unsafe.SizeOf<T>() + Unsafe.SizeOf<ExecutionCommandMeta>();
-            nint ptr = _allocator.Allocate(size);
-
-            Unsafe.WriteUnaligned(ptr.ToPointer(), new ExecutionCommandMeta { Type = commandType, Effect = _currentEffectFlags });
-            Unsafe.WriteUnaligned((ptr + Unsafe.SizeOf<ExecutionCommandMeta>()).ToPointer(), command);
-
-            _executionCommandOffsets.Add(currentOffset);
-            _currentEffectFlags = RecCommandEffectFlags.None;
-
-            if (commandType != RecCommandType.Dummy)
-                _commandCount++;
+            nint ptr = _allocator.Allocate(4);
+            *(uint*)ptr = s_commandValidationHeader;
         }
 
-        internal unsafe void AddModificationCommand<T>(RecCommandType commandType, T command) where T : unmanaged, IModificationCommand
-        {
-            int size = Unsafe.SizeOf<T>() + Unsafe.SizeOf<ModificationCommandMeta>();
-            nint ptr = _allocator.Allocate(size);
-
-            Unsafe.WriteUnaligned(ptr.ToPointer(), new ModificationCommandMeta { Type = commandType });
-            Unsafe.WriteUnaligned((ptr + Unsafe.SizeOf<ModificationCommandMeta>()).ToPointer(), command);
-
-            if (commandType != RecCommandType.Dummy)
-                _commandCount++;
-        }
-
-        internal unsafe void AddSetParameters(PropertyBlock block)
-        {
-            IShaderResourceSource? shader = block.Shader;
-            if (shader == null || shader.ResourceCount == 0)
-                return;
-
-            ShaderGlobalsManager globalsManager = ShaderGlobalsManager.Instance;
-            ReadOnlySpan<ShaderProperty> properties = shader.Properties;
-
-            {
-                int size = Unsafe.SizeOf<UCSetProperties>() + Unsafe.SizeOf<ModificationCommandMeta>();
-                nint ptr = _allocator.Allocate(size);
-
-                Unsafe.WriteUnaligned(ptr.ToPointer(), new ModificationCommandMeta { Type = RecCommandType.SetProperties });
-                Unsafe.WriteUnaligned((ptr + Unsafe.SizeOf<ModificationCommandMeta>()).ToPointer(), new UCSetProperties { ResourceCount = shader.ResourceCount, DataBlockSize = block.BlockSize, UseBufferForHeader = FlagUtility.HasFlag(shader.HeaderFlags, ShHeaderFlags.HeaderIsBuffer) });
-            }
-
-            if (block.BlockSize > 0 && block.BlockPointer != nint.Zero)
-            {
-                nint ptr = _allocator.Allocate(block.BlockSize);
-                Unsafe.CopyBlockUnaligned(ptr.ToPointer(), block.BlockPointer.ToPointer(), (uint)block.BlockSize);
-            }
-
-            //TODO: Add validation to ensure a non read write resource gets bound to a read write property
-
-            foreach (ref readonly ShaderProperty property in properties)
-            {
-                if (property.Type == ShPropertyType.Texture || property.Type == ShPropertyType.Buffer || property.Type == ShPropertyType.Sampler)
-                {
-                    SetPropertyFlags flags = SetPropertyFlags.None;
-                    if (FlagUtility.HasFlag(property.Flags, ShPropertyFlags.ReadWrite))
-                        flags = SetPropertyFlags.UnorderedAccess;
-
-                    PropertyData data = default;
-                    if (!FlagUtility.HasFlag(property.Flags, ShPropertyFlags.Global))
-                    {
-                        data = block.GetPropertyValue(property.IndexOrByteOffset);
-                    }
-                    else if (!globalsManager.TryGetPropertyValue(property.Name, out data))
-                    {
-                        int size2 = Unsafe.SizeOf<UnmanagedPropertyData>();
-                        nint ptr2 = _allocator.Allocate(size2);
-
-                        Unsafe.WriteUnaligned(ptr2.ToPointer(), new UnmanagedPropertyData
-                        {
-                            Meta = new PropertyMeta
-                            {
-                                Type = SetPropertyType.None,
-                                Target = ShPropertyStages.None,
-                                Flags = flags
-                            },
-                            IsExternal = false,
-                            Resource = nint.Zero
-                        });
-
-                        continue;
-                    }
-
-                    bool isExternal = false;
-                    nint dataPtr = -1;
-
-                    switch (property.Type)
-                    {
-                        case ShPropertyType.Buffer:
-                            {
-                                if (data.Resource.Resource == null)
-                                    dataPtr = data.Resource.Index;
-                                else
-                                {
-                                    dataPtr = (nint)Unsafe.As<RHIBuffer>(data.Resource.Resource).GetAsNative();
-                                    isExternal = true;
-                                }
-
-                                break;
-                            }
-                        case ShPropertyType.Texture:
-                            {
-                                if (data.Aux != null)
-                                {
-                                    TextureAsset asset = Unsafe.As<TextureAsset>(data.Aux);
-                                    dataPtr = asset.RawRHITexture == null ? nint.Zero : (nint)asset.RawRHITexture.GetAsNative();
-                                    isExternal = true;
-                                }
-                                else
-                                {
-                                    if (data.Resource.Resource == null)
-                                        dataPtr = data.Resource.Index;
-                                    else
-                                    {
-                                        dataPtr = (nint)Unsafe.As<RHITexture>(data.Resource.Resource).GetAsNative();
-                                        isExternal = true;
-                                    }
-                                }
-
-                                break;
-                            }
-                        case ShPropertyType.Sampler:
-                            {
-                                isExternal = true;
-                                if (data.Aux != null)
-                                {
-                                    RHISampler sampler = Unsafe.As<RHISampler>(data.Aux);
-                                    dataPtr = (nint)sampler.GetAsNative();
-                                }
-
-                                break;
-                            }
-                    }
-
-                    if (dataPtr == -1)
-                    {
-                        if (property.Type == ShPropertyType.Texture)
-                        {
-                            switch (property.Default)
-                            {
-                                case ShPropertyDefault.NumOne:
-                                case ShPropertyDefault.NumIdentity:
-                                case ShPropertyDefault.TexWhite: dataPtr = (nint)AssetManager.Static.DefaultWhite.RawRHITexture!.GetAsNative(); break;
-                                case ShPropertyDefault.NumZero:
-                                case ShPropertyDefault.TexBlack: dataPtr = (nint)AssetManager.Static.DefaultBlack.RawRHITexture!.GetAsNative(); break;
-                                case ShPropertyDefault.TexNormal: dataPtr = (nint)AssetManager.Static.DefaultNormal.RawRHITexture!.GetAsNative(); break;
-                                case ShPropertyDefault.TexMask: dataPtr = (nint)AssetManager.Static.DefaultMask.RawRHITexture!.GetAsNative(); break;
-                            }
-
-                            isExternal = true;
-                        }
-                        else if (property.Type == ShPropertyType.Sampler)
-                        {
-                            dataPtr = (nint)_manager.Resources.DefaultSampler.GetAsNative();
-                        }
-                    }
-
-                    int size = Unsafe.SizeOf<UnmanagedPropertyData>();
-                    nint ptr = _allocator.Allocate(size);
-
-                    Unsafe.WriteUnaligned(ptr.ToPointer(), new UnmanagedPropertyData
-                    {
-                        Meta = new PropertyMeta
-                        {
-                            Type = property.Type switch
-                            {
-                                ShPropertyType.Buffer => isExternal ? SetPropertyType.RHIBuffer : SetPropertyType.Buffer,
-                                ShPropertyType.Texture => isExternal ? SetPropertyType.RHITexture : SetPropertyType.Texture,
-                                ShPropertyType.Sampler => isExternal ? SetPropertyType.RHISampler : throw new NotSupportedException(),
-                                _ => throw new NotImplementedException()
-                            },
-                            Target = property.Stages,
-                            Flags = flags
-                        },
-                        IsExternal = isExternal,
-                        Resource = dataPtr
-                    });
-                }
-            }
-
-            _commandCount++;
-        }
+        internal void AddResourceToSet(FrameGraphResource resource) => _resourceSet.Add(resource);
 
         public nint GetPointerAtOffset(int offset)
         {
@@ -300,10 +118,23 @@ namespace Primary.Rendering.Recording
             return Unsafe.ReadUnaligned<T>((_allocator.Pointer + offset).ToPointer());
         }
 
+        [Conditional("DEBUG")]
+        internal unsafe void ValidateCommandAtOffset(int offset)
+        {
+            Debug.Assert(offset + 4 <= _allocator.CurrentOffset);
+            if (*(uint*)(_allocator.Pointer + offset) != s_commandValidationHeader)
+            {
+                uint header = *(uint*)(_allocator.Pointer + offset);
+                throw new InvalidDataException($"Incorrect header present at offset: {offset} (hex: {header:x8}, text: {Encoding.UTF8.GetString(MemoryMarshal.Cast<uint, byte>(new ReadOnlySpan<uint>(ref header)))})");
+            }
+        }
+
         public int BufferSize => _allocator.CurrentOffset;
         public int TotalCommandCount => _commandCount;
 
-        public ReadOnlySpan<int> ExecutionCommandOffsets => _executionCommandOffsets.AsSpan();
+        public IReadOnlySet<FrameGraphResource> UsedResources => _resourceSet;
+
+        private const uint s_commandValidationHeader = 0x54444d43;
     }
 
     public enum RecCommandType : byte
@@ -317,8 +148,6 @@ namespace Primary.Rendering.Recording
 
         ClearRenderTarget,
         ClearDepthStencil,
-        ClearRenderTargetCustom,
-        ClearDepthStencilCustom,
 
         SetViewport,
         SetScissor,
@@ -341,7 +170,7 @@ namespace Primary.Rendering.Recording
         Dispatch,
 
         SetPipeline,
-
+        
         PresentOnWindow,
 
         //New,
@@ -350,6 +179,11 @@ namespace Primary.Rendering.Recording
         SetResource,
         SetRawData,
         SetResourcesInfo,
+
+        CommitResources,
+        CommitRenderTargets,
+        CommitViewports,
+        CommitScissors
     }
 
     public enum RecCommandContextType : byte

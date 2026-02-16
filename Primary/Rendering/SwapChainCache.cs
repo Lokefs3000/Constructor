@@ -67,7 +67,7 @@ namespace Primary.Rendering
                 WindowHandle = window.NativeWindowHandle,
                 WindowSize = window.ClientSize,
 
-                BackBufferFormat = RHIFormat.RGBA8_UNorm,
+                BackBufferFormat = RHIFormat.RGB10A2_UNorm,
                 BackBufferCount = 2
             }) ?? throw new NullReferenceException();
 

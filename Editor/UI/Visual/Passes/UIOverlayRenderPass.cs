@@ -1,4 +1,5 @@
 ﻿using Primary.Rendering;
+using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
@@ -31,8 +32,6 @@ namespace Editor.UI.Visual.Passes
                         {
                             desc.UseResource(FGResourceUsage.Write, cameraData.ColorTexture);
                         }
-                        else
-                            throw new NotImplementedException();
                     }
 
                     desc.AllowPassCulling(false);
@@ -51,9 +50,25 @@ namespace Editor.UI.Visual.Passes
                 if (host.IsExternallyHosted)
                 {
                     cmd.Copy(new FGTextureCopyDesc((FrameGraphTexture)host.HostTexture!, null, cameraData.ColorTexture, 0, 0, 0));
+
+                    foreach (UIDockHost child in host.DockedHosts)
+                    {
+                        RecursiveHostCopy(cmd, cameraData.ColorTexture, child);
+                    }
                 }
-                else
-                    throw new NotImplementedException();
+            }
+
+            void RecursiveHostCopy(RasterCommandBuffer cmd, FrameGraphTexture dest, UIDockHost host)
+            {
+                if (host.HostTexture != null)
+                {
+                    cmd.Copy(new FGTextureCopyDesc((FrameGraphTexture)host.HostTexture!, null, dest, (uint)host.ClientOffset.X, (uint)host.ClientOffset.Y, 0));
+
+                    foreach (UIDockHost child in host.DockedHosts)
+                    {
+                        RecursiveHostCopy(cmd, dest, child);
+                    }
+                }
             }
         }
 

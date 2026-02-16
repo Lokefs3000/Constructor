@@ -268,6 +268,7 @@ namespace Primary.RHI2.Direct3D12
         {
             RHIFormat.RGBA8_UNorm => DXGI_FORMAT_R8G8B8A8_UNORM,
             RHIFormat.RGBA8_UNorm_sRGB => DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+            RHIFormat.RGB10A2_UNorm => DXGI_FORMAT_R10G10B10A2_UNORM,
             _ => DXGI_FORMAT_UNKNOWN,
         };
 

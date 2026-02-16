@@ -171,7 +171,7 @@ namespace Primary.RHI.Direct3D12
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void PresentInternal(PresentParameters parameters)
         {
-            bool hasVSync = FlagUtility.HasFlag(parameters, PresentParameters.VSync);
+            bool hasVSync = Flags.HasFlag(parameters, PresentParameters.VSync);
 
             Result r;
             try

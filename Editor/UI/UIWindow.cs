@@ -1,4 +1,5 @@
 ﻿using Editor.UI.Datatypes;
+using Editor.UI.Debugging;
 using Editor.UI.Elements;
 using Primary.Common;
 using System;
@@ -19,6 +20,8 @@ namespace Editor.UI
 
         private Vector2 _clientSize;
 
+        private LayoutRecorder? _layoutRecorder;
+
         public UIWindow(int uniqueWindowId)
         {
             _uniqueWindowId = uniqueWindowId;
@@ -35,6 +38,24 @@ namespace Editor.UI
         internal void RemoveInvalidFlags(UIInvalidationFlags flags) => _rootElement.RemoveInvalidFlag(flags);
         internal void SetClientSizeFromHost(Vector2 clientSize) => _clientSize = clientSize;
 
+        public void InvalidateTree(UIInvalidationFlags flags)
+        {
+            _parentHost?.InvalidateSelf(flags);
+            RecursiveInvalidate(_rootElement);
+
+            void RecursiveInvalidate(UIElement element)
+            {
+                element.InvalidateSelf(flags);
+
+                foreach (UIElement child in element.Children)
+                {
+                    RecursiveInvalidate(child);
+                }
+            }
+        }
+
+        public T? FindElementWithId<T>(string id) where T : UIElement => _rootElement.FindElementWithId<T>(id);
+
         public int UniqueWindowId => _uniqueWindowId;
         public UIElement RootElement => _rootElement;
 
@@ -46,5 +67,7 @@ namespace Editor.UI
         public string WindowTitle { get => _windowTitle; set => _windowTitle = value; }
 
         public Vector2 ClientSize { get => _clientSize; set => _parentHost?.TryChangeWindowSize(this, value); }
+
+        public LayoutRecorder? LayoutRecorder { get => _layoutRecorder; set => _layoutRecorder = value; }
     }
 }

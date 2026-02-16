@@ -1,6 +1,7 @@
 ﻿using Collections.Pooled;
 using CommunityToolkit.HighPerformance;
 using Primary.Common;
+using Primary.Pooling;
 using Primary.Rendering.NRD;
 using Primary.Rendering.Resources;
 using Primary.RHI2;
@@ -261,7 +262,7 @@ namespace Primary.Rendering.Pass
             }
 
             int alignedOffset = _uploadBufferLength + (-_uploadBufferLength & (info.Alignment - 1));
-            _uploadBufferLength = alignedOffset + info.SizeInBytes;
+            _uploadBufferLength = alignedOffset + uploadSize;
 
             _uploads.Add(new FGResourceUpload(buffer, alignedOffset, uploadSize));
             return _uploads.Count - 1;
@@ -276,7 +277,7 @@ namespace Primary.Rendering.Pass
             }
 
             int alignedOffset = _uploadBufferLength + (-_uploadBufferLength & (info.Alignment - 1));
-            _uploadBufferLength = alignedOffset + info.SizeInBytes;
+            _uploadBufferLength = alignedOffset + uploadSize;
 
             _uploads.Add(new FGResourceUpload(texture, alignedOffset, uploadSize));
             return _uploads.Count - 1;
@@ -289,7 +290,7 @@ namespace Primary.Rendering.Pass
             _resourceArray[resource.Index] = resource;
         }
 
-        internal int AddPontentialPipeline(RHIGraphicsPipeline pipeline)
+        internal int AddPotentialPipeline(RHIGraphicsPipeline pipeline)
         {
             if (_usedPipelinesDict.TryGetValue(pipeline, out int index))
                 return index;
@@ -302,7 +303,7 @@ namespace Primary.Rendering.Pass
             return index;
         }
 
-        internal int AddPontentialPipeline(RHIComputePipeline pipeline)
+        internal int AddPotentialPipeline(RHIComputePipeline pipeline)
         {
             if (_usedPipelinesDict.TryGetValue(pipeline, out int index))
                 return index;

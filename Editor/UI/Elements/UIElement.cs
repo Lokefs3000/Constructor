@@ -1,5 +1,8 @@
 ﻿using Editor.UI.Datatypes;
+using Editor.UI.Debugging;
+using Editor.UI.Interaction;
 using Editor.UI.Layout;
+using Editor.UI.Modifiers;
 using Editor.UI.Visual;
 using Primary.Common;
 using Primary.GUI.ImGui;
@@ -7,6 +10,7 @@ using Primary.Utility;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
@@ -31,6 +35,8 @@ namespace Editor.UI.Elements
 
         private List<IUILayoutModifier> _layoutMods;
 
+        private string? _id;
+
         public UIElement(UIElement? parent = null)
         {
             _windowOwner = null;
@@ -47,6 +53,8 @@ namespace Editor.UI.Elements
             _elementTreeBounds = Boundaries.Zero;
 
             _layoutMods = new List<IUILayoutModifier>();
+
+            _id = null;
 
             if (parent != null)
                 parent.AddChild(this);
@@ -68,6 +76,15 @@ namespace Editor.UI.Elements
             Debug.Assert(_children.Contains(child));
 
             _children.Remove(child);
+        }
+
+        public void MoveChild(UIElement child, int newIndex)
+        {
+            if (_children.IndexOf(child) != newIndex && _children.Remove(child))
+            {
+                _children.Insert(newIndex, child);
+                InvalidateSelf(UIInvalidationFlags.Layout);
+            }
         }
 
         internal void RemoveInvalidFlag(UIInvalidationFlags flags)
@@ -118,15 +135,29 @@ namespace Editor.UI.Elements
             return mod;
         }
 
+        public IUILayoutModifier AddLayoutModifier(Type type)
+        {
+            IUILayoutModifier mod = (IUILayoutModifier)Activator.CreateInstance(type, [this])!;
+            _layoutMods.Add(mod);
+
+            return mod;
+        }
+
         public T? RemoveLayoutModifier<T>() where T : class, IUILayoutModifier
         {
             _layoutMods.RemoveWhere((x) => x is T, out IUILayoutModifier? mod);
             return Unsafe.As<T>(mod);
         }
 
+        public IUILayoutModifier? RemoveLayoutModifier(Type type)
+        {
+            _layoutMods.RemoveWhere((x) => x.GetType() == type, out IUILayoutModifier? mod);
+            return mod;
+        }
+
         public void InvalidateSelf(UIInvalidationFlags flags)
         {
-            if (FlagUtility.HasFlag(flags, UIInvalidationFlags.Visual))
+            if (Flags.HasFlag(flags, UIInvalidationFlags.Visual))
             {
                 if ((_invalidFlags | UIInvalidationFlags.Visual) == _invalidFlags)
                     _invalidVisualRegion = _transform.RenderCoordinates;
@@ -138,43 +169,102 @@ namespace Editor.UI.Elements
 
             if (_parent != null)
             {
+                flags &= UIInvalidationFlags.All;
+
                 UIElement? head = _parent;
                 do
                 {
-                    if (FlagUtility.HasFlag(head._invalidFlags, flags))
-                        break;
-
                     head.InvalidateSelf(flags);
                 } while ((head = head.Parent) != null);
             }
+            else if (_windowOwner != null)
+            {
+                _windowOwner.ParentHost?.InvalidateSelf(_invalidFlags);
+            }
         }
 
-        public virtual UIRecalcLayoutStatus RecalculateLayout(UILayoutManager manager, UIRecalcType type)
+        public virtual void MeasureSize(UILayoutManager manager)
         {
             Debug.Assert(_windowOwner != null);
 
-            if (_transform.Recalculate(GetParentRenderBoundaries()))
+            if (_transform.Recalculate(GetParentSize()))
             {
                 InvalidateSelf(UIInvalidationFlags.Visual);
             }
+        }
 
-            return UIRecalcLayoutStatus.Finished;
+        public virtual void RecalculateLayout(UILayoutManager manager, ref UIMeasurements measurements)
+        {
+            ExecuteLayoutModifiers(ref measurements);
         }
 
         public virtual bool DrawVisual(UICommandBuffer commandBuffer)
         {
+            ExecuteDrawModifiers(commandBuffer);
             return true;
         }
 
-        public Boundaries GetParentRenderBoundaries()
+        public virtual void HandleEvent(HostInteractionManager interaction, ref readonly UIEvent @event)
         {
-            if (_parent == null)
-                return new Boundaries(Vector2.Zero, _windowOwner!.ClientSize);
-            else
-                return _parent._transform.RenderCoordinates;
+
         }
 
+        public virtual void AddStateToRecorder(LayoutRecorder recorder)
+        {
+            recorder.AddValue(this, "RelativePosition", _transform.RelativePosition);
+        }
+
+        internal void ExecuteMeasureModifiers(Vector2 treeSize)
+        {
+            foreach (IUILayoutModifier modifier in _layoutMods)
+            {
+                modifier.MeasureSize(treeSize);
+            }
+        }
+
+        protected void ExecuteLayoutModifiers(ref UIMeasurements measurements)
+        {
+            foreach (IUILayoutModifier modifier in _layoutMods)
+            {
+                measurements.CheckIfTreeIsValid();
+                modifier.ModifyElement(ref measurements);
+            }
+        }
+
+        internal void ExecuteDrawModifiers(UICommandBuffer commandBuffer)
+        {
+            foreach (IUILayoutModifier modifier in _layoutMods)
+            {
+                modifier.DrawVisual(commandBuffer);
+            }
+        }
+
+        public T? FindElementWithId<T>(string id) where T : UIElement
+        {
+            foreach (UIElement child in _children)
+            {
+                if (child is T && child.Id == id)
+                    return Unsafe.As<T>(child);
+                else
+                {
+                    T? ret = child.FindElementWithId<T>(id);
+                    if (ret != null)
+                        return ret;
+                }
+            }
+
+            return null;
+        }
+
+        public Vector2 GetParentSize() => _parent?.GetSizeAsParent() ?? _windowOwner!.ClientSize;
+
+        protected virtual Vector2 GetSizeAsParent() => _transform.RealSize;
+
+        protected void SetRealSize(Vector2 realSize) => _transform.RealSize = realSize;
+
         internal void SetTreeBounds(Boundaries boundaries) => _elementTreeBounds = boundaries;
+        internal void UpdateTransform() => _transform.Recalculate(_parent?.Transform?.RealSize ?? _windowOwner!.ClientSize);
+        internal void ComputeBoundaries() => _transform.ComputeBoundaries(_parent?._transform?.RenderCoordinates.Minimum ?? Vector2.Zero);
 
         public UIWindow? WindowOwner => _windowOwner;
 
@@ -190,5 +280,7 @@ namespace Editor.UI.Elements
         public Boundaries ElementTreeBounds => _elementTreeBounds;
 
         public IReadOnlyList<IUILayoutModifier> LayoutModifiers => _layoutMods;
+
+        public string? Id { get => _id; set => _id = value; }
     }
 }

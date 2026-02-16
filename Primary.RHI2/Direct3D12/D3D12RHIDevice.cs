@@ -17,6 +17,7 @@ using static TerraFX.Interop.DirectX.D3D12_RESOURCE_BINDING_TIER;
 using static TerraFX.Interop.DirectX.D3D12_RESOURCE_HEAP_TIER;
 using static TerraFX.Interop.DirectX.DXGI;
 using static TerraFX.Interop.DirectX.DXGI_GPU_PREFERENCE;
+using static TerraFX.Interop.DirectX.D3D12_MESSAGE_ID;
 using D3D12MA = Interop.D3D12MemAlloc;
 
 namespace Primary.RHI2.Direct3D12
@@ -42,6 +43,8 @@ namespace Primary.RHI2.Direct3D12
         private D3D12MA.Allocator* _d3d12Allocator;
 
         private D3D12RHIDeviceNative* _nativeRep;
+
+        private UploadManager _uploadManager;
 
         private Queue<(Action, ulong)> _pendingFreeCallbacks;
 
@@ -138,21 +141,25 @@ namespace Primary.RHI2.Direct3D12
                 {
                     fixed (D3D12_MESSAGE_SEVERITY* ptr = s_allowedSeverities)
                     {
-                        D3D12_INFO_QUEUE_FILTER filter = new D3D12_INFO_QUEUE_FILTER
+                        fixed (D3D12_MESSAGE_ID* ptr2 = s_deniedIds)
                         {
-                            AllowList = new D3D12_INFO_QUEUE_FILTER_DESC
+                            D3D12_INFO_QUEUE_FILTER filter = new D3D12_INFO_QUEUE_FILTER
                             {
-                                NumSeverities = (uint)s_allowedSeverities.Length,
-                                pSeverityList = ptr
-                            },
-                            DenyList = new D3D12_INFO_QUEUE_FILTER_DESC
-                            {
+                                AllowList = new D3D12_INFO_QUEUE_FILTER_DESC
+                                {
+                                    NumSeverities = (uint)s_allowedSeverities.Length,
+                                    pSeverityList = ptr
+                                },
+                                DenyList = new D3D12_INFO_QUEUE_FILTER_DESC
+                                {
+                                    NumIDs = (uint)s_deniedIds.Length,
+                                    pIDList = ptr2
+                                }
+                            };
 
-                            }
-                        };
-
-                        _infoQueue.Get()->ClearStorageFilter();
-                        _infoQueue.Get()->PushStorageFilter(&filter);
+                            _infoQueue.Get()->ClearStorageFilter();
+                            _infoQueue.Get()->PushStorageFilter(&filter);
+                        }
                     }
                 }
             }
@@ -214,17 +221,19 @@ namespace Primary.RHI2.Direct3D12
                 {
 
                 };
-                _nativeRep->Factory = (ComPtr<IDXGIFactory7>*)Unsafe.AsPointer(ref _factory);
-                _nativeRep->Adapter = (ComPtr<IDXGIAdapter4>*)Unsafe.AsPointer(ref _adapter);
-                _nativeRep->Debug = (ComPtr<ID3D12Debug6>*)Unsafe.AsPointer(ref _debug);
-                _nativeRep->Device = (ComPtr<ID3D12Device14>*)Unsafe.AsPointer(ref _device);
-                _nativeRep->InfoQueue = (ComPtr<ID3D12InfoQueue>*)Unsafe.AsPointer(ref _infoQueue);
-                _nativeRep->InfoQueue1 = (ComPtr<ID3D12InfoQueue1>*)Unsafe.AsPointer(ref _infoQueue1);
-                _nativeRep->DirectCmdQueue = (ComPtr<ID3D12CommandQueue>*)Unsafe.AsPointer(ref _directCmdQueue);
-                _nativeRep->ComputeCmdQueue = (ComPtr<ID3D12CommandQueue>*)Unsafe.AsPointer(ref _computeCmdQueue);
-                _nativeRep->CopyCmdQueue = (ComPtr<ID3D12CommandQueue>*)Unsafe.AsPointer(ref _copyCmdQueue);
+                _nativeRep->Factory = _factory.Get();
+                _nativeRep->Adapter = _adapter.Get();
+                _nativeRep->Debug = _debug.Get();
+                _nativeRep->Device = _device.Get();
+                _nativeRep->InfoQueue = _infoQueue.Get();
+                _nativeRep->InfoQueue1 = _infoQueue1.Get();
+                _nativeRep->DirectCmdQueue = _directCmdQueue.Get();
+                _nativeRep->ComputeCmdQueue = _computeCmdQueue.Get();
+                _nativeRep->CopyCmdQueue = _copyCmdQueue.Get();
                 _nativeRep->D3D12MAllocator = _d3d12Allocator;
             }
+
+            _uploadManager = new UploadManager(this);
 
             _pendingFreeCallbacks = new Queue<(Action, ulong)>();
 
@@ -246,6 +255,8 @@ namespace Primary.RHI2.Direct3D12
                     NativeMemory.Free(_nativeRep);
                     _nativeRep = null;
                 }
+
+                _uploadManager.Dispose();
 
                 _d3d12Allocator->Base.Release();
 
@@ -283,6 +294,8 @@ namespace Primary.RHI2.Direct3D12
             ++_frameIndex;
         }
 
+        public void UploadPendingData(ID3D12GraphicsCommandList10* cmds) => _uploadManager.UploadPending(cmds);
+
         public override RHIBuffer? CreateBuffer(in RHIBufferDescription description, nint rawData, [CallerMemberName] string? debugName = "")
         {
             if (!BufferValidator.Validate(in description, _logger, debugName))
@@ -292,6 +305,8 @@ namespace Primary.RHI2.Direct3D12
             if (debugName != null)
                 buffer.DebugName = debugName;
 
+            if (rawData != nint.Zero)
+                _uploadManager.AddBufferUpload(buffer, rawData);
             return buffer;
         }
 
@@ -304,6 +319,11 @@ namespace Primary.RHI2.Direct3D12
             if (debugName != null)
                 texture.DebugName = debugName;
 
+            if (!planeSlices.IsEmpty)
+            {
+                for (int i = 0; i < planeSlices.Length; ++i)
+                    _uploadManager.AddTextureUpload(texture, planeSlices[i], (uint)i, description.Width / (i + 1) * RHIFormatInfo.Query(description.Format).BytesPerPixel);
+            }
             return texture;
         }
 
@@ -419,13 +439,22 @@ namespace Primary.RHI2.Direct3D12
         public ComPtr<ID3D12CommandQueue> ComputeCmdQueue => _computeCmdQueue.Get();
         public ComPtr<ID3D12CommandQueue> CopyCmdQueue => _copyCmdQueue.Get();
 
+        public bool HasPendingUploads => _uploadManager.HasPendingUploads;
+        
+        internal UploadManager UploadManager => _uploadManager;
+
         public override RHIDeviceAPI DeviceAPI => RHIDeviceAPI.Direct3D12;
 
         private static D3D12_MESSAGE_SEVERITY[] s_allowedSeverities = [
             D3D12_MESSAGE_SEVERITY_CORRUPTION,
             D3D12_MESSAGE_SEVERITY_ERROR,
             D3D12_MESSAGE_SEVERITY_WARNING,
-            D3D12_MESSAGE_SEVERITY_INFO,
+            ];
+
+        private static D3D12_MESSAGE_ID[] s_deniedIds = [
+            D3D12_MESSAGE_ID_HEAP_ADDRESS_RANGE_INTERSECTS_MULTIPLE_BUFFERS,
+            D3D12_MESSAGE_ID_CLEARDEPTHSTENCILVIEW_MISMATCHINGCLEARVALUE,
+            D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE
             ];
     }
 
@@ -433,18 +462,18 @@ namespace Primary.RHI2.Direct3D12
     {
         public RHIDeviceNative Base;
 
-        public ComPtr<IDXGIFactory7>* Factory;
-        public ComPtr<IDXGIAdapter4>* Adapter;
+        public IDXGIFactory7* Factory;
+        public IDXGIAdapter4* Adapter;
 
-        public ComPtr<ID3D12Debug6>* Debug;
-        public ComPtr<ID3D12Device14>* Device;
+        public ID3D12Debug6* Debug;
+        public ID3D12Device14* Device;
 
-        public ComPtr<ID3D12InfoQueue>* InfoQueue;
-        public ComPtr<ID3D12InfoQueue1>* InfoQueue1;
+        public ID3D12InfoQueue* InfoQueue;
+        public ID3D12InfoQueue1* InfoQueue1;
 
-        public ComPtr<ID3D12CommandQueue>* DirectCmdQueue;
-        public ComPtr<ID3D12CommandQueue>* ComputeCmdQueue;
-        public ComPtr<ID3D12CommandQueue>* CopyCmdQueue;
+        public ID3D12CommandQueue* DirectCmdQueue;
+        public ID3D12CommandQueue* ComputeCmdQueue;
+        public ID3D12CommandQueue* CopyCmdQueue;
 
         public D3D12MA.Allocator* D3D12MAllocator;
 

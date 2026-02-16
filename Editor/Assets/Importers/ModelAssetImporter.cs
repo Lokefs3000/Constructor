@@ -118,12 +118,12 @@ namespace Editor.Assets.Importers
             AssetCategoryDatabase category = Editor.GlobalSingleton.AssetDatabase.GetCategory<RenderMesh>()!;
 
             Stream dataReadStream = stream;
-            if (FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.IsCompressed))
+            if (Flags.HasFlag(header.Flags, PMFHeaderFlags.IsCompressed))
                 dataReadStream = LZ4Stream.Decode(stream);
 
             using BinaryReader br = new BinaryReader(dataReadStream);
 
-            int indexStride = FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? 4 : 2;
+            int indexStride = Flags.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? 4 : 2;
             for (int i = 0; i < header.MeshCount; i++)
             {
                 string meshName = br.ReadString();

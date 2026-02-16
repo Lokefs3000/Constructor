@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace Primary.Rendering.Resources
 {
-    public readonly record struct FrameGraphTexture
+    public readonly record struct FrameGraphTexture : IEquatable<FrameGraphTexture>, IEquatable<FrameGraphResource>
     {
         private readonly FrameGraphResource _resource;
 
@@ -24,6 +24,9 @@ namespace Primary.Rendering.Resources
         public override int GetHashCode() => _resource.GetHashCode();
         public override string ToString() => _resource.ToString();
 
+        public bool Equals(FrameGraphTexture other) => _resource.Equals(other._resource);
+        public bool Equals(FrameGraphResource other) => _resource.Equals(other);
+
         [UnscopedRef]
         public ref readonly FrameGraphTextureDesc Description => ref _resource.TextureDesc;
         public int Index => _resource.Index;
@@ -34,7 +37,7 @@ namespace Primary.Rendering.Resources
         public bool IsValidAndRenderGraph => _resource.IsValidAndRenderGraph;
         public bool IsNull => _resource.IsNull;
 
-        public static readonly FrameGraphTexture Invalid = new FrameGraphTexture(new FrameGraphResource(-1, default(FrameGraphTextureDesc), null));
+        public static readonly FrameGraphTexture Invalid = new FrameGraphTexture(new FrameGraphResource());
 
         public static implicit operator FrameGraphResource(FrameGraphTexture resource) => resource._resource;
         public static explicit operator FrameGraphTexture(FrameGraphResource resource) => resource.AsTexture();

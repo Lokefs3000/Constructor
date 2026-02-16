@@ -3,6 +3,7 @@ using Primary.Pooling;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace Primary.Rendering.Pass
 {
@@ -129,14 +130,16 @@ namespace Primary.Rendering.Pass
                     }
                 }
 
-                WeakRef<int> lifetimeIndex = desc.Type switch
-                {
-                    RenderPassType.Graphics => new WeakRef<int>(ref rasterIndex),
-                    RenderPassType.Compute => new WeakRef<int>(ref computeIndex),
-                    _ => throw new NotSupportedException()
-                };
-
-                lifetimeIndex = new WeakRef<int>(ref index);
+                ref int lifetimeIndex = ref index;
+                //unsafe
+                //{
+                //    lifetimeIndex = Unsafe.AsRef<int>(desc.Type switch
+                //    {
+                //        RenderPassType.Graphics => &rasterIndex,
+                //        RenderPassType.Compute => &computeIndex,
+                //        _ => throw new NotSupportedException()
+                //    });
+                //}
 
                 foreach (var kvp in pass.Resources)
                 {
@@ -145,20 +148,20 @@ namespace Primary.Rendering.Pass
 
                     if (_resourceLifetimeDict.TryGetValue(kvp.Key, out range))
                     {
-                        if (lifetimeIndex.Ref < range.Start)
+                        if (lifetimeIndex < range.Start)
                         {
-                            Debug.Assert(range.End >= lifetimeIndex.Ref);
-                            _resourceLifetimeDict[kvp.Key] = new IndexRange(lifetimeIndex.Ref, range.End);
+                            Debug.Assert(range.End >= lifetimeIndex);
+                            _resourceLifetimeDict[kvp.Key] = new IndexRange(lifetimeIndex, range.End);
                         }
-                        else if (range.End < lifetimeIndex.Ref)
+                        else if (range.End < lifetimeIndex)
                         {
-                            Debug.Assert(range.Start <= lifetimeIndex.Ref);
-                            _resourceLifetimeDict[kvp.Key] = new IndexRange(range.Start, lifetimeIndex.Ref);
+                            Debug.Assert(range.Start <= lifetimeIndex);
+                            _resourceLifetimeDict[kvp.Key] = new IndexRange(range.Start, lifetimeIndex);
                         }
                     }
                     else
                     {
-                        _resourceLifetimeDict.Add(kvp.Key, new IndexRange(lifetimeIndex.Ref, lifetimeIndex.Ref));
+                        _resourceLifetimeDict.Add(kvp.Key, new IndexRange(lifetimeIndex, lifetimeIndex));
                     }
                 }
 
@@ -168,7 +171,7 @@ namespace Primary.Rendering.Pass
                     case RenderPassType.Compute: timeline.AddComputeEvent(i); break;
                 }
 
-                ++lifetimeIndex.Ref;
+                ++lifetimeIndex;
             }
 
             static TimelineFenceQueue GetQueueFromType(RenderPassType type) => type switch
@@ -193,7 +196,7 @@ namespace Primary.Rendering.Pass
         {
             foreach (var kvp in currentPass.Resources)
             {
-                if (!FlagUtility.HasFlag(kvp.Value, FGResourceUsage.Read))
+                if (!Flags.HasFlag(kvp.Value, FGResourceUsage.Read))
                 {
                     if (passToCheck.HasResourceWithUsage(kvp.Key, FGResourceUsage.Write))
                     {
@@ -246,7 +249,7 @@ namespace Primary.Rendering.Pass
             internal bool HasResourceWithUsage(FrameGraphResource resource, FGResourceUsage usage)
             {
                 if (_resources.TryGetValue(resource, out FGResourceUsage resUsage))
-                    return FlagUtility.HasEither(resUsage, usage);
+                    return Flags.HasEither(resUsage, usage);
 
                 return false;
             }

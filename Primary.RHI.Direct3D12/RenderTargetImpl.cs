@@ -86,7 +86,7 @@ namespace Primary.RHI.Direct3D12
                 _rtDescriptor = device.CpuRTVDescriptors.Rent(1);
                 device.D3D12Device.CreateRenderTargetView(_renderTexture, null, _rtDescriptor.GetCpuHandle());
 
-                _rtView = new RenderTextureViewImpl(device, _renderTexture, resDesc.Format, _rtDescriptor, ResourceStates.RenderTarget, FlagUtility.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Color), 0);
+                _rtView = new RenderTextureViewImpl(device, _renderTexture, resDesc.Format, _rtDescriptor, ResourceStates.RenderTarget, Flags.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Color), 0);
             }
 
             if (desc.DepthFormat != DepthStencilFormat.Undefined)
@@ -151,7 +151,7 @@ namespace Primary.RHI.Direct3D12
                     device.D3D12Device.CreateDepthStencilView(_depthStencilTexture, null, _dstDescriptor.GetCpuHandle());
                 }
 
-                _dstView = new RenderTextureViewImpl(device, _depthStencilTexture, resDesc.Format, _dstDescriptor, ResourceStates.DepthWrite, FlagUtility.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Depth), 1);
+                _dstView = new RenderTextureViewImpl(device, _depthStencilTexture, resDesc.Format, _dstDescriptor, ResourceStates.DepthWrite, Flags.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Depth), 1);
                 if (desc.DepthFormat switch
                 {
                     DepthStencilFormat.D32sfS8X24ui => true,
@@ -160,7 +160,7 @@ namespace Primary.RHI.Direct3D12
                     DepthStencilFormat.R24tX8ui => true,
                     _ => false
                 })
-                    _stencilView = new RenderTextureViewStencilImpl(device, _dstView, _depthStencilTexture, resDesc.Format, ResourceStates.DepthWrite, FlagUtility.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Stencil));
+                    _stencilView = new RenderTextureViewStencilImpl(device, _dstView, _depthStencilTexture, resDesc.Format, ResourceStates.DepthWrite, Flags.HasFlag(desc.ShaderVisibility, RenderTargetVisiblity.Stencil));
             }
 
             _device.FlushMessageQueue();

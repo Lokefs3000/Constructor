@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Editor.Interop.Ed;
 using Editor.UI.Assets;
-using Editor.UI.Memory;
+using Editor.UI.Helpers;
 using Primary.Common;
 using Primary.Pooling;
 using Primary.RHI2;
@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 using System.Text;
 
 namespace Editor.UI
@@ -90,9 +91,11 @@ namespace Editor.UI
 
             style.FontData.SetShapingFontStyle(style);
 
+            (DisposableShapedGlyph, char)[] shapedGlyphs = Array.Empty<(DisposableShapedGlyph, char)>();
+
             {
                 using RentedArray<Task> rentedTasks = RentedArray<Task>.Rent(unrendered.Count, true);
-                (DisposableShapedGlyph, char)[] shapedGlyphs = new (DisposableShapedGlyph, char)[unrendered.Count];
+                shapedGlyphs = new (DisposableShapedGlyph, char)[unrendered.Count];
 
                 int index = 0;
                 while (unrendered.TryDequeue(out char glyph))
@@ -118,7 +121,7 @@ namespace Editor.UI
                         DisposableShapedGlyph sg = shapedGlyphs[k].Item1;
 
                         MSDF_RenderBox renderBox = new MSDF_RenderBox();
-                        EdInterop.MSDF_CalculateBox(sg.Ptr, style.FontData.GlyphSize, 2.0, 1.0, 2, 2, &renderBox);
+                        EdInterop.MSDF_CalculateBox(sg.Ptr, style.FontData.GlyphSize, 2.0, 1.0, 0, 0, &renderBox);
 
                         Vector2 bitmapSize = new Vector2(renderBox.RectW, renderBox.RectH);
                         int bitmapPixelCount = (int)bitmapSize.X * (int)bitmapSize.Y;
@@ -141,24 +144,31 @@ namespace Editor.UI
                             EdInterop.MSDF_GenerateGlyph(sg.Ptr, &renderBox, &renderBitmap);
                         }
 
+                        Vector128<float> minVector = Vector128.Create(0.0f, 0.0f, 0.0f, 0.0f);
+                        Vector128<float> maxVector = Vector128.Create(1.0f, 1.0f, 1.0f, 1.0f);
+                        Vector128<float> _255Vector = Vector128.Create(255.0f, 255.0f, 255.0f, 255.0f);
+
                         //TODO: maybe see if SIMD can speed up this conversion?
                         int total = bitmapPixelCount * 4;
-                        for (int i = 0; i < total; i++)
+                        for (int i = 0; i < total; i += 4)
                         {
-                            float normal = MathF.Min(MathF.Max(bitmapFloats[i], 0.0f), 1.0f);
-                            bitmapPixels[i] = (byte)(~(int)(255.5f - 255.0f * normal));
+                            Vector128<float> rgba = Unsafe.ReadUnaligned<Vector128<float>>(ref Unsafe.As<float, byte>(ref bitmapFloats[i]));
+                            rgba = Vector128.Clamp(rgba, minVector, maxVector);
+                            rgba = _255Vector - _255Vector * rgba;
+
+                            Vector128<int> rgbaInt = ~Vector128.ConvertToInt32(rgba);
+
+                            bitmapPixels[i] = (byte)rgbaInt.GetElement(0);
+                            bitmapPixels[i + 1] = (byte)rgbaInt.GetElement(1);
+                            bitmapPixels[i + 2] = (byte)rgbaInt.GetElement(2);
+                            bitmapPixels[i + 3] = (byte)rgbaInt.GetElement(3);
                         }
 
-                        rendered.Enqueue(new RenderedGlyph(shapedGlyphs[k].Item2, bitmapPixels, bitmapSize));
+                        rendered.Enqueue(new RenderedGlyph(shapedGlyphs[k].Item2, bitmapPixels, bitmapSize, k));
                     });
                 }
 
                 Task.WaitAll(rentedTasks.Span);
-
-                for (int i = 0; i < shapedGlyphs.Length; i++)
-                {
-                    _shapedGlyphPool.Return(shapedGlyphs[i].Item1);
-                }
             }
 
             if (rendered.Count > 0)
@@ -261,7 +271,17 @@ namespace Editor.UI
                         glyphLineExtents = Vector2.Zero;
                     }
 
-                    currentGlyphLine.Add(glyph);
+                    if (glyph.BitmapSize.X > 0.0f && glyph.BitmapSize.Y > 0.0f)
+                        currentGlyphLine.Add(glyph);
+
+                    DisposableShapedGlyph sg = shapedGlyphs[glyph.ShapingIndex].Item1;
+                    style.AddGlyph(new UIGlyphData(
+                        shapedGlyphs[glyph.ShapingIndex].Item2,
+                        new Vector2((float)sg.Ptr->BearingX, (float)sg.Ptr->BearingY),
+                        new Vector2((float)sg.Ptr->Width, (float)sg.Ptr->Height),
+                        space.CurrentOffset,
+                        glyph.BitmapSize,
+                        (float)sg.Ptr->Advance));
 
                     space.CurrentOffset.X = filledLeftOffset;
                     space.MaxGlyphHeightOnLine = MathF.Max(space.MaxGlyphHeightOnLine, glyph.BitmapSize.Y);
@@ -320,6 +340,13 @@ namespace Editor.UI
                 }
                 else
                     _pendingUpdates.Enqueue(new UIFontUpdate(style, null, glyphLines.ToArray()));
+
+                style.GenerateUVsForGlyphs();
+            }
+
+            for (int i = 0; i < shapedGlyphs.Length; i++)
+            {
+                _shapedGlyphPool.Return(shapedGlyphs[i].Item1);
             }
         }
 
@@ -327,7 +354,7 @@ namespace Editor.UI
 
         internal Queue<UIFontUpdate> PendingFontUpdates => _pendingUpdates;
 
-        private readonly record struct RenderedGlyph(char Glyph, byte[] Bitmap, Vector2 BitmapSize);
+        private readonly record struct RenderedGlyph(char Glyph, byte[] Bitmap, Vector2 BitmapSize, int ShapingIndex);
 
         private unsafe struct DisposableShapedGlyph : IDisposable
         {

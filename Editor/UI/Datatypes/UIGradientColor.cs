@@ -50,6 +50,26 @@ namespace Editor.UI.Datatypes
 
             return hash;
         }
+
+        public Color Sample(float time)
+        {
+            for (int i = 0; i < Keys.Length; ++i)
+            {
+                UIGradientKey key = Keys[i];
+                if (key.Time > time)
+                {
+                    if (i == 0)
+                        return key.Color;
+                    else
+                    {
+                        UIGradientKey prev = Keys[i - 1];
+                        return Color.Lerp(prev.Color, key.Color, (time - prev.Time) / (key.Time - prev.Time));
+                    }
+                }
+            }
+
+            return Keys.LastOrDefault(new UIGradientKey(0.0f, Color.TransparentBlack)).Color;
+        }
     }
 
     public struct UIGradientKey

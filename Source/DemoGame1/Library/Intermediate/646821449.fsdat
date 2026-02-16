@@ -1,4 +1,5 @@
 Engine/Shaders/Debug/Normals.hlsl;638925191802548655
+Engine/Textures/Dannebrog.toml;639057976175580562
 Engine/Models/Torus.toml;638955906987050958
 Engine/Textures/DefaultTex_White.png;638963916394553316
 Engine/Shaders/Blit.hlsl;638955906987060936
@@ -39,7 +40,8 @@ Engine/Shaders/Unlit.hlsl;638955906987080878
 Engine/Textures/DefaultTex_Black.png;639030421367292718
 Engine/Models/Capsule.fbx;638960684165634501
 Engine/Shaders/FinalBlitSwapChain.toml;639029881734540627
-Engine/Textures/DefaultTex_White.toml;638955906987100825
+Engine/Textures/Dannebrog.png;639057975917416524
+Engine/Textures/DefaultTex_White.toml;639054055847862979
 Engine/Shaders/ForwardPlus/MissingDefault.toml;639010645293973793
 Engine/Models/Cylinder.toml;638955906987031010
 Engine/Shaders/Debug/DetailLighting.hlsl;638963940868702322
@@ -50,7 +52,7 @@ Engine/Shaders/Unlit.toml;638955906987080878
 Engine/Models/Sphere.toml;638955906987050958
 Engine/Textures/DefaultTex_Mask.toml;638963916634061455
 Engine/Shaders/Lit.toml;638955906987070904
-Engine/Shaders/ForwardPlus/Objects.hlsl;639030478645146194
+Engine/Shaders/ForwardPlus/Objects.hlsl;639041745307746896
 Engine/Shaders/FinalBlitSwapChain.hlsl2;639030412635782309
 Engine/Models/Cone.toml;638955906987021038
 Engine/Materials/ForwardPlus/MissingDefMat.mat2;639010644715336052
@@ -62,7 +64,7 @@ Engine/Shaders/Debug/Wireframe.toml;638925296915383762
 Engine/Textures/DefaultTex_Normal.png;638955906987080878
 Engine/Shaders/Converters.hlsl;638955906987060936
 Engine/Shaders/ForwardPlus/Test.toml;639029699274294034
-Engine/Textures/DefaultTex_Normal.toml;638955906987080878
+Engine/Textures/DefaultTex_Normal.toml;639054056451097601
 Engine/Shaders/Debug/Overdraw.toml;638925296983585189
 Engine/Shaders/Missing.hlsl;638955906987070904
 Engine/Models/Cone.fbx;638960684509961504

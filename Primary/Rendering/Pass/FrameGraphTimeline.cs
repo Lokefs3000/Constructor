@@ -1,12 +1,12 @@
 ﻿using CommunityToolkit.HighPerformance;
-using Primary.Rendering.Memory;
+using Primary.Common.Memory;
 using System.Runtime.CompilerServices;
 
 namespace Primary.Rendering.Pass
 {
     public unsafe sealed class FrameGraphTimeline : IDisposable
     {
-        private SequentialLinearAllocator _allocator;
+        private LinearBlockAllocator _allocator;
 
         private List<nint> _events;
         private List<int> _passes;
@@ -15,7 +15,7 @@ namespace Primary.Rendering.Pass
 
         internal FrameGraphTimeline()
         {
-            _allocator = new SequentialLinearAllocator(128);
+            _allocator = new LinearBlockAllocator(128);
 
             _events = new List<nint>();
             _passes = new List<int>();

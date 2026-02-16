@@ -2,6 +2,7 @@
 using Hexa.NET.ImGui.Backends.SDL3;
 using Primary.Assets;
 using Primary.Common;
+using Primary.Polling;
 using Primary.Profiling;
 using Primary.Rendering;
 using SDL;

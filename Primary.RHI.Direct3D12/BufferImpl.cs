@@ -73,7 +73,7 @@ namespace Primary.RHI.Direct3D12
             if (desc.Memory == MemoryUsage.Staging)
                 _defaultState |= ResourceStates.GenericRead;
 
-            if (FlagUtility.HasFlag(desc.CpuAccessFlags, CPUAccessFlags.Read))
+            if (Flags.HasFlag(desc.CpuAccessFlags, CPUAccessFlags.Read))
             {
                 heapType = HeapType.Readback;
                 _defaultState |= ResourceStates.CopySource;
@@ -125,11 +125,11 @@ namespace Primary.RHI.Direct3D12
             _allocation = ptr;
             _resource = new ID3D12Resource((nint)outPtr);
 
-            if (FlagUtility.HasFlag(desc.Usage, BufferUsage.ConstantBuffer) || FlagUtility.HasFlag(desc.Usage, BufferUsage.ShaderResource))
+            if (Flags.HasFlag(desc.Usage, BufferUsage.ConstantBuffer) || Flags.HasFlag(desc.Usage, BufferUsage.ShaderResource))
             {
                 _descriptor = device.CpuSRVCBVUAVDescriptors.Rent(1);
 
-                if (FlagUtility.HasFlag(desc.Usage, BufferUsage.ConstantBuffer))
+                if (Flags.HasFlag(desc.Usage, BufferUsage.ConstantBuffer))
                 {
                     device.D3D12Device.CreateConstantBufferView(new ConstantBufferViewDescription
                     {
@@ -137,7 +137,7 @@ namespace Primary.RHI.Direct3D12
                         SizeInBytes = (uint)resDesc.Width
                     }, _descriptor.GetCpuHandle());
                 }
-                else if (FlagUtility.HasFlag(desc.Usage, BufferUsage.ShaderResource))
+                else if (Flags.HasFlag(desc.Usage, BufferUsage.ShaderResource))
                 {
                     Checking.Assert(desc.Stride > 0 && desc.Stride <= desc.ByteWidth, $"Buffer stride must be more then 0 and less than the total byte width of the buffer (width: {desc.ByteWidth}, stride: {desc.Stride})");
 
@@ -171,7 +171,7 @@ namespace Primary.RHI.Direct3D12
             _gpuVirtualAddress = _resource.GPUVirtualAddress;
             _resourceName = _resource.Name;
 
-            if (FlagUtility.HasFlag(desc.Usage, BufferUsage.IndexBuffer))
+            if (Flags.HasFlag(desc.Usage, BufferUsage.IndexBuffer))
             {
                 _indexStrideFormat = desc.Stride switch
                 {
@@ -320,7 +320,7 @@ namespace Primary.RHI.Direct3D12
         internal Format IndexStrideFormat => _indexStrideFormat;
 
         public bool IsShaderVisible => !_descriptor.IsNull;
-        public ResourceType Type => FlagUtility.HasFlag(_description.Usage, BufferUsage.ShaderResource) ? ResourceType.ShaderBuffer : ResourceType.ConstantBuffer;
+        public ResourceType Type => Flags.HasFlag(_description.Usage, BufferUsage.ShaderResource) ? ResourceType.ShaderBuffer : ResourceType.ConstantBuffer;
         public string ResourceName => _resourceName;
         public CpuDescriptorHandle CpuDescriptor => _descriptor.GetCpuHandle();
         public ResourceStates GenericState => ResourceStates.Common;
@@ -357,7 +357,7 @@ namespace Primary.RHI.Direct3D12
             internal DescriptorImpl(BufferImpl owner, DescriptorKey key, BufferCBDescriptorDescription description) : this(owner, key, new DescriptorDescription { BufferCB = description })
             {
                 _bindType = ResourceType.ConstantBuffer;
-                _isDynamic = FlagUtility.HasFlag(description.Flags, DescriptorFlags.Dynamic);
+                _isDynamic = Flags.HasFlag(description.Flags, DescriptorFlags.Dynamic);
 
                 if (!_isDynamic)
                 {

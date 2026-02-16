@@ -178,7 +178,7 @@ namespace Primary.RHI.Direct3D12.Memory
         {
             const ResourceFlags ResourceFlags_UseTightAlignment = (ResourceFlags)0x400;
 
-            if (FlagUtility.HasFlag(desc.Flags, ResourceFlags_UseTightAlignment))
+            if (Flags.HasFlag(desc.Flags, ResourceFlags_UseTightAlignment))
                 UploadToTexture_TightAlign(resource, currentState, info, dataSlices, dataSize, ref desc);
             else
                 UploadToTexture_Fallback(resource, currentState, info, dataSlices, dataSize, ref desc);

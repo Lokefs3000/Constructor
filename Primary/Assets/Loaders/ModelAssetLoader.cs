@@ -51,7 +51,7 @@ namespace Primary.Assets.Loaders
                     ThrowException("Invalid version present in file: {version}", header.Version);
 
                 Stream dataReadStream = stream;
-                if (FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.IsCompressed))
+                if (Flags.HasFlag(header.Flags, PMFHeaderFlags.IsCompressed))
                     dataReadStream = LZ4Stream.Decode(stream);
 
                 using BinaryReader br = new BinaryReader(dataReadStream);
@@ -64,7 +64,7 @@ namespace Primary.Assets.Loaders
                 uint indexOffsetTotal = 0;
 
                 byte[] vertexData = new byte[header.VertexTotalSize];
-                byte[] indexData = new byte[header.IndexCount * (FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? sizeof(uint) : sizeof(ushort))];
+                byte[] indexData = new byte[header.IndexCount * (Flags.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? sizeof(uint) : sizeof(ushort))];
 
                 for (int i = 0; i < meshes.Length; i++)
                 {
@@ -85,7 +85,7 @@ namespace Primary.Assets.Loaders
 
                     Span<float> vertices = MemoryMarshal.Cast<byte, float>(new Span<byte>(vertexData, vertexDataOffset, (int)mesh.VertexCount * (12 + (uvChannelCount * 2)) * sizeof(float)));
 
-                    if (FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.HalfVertexValues))
+                    if (Flags.HasFlag(header.Flags, PMFHeaderFlags.HalfVertexValues))
                     {
                         using PoolArray<Half> pool = ArrayPool<Half>.Shared.Rent(vertices.Length);
                         br.Read(pool.AsSpan(0, vertices.Length));
@@ -102,7 +102,7 @@ namespace Primary.Assets.Loaders
 
                     vertexDataOffset += vertices.Length * sizeof(float);
 
-                    if (FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices))
+                    if (Flags.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices))
                     {
                         int indexDataSize = (int)(mesh.IndexCount * sizeof(uint));
                         Span<uint> indices = MemoryMarshal.Cast<byte, uint>(new Span<byte>(indexData, indexDataOffset, indexDataSize));
@@ -151,7 +151,7 @@ namespace Primary.Assets.Loaders
                     PMFNode node = new PMFNode
                     {
                         Name = br.ReadString(),
-                        Transform = ReadTransform(br, FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.HalfNodeTransforms)),
+                        Transform = ReadTransform(br, Flags.HasFlag(header.Flags, PMFHeaderFlags.HalfNodeTransforms)),
 
                         ChildCount = br.ReadUInt16(),
 
@@ -204,7 +204,7 @@ namespace Primary.Assets.Loaders
                         indexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
                         {
                             Width = (uint)indexData.Length,
-                            Stride = FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? 4 : 2,
+                            Stride = Flags.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? 4 : 2,
 
                             Usage = RHIResourceUsage.IndexInput
                         }, (nint)ptr);
@@ -229,28 +229,28 @@ namespace Primary.Assets.Loaders
                         Scale = Vector3.One
                     };
 
-                    if (FlagUtility.HasFlag(transform.Features, PMFTransformFeatures.Position))
+                    if (Flags.HasFlag(transform.Features, PMFTransformFeatures.Position))
                     {
                         transform.Position = halfPrecision ?
                             new Vector3((float)br.ReadHalf(), (float)br.ReadHalf(), (float)br.ReadHalf()) :
                             new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
                     }
 
-                    if (FlagUtility.HasFlag(transform.Features, PMFTransformFeatures.Rotation))
+                    if (Flags.HasFlag(transform.Features, PMFTransformFeatures.Rotation))
                     {
                         transform.Rotation = halfPrecision ?
                             new Quaternion((float)br.ReadHalf(), (float)br.ReadHalf(), (float)br.ReadHalf(), (float)br.ReadHalf()) :
                             new Quaternion(br.ReadSingle(), br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
                     }
 
-                    if (FlagUtility.HasFlag(transform.Features, PMFTransformFeatures.UniformScale))
+                    if (Flags.HasFlag(transform.Features, PMFTransformFeatures.UniformScale))
                     {
                         transform.Scale = new Vector3(halfPrecision ?
                             (float)br.ReadHalf() :
                             br.ReadSingle());
                     }
 
-                    if (FlagUtility.HasFlag(transform.Features, PMFTransformFeatures.Scale))
+                    if (Flags.HasFlag(transform.Features, PMFTransformFeatures.Scale))
                     {
                         transform.Scale = halfPrecision ?
                             new Vector3((float)br.ReadHalf(), (float)br.ReadHalf(), (float)br.ReadHalf()) :
