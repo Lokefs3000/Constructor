@@ -210,8 +210,9 @@ namespace Primary.Rendering.Assets
             {
                 if (remap.Type != ShPropertyType.Texture)
                     return;
+
                 if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
-                    return;
+                    _properties[remap.ByteWidthOrChildIndex] = PropertyData.Null;
 
                 _properties[remap.IndexOrByteOffset] = new PropertyData(texture);
                 ++_updateIndex;
@@ -240,8 +241,9 @@ namespace Primary.Rendering.Assets
             {
                 if (remap.Type != ShPropertyType.Texture)
                     return;
+
                 if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
-                    return;
+                    _properties[remap.ByteWidthOrChildIndex] = PropertyData.Null;
 
                 _properties[remap.IndexOrByteOffset] = new PropertyData(new FrameGraphResource(texture, null));
                 ++_updateIndex;

@@ -1,5 +1,11 @@
-﻿using System.Numerics;
+﻿using Primary.Serialization.Toml;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
+using Tomlyn.Serialization;
 
 namespace Primary.Assets.Types
 {
@@ -8,45 +14,60 @@ namespace Primary.Assets.Types
         public string? RetrievePathForId(AssetId assetId);
         public AssetId RetriveIdForPath(ReadOnlySpan<char> path);
 
-        public const ulong Invalid = ulong.MaxValue;
-        public const uint InvalidAssetId = uint.MaxValue;
-        public const uint InvalidProjectId = uint.MaxValue;
+        public static readonly AssetId Invalid = new AssetId(Guid.Empty);
     }
 
-    [StructLayout(LayoutKind.Explicit)]
-    public readonly record struct AssetId : IEquatable<AssetId>, IComparable<AssetId>, IComparisonOperators<AssetId, AssetId, bool>, IEqualityOperators<AssetId, AssetId, bool>
+    public readonly record struct AssetId : IEquatable<AssetId>, IComparable<AssetId>, IFormattable, IComparisonOperators<AssetId, AssetId, bool>, IEqualityOperators<AssetId, AssetId, bool>
     {
-        [FieldOffset(0)]
-        private readonly ulong _id;
+        // assume little endian architecture
+        private readonly ulong _high;
+        private readonly ulong _low;
 
-        [FieldOffset(0)]
-        private readonly uint _projectId;
-        [FieldOffset(4)]
-        private readonly uint _assetId;
+        public AssetId() => this = IAssetIdProvider.Invalid;
+        public AssetId(ulong high, ulong low) { _high = high; _low = low; }
+        public AssetId(Guid guid) => this = Unsafe.BitCast<Guid, AssetId>(guid);
 
-        public AssetId() => _id = IAssetIdProvider.Invalid;
-        public AssetId(ulong id) => _id = id;
-        public AssetId(uint project, uint id) => _id = project | (ulong)id << 32;
+        /// <summary>Produces same result as <see cref="Guid.GetHashCode"/></summary>
+        public override int GetHashCode()
+        {
+            ref int r = ref Unsafe.As<ulong, int>(ref Unsafe.AsRef(in _high));
+            return r ^ Unsafe.Add(ref r, 1) ^ Unsafe.Add(ref r, 2) ^ Unsafe.Add(ref r, 3);
+        }
 
-        public override int GetHashCode() => _id.GetHashCode();
-        public override string ToString() => _id.ToString();
-        public bool Equals(AssetId other) => _id == other._id;
-        public int CompareTo(AssetId other) => _id.CompareTo(other._id);
+        public override string ToString() => ToString("N", CultureInfo.InvariantCulture);
+        public string ToString([StringSyntax(StringSyntaxAttribute.GuidFormat)] string? format) => ToString(format, CultureInfo.InvariantCulture);
+        public string ToString(IFormatProvider? formatProvider) => ToString("N", formatProvider);
+        public string ToString([StringSyntax(StringSyntaxAttribute.GuidFormat)] string? format, IFormatProvider? formatProvider) => Unsafe.BitCast<AssetId, Guid>(this).ToString(format, formatProvider);
 
-        public ulong Value => _id;
-        public bool IsInvalid => _id == IAssetIdProvider.Invalid;
+        public bool Equals(AssetId other)
+        {
+            if (Vector128.IsHardwareAccelerated)
+                return Unsafe.BitCast<AssetId, Vector128<byte>>(this) == Unsafe.BitCast<AssetId, Vector128<byte>>(other);
+            else
+                return _high == other._high && _low == other._low;
+        }
 
-        public uint ProjectId => _projectId;
-        public uint Id => _assetId;
+        public int CompareTo(AssetId other)
+        {
+            int r = _high.CompareTo(other._high);
+            return r == 0 ? _low.CompareTo(other._low) : r;
+        }
 
-        public static readonly AssetId Invalid = new AssetId(IAssetIdProvider.Invalid);
+        public ulong High => _high;
+        public ulong Low => _low;
 
-        public static explicit operator AssetId(ulong id) => new AssetId(id);
-        public static implicit operator ulong(AssetId id) => id._id;
+        public Guid Guid => Unsafe.BitCast<AssetId, Guid>(this);
 
-        public static bool operator >(AssetId left, AssetId right) => left._id > right._id;
-        public static bool operator >=(AssetId left, AssetId right) => left._id >= right._id;
-        public static bool operator <(AssetId left, AssetId right) => left._id < right._id;
-        public static bool operator <=(AssetId left, AssetId right) => left._id <= right._id;
+        public bool IsInvalid => (_low | _high) == 0;
+
+        public static readonly AssetId Invalid = IAssetIdProvider.Invalid;
+
+        public static explicit operator AssetId(Guid guid) => new AssetId(guid);
+        public static implicit operator Guid(AssetId id) => id.Guid;
+
+        public static bool operator >(AssetId left, AssetId right) => left._high == right._high ? (left._low > right._low) : (left._high > right._high);
+        public static bool operator >=(AssetId left, AssetId right) => left._high == right._high ? (left._low >= right._low) : (left._high >= right._high);
+        public static bool operator <(AssetId left, AssetId right) => left._high == right._high ? (left._low <= right._low) : (left._high <= right._high);
+        public static bool operator <=(AssetId left, AssetId right) => left._high == right._high ? (left._low < right._low) : (left._high < right._high);
     }
 }

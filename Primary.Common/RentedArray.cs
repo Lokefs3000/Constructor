@@ -70,6 +70,8 @@ namespace Primary.Common
         public Span<T> Span => _array.AsSpan(0, _count);
         public bool ClearOnReturn => _returnClear;
 
+        public T[] BackingArray => _array;
+
         public static RentedArray<T> Rent(int count, bool clearOnReturn = false) => new RentedArray<T>(count, clearOnReturn);
         public static RentedArray<T> Rent(int count, ArrayPool<T> pool, bool clearOnReturn = false) => new RentedArray<T>(count, pool, clearOnReturn);
     }

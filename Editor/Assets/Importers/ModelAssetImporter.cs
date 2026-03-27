@@ -45,7 +45,7 @@ namespace Editor.Assets.Importers
                 pipeline.Associator.MakeAssocations(id, new ReadOnlySpan<AssetId>(in configId));
             }
 
-            TomlTable rootConfig = Toml.ToModel<TomlTable>(File.ReadAllText(configFile));
+            TomlTable rootConfig = TomlSerializer.Deserialize<TomlTable>(File.ReadAllText(configFile))!;
             ModelProcessorArgs args = ReadTomlDocument(rootConfig);
 
             args.AbsoluteFilepath = fullFilePath;

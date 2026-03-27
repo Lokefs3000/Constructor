@@ -2,6 +2,7 @@
 using CommunityToolkit.HighPerformance;
 using Editor.Geometry.Shapes;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using System.Buffers;
 using System.Numerics;
@@ -212,8 +213,8 @@ namespace Editor.Geometry
 
                 Array.Sort(faces, (a, b) =>
                 {
-                    ulong aNum = a.MaterialIndex?.Id.Value ?? ulong.MaxValue;
-                    ulong bNum = b.MaterialIndex?.Id.Value ?? ulong.MaxValue;
+                    AssetId aNum = a.MaterialIndex?.Id ?? AssetId.Invalid;
+                    AssetId bNum = b.MaterialIndex?.Id ?? AssetId.Invalid;
                     return aNum.CompareTo(bNum);
                 });
 

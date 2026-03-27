@@ -94,7 +94,7 @@ namespace Primary.RHI2.Direct3D12
             void* rawData = NativeMemory.Alloc((nuint)info.SizeInBytes);
             NativeMemory.Copy(data.ToPointer(), rawData, (nuint)info.SizeInBytes);
 
-            _pendingUploads.Add(new PendingDataUpload((nint)rawData, buffer.Description.Width, offset, buffer, 0));
+            _pendingUploads.Add(new PendingDataUpload((nint)rawData, buffer.Description.Width, offset, buffer, 0, 0));
         }
 
         internal void AddTextureUpload(D3D12RHITexture texture, nint data, uint subresource, int rowPitch)
@@ -102,36 +102,38 @@ namespace Primary.RHI2.Direct3D12
             D3D12_RESOURCE_DESC1 desc = texture.Resource.Get()->GetDesc1();
 
             desc.Alignment = 0;
-            desc.Width /= subresource + 1;
-            desc.Height /= subresource + 1;
+            desc.Width /= 1u << (int)subresource;
+            desc.Height /= 1u << (int)subresource;
             if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
-                desc.DepthOrArraySize /= (ushort)(subresource + 1);
+                desc.DepthOrArraySize /= (ushort)(1 << (int)subresource);
             desc.MipLevels = 1;
 
-            D3D12_RESOURCE_ALLOCATION_INFO info = _device.Device.Get()->GetResourceAllocationInfo3(0, 1, &desc, null, null, null);
+            //D3D12_RESOURCE_ALLOCATION_INFO info = _device.Device.Get()->GetResourceAllocationInfo2(0, 1, &desc, null);
+            RHIFormatInfo fi = RHIFormatInfo.Query(texture.Description.Format);
 
-            long offset = _uploadBufferOffset + (-_uploadBufferOffset & ((long)info.Alignment - 1));
-            _uploadBufferOffset = offset + (long)info.SizeInBytes;
+            int uploadRowPitch = (int)fi.CalculatePitch((long)desc.Width);
+            uploadRowPitch = uploadRowPitch + (-uploadRowPitch & ((int)D3D12.D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1));
 
-            void* rawData = NativeMemory.Alloc((nuint)info.SizeInBytes);
+            long uploadSizeInBytes = uploadRowPitch * desc.Height * desc.DepthOrArraySize;
+
+            long offset = _uploadBufferOffset + (-_uploadBufferOffset & ((long)D3D12.D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT - 1));
+            _uploadBufferOffset = offset + uploadSizeInBytes;
+
+            void* rawData = NativeMemory.Alloc((nuint)uploadSizeInBytes);
             if (rowPitch % 256 == 0)
             {
-                NativeMemory.Copy(data.ToPointer(), rawData, (nuint)info.SizeInBytes);
+                NativeMemory.Copy(data.ToPointer(), rawData, (nuint)uploadSizeInBytes);
             }
             else
             {
-                int paddedRowPitch = (int)(desc.Width * RHIFormatInfo.Query(texture.Description.Format).BytesPerPixel);
-                //paddedRowPitch = paddedRowPitch + (-paddedRowPitch & ((int)info.Alignment - 1));
-
                 int totalRows = (int)(desc.Height * (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? desc.DepthOrArraySize : 1));
-
                 for (int i = 0; i < totalRows; i++)
                 {
-                    NativeMemory.Copy((data + i * rowPitch).ToPointer(), ((byte*)rawData) + i * paddedRowPitch, (nuint)rowPitch);
+                    NativeMemory.Copy((data + i * rowPitch).ToPointer(), ((byte*)rawData) + i * uploadRowPitch, (nuint)rowPitch);
                 }
             }
 
-            _pendingUploads.Add(new PendingDataUpload((nint)rawData, (uint)info.SizeInBytes, offset, texture, subresource));
+            _pendingUploads.Add(new PendingDataUpload((nint)rawData, (uint)uploadSizeInBytes, offset, texture, subresource, uploadRowPitch));
         }
 
         internal void UploadPending(ID3D12GraphicsCommandList10* cmds)
@@ -173,7 +175,7 @@ namespace Primary.RHI2.Direct3D12
                 }
                 else if (upload.Resource is D3D12RHITexture texture)
                 {
-                    int mipDiv = (int)(upload.SubresourceIndex + 1);
+                    int mipDiv = (int)upload.SubresourceIndex;
 
                     D3D12_TEXTURE_COPY_LOCATION destLoc = new D3D12_TEXTURE_COPY_LOCATION((ID3D12Resource*)texture.Resource.Get(), upload.SubresourceIndex);
                     D3D12_TEXTURE_COPY_LOCATION srcLoc = new D3D12_TEXTURE_COPY_LOCATION((ID3D12Resource*)uploadBuffer.Get(), new D3D12_PLACED_SUBRESOURCE_FOOTPRINT
@@ -182,10 +184,10 @@ namespace Primary.RHI2.Direct3D12
                         Footprint = new D3D12_SUBRESOURCE_FOOTPRINT
                         {
                             Format = texture.Description.Format.ToTextureFormat(),
-                            Width = (uint)(texture.Description.Width / mipDiv),
-                            Height = (uint)(texture.Description.Height / mipDiv),
-                            Depth = (uint)(texture.Description.Dimension == RHIDimension.Texture3D ? texture.Description.DepthOrArraySize / mipDiv : 1),
-                            RowPitch = (uint)(((texture.Description.Width / mipDiv) + (-(texture.Description.Width / mipDiv) & 255)) * RHIFormatInfo.Query(texture.Description.Format).BytesPerPixel)
+                            Width = (uint)(texture.Description.Width / (1 << mipDiv)),
+                            Height = (uint)(texture.Description.Height / (1 << mipDiv)),
+                            Depth = (uint)(texture.Description.Dimension == RHIDimension.Texture3D ? texture.Description.DepthOrArraySize / (1 << mipDiv) : 1),
+                            RowPitch = (uint)upload.RowPitch
                         }
                     });
 
@@ -320,6 +322,6 @@ namespace Primary.RHI2.Direct3D12
 
         internal bool HasPendingUploads => _pendingUploads.Count > 0;
 
-        private readonly record struct PendingDataUpload(nint RawData, uint RawDataSize, long UploadDataOffset, RHIResource Resource, uint SubresourceIndex);
+        private readonly record struct PendingDataUpload(nint RawData, uint RawDataSize, long UploadDataOffset, RHIResource Resource, uint SubresourceIndex, int RowPitch);
     }
 }

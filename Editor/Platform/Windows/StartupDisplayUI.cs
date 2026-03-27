@@ -51,7 +51,7 @@ namespace Editor.Platform.Windows
             SDL_SetWindowHitTest(_window, &HitTest, nint.Zero);
             SDL_SetWindowProgressState(_window, SDL_ProgressState.SDL_PROGRESS_STATE_NORMAL);
 
-            using BundleReader reader = new BundleReader(File.OpenRead("SplashData.bundle")!, true);
+            using BundleReader reader = new BundleReader(File.OpenRead(Path.Combine(Path.GetDirectoryName(Environment.ProcessPath)!, "SplashData.bundle"))!, true);
 
             //Splash icon
             {

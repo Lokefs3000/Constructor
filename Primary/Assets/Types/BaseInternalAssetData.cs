@@ -54,8 +54,10 @@ namespace Primary.Assets.Types
         public virtual void SetAssetInternalName(string name) => _name = name;
         public virtual void SetAssetInternalStatus(ResourceStatus status) => _status = status;
 
+        IAssetDefinition? IInternalAssetData.Definition => Unsafe.As<T>(_asset.Target);
+
         public AssetId Id => _id;
-        public IAssetDefinition? Definition => Unsafe.As<T>(_asset.Target);
+        public T? Definition => Unsafe.As<T>(_asset.Target);
 
         public ResourceStatus Status => _status;
         public string Name => _name;

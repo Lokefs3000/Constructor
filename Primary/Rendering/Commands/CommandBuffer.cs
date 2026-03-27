@@ -9,6 +9,7 @@ using Primary.Rendering.Structures;
 using Primary.RHI2;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Vortice.Mathematics;
 
 namespace Primary.Rendering.Commands
 {
@@ -252,30 +253,6 @@ namespace Primary.Rendering.Commands
             if (!ValidateCopySource(this, desc.Destination, FGResourceUsage.Write))
                 return;
 
-            if (desc.SourceBox.HasValue)
-            {
-                FGBox box = desc.SourceBox.Value;
-                if (desc.Source.Type == FGTextureCopySourceType.SubresourceIndex)
-                {
-                    (int width, int height, int depth) = FGResourceUtility.GetTextureSize(desc.Source.Resource.AsTexture());
-                    (width, height, depth) = FGResourceUtility.GetSizeForSubresource(desc.Source.SubresourceIndex, width, height, depth);
-
-                    if (box.X + box.Width > width || box.Y + box.Height > height || box.Z + box.Depth > depth)
-                    {
-                        _errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.OutOfRange, desc.Source.Resource.ToString());
-                        return;
-                    }
-                }
-                else
-                {
-                    if (box.X + box.Width > desc.Source.Footprint.Width || box.Y + box.Height > desc.Source.Footprint.Height || box.Z + box.Depth > desc.Source.Footprint.Depth)
-                    {
-                        _errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.OutOfRange, desc.Source.Resource.ToString());
-                        return;
-                    }
-                }
-            }
-
             int srcWidth = -1;
             int srcHeight = -1;
             int srcDepth = -1;
@@ -311,6 +288,27 @@ namespace Primary.Rendering.Commands
                     srcDepth = (int)desc.Source.Footprint.Depth;
                 }
             }
+            else
+            {
+                if (desc.Source.Type == FGTextureCopySourceType.SubresourceIndex)
+                {
+                    (int width, int height, int depth) = FGResourceUtility.GetTextureSize(desc.Source.Resource.AsTexture());
+                    (width, height, depth) = FGResourceUtility.GetSizeForSubresource(desc.Source.SubresourceIndex, width, height, depth);
+
+                    srcWidth = width;
+                    srcHeight = height;
+                    srcDepth = depth;
+                }
+                else
+                {
+                    srcWidth = (int)desc.Source.Footprint.Width;
+                    srcHeight = (int)desc.Source.Footprint.Height;
+                    srcDepth = (int)desc.Source.Footprint.Depth;
+                }
+            }
+
+            if (srcWidth == 0 || srcHeight == 0 || srcDepth == 0)
+                return;
 
             {
                 if (desc.Destination.Type == FGTextureCopySourceType.SubresourceIndex)
@@ -318,26 +316,18 @@ namespace Primary.Rendering.Commands
                     (int width, int height, int depth) = FGResourceUtility.GetTextureSize(desc.Destination.Resource.AsTexture());
                     (width, height, depth) = FGResourceUtility.GetSizeForSubresource(desc.Destination.SubresourceIndex, width, height, depth);
 
-                    if (desc.SourceBox.HasValue)
+                    if (width - desc.DstX < srcWidth || height - desc.DstY < srcHeight || depth - desc.DstZ < srcDepth)
                     {
-                        FGBox box = desc.SourceBox.Value;
-                        if (box.X + box.Width > width || box.Y + box.Height > height || box.Z + box.Depth > depth)
-                        {
-                            _errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.OutOfRange, desc.Destination.Resource.ToString());
-                            return;
-                        }
+                        _errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.OutOfRange, desc.Destination.Resource.ToString());
+                        return;
                     }
                 }
                 else
                 {
-                    if (desc.SourceBox.HasValue)
+                    if (desc.Destination.Footprint.Width - desc.DstX < srcWidth || desc.Destination.Footprint.Height - desc.DstY < srcHeight || desc.Destination.Footprint.Depth - desc.DstZ < srcDepth)
                     {
-                        FGBox box = desc.SourceBox.Value;
-                        if (box.X + box.Width > desc.Destination.Footprint.Width || box.Y + box.Height > desc.Destination.Footprint.Height || box.Z + box.Depth > desc.Destination.Footprint.Depth)
-                        {
-                            _errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.OutOfRange, desc.Destination.Resource.ToString());
-                            return;
-                        }
+                        _errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.OutOfRange, desc.Destination.Resource.ToString());
+                        return;
                     }
                 }
             }

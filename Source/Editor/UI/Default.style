@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Stylesheet>
+	<Class Type="Frame">
+        <BackgroundColor Value="#242424" />
+    </Class>
+    <Class Type="SplitContainer">
+        <BackgroundColor Value="#101010" />
+    </Class>
+    <Class Type="MenuBar">
+        <BackgroundColor Value="#505050" />
+        <StrokeColor Value="#101010" />
+        <StrokeWeight Value="1" />
+    </Class>
+    <Class Type="MenuItem">
+        <Font Value="Editor/Fonts/Inter.uifont" />
+        <FontStyle Value="Regular" />
+        <TextColor Value="#ffffff" />
+    </Class>
+    <Class Type="TreeView">
+        <ArrowColor Value="#a0a0a0" />
+    </Class>
+	<Class Type="Label">
+		<Font Value="Editor/Fonts/Inter.uifont" />
+		<FontStyle Value="Regular" />
+        <TextColor Value="#ffffff" />
+	</Class>
+	<Class Type="Label" Name=".Italic">
+		<Font Value="Editor/Fonts/InterItalic.uifont" />
+		<FontStyle Value="Italic" />
+		<TextColor Value="#ffffff" />
+	</Class>
+	<Class Type="Button">
+		<State Name="Normal">
+			<BackgroundColor Value="#4f4f4f" />
+			<StrokeColor Value="#1b1b1b" />
+			<StrokeWeight Value="1" />
+			<CornerRadius Value="3" />
+		</State>
+		<State Name="Hovered">
+			<BackgroundColor Value="#6d6d6d" />
+			<StrokeColor Value="#252525" />
+		</State>
+		<State Name="Pressed">
+			<BackgroundColor Value="#3f3f3f" />
+			<StrokeColor Value="#808080" />
+		</State>
+	</Class>
+</Stylesheet>

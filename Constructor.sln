@@ -70,6 +70,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dedicated", "Dedicated", "{
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExtConsole", "ExtConsole\ExtConsole.csproj", "{D3FE09B5-44E3-42A8-A947-18DC7DB24324}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Editor.UI", "Editor.UI\Editor.UI.csproj", "{1EE65762-F7CA-449F-96F9-52FC9170779F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -479,6 +481,24 @@ Global
 		{D3FE09B5-44E3-42A8-A947-18DC7DB24324}.ReleaseWithDebug|x64.Build.0 = Release|Any CPU
 		{D3FE09B5-44E3-42A8-A947-18DC7DB24324}.ReleaseWithDebug|x86.ActiveCfg = Release|Any CPU
 		{D3FE09B5-44E3-42A8-A947-18DC7DB24324}.ReleaseWithDebug|x86.Build.0 = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Debug|x64.Build.0 = Debug|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Debug|x86.Build.0 = Debug|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Release|x64.ActiveCfg = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Release|x64.Build.0 = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Release|x86.ActiveCfg = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.Release|x86.Build.0 = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.ReleaseWithDebug|Any CPU.ActiveCfg = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.ReleaseWithDebug|Any CPU.Build.0 = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.ReleaseWithDebug|x64.ActiveCfg = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.ReleaseWithDebug|x64.Build.0 = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.ReleaseWithDebug|x86.ActiveCfg = Release|Any CPU
+		{1EE65762-F7CA-449F-96F9-52FC9170779F}.ReleaseWithDebug|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -510,6 +530,7 @@ Global
 		{8F6B6FED-018C-4D81-89AD-D00F6E0BBFD4} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{02C2791B-AAAD-4B8D-B144-311CFFF5194D} = {9290F94F-B0DB-4EE2-BCED-7E32E6D2740A}
 		{D3FE09B5-44E3-42A8-A947-18DC7DB24324} = {02C2791B-AAAD-4B8D-B144-311CFFF5194D}
+		{1EE65762-F7CA-449F-96F9-52FC9170779F} = {9290F94F-B0DB-4EE2-BCED-7E32E6D2740A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {163DD1B0-7A37-4D0E-9F49-50703AE7E83C}

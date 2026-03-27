@@ -1,0 +1,76 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+    <BuildType Name="ReleaseWithDebug" />
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Editor/">
+    <Project Path="Editor.Geometry/Editor.Geometry.csproj" />
+    <Project Path="Editor.Interop/Editor.Interop.csproj">
+      <BuildDependency Project="Native/EditorInterop/EditorInterop.vcxproj" />
+    </Project>
+    <Project Path="Editor.Processors/Editor.Processors.csproj" />
+    <Project Path="Editor.Shaders/Editor.Shaders.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Editor.UI/Editor.UI.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Editor/Editor.csproj" />
+  </Folder>
+  <Folder Name="/Editor/Debug/">
+    <Project Path="ExportValidator/ExportValidator.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="ShaderGen/ShaderGen.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Editor/Dedicated/">
+    <Project Path="ExtConsole/ExtConsole.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Editor/Native/">
+    <Project Path="Native/EditorInterop/EditorInterop.vcxproj" Id="656e6c57-b883-4a4a-b11a-a62ba4a1965b" />
+  </Folder>
+  <Folder Name="/Engine/">
+    <Project Path="Primary.Common/Primary.Common.csproj" />
+    <Project Path="Primary.Interop/Primary.Interop.csproj" />
+    <Project Path="Primary.R2.ForwardPlus/Primary.R2.ForwardPlus.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Primary.RHI.Direct3D12/Primary.RHI.Direct3D12.csproj" />
+    <Project Path="Primary.RHI/Primary.RHI.csproj" />
+    <Project Path="Primary.RHI2/Primary.RHI2.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Primary/Primary.csproj" />
+    <Project Path="Runtime/Runtime.csproj" />
+  </Folder>
+  <Folder Name="/Engine/Interop/">
+    <Project Path="Interop.D3D12MemAlloc/Interop.D3D12MemAlloc.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Interop.NVAftermath/Interop.NVAftermath.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Extra/">
+    <Project Path="Extra/BundleExplorer/BundleExplorer.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="ExtraFramework/ExtraFramework.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Folder Name="/SourceGenerators/">
+    <Project Path="Primary.SourceGenerator/Primary.SourceGenerator.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+</Solution>

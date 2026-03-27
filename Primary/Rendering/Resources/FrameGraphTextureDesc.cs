@@ -1,4 +1,5 @@
 ﻿using Primary.RHI2;
+using System.Runtime.InteropServices;
 
 namespace Primary.Rendering.Resources
 {
@@ -12,7 +13,7 @@ namespace Primary.Rendering.Resources
         public RHIFormat Format;
         public FGTextureUsage Usage;
 
-        public FrameGraphTextureSwizzle Swizzle;
+        public FGTextureSwizzle Swizzle;
 
         public FrameGraphTextureDesc()
         {
@@ -24,7 +25,7 @@ namespace Primary.Rendering.Resources
             Format = RHIFormat.Unknown;
             Usage = FGTextureUsage.Undefined;
 
-            Swizzle = FrameGraphTextureSwizzle.RGBA;
+            Swizzle = FGTextureSwizzle.RGBA;
         }
 
         public FrameGraphTextureDesc(FrameGraphTextureDesc @base)
@@ -41,26 +42,30 @@ namespace Primary.Rendering.Resources
         }
     }
 
-    public struct FrameGraphTextureSwizzle
+    [StructLayout(LayoutKind.Explicit)]
+    public struct FGTextureSwizzle
     {
-        public ushort Encoded;
+        [FieldOffset(0)] public ushort Encoded;
 
-        public FrameGraphTextureSwizzle()
+        [FieldOffset(0)] public FGSwizzleChannel R;
+        [FieldOffset(1)] public FGSwizzleChannel G;
+        [FieldOffset(2)] public FGSwizzleChannel B;
+        [FieldOffset(3)] public FGSwizzleChannel A;
+
+        public FGTextureSwizzle()
         {
             this = RGBA;
         }
 
-        public FrameGraphTextureSwizzle(FGTextureSwizzleChannel r, FGTextureSwizzleChannel g, FGTextureSwizzleChannel b, FGTextureSwizzleChannel a)
+        public FGTextureSwizzle(FGSwizzleChannel r, FGSwizzleChannel g, FGSwizzleChannel b, FGSwizzleChannel a)
         {
-            Encoded = (ushort)((((int)r) << 6) | (((int)g) << 4) | (((int)b) << 2) | ((int)a));
+            R = r;
+            G = g;
+            B = b;
+            A = a;
         }
 
-        public FGTextureSwizzleChannel R { get => (FGTextureSwizzleChannel)((Encoded >> 9) & 0x7); set => Encoded = (ushort)((Encoded & ~(0x7 << 9)) | ((int)value << 9)); }
-        public FGTextureSwizzleChannel G { get => (FGTextureSwizzleChannel)((Encoded >> 6) & 0x7); set => Encoded = (ushort)((Encoded & ~(0x7 << 6)) | ((int)value << 6)); }
-        public FGTextureSwizzleChannel B { get => (FGTextureSwizzleChannel)((Encoded >> 3) & 0x7); set => Encoded = (ushort)((Encoded & ~(0x7 << 3)) | ((int)value << 3)); }
-        public FGTextureSwizzleChannel A { get => (FGTextureSwizzleChannel)(Encoded & 0x7); set => Encoded = (ushort)((Encoded & ~0x7) | (int)value); }
-
-        public static readonly FrameGraphTextureSwizzle RGBA = new FrameGraphTextureSwizzle(FGTextureSwizzleChannel.Red, FGTextureSwizzleChannel.Green, FGTextureSwizzleChannel.Blue, FGTextureSwizzleChannel.Alpha);
+        public static readonly FGTextureSwizzle RGBA = new FGTextureSwizzle(FGSwizzleChannel.Red, FGSwizzleChannel.Green, FGSwizzleChannel.Blue, FGSwizzleChannel.Alpha);
     }
 
     public enum FGTextureDimension : byte
@@ -196,7 +201,7 @@ namespace Primary.Rendering.Resources
         D16_UNorm,
     }
 
-    public enum FGTextureSwizzleChannel : byte
+    public enum FGSwizzleChannel : byte
     {
         Red = 0,
         Green,

@@ -114,9 +114,9 @@
 		<ProjectReference Include="..\Editor.Geometry\Editor.Geometry.csproj" />
 		<ProjectReference Include="..\Editor.Interop\Editor.Interop.csproj" />
 		<ProjectReference Include="..\Editor.Processors\Editor.Processors.csproj" />
+		<ProjectReference Include="..\Editor.UI\Editor.UI.csproj" />
 		<ProjectReference Include="..\ExtConsole\ExtConsole.csproj" />
 		<ProjectReference Include="..\Primary.R2.ForwardPlus\Primary.R2.ForwardPlus.csproj" />
-		<ProjectReference Include="..\Primary.Rendering2\Primary.Rendering2.csproj" />
 		<ProjectReference Include="..\Primary\Primary.csproj" />
 	</ItemGroup>
 	<ItemGroup>
@@ -133,7 +133,6 @@
 	</ItemGroup>
 	<ItemGroup>
 		<Folder Include="Rendering\Paths\" />
-		<Folder Include="UI\IO\" />
 	</ItemGroup>
 	<ItemGroup>
 		<None Include="DearImGui\DearImGuiWindowManager.cs" />

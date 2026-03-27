@@ -96,20 +96,20 @@ namespace Editor.UI
                     nint basePixelsPtr = pixels.OpaquePointer;
 
                     _texture?.Dispose();
-                    _texture = RHIDevice.Instance!.CreateTexture(new RHITextureDescription
-                    {
-                        Width = _atlasSize,
-                        Height = _atlasSize,
-                        DepthOrArraySize = 1,
-
-                        MipLevels = 1,
-
-                        Dimension = RHIDimension.Texture2D,
-                        Format = RHIFormat.RGBA8_UNorm,
-                        Usage = RHIResourceUsage.ShaderResource,
-
-                        Swizzle = RHISwizzle.RGBA,
-                    }, new Span<nint>(ref basePixelsPtr), $"DynAtlas-{_fittedIcons.Count}");
+                    //_texture = RHIDevice.Instance!.CreateTexture(new RHITextureDescription
+                    //{
+                    //    Width = _atlasSize,
+                    //    Height = _atlasSize,
+                    //    DepthOrArraySize = 1,
+                    //
+                    //    MipLevels = 1,
+                    //
+                    //    Dimension = RHIDimension.Texture2D,
+                    //    Format = RHIFormat.RGBA8_UNorm,
+                    //    Usage = RHIResourceUsage.ShaderResource,
+                    //
+                    //    Swizzle = RHISwizzle.RGBA,
+                    //}, new Span<nint>(ref basePixelsPtr), $"DynAtlas-{_fittedIcons.Count}");
                 }).Wait();
             }
             catch (Exception ex)

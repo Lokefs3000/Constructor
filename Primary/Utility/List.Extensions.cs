@@ -27,5 +27,16 @@
             value = default;
             return false;
         }
+
+        public static bool AddUnique<T>(this List<T> self, T item)
+        {
+            if (!self.Contains(item))
+            {
+                self.Add(item);
+                return true;
+            }
+
+            return false;
+        }
     }
 }

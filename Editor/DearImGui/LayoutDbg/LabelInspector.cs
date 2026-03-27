@@ -13,36 +13,19 @@ namespace Editor.DearImGui.LayoutDbg
             UILabel label = Unsafe.As<UILabel>(element);
 
             string text = label.Text;
-            float size = label.Size;
-
-            float? lineHeight = label.LineHeight;
-            float letterSpacing = label.LetterSpacing;
+            float size = label.FontSize;
 
             UITextAlignment alignment = label.Alignment;
             UITextOverflow overflow = label.Overflow;
 
-            UITextAutoSize autoSize = label.AutoSize;
+            bool autoSize = label.AutoSize == UITextAutoSize.FitBoundsToText;
             
-            UIColor fillColor = label.FillColor;
+            UIColor fillColor = label.TextColor;
 
             if (ImGui.InputTextMultiline("Text"u8, ref text, ushort.MaxValue))
                 label.Text = text;
-            if (ImGui.DragFloat("Size"u8, ref size, 1.0f, 0.0f, float.MaxValue))
-                label.Size = size;
-
-            bool v = lineHeight.HasValue;
-            if (ImGui.Checkbox(v ? "##LH"u8 : "Line height"u8, ref v))
-                label.LineHeight = v ? 0.0f : null;
-            if (lineHeight.HasValue)
-            {
-                ImGui.SameLine();
-
-                float lh = lineHeight.Value;
-                if (ImGui.DragFloat("Line height"u8, ref lh, 0.1f))
-                    label.LineHeight = lh;
-            }
-            if (ImGui.DragFloat("Letter spacing"u8, ref letterSpacing, 0.1f))
-                label.LetterSpacing = letterSpacing;
+            if (ImGui.DragFloat("Size"u8, ref size, 0.02f, 0.0f, float.MaxValue))
+                label.FontSize = size;
 
             {
                 UITextAlignment prev = alignment;
@@ -147,11 +130,11 @@ namespace Editor.DearImGui.LayoutDbg
             if (IElementInspector.ComboBox("Overflow"u8, ref Unsafe.As<UITextOverflow, int>(ref overflow), s_textOverflowEnum))
                 label.Overflow = overflow;
 
-            if (IElementInspector.ComboBox("Auto size"u8, ref Unsafe.As<UITextAutoSize, int>(ref autoSize), s_textAutoSizeEnum))
-                label.AutoSize = autoSize;
+            if (ImGui.Checkbox("Auto size"u8, ref autoSize))
+                label.AutoSize = autoSize ? UITextAutoSize.FitBoundsToText : UITextAutoSize.None;
 
-            if (IElementInspector.InputUIColor("Fill color"u8, ref fillColor))
-                label.FillColor = fillColor;
+            if (IElementInspector.InputUIColor("Text color"u8, ref fillColor))
+                label.TextColor = fillColor;
         }
 
         private static readonly string[] s_textOverflowEnum = Enum.GetNames<UITextOverflow>();

@@ -10,7 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Editor.Gui.Windows
+namespace Editor.UI.Windows
 {
     internal sealed class AssetBrowser : UIWindow
     {
@@ -25,7 +25,7 @@ namespace Editor.Gui.Windows
             string? xml = AssetFilesystem.ReadString("Editor/UI/AssetBrowser.ui");
             if (xml != null)
             {
-                UISerializer.TryDeserialize(xml, RootElement);
+                //UISerializer.TryDeserialize(xml, RootElement);
             }
 
             _font = AssetManager.LoadAsset<UIFontAsset>("Editor/Fonts/Inter.uifont");

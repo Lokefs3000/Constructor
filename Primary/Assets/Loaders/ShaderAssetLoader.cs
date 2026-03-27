@@ -351,8 +351,10 @@ namespace Primary.Assets.Loaders
                                 usage = PsSortDummyUsage.Global;
                             else if (Flags.HasFlag(property.Flags, ShPropertyFlags.Constants))
                                 usage = PsSortDummyUsage.Constants;
+                            else if (type == PsSortDummyType.Resource)
+                                usage = PsSortDummyUsage.Resource;
 
-                            dummies[j++] = new PropertySortDummy(i, property.Name, type, usage);
+                            dummies[j++] = new PropertySortDummy(i | (property.IndexOrByteOffset << 16), property.Name, type, usage);
                         }
                     }
 
@@ -398,7 +400,7 @@ namespace Primary.Assets.Loaders
 
                             headerBlockSize += sizeof(uint);
 
-                            outputProperties[outputIdx++] = new ShaderProperty(resource.Name, (ushort)propIndex++, sizeof(uint), ushort.MaxValue, resource.Type switch
+                            ShPropertyType propertyType = resource.Type switch
                             {
                                 ShResourceType.Texture1D => ShPropertyType.Texture,
                                 ShResourceType.Texture2D => ShPropertyType.Texture,
@@ -409,7 +411,9 @@ namespace Primary.Assets.Loaders
                                 ShResourceType.ByteAddressBuffer => ShPropertyType.Buffer,
                                 ShResourceType.SamplerState => ShPropertyType.Sampler,
                                 _ => throw new NotImplementedException(),
-                            }, ShPropertyDefault.TexWhite, ShPropertyStages.AllShading, ShPropertyFlags.None, ShPropertyDisplay.Default);
+                            };
+
+                            outputProperties[outputIdx++] = new ShaderProperty(resource.Name, (ushort)propIndex++, sizeof(uint), ushort.MaxValue, propertyType, ShPropertyDefault.TexWhite, ShPropertyStages.AllShading, ShPropertyFlags.None, ShPropertyDisplay.Default);
                             localByteOffset += sizeof(uint);
 
                             customNameDict.TryGetValue(sourceIndex, out string? customName);
@@ -417,6 +421,9 @@ namespace Primary.Assets.Loaders
                         }
                         else
                         {
+                            int resourceIndex = (sourceIndex >> 16) & 0xffff;
+                            sourceIndex &= 0xffff;
+
                             ref ShaderProperty property = ref oldPropertiesSpan[sourceIndex];
 
                             WeakRef<int> byteOffsetPtr = Flags.HasFlag(property.Flags, ShPropertyFlags.Global) ? new WeakRef<int>(ref globalByteOffset) : new WeakRef<int>(ref localByteOffset);
@@ -427,7 +434,7 @@ namespace Primary.Assets.Loaders
                                 headerBlockSize += sizeof(uint);
 
                                 ushort childIndex = ushort.MaxValue;
-                                if (samplerDict.TryGetValue(sourceIndex, out string? samplerName))
+                                if (samplerDict.TryGetValue(resourceIndex, out string? samplerName))
                                 {
                                     int find = dummiesSpan.FindIndex((x) => x.Name == samplerName);
                                     if (find == -1)

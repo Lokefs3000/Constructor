@@ -67,7 +67,7 @@ namespace Primary.Common
         public static readonly PoolArray<T> Empty = new PoolArray<T>(null, false);
     }
 
-    internal interface IArrayIterator<T>
+    public interface IArrayIterator<T>
     {
         public T this[int index] { get; set; }
     }

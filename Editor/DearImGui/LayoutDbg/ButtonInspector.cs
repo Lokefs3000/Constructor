@@ -18,10 +18,10 @@ namespace Editor.DearImGui.LayoutDbg
             UIButton button = Unsafe.As<UIButton>(element);
 
             float cornerRadius = button.CornerRadius;
-            UIRoundedCorner cornerRounding = button.CornerRounding;
-            UIColor fillColor = button.FillColor;
+            RectCorner cornerRounding = button.Corners;
+            UIColor fillColor = button.BackgroundColor;
             UIColor strokeColor = button.StrokeColor;
-            UIStrokePosition strokePosition = button.StrokePosition;
+            StrokePosition strokePosition = button.StrokePosition;
             float strokeWeight = button.StrokeWeight;
 
             if (ImGui.DragFloat("Corner radius"u8, ref cornerRadius, 1.0f, 0.0f, float.MaxValue))
@@ -37,70 +37,70 @@ namespace Editor.DearImGui.LayoutDbg
 
                     boxSize = ImGui.GetContentRegionAvail();
 
-                    v = Flags.HasFlag(cornerRounding, UIRoundedCorner.TopLeft);
+                    v = Flags.HasFlag(cornerRounding, RectCorner.TopLeft);
                     if (ImGui.Checkbox("##TL"u8, ref v))
-                        cornerRounding = v ? Flags.AddFlags(cornerRounding, UIRoundedCorner.TopLeft) : Flags.RemoveFlags(cornerRounding, UIRoundedCorner.TopLeft);
+                        cornerRounding = v ? Flags.AddFlags(cornerRounding, RectCorner.TopLeft) : Flags.RemoveFlags(cornerRounding, RectCorner.TopLeft);
 
                     ImGui.SameLine();
 
-                    v = Flags.HasFlag(cornerRounding, UIRoundedCorner.Top);
+                    v = Flags.HasFlag(cornerRounding, RectCorner.Top);
                     if (ImGui.Checkbox("##T"u8, ref v))
-                        cornerRounding = v ? Flags.AddFlags(cornerRounding, UIRoundedCorner.Top) : Flags.RemoveFlags(cornerRounding, UIRoundedCorner.Top);
+                        cornerRounding = v ? Flags.AddFlags(cornerRounding, RectCorner.Top) : Flags.RemoveFlags(cornerRounding, RectCorner.Top);
 
                     ImGui.SameLine();
 
-                    v = Flags.HasFlag(cornerRounding, UIRoundedCorner.TopRight);
+                    v = Flags.HasFlag(cornerRounding, RectCorner.TopRight);
                     if (ImGui.Checkbox("##TR"u8, ref v))
-                        cornerRounding = v ? Flags.AddFlags(cornerRounding, UIRoundedCorner.TopRight) : Flags.RemoveFlags(cornerRounding, UIRoundedCorner.TopRight);
+                        cornerRounding = v ? Flags.AddFlags(cornerRounding, RectCorner.TopRight) : Flags.RemoveFlags(cornerRounding, RectCorner.TopRight);
 
-                    v = Flags.HasFlag(cornerRounding, UIRoundedCorner.Left);
+                    v = Flags.HasFlag(cornerRounding, RectCorner.Left);
                     if (ImGui.Checkbox("##L"u8, ref v))
-                        cornerRounding = v ? Flags.AddFlags(cornerRounding, UIRoundedCorner.Left) : Flags.RemoveFlags(cornerRounding, UIRoundedCorner.Left);
+                        cornerRounding = v ? Flags.AddFlags(cornerRounding, RectCorner.Left) : Flags.RemoveFlags(cornerRounding, RectCorner.Left);
 
                     ImGui.SameLine();
 
-                    v = Flags.HasFlag(cornerRounding, UIRoundedCorner.All);
+                    v = Flags.HasFlag(cornerRounding, RectCorner.All);
                     if (ImGui.Checkbox("##ALL"u8, ref v))
-                        cornerRounding = v ? Flags.AddFlags(cornerRounding, UIRoundedCorner.All) : Flags.RemoveFlags(cornerRounding, UIRoundedCorner.All);
+                        cornerRounding = v ? Flags.AddFlags(cornerRounding, RectCorner.All) : Flags.RemoveFlags(cornerRounding, RectCorner.All);
 
                     ImGui.SameLine();
 
-                    v = Flags.HasFlag(cornerRounding, UIRoundedCorner.Right);
+                    v = Flags.HasFlag(cornerRounding, RectCorner.Right);
                     if (ImGui.Checkbox("##R"u8, ref v))
-                        cornerRounding = v ? Flags.AddFlags(cornerRounding, UIRoundedCorner.Right) : Flags.RemoveFlags(cornerRounding, UIRoundedCorner.Right);
+                        cornerRounding = v ? Flags.AddFlags(cornerRounding, RectCorner.Right) : Flags.RemoveFlags(cornerRounding, RectCorner.Right);
 
-                    v = Flags.HasFlag(cornerRounding, UIRoundedCorner.BottomLeft);
+                    v = Flags.HasFlag(cornerRounding, RectCorner.BottomLeft);
                     if (ImGui.Checkbox("##BL"u8, ref v))
-                        cornerRounding = v ? Flags.AddFlags(cornerRounding, UIRoundedCorner.BottomLeft) : Flags.RemoveFlags(cornerRounding, UIRoundedCorner.BottomLeft);
+                        cornerRounding = v ? Flags.AddFlags(cornerRounding, RectCorner.BottomLeft) : Flags.RemoveFlags(cornerRounding, RectCorner.BottomLeft);
 
                     ImGui.SameLine();
 
-                    v = Flags.HasFlag(cornerRounding, UIRoundedCorner.Bottom);
+                    v = Flags.HasFlag(cornerRounding, RectCorner.Bottom);
                     if (ImGui.Checkbox("##B"u8, ref v))
-                        cornerRounding = v ? Flags.AddFlags(cornerRounding, UIRoundedCorner.Bottom) : Flags.RemoveFlags(cornerRounding, UIRoundedCorner.Bottom);
+                        cornerRounding = v ? Flags.AddFlags(cornerRounding, RectCorner.Bottom) : Flags.RemoveFlags(cornerRounding, RectCorner.Bottom);
 
                     ImGui.SameLine();
 
-                    v = Flags.HasFlag(cornerRounding, UIRoundedCorner.BottomRight);
+                    v = Flags.HasFlag(cornerRounding, RectCorner.BottomRight);
                     if (ImGui.Checkbox("##BR"u8, ref v))
-                        cornerRounding = v ? Flags.AddFlags(cornerRounding, UIRoundedCorner.BottomRight) : Flags.RemoveFlags(cornerRounding, UIRoundedCorner.BottomRight);
+                        cornerRounding = v ? Flags.AddFlags(cornerRounding, RectCorner.BottomRight) : Flags.RemoveFlags(cornerRounding, RectCorner.BottomRight);
 
-                    if (cornerRounding != button.CornerRounding)
-                        button.CornerRounding = cornerRounding;
+                    if (cornerRounding != button.Corners)
+                        button.Corners = cornerRounding;
                 }
                 ImGui.EndChild();
 
                 ImGui.SameLine();
 
                 ImDrawFlags flags = ImDrawFlags.None;
-                if (Flags.HasFlag(cornerRounding, UIRoundedCorner.TopLeft)) flags |= ImDrawFlags.RoundCornersTopLeft;
-                if (Flags.HasFlag(cornerRounding, UIRoundedCorner.TopRight)) flags |= ImDrawFlags.RoundCornersTopRight;
-                if (Flags.HasFlag(cornerRounding, UIRoundedCorner.BottomLeft)) flags |= ImDrawFlags.RoundCornersBottomLeft;
-                if (Flags.HasFlag(cornerRounding, UIRoundedCorner.BottomRight)) flags |= ImDrawFlags.RoundCornersBottomRight;
+                if (Flags.HasFlag(cornerRounding, RectCorner.TopLeft)) flags |= ImDrawFlags.RoundCornersTopLeft;
+                if (Flags.HasFlag(cornerRounding, RectCorner.TopRight)) flags |= ImDrawFlags.RoundCornersTopRight;
+                if (Flags.HasFlag(cornerRounding, RectCorner.BottomLeft)) flags |= ImDrawFlags.RoundCornersBottomLeft;
+                if (Flags.HasFlag(cornerRounding, RectCorner.BottomRight)) flags |= ImDrawFlags.RoundCornersBottomRight;
 
                 Vector2 boxOrigin = ImGui.GetCursorScreenPos() + context.Style.FramePadding;
                 ImDrawListPtr drawList = ImGui.GetWindowDrawList();
-                drawList.AddRectFilled(boxOrigin, boxOrigin + new Vector2(boxSize.X), 0xffffffff, cornerRounding == UIRoundedCorner.None ? 0.0f : MathF.Min(cornerRadius == 0.0f ? 16.0f : cornerRadius, boxSize.X * 0.35f), flags);
+                drawList.AddRectFilled(boxOrigin, boxOrigin + new Vector2(boxSize.X), 0xffffffff, cornerRounding == RectCorner.None ? 0.0f : MathF.Min(cornerRadius == 0.0f ? 16.0f : cornerRadius, boxSize.X * 0.35f), flags);
 
                 ImGui.Dummy(new Vector2(boxSize.X) + context.Style.FramePadding);
                 ImGui.SameLine();
@@ -109,18 +109,18 @@ namespace Editor.DearImGui.LayoutDbg
             }
 
             if (IElementInspector.InputUIColor("Fill color"u8, ref fillColor))
-                button.FillColor = fillColor;
+                button.BackgroundColor = fillColor;
 
             if (IElementInspector.InputUIColor("Stroke color"u8, ref strokeColor))
                 button.StrokeColor = strokeColor;
 
-            if (IElementInspector.ComboBox("Stroke position"u8, ref Unsafe.As<UIStrokePosition, int>(ref strokePosition), s_strokePositionEnum))
+            if (IElementInspector.ComboBox("Stroke position"u8, ref Unsafe.As<StrokePosition, int>(ref strokePosition), s_strokePositionEnum))
                 button.StrokePosition = strokePosition;
 
             if (ImGui.DragFloat("Stroke weight"u8, ref strokeWeight, 1.0f, 0.0f, float.MaxValue))
                 button.StrokeWeight = strokeWeight;
         }
 
-        private static readonly string[] s_strokePositionEnum = Enum.GetNames<UIStrokePosition>();
+        private static readonly string[] s_strokePositionEnum = Enum.GetNames<StrokePosition>();
     }
 }

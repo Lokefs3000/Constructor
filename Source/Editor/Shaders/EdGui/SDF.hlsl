@@ -5,6 +5,12 @@ float sdCircle( float2 p, float r )
     return length(p) - r;
 }
 
+float sdBox(in float2 p, in float2 b)
+{
+    float2 d = abs(p) - b;
+    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
+
 float sdRoundedBox( in float2 p, in float2 b, in float4 r )
 {
     r.xy = (p.x>0.0)?r.xy : r.zw;
@@ -40,4 +46,15 @@ float opSubtraction(float d1, float d2)
 float opRound(float dist, in float r )
 {
   return dist - r;
+}
+
+//https://drewcassidy.me/2020/06/26/sdf-antialiasing/
+
+float SmoothSDF(float dist)
+{
+    float2 ddist = float2(ddx(dist), ddy(dist));
+    float pixelDist = dist / length(ddist);
+    float t = saturate(0.5 - pixelDist);
+
+    return t;
 }

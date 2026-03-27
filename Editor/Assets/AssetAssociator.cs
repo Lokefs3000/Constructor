@@ -33,12 +33,12 @@ namespace Editor.Assets
             foreach (ReadOnlySpan<char> line in source.Tokenize('\n'))
             {
                 ReadOnlySpanTokenizer<char> tokenizer = line.Trim().Tokenize(';');
-                if (tokenizer.MoveNext() && uint.TryParse(tokenizer.Current, out uint assetId))
+                if (tokenizer.MoveNext() && Guid.TryParse(tokenizer.Current, out Guid assetId))
                 {
                     ids.Clear();
                     while (tokenizer.MoveNext())
                     {
-                        if (uint.TryParse(tokenizer.Current, out uint dependencyId))
+                        if (Guid.TryParse(tokenizer.Current, out Guid dependencyId))
                         {
                             ids.Add((AssetId)dependencyId);
                         }
@@ -64,7 +64,7 @@ namespace Editor.Assets
                 if (kvp.Value.Dependencies.Count == 0)
                     continue;
 
-                sb.Append(kvp.Key.Value);
+                sb.Append(kvp.Key.ToString("N"));
                 sb.Append(';');
 
                 int lastIndex = kvp.Value.Dependencies.Count;
@@ -72,7 +72,7 @@ namespace Editor.Assets
                 {
                     lastIndex--;
 
-                    sb.Append(item.Value);
+                    sb.Append(item.ToString("N"));
                     if (lastIndex > 0)
                         sb.Append(';');
                 }

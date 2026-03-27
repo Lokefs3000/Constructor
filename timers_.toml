@@ -1,0 +1,51 @@
+[Editor-Editor_csproj]
+Gui-Windows-AssetBrowser_cs = "00:00:21.8868607"
+Editor_cs = "00:01:04.7175314"
+UI-Assets-Importers-UIFontAssetImporter_cs = "00:00:00.0029898"
+UI-Assets-Loaders-UIFontAssetLoader_cs = "00:01:53.1797305"
+UI-Assets-UIFontAsset_cs = "00:10:03.0367571"
+EditorInterop-MSDFGenInterop_cpp = "00:01:04.8502376"
+UI-Elements-UITreeView_cs = "00:00:44.6255210"
+Interop-Ed-EdInterop_cs = "00:00:01.6150337"
+UI-UIFontManager_cs = "00:00:19.0688638"
+UI-Text-UITextShaper_cs = "00:01:08.2799626"
+UI-Visual-UIBakedCommandBuffer_cs = "00:01:07.6886514"
+UI-Visual-UIDrawCommand_cs = "00:00:02.8483809"
+UI-Visual-UIPainter_cs = "00:19:09.9733530"
+UI-Visual-UIPaint_cs = "00:01:30.5465573"
+UI-Visual-PaintStructs_cs = "00:08:35.7612069"
+UI-Helpers-TemporyAllocator_cs = "00:00:03.3163755"
+UI-Interaction-HostInteractionManager_cs = "00:00:00.9904434"
+UI-UIWindow_cs = "00:00:00.4358492"
+UI-Helpers-StringAllocator_cs = "00:00:00.5174731"
+UI-Helpers-ObjectIndexer_cs = "00:00:04.1312061"
+-Assets-ShaderAsset_cs = "00:00:00.0069813"
+Shaders-ShaderAttributeSettings_cs = "00:00:00.0069801"
+-Assets-AssetManager_cs = "00:00:00.9073630"
+DearImGui-UILayoutDebugger_cs = "00:00:01.4378332"
+DearImGui-LayoutDbg-LabelInspector_cs = "00:00:00.0099735"
+EditorInterop-SPIRVInterop_cpp = "00:00:00.0458844"
+EditorInterop-BCInterop_cpp = "00:00:00.0079743"
+ole-WindowManager_cs = "00:00:00.0084995"
+
+[Native-EditorInterop-EditorInterop_vcxproj]
+MSDFGenInterop_cpp = "00:03:54.9433714"
+ntAsset_cs = "00:00:12.0136265"
+TreeView_cs = "00:00:02.4587284"
+msdfgen-core-Range_hpp = "00:00:00.0615165"
+nterop_cs = "00:00:16.7445754"
+er_cs = "00:00:19.0660948"
+SPIRVInterop_cpp = "00:00:02.6735269"
+BCInterop_cpp = "00:00:04.7484408"
+
+[Primary-Primary_csproj]
+Assets-AssetManager_cs = "00:00:07.6165354"
+ditorInterop-MSDFGenInterop_cpp = "00:00:00.5091853"
+I-Visual-PaintStructs_cs = "00:00:02.2686605"
+
+[Editor_Interop-Editor_Interop_csproj]
+Ed-EdInterop_cs = "00:00:00.5116668"
+
+[ExtConsole-ExtConsole_csproj]
+WindowManager_cs = "00:00:00.0129684"
+

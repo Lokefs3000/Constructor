@@ -75,6 +75,18 @@ namespace Editor.Shaders
 
                     includedFiles = includeHandler.GetReadFiles();
                 }
+
+                //HACK: replace "hlsl.hlsl" with custom name
+                //  NOTE: validate that dxc does not already have a way to do this
+
+                int relative = fileName.Length - "hlsl.hlsl".Length;
+
+                int sourceOffset = 0;
+                while ((sourceOffset = source.IndexOf("\"hlsl.hlsl\"", sourceOffset)) != -1)
+                {
+                    source = source.Remove(sourceOffset + 1, 9).Insert(sourceOffset + 1, fileName);
+                    sourceOffset += relative;
+                }
             }
 
             ShaderData data = new ShaderData();
@@ -152,6 +164,18 @@ namespace Editor.Shaders
                     }
 
                     includedFiles = includeHandler.GetReadFiles();
+                }
+
+                //HACK: replace "hlsl.hlsl" with custom name
+                //  NOTE: validate that dxc does not already have a way to do this
+
+                int relative = fileName.Length - "hlsl.hlsl".Length;
+
+                int sourceOffset = 0;
+                while ((sourceOffset = source.IndexOf("\"hlsl.hlsl\"", sourceOffset)) != -1)
+                {
+                    source = source.Remove(sourceOffset + 1, 9).Insert(sourceOffset + 1, fileName);
+                    sourceOffset += relative;
                 }
             }
 
@@ -348,12 +372,16 @@ namespace Editor.Shaders
             "-WX",
 #if DEBUG
             "-Zi",
+            "-Qembed_debug",
+            "-Qsource_in_debug_module",
             "-fspv-debug=vulkan-with-source",
 #endif
             "-O3",
             "-fspv-target-env=vulkan1.3",
             "-fvk-use-dx-layout",
-            "-fvk-use-dx-position-w"
+            "-fvk-use-dx-position-w",
+            "-enable-16bit-types",
+            "-enable-lifetime-markers"
 ];
 
         private static string[] s_d3d12Preset = [
@@ -361,8 +389,12 @@ namespace Editor.Shaders
             "-WX",
 #if DEBUG
             "-Zi",
+            "-Qembed_debug",
+            "-Qsource_in_debug_module",
 #endif
-            "-O3"
+            "-O3",
+            "-enable-16bit-types",
+            "-enable-lifetime-markers"
         ];
 
         public const int MaxConstantsBufferSize = 128; //Vulkan enforced limit

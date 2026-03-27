@@ -13,6 +13,7 @@ using Primary.RHI2;
 using Primary.RHI2.Direct3D12;
 using System;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -510,6 +511,19 @@ namespace Primary.Rendering.D3D12
 
                                         if (cmd.Resource.IsNull)
                                         {
+                                            if (cmd.Resource.Type == CmdResourceType.Sampler)
+                                            {
+                                                uint index = _samplerHeap.GetDescriptorIndex(s_defaultSamplerDesc, out bool changedActiveHeap);
+                                                if (changedActiveHeap)
+                                                {
+                                                    Debug.Assert(resourceByteOffsetBackup != -1);
+                                                    byteOffset = resourceByteOffsetBackup;
+                                                    break;
+                                                }
+
+                                                *(uint*)(_state.ResourceData + cmd.DataOffset) = index;
+                                            }
+
                                             //*(uint*)(_state.ResourceData + cmd.DataOffset) = _gpuHeap.Nu;
                                         }
                                         else
@@ -517,11 +531,12 @@ namespace Primary.Rendering.D3D12
                                             NRDResource resource = ResourceUtility.AsNRDResource(cmd.Resource);
                                             if (resource.Id == NRDResourceId.Sampler)
                                             {
+                                                Debug.Assert(cmd.Resource.IsExternal);
+
                                                 uint index = _samplerHeap.GetDescriptorIndex(((D3D12RHISamplerNative*)resource.Native)->Base.Description, out bool changedActiveHeap);
                                                 if (changedActiveHeap)
                                                 {
                                                     Debug.Assert(resourceByteOffsetBackup != -1);
-
                                                     byteOffset = resourceByteOffsetBackup;
                                                     break;
                                                 }
@@ -1128,6 +1143,8 @@ namespace Primary.Rendering.D3D12
 
         internal GpuDescriptorHeap GPUDescriptorHeap => _gpuHeap;
         internal SamplerDescriptorHeap SamplerDescriptorHeap => _samplerHeap;
+
+        private static readonly SamplerDesc s_defaultSamplerDesc = new SamplerDesc(new RHISamplerDescription());
 
         private readonly record struct CmdListData(Ptr<ID3D12GraphicsCommandList10> CmdListPtr, Ptr<ID3D12CommandAllocator> AllocatorPtr) : IDisposable
         {

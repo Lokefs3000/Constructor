@@ -43,7 +43,7 @@ namespace Editor.Assets.Importers
             else
                 pipeline.Associator.ClearAssocations(id);
 
-            TomlTable root = Toml.ToModel<TomlTable>(FileUtility.TryReadAllText(tomlFile)!);
+            TomlTable root = TomlSerializer.Deserialize<TomlTable>(FileUtility.TryReadAllText(tomlFile)!)!;
             NewShaderProcessorArgs args = new NewShaderProcessorArgs
             {
                 SourceFilepath = fullFilePath,

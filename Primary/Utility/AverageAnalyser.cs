@@ -51,6 +51,31 @@ namespace Primary.Utility
             return def / T.CreateChecked(_values.Length);
         }
 
+        public T Max()
+        {
+            T def = _values[0];
+            for (int i = 1; i < _values.Length; i++)
+            {
+                def = T.Max(def, _values[i]);
+            }
+
+            return def;
+        }
+
+        public T Min()
+        {
+            T def = _values[0];
+            for (int i = 1; i < _values.Length; i++)
+            {
+                def = T.Min(def, _values[i]);
+            }
+
+            return def;
+        }
+
+        public int Count => _values.Length;
+        public float Timeout => _timeout;
+
         public bool IsValid => _isValid;
     }
 }

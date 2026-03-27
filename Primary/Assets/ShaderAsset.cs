@@ -11,11 +11,8 @@ namespace Primary.Assets
         {
         }
 
-        public PropertyBlock? CreatePropertyBlock()
+        public PropertyBlock CreatePropertyBlock()
         {
-            if (Status != ResourceStatus.Success)
-                return null;
-
             return new PropertyBlock(this);
         }
 

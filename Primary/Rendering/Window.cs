@@ -1,4 +1,5 @@
 ﻿using Primary.Common;
+using Primary.Mathematics;
 using Primary.Polling;
 using SDL;
 using System.Numerics;
@@ -11,8 +12,8 @@ namespace Primary.Rendering
     public class Window : IDisposable, IEventHandler
     {
         private string _windowTitle;
-        private Vector2 _clientSize;
-        private Vector2 _position;
+        private Int2 _clientSize;
+        private Int2 _position;
         private bool _isFocused;
         private bool _isClosed;
 
@@ -26,11 +27,11 @@ namespace Primary.Rendering
 
         private bool _disposedValue;
 
-        internal unsafe Window(string windowTitle, Vector2 clientSize, CreateWindowFlags flags)
+        internal unsafe Window(string windowTitle, Int2 clientSize, CreateWindowFlags flags)
         {
             _windowTitle = windowTitle;
             _clientSize = clientSize;
-            _position = Vector2.Zero;
+            _position = Int2.Zero;
             _isFocused = false;
             _isClosed = false;
 
@@ -53,9 +54,10 @@ namespace Primary.Rendering
             SDL_DestroyProperties(_props);
             _props = SDL_GetWindowProperties((SDL_Window*)_window);
 
-            int x, y;
-            SDL_GetWindowPosition((SDL_Window*)_window, &x, &y);
-            _position = new Vector2(x, y);
+            fixed (Int2* pos = &_position)
+            {
+                SDL_GetWindowPosition((SDL_Window*)_window, &pos->X, &pos->Y);
+            }
 
             _isFocused = Flags.HasFlag(SDL_GetWindowFlags((SDL_Window*)_window), SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS);
 
@@ -72,12 +74,12 @@ namespace Primary.Rendering
                 //TODO: convert to switch statement instead
                 if (@event.window.type == SDL_EventType.SDL_EVENT_WINDOW_MOVED)
                 {
-                    _position = new Vector2(@event.window.data1, @event.window.data2);
+                    _position = new Int2(@event.window.data1, @event.window.data2);
                     WindowMoved?.Invoke(_position);
                 }
                 else if (@event.window.type == SDL_EventType.SDL_EVENT_WINDOW_RESIZED)
                 {
-                    _clientSize = new Vector2(@event.window.data1, @event.window.data2);
+                    _clientSize = new Int2(@event.window.data1, @event.window.data2);
                     WindowResized?.Invoke(_clientSize);
                 }
                 else if (@event.window.type == SDL_EventType.SDL_EVENT_WINDOW_FOCUS_GAINED)
@@ -159,7 +161,7 @@ namespace Primary.Rendering
 
             if (window._currentHitTest != null)
             {
-                return (SDL_HitTestResult)window._currentHitTest(window, new Vector2(area->x, area->y));
+                return (SDL_HitTestResult)window._currentHitTest(window, new Int2(area->x, area->y));
             }
 
             SDL_SetWindowHitTest((SDL_Window*)window._window, null, nint.Zero);
@@ -175,24 +177,24 @@ namespace Primary.Rendering
         public uint WindowId => (uint)_id;
 
         public unsafe string WindowTitle { get => _windowTitle; set { if (SDL_SetWindowTitle((SDL_Window*)_window, value)) _windowTitle = value; } }
-        public unsafe Vector2 ClientSize
+        public unsafe Int2 ClientSize
         {
             get => _clientSize;
             set
             {
-                if (SDL_SetWindowSize((SDL_Window*)_window, (int)value.X, (int)value.Y))
+                if (SDL_SetWindowSize((SDL_Window*)_window, value.X, value.Y))
                 {
                     _clientSize = value;
                     //WindowResized?.Invoke(_clientSize);
                 }
             }
         }
-        public unsafe Vector2 Position
+        public unsafe Int2 Position
         {
             get => _position;
             set
             {
-                if (SDL_SetWindowPosition((SDL_Window*)_window, (int)value.X, (int)value.Y))
+                if (SDL_SetWindowPosition((SDL_Window*)_window, value.X, value.Y))
                 {
                     _position = value;
                     //WindowMoved?.Invoke(_position);
@@ -213,11 +215,11 @@ namespace Primary.Rendering
         public nint InternalWindowInterop => _window;
 
         public event Action<Window>? WindowClosed;
-        public event Action<Vector2>? WindowResized;
-        public event Action<Vector2>? WindowMoved;
+        public event Action<Int2>? WindowResized;
+        public event Action<Int2>? WindowMoved;
 
 
-        public delegate HitTestResult HitTestDelegate(Window window, Vector2 area);
+        public delegate HitTestResult HitTestDelegate(Window window, Int2 area);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private unsafe delegate SDL_HitTestResult HitTestWrapperDelegate(SDL_Window win, System.Drawing.Point* area, nint data);
     }

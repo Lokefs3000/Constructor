@@ -38,6 +38,10 @@ namespace Editor.Interop.Ed
 
         [LibraryImport(LibraryName)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        public static partial MSDF_FontFace* MSDF_LoadFont_Memory(nint ft, byte* memory, ulong memorySize);
+
+        [LibraryImport(LibraryName)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         public static partial void MSDF_DestroyFont(MSDF_FontFace* font);
 
         [LibraryImport(LibraryName)]
@@ -60,7 +64,7 @@ namespace Editor.Interop.Ed
 
         [LibraryImport(LibraryName)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        public static partial void MSDF_GetLineHeight(MSDF_FontFace* face, double* lineHeight);
+        public static partial void MSDF_GetMetrics(MSDF_FontFace* face, double* ascender, double* descender, double* lineHeight, double* underlineY, double* height);
 
         [LibraryImport(LibraryName)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
@@ -171,7 +175,28 @@ namespace Editor.Interop.Ed
     {
         public int RectW;
         public int RectH;
-        public fixed byte Range[16];
-        public fixed byte Projection[32];
+        public MSDF_Range Range;
+        public MSDF_Projection Projection;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct MSDF_Range
+    {
+        public double Lower;
+        public double Upper;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct MSDF_Projection
+    {
+        public MSDF_Vector2 Scale;
+        public MSDF_Vector2 Translate;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct MSDF_Vector2
+    {
+        public double X;
+        public double Y;
     }
 }

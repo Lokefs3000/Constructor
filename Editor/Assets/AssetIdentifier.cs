@@ -9,22 +9,14 @@ namespace Editor.Assets
 {
     public sealed class AssetIdentifier : IAssetIdProvider
     {
-        private readonly uint _projectId;
-
         //Key = LocalPath
         private ConcurrentDictionary<string, AssetId> _assets;
         private ConcurrentDictionary<AssetId, string> _assetPaths;
 
-        private HashSet<uint> _idHashSet;
-
         internal AssetIdentifier()
         {
-            _projectId = 222;
-
             _assets = new ConcurrentDictionary<string, AssetId>();
             _assetPaths = new ConcurrentDictionary<AssetId, string>();
-
-            _idHashSet = new HashSet<uint>();
 
             if (File.Exists(DataFilePath))
             {
@@ -35,22 +27,52 @@ namespace Editor.Assets
         /// <summary>Not thread-safe</summary>
         private void TryLoadAssetIds(string filePath)
         {
-            string[] source = File.ReadAllLines(filePath);
+            string source = File.ReadAllText(filePath);
 
-            foreach (string line in source)
+            bool isCorrectVersion = false;
+
+            foreach (var line in source.Tokenize('\n'))
             {
-                ReadOnlySpanTokenizer<char> tokenizer = line.Tokenize(':');
+                if (line.IsEmpty)
+                    continue;
 
-                tokenizer.MoveNext();
-                string localFilePath = tokenizer.Current.ToString();
+                ReadOnlySpan<char> trimmed = line.Trim();
+                if (trimmed.StartsWith(":@"))
+                {
+                    int find = trimmed.IndexOf(' ');
+                    if (find == -1)
+                        throw new Exception("Malformed meta");
 
-                tokenizer.MoveNext();
-                uint localId = uint.Parse(tokenizer.Current.ToString());
+                    ReadOnlySpan<char> name = trimmed.Slice(2, find - 2);
+                    if (name.SequenceEqual("version"))
+                    {
+                        if (!uint.TryParse(trimmed.Slice(find), out uint result))
+                            throw new Exception("Malformed version meta");
 
-                _assets.TryAdd(localFilePath, new AssetId(_projectId, localId));
-                _assetPaths.TryAdd(new AssetId(_projectId, localId), localFilePath);
-                _idHashSet.Add(localId);
+                        //TODO: ask auto-upgrade in place
+                        if (result != FileVersion)
+                            throw new Exception("Outdated id file");
+
+                        isCorrectVersion = true;
+                    }
+                }
+                else
+                {
+                    ReadOnlySpanTokenizer<char> tokenizer = line.Tokenize('|');
+
+                    tokenizer.MoveNext();
+                    string localFilePath = tokenizer.Current.ToString();
+
+                    tokenizer.MoveNext();
+                    AssetId localId = (AssetId)Guid.Parse(tokenizer.Current.ToString());
+
+                    _assets.TryAdd(localFilePath, localId);
+                    _assetPaths.TryAdd(localId, localFilePath);
+                }
             }
+
+            if (!isCorrectVersion)
+                throw new Exception("Missing data in id file");
         }
 
         /// <summary>Thread-safe</summary>
@@ -61,15 +83,22 @@ namespace Editor.Assets
 
             StringBuilder sb = new StringBuilder();
 
+            //header
+            {
+                sb.Append(":@version ");
+                sb.Append(FileVersion);
+
+                sb.AppendLine();
+            }
+
             foreach (var kvp in _assets)
             {
                 sb.Append(kvp.Key);
-                sb.Append(':');
-                sb.AppendLine(kvp.Value.Id.ToString());
+                sb.Append('|');
+                sb.AppendLine(kvp.Value.ToString("N"));
             }
 
             sb.Length--;
-
             return sb.ToString();
         }
 
@@ -80,19 +109,16 @@ namespace Editor.Assets
             {
                 if (!AssetPipeline.TryGetLocalPathFromFull(localPath, out localPath!))
                 {
-                    EdLog.Assets.Warning("Cannot get asset id for not local path: {path}", localPath);
+                    EdLog.Assets.Warning("Failed to get local path for id retrieval: {path}", localPath);
                     return AssetId.Invalid;
                 }
             }
 
             AssetId id = _assets.GetOrAdd(localPath, (_) =>
             {
-                lock (_idHashSet)
-                {
-                    AssetId id = new AssetId(_projectId, GenerateId());
-                    _assetPaths.TryAdd(id, localPath);
-                    return id;
-                }
+                AssetId id = new AssetId(Guid.CreateVersion7());
+                _assetPaths.TryAdd(id, localPath);
+                return id;
             });
 
             return id;
@@ -116,19 +142,6 @@ namespace Editor.Assets
         /// <summary>Thread-safe</summary>
         public bool IsIdValid(AssetId id) => !id.IsInvalid && _assetPaths.ContainsKey(id);
 
-        /// <summary>Not thread-safe</summary>
-        private uint GenerateId()
-        {
-            uint id = (uint)Stopwatch.GetTimestamp();
-            while (id == IAssetIdProvider.InvalidAssetId || _idHashSet.Contains(id))
-            {
-                id++;
-            }
-
-            _idHashSet.Add(id);
-            return id;
-        }
-
         #region Provider
         public string? RetrievePathForId(AssetId assetId)
         {
@@ -146,8 +159,10 @@ namespace Editor.Assets
         #endregion
 
         /// <summary>Thread-safe, Not atomic</summary>
-        public int IdCount => _idHashSet.Count;
+        public int IdCount => _assets.Count;
 
         public static string DataFilePath = Path.Combine(EditorFilepaths.LibraryPath, "assets.ids");
+
+        private const uint FileVersion = 1;
     }
 }

@@ -114,6 +114,66 @@
     <ClCompile Include="msdfgen\ext\save-png.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="MSDFAtlasInterop.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\artery-font-export.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\bitmap-blit.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\Charset.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\charset-parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\csv-export.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\FontGeometry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\glyph-generators.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\GlyphGeometry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\GridAtlasPacker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\image-encode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\json-export.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\Padding.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\RectanglePacker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\shadron-preview-generator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\size-selectors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\TightAtlasPacker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\utf8.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="msdf-atlas-gen\Workload.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bc7enc_rdo\bc7enc.h">
@@ -564,6 +624,111 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="msdfgen\msdfgen-config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\artery-font-export.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\AtlasGenerator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\AtlasStorage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\BitmapAtlasStorage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\BitmapAtlasStorage.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\bitmap-blit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\Charset.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\csv-export.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\DynamicAtlas.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\DynamicAtlas.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\FontGeometry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\GlyphBox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\glyph-generators.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\GlyphGeometry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\GridAtlasPacker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\image-encode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\image-save.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\image-save.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\ImmediateAtlasGenerator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\ImmediateAtlasGenerator.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\json-export.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\msdf-atlas-gen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\Padding.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\Rectangle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\RectanglePacker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\rectangle-packing.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\rectangle-packing.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\Remap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\shadron-preview-generator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\size-selectors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\TightAtlasPacker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\utf8.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\utils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msdf-atlas-gen\Workload.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

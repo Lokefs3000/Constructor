@@ -24,6 +24,31 @@ namespace Editor.Assets
         }
 
         /// <summary>Thread-safe</summary>
+        public string? GetFilePathOrLocal(string localPath, string keyword, out bool isLocal)
+        {
+            AssetId id = _pipeline.Identifier.GetOrRegisterAsset(localPath);
+
+            string sourcePath = Path.Combine(EditorFilepaths.LibraryAssetsPath, $"{id.ToString("N")}_{keyword}.toml");
+            if (!File.Exists(sourcePath))
+            {
+                sourcePath = Path.ChangeExtension(localPath, ".toml");
+                if (!AssetPipeline.TryGetFullPathFromLocal(sourcePath, out string? fullPath) || !File.Exists(fullPath))
+                {
+                    isLocal = false;
+                    return null;
+                }
+
+                isLocal = true;
+                return sourcePath;
+            }
+            else
+            {
+                isLocal = false;
+                return sourcePath;
+            }
+        }
+
+        /// <summary>Thread-safe</summary>
         public bool DoesFileHaveConfig(string localPath, string keyword, bool allowLocalConfig = true)
         {
             AssetId id = _pipeline.Identifier.GetOrRegisterAsset(localPath);

@@ -1,5 +1,6 @@
 ﻿using Arch.Core;
 using Primary.Components;
+using Primary.Mathematics;
 using Primary.Profiling;
 using Primary.Rendering;
 using Primary.Scenes;
@@ -26,7 +27,7 @@ namespace Primary.Systems
             {
                 Window? window = WindowManager.Instance.PrimaryWindow!;
                 if (window != null)
-                    clientSize = window.ClientSize;
+                    clientSize = window.ClientSize.AsVector2();
             }
 
             if (camera.IsDirty || projectionData.ClientSize != clientSize)

@@ -11,14 +11,16 @@ namespace Primary.Serialization.Json
         {
             if (reader.TokenType == JsonTokenType.Number && reader.TryGetUInt32(out uint assetId))
             {
-                return AssetManager.LoadAsset<TextureAsset>((AssetId)assetId);
+                throw new NotImplementedException();
+                //return AssetManager.LoadAsset<TextureAsset>((AssetId)assetId);
             }
             return null;
         }
 
         public override void Write(Utf8JsonWriter writer, TextureAsset value, JsonSerializerOptions options)
         {
-            writer.WriteNumberValue(value.Id);
+                throw new NotImplementedException();
+            //writer.WriteNumberValue(value.Id);
         }
     }
 }

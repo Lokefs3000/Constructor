@@ -231,6 +231,10 @@ namespace Primary.Rendering.State
                                         case ShPropertyDefault.TexMask: resource = new CmdDataResource(CmdResourceType.Texture, true, (nint)AssetManager.Static.DefaultMask.RawRHITexture!.GetAsNative()); break;
                                     }
                                 }
+                                else if (property.Type == ShPropertyType.Sampler)
+                                {
+                                    resource = new CmdDataResource(CmdResourceType.Sampler, true, nint.Zero);
+                                }
                             }
 
                             recorder.AddResourceToSet(data.Resource);

@@ -9,6 +9,7 @@ using Editor.UI.Visual;
 using Hexa.NET.ImGui;
 using Primary.Common;
 using Primary.Mathematics;
+using Primary.Rendering;
 using Primary.Threading;
 using System;
 using System.Collections.Frozen;
@@ -115,7 +116,9 @@ namespace Editor.DearImGui
 
             if (_targetWindow != null)
             {
-                Vector2 baseOffset = _targetWindow.ParentHost!.TabbedClientBounds.Minimum + _targetWindow.ParentHost!.ClientOffset;
+                Vector2 baseOffset = _targetWindow.ParentHost!.ClientOffset.AsVector2();
+                if (_targetWindow.ParentHost is UIDockHost dockHost)
+                    baseOffset += dockHost.TabbedClientBounds.Minimum;
 
                 if (_drawElementBounds && _targetWindow != null)
                 {
@@ -124,7 +127,7 @@ namespace Editor.DearImGui
 
                     void RecursiveDraw(UIElement element)
                     {
-                        Boundaries bounds = Boundaries.Offset(element.Transform.RenderCoordinates, baseOffset);
+                        Boundaries bounds = Boundaries.Offset(element.PixelCoordinates, baseOffset);
                         drawList.AddRect(bounds.Minimum, bounds.Maximum, 0x8000ffff);
 
                         foreach (UIElement child in element.Children)
@@ -137,7 +140,7 @@ namespace Editor.DearImGui
                 if (_hoveredElement != null)
                 {
                     ImDrawListPtr drawList = ImGui.GetBackgroundDrawList();
-                    Boundaries renderBounds = Boundaries.Offset(_hoveredElement.Transform.RenderCoordinates, baseOffset);
+                    Boundaries renderBounds = Boundaries.Offset(_hoveredElement.PixelCoordinates, baseOffset);
 
                     drawList.AddRect(renderBounds.Minimum, renderBounds.Maximum, 0xff0000ff);
 
@@ -147,13 +150,13 @@ namespace Editor.DearImGui
                 if (_selectedElement != null)
                 {
                     ImDrawListPtr drawList = ImGui.GetBackgroundDrawList();
-                    Boundaries renderBounds = Boundaries.Offset(_selectedElement.Transform.RenderCoordinates, baseOffset);
+                    Boundaries renderBounds = Boundaries.Offset(_selectedElement.PixelCoordinates, baseOffset);
 
                     drawList.AddRect(renderBounds.Minimum - new Vector2(8.0f), renderBounds.Maximum + new Vector2(8.0f), 0xffff0000);
 
-                    if (_selectedElement.WindowOwner != null && !renderBounds.IsIntersecting(new Boundaries(Vector2.Zero, _selectedElement.WindowOwner.ClientSize)))
+                    if (_selectedElement.WindowOwner != null && !renderBounds.IsIntersecting(new Boundaries(Vector2.Zero, _selectedElement.WindowOwner.ClientSize.AsVector2())))
                     {
-                        Boundaries within = new Boundaries(new Vector2(8.0f), _selectedElement.WindowOwner.ClientSize - new Vector2(8.0f));
+                        Boundaries within = new Boundaries(new Vector2(8.0f), (_selectedElement.WindowOwner.ClientSize - new Int2(8)).AsVector2());
 
                         Vector2 closest = Boundaries.OnEdge(within, renderBounds.Center);
                         float angle = ExMath.GetAngleTowards(within.Center, closest);
@@ -164,12 +167,12 @@ namespace Editor.DearImGui
                     else
                         drawList.AddRect(renderBounds.Minimum, renderBounds.Maximum, 0xff0000ff);
 
-                    if (_selectedElement is UIFrame frame && frame.StrokeWeight > 0.0f && frame.StrokePosition != UIStrokePosition.Center)
+                    if (_selectedElement is UIFrame frame && frame.StrokeWeight > 0.0f && frame.StrokePosition != StrokePosition.Middle)
                     {
                         Boundaries newBounds = frame.StrokePosition switch
                         {
-                            UIStrokePosition.Inside => new Boundaries(renderBounds.Minimum + new Vector2(frame.StrokeWeight), renderBounds.Maximum - new Vector2(frame.StrokeWeight)),
-                            UIStrokePosition.Outside => new Boundaries(renderBounds.Minimum - new Vector2(frame.StrokeWeight), renderBounds.Maximum + new Vector2(frame.StrokeWeight)),
+                            StrokePosition.Inside => new Boundaries(renderBounds.Minimum + new Vector2(frame.StrokeWeight), renderBounds.Maximum - new Vector2(frame.StrokeWeight)),
+                            StrokePosition.Outside => new Boundaries(renderBounds.Minimum - new Vector2(frame.StrokeWeight), renderBounds.Maximum + new Vector2(frame.StrokeWeight)),
                             _ => throw new NotImplementedException(),
                         };
 
@@ -177,8 +180,8 @@ namespace Editor.DearImGui
                     }
 
                     drawList.AddText(renderBounds.Minimum, 0xffffffff, _selectedElement.GetType().Name);
-                    drawList.AddText(renderBounds.Minimum + new Vector2(0.0f, 12.0f), 0xffffffff, $"RelPos: {_selectedElement.Transform.RelativePosition}");
-                    drawList.AddText(renderBounds.Minimum + new Vector2(0.0f, 24.0f), 0xffffffff, $"RealSize: {_selectedElement.Transform.RealSize}");
+                    drawList.AddText(renderBounds.Minimum + new Vector2(0.0f, 12.0f), 0xffffffff, $"RelPos: {_selectedElement.RelativeOffset}");
+                    drawList.AddText(renderBounds.Minimum + new Vector2(0.0f, 24.0f), 0xffffffff, $"RealSize: {_selectedElement.CurrentSize}");
                 }
             }
         }
@@ -347,9 +350,9 @@ namespace Editor.DearImGui
                 ImGui.Separator();
 
                 if (ImGui.MenuItem("Invalidate layout"u8))
-                    element.InvalidateSelf(UIInvalidationFlags.Layout);
+                    element.AddStateFlags(UIStateFlags.InvalidLayout);
                 if (ImGui.MenuItem("Invalidate visual"u8))
-                    element.InvalidateSelf(UIInvalidationFlags.Visual);
+                    element.AddStateFlags(UIStateFlags.InvalidVisual);
 
                 ImGui.EndPopup();
             }
@@ -383,6 +386,13 @@ namespace Editor.DearImGui
             private UIWindow? _targetWindow;
             private bool _hasSelected;
 
+            private HashSet<UIWindow> _alreadyShown;
+
+            public SelectWindowPopup()
+            {
+                _alreadyShown = new HashSet<UIWindow>();
+            }
+
             public void OpenPopup() => ImGui.OpenPopup("Select window"u8);
 
             public void Render(ref bool WindowOpen)
@@ -405,12 +415,32 @@ namespace Editor.DearImGui
                                     if (ImGui.Selectable($"{window.WindowTitle}({window.GetType().Name})", _targetWindow == window))
                                         _targetWindow = window;
                                     ImGui.PopID();
+
+                                    _alreadyShown.Add(window);
                                 }
 
                                 ImGui.TreePop();
                             }
 
                             ImGui.PopID();
+                        }
+
+                        if (ImGui.TreeNodeEx("External"u8, ImGuiTreeNodeFlags.DefaultOpen))
+                        {
+                            foreach (var kvp in manager.WindowManager.Active)
+                            {
+                                if (!_alreadyShown.Contains(kvp.Value))
+                                {
+                                    UIWindow window = kvp.Value;
+
+                                    ImGui.PushID(window.UniqueWindowId);
+                                    if (ImGui.Selectable($"{window.WindowTitle}({window.GetType().Name})", _targetWindow == window))
+                                        _targetWindow = window;
+                                    ImGui.PopID();
+                                }
+                            }
+
+                            ImGui.TreePop();
                         }
                     }
                     ImGui.EndChild();
@@ -426,6 +456,8 @@ namespace Editor.DearImGui
 
                     ImGui.EndPopup();
                 }
+
+                _alreadyShown.Clear();
             }
 
             public UIWindow? TargetWindow => _hasSelected ? _targetWindow : null;
@@ -435,15 +467,15 @@ namespace Editor.DearImGui
         private sealed class RecorderViewPopup : IDearImGuiPopup
         {
             private readonly UIWindow _targetWindow;
-            private readonly LayoutRecorder _recorder;
+            //private readonly LayoutRecorder _recorder;
 
             internal RecorderViewPopup(UIWindow targetWindow)
             {
                 _targetWindow = targetWindow;
-                _recorder = new LayoutRecorder();
+                //_recorder = new LayoutRecorder();
 
-                Debug.Assert(targetWindow.LayoutRecorder == null);
-                targetWindow.LayoutRecorder = _recorder;
+                //Debug.Assert(targetWindow.LayoutRecorder == null);
+                //targetWindow.LayoutRecorder = _recorder;
             }
 
             public void Render(ref bool windowOpen)
@@ -454,7 +486,7 @@ namespace Editor.DearImGui
                     {
                         if (ImGui.MenuItem("Relayout tree"))
                         {
-                            _targetWindow.InvalidateTree(UIInvalidationFlags.Layout);
+                            _targetWindow.InvalidateTree(UIStateFlags.InvalidLayout);
                         }
 
                         ImGui.EndMenuBar();
@@ -464,8 +496,8 @@ namespace Editor.DearImGui
 
                 if (!windowOpen)
                 {
-                    _recorder.Dispose();
-                    _targetWindow.LayoutRecorder = null;
+                    //_recorder.Dispose();
+                    //_targetWindow.LayoutRecorder = null;
                 }
             }
 
@@ -562,7 +594,7 @@ namespace Editor.DearImGui
 
                             ImDrawListPtr drawList = ImGui.GetBackgroundDrawList();
 
-                            Boundaries bounds = Boundaries.Offset(eventData.Element.Transform.RenderCoordinates, _targetWindow.ParentHost!.ClientOffset);
+                            Boundaries bounds = Boundaries.Offset(eventData.Element.PixelCoordinates, _targetWindow.ParentHost!.ClientOffset.AsVector2());
                             drawList.AddRect(bounds.Minimum, bounds.Maximum, 0xffffff00);
 
                             if (eventData.Element.Id != null)
@@ -610,7 +642,7 @@ namespace Editor.DearImGui
                                         drawList.AddCircle(data.Position, 4.0f, 0xffff0000);
                                         break;
                                     }
-                                case UIEventType.MouseButtonDown:
+                                case UIEventType.MouseActivate:
                                     {
                                         UIMouseEvent data = @event.Mouse;
                                         ImGui.TextUnformatted($"Position: {data.Position}");
@@ -619,7 +651,7 @@ namespace Editor.DearImGui
                                         drawList.AddCircle(data.Position, 4.0f, 0xffff0000);
                                         break;
                                     }
-                                case UIEventType.MouseButtonUp:
+                                case UIEventType.MouseDeactivate:
                                     {
                                         UIMouseEvent data = @event.Mouse;
                                         ImGui.TextUnformatted($"Position: {data.Position}");
@@ -653,8 +685,8 @@ namespace Editor.DearImGui
         {
             private readonly UIWindow _targetWindow;
 
-            private UICommandBuffer _heldCommandBuffer;
-            private UIBakedCommandBuffer _heldBakedCommandBuffer;
+            //private UICommandBuffer _heldCommandBuffer;
+            //private UIBakedCommandBuffer _heldBakedCommandBuffer;
 
             private int _focusedCommandIndex;
 
@@ -666,36 +698,21 @@ namespace Editor.DearImGui
                 _targetWindow = targetWindow;
 
                 UIRenderer renderer = Editor.GlobalSingleton.UIManager.Renderer;
-                _heldCommandBuffer = new UICommandBuffer(renderer);
-                _heldBakedCommandBuffer = new UIBakedCommandBuffer();
+                //_heldCommandBuffer = new UICommandBuffer(renderer);
+                //_heldBakedCommandBuffer = new UIBakedCommandBuffer();
 
                 _focusedCommandIndex = -1;
 
                 _showSorted = true;
                 _viewOutput = false;
 
-                renderer.CommandBufferFinished += CommandBufferFinishedCallback;
-                renderer.CommandBufferBaked += CommandBufferBakedCallback;
-            }
-
-            private void CommandBufferFinishedCallback(UIWindow window, UICommandBuffer commandBuffer)
-            {
-                if (!_viewOutput && window == _targetWindow)
-                {
-                    commandBuffer.CopyInternalsTo(_heldCommandBuffer);
-                }
-            }
-
-            private void CommandBufferBakedCallback(UIWindow window, UIBakedCommandBuffer commandBuffer)
-            {
-                if (_viewOutput && window == _targetWindow)
-                {
-                    commandBuffer.CopyInternalsTo(_heldBakedCommandBuffer);
-                }
+                //renderer.CommandBufferFinished += CommandBufferFinishedCallback;
+                //renderer.CommandBufferBaked += CommandBufferBakedCallback;
             }
 
             public void Render(ref bool windowOpen)
             {
+                /*
                 if (ImGui.Begin("Rendering view"u8, ref windowOpen, ImGuiWindowFlags.MenuBar))
                 {
                     if (ImGui.BeginMenuBar())
@@ -934,6 +951,8 @@ namespace Editor.DearImGui
 
                     _heldCommandBuffer.Dispose();
                 }
+                */
+                windowOpen = false;
             }
 
             public void OpenPopup() { }

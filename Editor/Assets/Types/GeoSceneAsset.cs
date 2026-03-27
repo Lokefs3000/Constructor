@@ -134,12 +134,12 @@ namespace Editor.Assets.Types
                         _vertexBufferSize = (int)(_generator.Vertices.Length * 1.5);
                         unsafe
                         {
-                            _vertexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
-                            {
-                                Width = (uint)(Unsafe.SizeOf<GeoVertex>() * _vertexBufferSize),
-                                Stride = Unsafe.SizeOf<GeoVertex>(),
-                                Usage = RHIResourceUsage.VertexInput,
-                            }, (nint)Unsafe.AsPointer(ref _generator.Vertices[0]));
+                            //_vertexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
+                            //{
+                            //    Width = (uint)(Unsafe.SizeOf<GeoVertex>() * _vertexBufferSize),
+                            //    Stride = Unsafe.SizeOf<GeoVertex>(),
+                            //    Usage = RHIResourceUsage.VertexInput,
+                            //}, (nint)Unsafe.AsPointer(ref _generator.Vertices[0]));
                         }
                     }
                     //else
@@ -150,12 +150,12 @@ namespace Editor.Assets.Types
                         _indexBufferSize = (int)(_generator.Indices.Length * 1.5);
                         unsafe
                         {
-                            _indexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
-                            {
-                                Width = (uint)(Unsafe.SizeOf<ushort>() * _indexBufferSize),
-                                Stride = Unsafe.SizeOf<ushort>(),
-                                Usage = RHIResourceUsage.VertexInput,
-                            }, (nint)Unsafe.AsPointer(ref _generator.Indices[0]));
+                            //_indexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
+                            //{
+                            //    Width = (uint)(Unsafe.SizeOf<ushort>() * _indexBufferSize),
+                            //    Stride = Unsafe.SizeOf<ushort>(),
+                            //    Usage = RHIResourceUsage.VertexInput,
+                            //}, (nint)Unsafe.AsPointer(ref _generator.Indices[0]));
                         }
                     }
                     //else

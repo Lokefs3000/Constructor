@@ -131,7 +131,7 @@ namespace Primary.Rendering
                         _rasterContext.SetupContext(stateData, recorder);
                         _rasterState.SoftResetForNextPass();
 
-                        submittedPasses[passIndex].Function?.Invoke(_rasterContext, _renderPass.GetPassData(desc.PassDataType!) ?? throw new NullReferenceException());
+                        submittedPasses[passIndex].Function?.Invoke(_rasterContext, desc.PassData);
 
                         _commands.Add(new FrameGraphCommands(recorder));
                     }
@@ -144,7 +144,7 @@ namespace Primary.Rendering
                         _computeContext.SetupContext(stateData, recorder);
                         _computeState.SoftResetForNextPass();
 
-                        submittedPasses[passIndex].Function?.Invoke(_computeContext, _renderPass.GetPassData(desc.PassDataType!) ?? throw new NullReferenceException());
+                        submittedPasses[passIndex].Function?.Invoke(_computeContext, desc.PassData);
 
                         _commands.Add(new FrameGraphCommands(recorder));
                     }

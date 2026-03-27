@@ -1,11 +1,21 @@
-﻿namespace Primary.Rendering
+﻿using System.Runtime.Serialization;
+
+namespace Primary.Rendering
 {
     internal sealed class RenderPassErrorReporter
     {
         internal void ReportError(RPErrorSource source, RPErrorType type, string? resourceName)
         {
             EngLog.Render.Error("[{src}]: {type} - {res}", source, type, resourceName);
-            throw new Exception();
+            throw new RenderPassException(source, type, resourceName);
+        }
+    }
+
+    public sealed class RenderPassException : Exception
+    {
+        public RenderPassException(RPErrorSource Source, RPErrorType Type, string? ResourceName) : base($"{Source}: {Type} ({ResourceName})")
+        {
+
         }
     }
 

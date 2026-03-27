@@ -62,8 +62,8 @@ namespace Primary.Common
             A = _32.A * ConvertTo01;
         }
 
-        public Vector4 AsVector4() => new Vector4(R, G, B, A);
-        public Vector3 AsVector3() => new Vector3(R, G, B);
+        public Vector4 AsVector4() => Unsafe.ReadUnaligned<Vector4>(ref Unsafe.As<Color, byte>(ref this));
+        public Vector3 AsVector3() => Unsafe.ReadUnaligned<Vector3>(ref Unsafe.As<Color, byte>(ref this));
 
         public Vector128<float> AsVector128() => Unsafe.ReadUnaligned<Vector128<float>>(ref Unsafe.As<Color, byte>(ref this));
 

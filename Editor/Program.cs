@@ -1,6 +1,9 @@
-﻿using Editor.Runners;
+﻿using Editor.UI.Designer;
+using Editor.Runners;
+using Primary;
 using Serilog;
 using System.Diagnostics;
+using Editor.Assets;
 
 namespace Editor
 {
@@ -20,12 +23,31 @@ namespace Editor
                 }
             }
 
-            Stopwatch sw = Stopwatch.StartNew();
+            if (args.Contains("--suspend-launch"))
+                Console.ReadLine();
+
+            if (args.Contains("--asset-watcher"))
+            {
+                using (StandaloneAssetWatcher assetWatcher = new StandaloneAssetWatcher(Path.GetFullPath(args[0]), args))
+                {
+                    assetWatcher.Run();
+                }
+
+                return;
+            }
+
+            if (args.Contains("--edui-designer"))
+            {
+                using (UIDesignerEngine designer = new UIDesignerEngine(Path.GetFullPath(args[0]), args))
+                {
+                    designer.Run();
+                }
+
+                return;
+            }
+
             using (Editor editor = new Editor(Path.GetFullPath(args[0]), args))
             {
-                sw.Stop();
-                Log.Information("Editor startup took: {secs}s", sw.Elapsed.TotalSeconds);
-
                 editor.Run();
             }
         }

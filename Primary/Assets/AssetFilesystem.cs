@@ -105,11 +105,32 @@ namespace Primary.Assets
             GC.SuppressFinalize(this);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string? ReadString(ReadOnlySpan<char> path, BundleReader? bundleToReadFrom = null) => s_instance!.ReadAsString(path, bundleToReadFrom);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Stream? OpenStream(ReadOnlySpan<char> path, BundleReader? bundleToReadFrom = null) => s_instance!.OpenAsStream(path, bundleToReadFrom);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool Exists(ReadOnlySpan<char> path, BundleReader? bundleToReadFrom = null) => s_instance!.DoesFileExist(path, bundleToReadFrom);
+
+        public static string? ReadString(AssetId id)
+        {
+            AssetManager assets = Engine.GlobalSingleton.AssetManager;
+            string? path = assets.IdProvider.RetrievePathForId(id);
+
+            return path != null ? ReadString(path) : null;
+        }
+
+        public static Stream? OpenStream(AssetId id)
+        {
+            AssetManager assets = Engine.GlobalSingleton.AssetManager;
+            string? path = assets.IdProvider.RetrievePathForId(id);
+
+            return path != null ? OpenStream(path) : null;
+        }
+
+        public static bool Exists(AssetId id)
+        {
+            AssetManager assets = Engine.GlobalSingleton.AssetManager;
+            string? path = assets.IdProvider.RetrievePathForId(id);
+
+            return path != null ? Exists(path) : false;
+        }
     }
 }

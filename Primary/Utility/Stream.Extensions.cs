@@ -12,10 +12,10 @@ namespace Primary.Utility
         //    return v;
         //}
         //
-        public static void Write<T>(this Stream stream, in T value) where T : unmanaged
-        {
-            stream.Write(MemoryMarshal.Cast<T, byte>(new ReadOnlySpan<T>(in value)));
-        }
+        //public static void Write<T>(this Stream stream, in T value) where T : unmanaged
+        //{
+        //    stream.Write(MemoryMarshal.Cast<T, byte>(new ReadOnlySpan<T>(in value)));
+        //}
 
         public static unsafe T[] ReadArray<T>(this Stream stream, int count) where T : unmanaged
         {

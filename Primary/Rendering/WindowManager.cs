@@ -1,4 +1,5 @@
-﻿using SDL;
+﻿using Primary.Mathematics;
+using SDL;
 using System.Numerics;
 
 namespace Primary.Rendering
@@ -20,7 +21,7 @@ namespace Primary.Rendering
             //ExceptionUtility.Assert(SDL3.SDL_SetHint(SDL3.SDL_HINT_MOUSE_AUTO_CAPTURE, true));
         }
 
-        public Window CreateWindow(string windowTitle, Vector2 clientSize, CreateWindowFlags flags)
+        public Window CreateWindow(string windowTitle, Int2 clientSize, CreateWindowFlags flags)
         {
             Window window = new Window(windowTitle, clientSize, flags);
             _windows.Add(window.ID, window);

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Stylesheet>
+	<Class Name="button-active" Type="Button">
+		<State Name="Normal">
+			<StrokeColor Value="#e0a04c" />
+		</State>
+		<State Name="Hovered">
+			<StrokeColor Value="#e0a04c" />
+		</State>
+		<State Name="Pressed">
+			<StrokeColor Value="#e0a04c" />
+		</State>
+	</Class>
+</Stylesheet>

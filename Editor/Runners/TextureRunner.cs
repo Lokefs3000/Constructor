@@ -1,5 +1,6 @@
 ﻿using CommandLine;
 using Editor.Processors;
+using Editor.Processors.Texture;
 
 namespace Editor.Runners
 {
@@ -30,25 +31,7 @@ namespace Editor.Runners
 
             RunnerArguments value = result.Value;
 
-            TextureProcessor processor = new TextureProcessor();
-            processor.Execute(new TextureProcessorArgs
-            {
-                Sources = [new TextureProcessorArgs.Source { AbsoluteFilepath = Path.GetFullPath(value.Input) }],
-                AbsoluteOutputPath = Path.GetFullPath(value.Output),
-
-                FlipVertical = value.FlipVertical,
-                ImageFormat = value.ImageFormat,
-                CutoutDither = value.CutoutDither,
-                CutoutThreshold = value.CutoutThreshold,
-                GammaCorrect = value.GammaCorrect,
-                PremultipliedAlpha = value.PremultipliedAlpha,
-                MipmapFilter = value.MipmapFilter,
-                MaxMipmapCount = value.MaxMipmapCount,
-                MinMipmapSize = value.MinMipmapSize,
-                GenerateMipmaps = value.GenerateMipmaps,
-                ImageType = value.ImageType,
-                ScaleAlphaForMipmaps = value.ScaleAlphaForMipmaps
-            });
+            
         }
 
         private class RunnerArguments

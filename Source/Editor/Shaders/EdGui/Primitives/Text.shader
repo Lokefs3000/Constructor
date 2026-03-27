@@ -1,21 +1,31 @@
 #include "../Shared.hlsl2"
+#include "../SDF.hlsl"
+
+struct TextMetadata
+{
+    uint16_t HasStroke;
+    
+    float16_t4 Color;
+    uint16_t ZIndex;
+};
 
 [vertex]
 DefaultPsInput VertexMain(VsInput input)
 {
+    TextMetadata metadata = baMetadata.Load<TextMetadata>(input.MetadataOffset);
     DefaultPsInput output =
     {
-        mul(cbGlobals.Model, float4(input.Position, 0.0, 1.0)),
+        float4(mul(transpose(cbGlobals.Model), float3(input.Position, 1.0)), metadata.ZIndex * 0.01, 1.0),
         input.UV,
-        input.Color,
+        metadata.Color,
 
-        input.MetadataOffset
+        input.MetadataOffset | (uint(metadata.HasStroke) << 31)
     };
-	
+    
     return output;
 }
 
-Texture2D<float4> txFontAtlas;
+Texture2D<float2> txFontAtlas;
 
 float Median(float r, float g, float b)
 {
@@ -36,20 +46,11 @@ float ScreenPxRange(float param, float2 uv)
 [pixel]
 float4 PixelMain(DefaultPsInput input) : SV_Target
 {
-    [branch]
-    if (input.Color.a < 0.0)
-    {
-        input.Color = txGradients.Sample(ssDefaultLinear, input.Color.xy);
-    }
-    
-    return float4(input.Color.rgb, smoothstep(0.0, 1.0, input.Color.a * txFontAtlas.Sample(ssDefaultLinear, input.UV).a));
-
-    const float DistanceRange = 2.0;
-
-    float4 msdf = txFontAtlas.Sample(ssDefaultLinear, input.UV);
-    float sd = Median(msdf.r, msdf.g, msdf.b);
-    float screenPxDistance = ScreenPxRange(DistanceRange, input.UV) * (sd - 0.5);
+    float2 msd = txFontAtlas.Sample(ssDefaultLinear, input.UV);
+    float sd = msd.r;
+    float screenPxDistance = ScreenPxRange(2.0, input.UV) * (sd - 0.5);
     float opacity = clamp(screenPxDistance + 0.5, 0.0, 1.0);
 
-    return float4(input.Color.rgb, input.Color.a * opacity);
+    //return float4(msd.rgb, 1.0);
+    return float4(input.Color.rgb, input.Color.w * opacity);
 }

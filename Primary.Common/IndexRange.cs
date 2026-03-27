@@ -26,6 +26,7 @@ namespace Primary.Common
         public override string ToString() => $"{Start} - {End}";
 
         public int Length => End - Start;
+        public bool IsEmpty => End <= Start;
 
         public static readonly IndexRange Empty = new IndexRange(0, 0);
 

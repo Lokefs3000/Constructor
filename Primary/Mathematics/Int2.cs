@@ -34,7 +34,7 @@ namespace Primary.Mathematics
         }
 
         public readonly override bool Equals([NotNullWhen(true)] object? obj) => (obj is Vector2 other) && Equals(other);
-        public readonly bool Equals(Int2 other) => this.AsVector128Unsafe() == other.AsVector128Unsafe();
+        public readonly bool Equals(Int2 other) => this.AsVector128() == other.AsVector128();
 
         public readonly override int GetHashCode() => HashCode.Combine(X, Y);
 
@@ -75,6 +75,21 @@ namespace Primary.Mathematics
 
         public static Int2 CreateScalar(int x) => Vector128.CreateScalar(x).AsInt2();
 
+        /// <summary><paramref name="left"/> > <paramref name="right"/></summary>
+        public static bool GreaterThanAny(Int2 left, Int2 right) => Vector128.GreaterThanAny(left.AsVector128(), right.AsVector128());
+        /// <summary><paramref name="left"/> >= <paramref name="right"/></summary>
+        public static bool GreaterThanOrEqualAny(Int2 left, Int2 right) => left.X >= right.X || left.Y >= right.Y;
+        /// <summary><paramref name="left"/> < <paramref name="right"/></summary>
+        public static bool LessThanAny(Int2 left, Int2 right) => Vector128.LessThanAny(left.AsVector128(), right.AsVector128());
+        /// <summary><paramref name="left"/> <= <paramref name="right"/></summary>
+        public static bool LessThanOrEqualAny(Int2 left, Int2 right) => left.X <= right.X || left.Y <= right.Y;
+
+        public static Int2 Min(Int2 a, Int2 b) => Vector128.Min(a.AsVector128Unsafe(), b.AsVector128Unsafe()).AsInt2();
+        public static Int2 Max(Int2 a, Int2 b) => Vector128.Max(a.AsVector128Unsafe(), b.AsVector128Unsafe()).AsInt2();
+        public static Int2 Clamp(Int2 a, Int2 min, Int2 max) => Vector128.Clamp(a.AsVector128Unsafe(), min.AsVector128Unsafe(), max.AsVector128Unsafe()).AsInt2();
+        
+        public static Int2 Abs(Int2 a) => Vector128.Abs(a.AsVector128Unsafe()).AsInt2();
+
         public static Int2 operator +(Int2 left, Int2 right) => (left.AsVector128Unsafe() + right.AsVector128Unsafe()).AsInt2();
         public static Int2 operator -(Int2 left, Int2 right) => (left.AsVector128Unsafe() - right.AsVector128Unsafe()).AsInt2();
         public static Int2 operator *(Int2 left, Int2 right) => (left.AsVector128Unsafe() * right.AsVector128Unsafe()).AsInt2();
@@ -90,5 +105,13 @@ namespace Primary.Mathematics
         public static Int2 operator >>(Int2 left, int shiftAmount) => (left.AsVector128Unsafe() >> shiftAmount).AsInt2();
         public static Int2 operator <<(Int2 left, int shiftAmount) => (left.AsVector128Unsafe() << shiftAmount).AsInt2();
         public static Int2 operator >>>(Int2 left, int shiftAmount) => (left.AsVector128Unsafe() >> shiftAmount).AsInt2();
+
+        public static bool operator ==(Int2 left, Int2 right) => left.Equals(right);
+        public static bool operator !=(Int2 left, Int2 right) => !left.Equals(right);
+
+        public static bool operator >(Int2 left, Int2 right) => Vector128.GreaterThanAll(left.AsVector128(1), right.AsVector128());
+        public static bool operator >=(Int2 left, Int2 right) => Vector128.GreaterThanOrEqualAll(left.AsVector128(1), right.AsVector128());
+        public static bool operator <(Int2 left, Int2 right) => Vector128.LessThanAll(left.AsVector128(-1), right.AsVector128());
+        public static bool operator <=(Int2 left, Int2 right) => Vector128.LessThanOrEqualAll(left.AsVector128(-1), right.AsVector128());
     }
 }

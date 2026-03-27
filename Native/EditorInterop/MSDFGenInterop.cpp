@@ -11,6 +11,8 @@ struct MSDF_FontFace
 {
 	FT_Face Face;
 	msdfgen::FontHandle* MSDFFont;
+
+	void* HeldFaceMemory;
 };
 
 struct MSDF_VarFontMetrics
@@ -98,7 +100,28 @@ extern "C"
 		
 		return new MSDF_FontFace{
 			face,
-			msdfgen::adoptFreetypeFont(face)
+			msdfgen::adoptFreetypeFont(face),
+			nullptr
+		};
+	}
+
+	__declspec(dllexport) MSDF_FontFace* MSDF_LoadFont_Memory(FT_Library ft, uint8_t* memory, uint64_t fileSize)
+	{
+		uint8_t* memCopy = (uint8_t*)malloc(fileSize);
+		memcpy(memCopy, memory, fileSize);
+
+		FT_Face face = nullptr;
+
+		FT_Error err = FT_New_Memory_Face(ft, memCopy, fileSize, 0, &face);
+		if (err != 0)
+			return nullptr;
+
+		FT_Select_Charmap(face, FT_ENCODING_UNICODE);
+
+		return new MSDF_FontFace{
+			face,
+			msdfgen::adoptFreetypeFont(face),
+			memCopy
 		};
 	}
 
@@ -106,6 +129,8 @@ extern "C"
 	{
 		if (face != nullptr)
 		{
+			if (face->HeldFaceMemory != nullptr)
+				free(face->HeldFaceMemory);
 			msdfgen::destroyFont(face->MSDFFont);
 			FT_Done_Face(face->Face);
 
@@ -146,10 +171,15 @@ extern "C"
 		return true;
 	}
 
-	__declspec(dllexport) void MSDF_GetLineHeight(MSDF_FontFace* face, double* lineHeight)
+	__declspec(dllexport) void MSDF_GetMetrics(MSDF_FontFace* face, double* ascender, double* descender, double* lineHeight, double* underlineY, double* fontHeight)
 	{
 		double scale = 1.0 / (face->Face->units_per_EM ? face->Face->units_per_EM : 1);
+
+		*ascender = face->Face->ascender * -scale;
+		*descender = face->Face->descender * -scale;
 		*lineHeight = (face->Face->ascender - face->Face->descender) * scale;
+		*underlineY = face->Face->underline_position * -scale;
+		*fontHeight = face->Face->height * scale;
 	}
 
 	__declspec(dllexport) FT_MM_Var* MSDF_GetVarFontData(MSDF_FontFace* face, MSDF_VarFontMetrics* metrics)
@@ -248,12 +278,9 @@ extern "C"
 			double scale = 1.0 / (face->Face->units_per_EM ? face->Face->units_per_EM : 1);
 			msdfgen::Shape::Bounds bounds = outData->Shape.getBounds();
 
-			outData->BearingX = bounds.l;
-			outData->BearingY = bounds.b;
-			
-			outData->Width = bounds.r - bounds.l;
-			outData->Height = bounds.t - bounds.b;
-
+			outData->BearingX = face->Face->glyph->metrics.horiBearingX * -scale;
+			outData->BearingY = face->Face->glyph->metrics.horiBearingY * -scale;
+		
 			return true;
 		}
 
@@ -265,9 +292,15 @@ extern "C"
 		msdfgen::BitmapSection<float, 4> section = msdfgen::BitmapSection<float, 4>(bitmap->Pixels, bitmap->Width, bitmap->Height, msdfgen::Y_DOWNWARD);
 		msdfgen::SDFTransformation transformation(renderBox->Projection, renderBox->Range);
 
+		float sdfZeroValue = renderBox->Range.lower != renderBox->Range.upper ? (float)(renderBox->Range.lower / (renderBox->Range.lower - renderBox->Range.upper)) : 0.5f;
+
+		msdfgen::MSDFGeneratorConfig config = msdfgen::MSDFGeneratorConfig(true);
+		config.errorCorrection.mode = msdfgen::ErrorCorrectionConfig::Mode::EDGE_ONLY;
+		config.errorCorrection.distanceCheckMode = msdfgen::ErrorCorrectionConfig::DistanceCheckMode::DO_NOT_CHECK_DISTANCE;
+
 		msdfgen::edgeColoringByDistance(shapedGlyph->Shape, 3.0);
 		msdfgen::generateMTSDF(section, shapedGlyph->Shape, transformation);
-		msdfgen::distanceSignCorrection(section, shapedGlyph->Shape, transformation, msdfgen::FILL_NONZERO);
+		msdfgen::distanceSignCorrection(section, shapedGlyph->Shape, transformation, sdfZeroValue, msdfgen::FILL_NONZERO);
 		msdfgen::msdfErrorCorrection(section, shapedGlyph->Shape, transformation, msdfgen::Range(0.125));
 	}
 

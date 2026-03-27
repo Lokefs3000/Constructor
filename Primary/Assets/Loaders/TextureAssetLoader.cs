@@ -1,6 +1,9 @@
-﻿using Primary.Assets.Types;
+﻿using CommunityToolkit.Diagnostics;
+using CommunityToolkit.HighPerformance;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
+using Primary.Memory.Native;
 using Primary.RHI2;
 using Primary.Utility;
 using Serilog;
@@ -10,6 +13,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace Primary.Assets.Loaders
 {
@@ -40,14 +44,14 @@ namespace Primary.Assets.Loaders
                 using Stream? stream = AssetFilesystem.OpenStream(sourcePath, bundleToReadFrom);
                 ExceptionUtility.Assert(stream != null);
 
-                BinaryReader br = new BinaryReader(stream!, Encoding.UTF8, true);
-
-                TextureHeader header = br.Read<TextureHeader>();
+                TextureHeader header = stream.Read<TextureHeader>();
 
                 if (header.FileHeader != TextureHeader.Header)
                     throw new Exception("Invalid file header specified!");
                 if (header.FileVersion != TextureHeader.Version)
                     throw new Exception("Incompatible file version specified!");
+
+                TextureSampler samplerInfo = stream.Read<TextureSampler>();
 
                 RHIFormatInfo fi = default;
                 switch (header.Format)
@@ -63,10 +67,7 @@ namespace Primary.Assets.Loaders
                     case TextureFormat.BC1a: fi = RHIFormatInfo.Query(RHIFormat.BC1_Typeless); break;
                     case TextureFormat.BC1: fi = RHIFormatInfo.Query(RHIFormat.BC1_UNorm); break;
                     case TextureFormat.R8a: fi = RHIFormatInfo.Query(RHIFormat.R8_UNorm); break;
-                    case TextureFormat.R8l: fi = RHIFormatInfo.Query(RHIFormat.R8_UNorm); break;
-                    case TextureFormat.BGR8: fi = new RHIFormatInfo(3, 3); break;
-                    case TextureFormat.BGRA8: fi = new RHIFormatInfo(4, 4); break;
-                    case TextureFormat.BGRX8: fi = new RHIFormatInfo(4, 3); break;
+                    case TextureFormat.RG8: fi = RHIFormatInfo.Query(RHIFormat.RG8_UNorm); break;
                     case TextureFormat.RGB8: fi = new RHIFormatInfo(3, 3); break;
                     case TextureFormat.RGBA8: fi = RHIFormatInfo.Query(RHIFormat.RGBA8_UNorm); break;
                     case TextureFormat.R16: fi = RHIFormatInfo.Query(RHIFormat.R16_Float); break;
@@ -84,122 +85,106 @@ namespace Primary.Assets.Loaders
                 RHITexture? rhiTexture = null;
                 RHISampler? rhiSampler = null;
 
+                using var _ = ScopedMemory.PushScope();
+
                 //TODO: use an ArrayPool instead to avoid memalloc
-                nint[] planeSlices = new nint[header.ArraySize * header.MipLevels];
-                try
+                ArrayPtr<byte>[] planeSlices = new ArrayPtr<byte>[header.ArraySize * header.MipLevels];
+                for (int j = 0; j < header.ArraySize; j++)
                 {
-                    for (int j = 0; j < header.ArraySize; j++)
+                    Span<ArrayPtr<byte>> mipLevels = planeSlices.AsSpan(j * header.MipLevels, header.MipLevels);
+                    for (int i = 0; i < header.MipLevels; i++)
                     {
-                        Span<nint> mipLevels = planeSlices.AsSpan(j * header.MipLevels, header.MipLevels);
-                        for (int i = 0; i < header.MipLevels; i++)
+                        uint width = (uint)(header.Width >> i);
+                        uint height = (uint)(header.Height >> i);
+                        uint depth = Math.Max(1u, header.Depth);
+
+                        //ulong dataPitch = (ulong)fi.CalculatePitch(width);
+                        //ulong dataSize = (dataPitch * height) * depth;
+                        ulong dataSize = (ulong)fi.CalculateSize(width, height, depth);
+
+                        ExceptionUtility.Assert(dataSize <= uint.MaxValue);
+
+                        ScopedPtr<byte> mipData = ScopedMemory.Allocate((nuint)dataSize);
+                        stream.ReadExactly(mipData.AsSpan((int)dataSize));
+
+                        if (header.Format == TextureFormat.RGB8)
                         {
-                            uint width = (uint)(header.Width >> i);
-                            uint height = (uint)(header.Height >> i);
-                            uint depth = Math.Max(1u, header.Depth);
+                            ExceptionUtility.Assert(depth > 1, "can depth actually have a 24bit format?");
 
-                            //ulong dataPitch = (ulong)fi.CalculatePitch(width);
-                            //ulong dataSize = (dataPitch * height) * depth;
-                            ulong dataSize = (ulong)fi.CalculateSize(width, height, depth);
-
-                            ExceptionUtility.Assert(dataSize <= uint.MaxValue);
-
-                            nint mipData = (nint)NativeMemory.Alloc((nuint)dataSize);
-                            stream!.ReadExactly(new Span<byte>(mipData.ToPointer(), (int)dataSize));
-
-                            if (header.Format == TextureFormat.BGR8 || header.Format == TextureFormat.RGB8)
-                            {
-                                ExceptionUtility.Assert(depth > 1, "can depth actually have a 24bit format?");
-                                nint newMipData = AddAlphaChannelToPixelData(mipData, width, height, (uint)fi.BytesPerPixel);
-
-                                NativeMemory.Free(mipData.ToPointer());
-                                mipData = newMipData;
-                            }
-
-                            mipLevels[i] = mipData;
+                            mipData = AddAlphaChannelToPixelData(mipData, width, height);
+                            fi = RHIFormatInfo.Query(RHIFormat.RGBA8_UNorm);
                         }
-                    }
 
-                    RHIFormat rhiFormat = header.Format switch
-                    {
-                        TextureFormat.BC7 => RHIFormat.BC7_UNorm,
-                        TextureFormat.BC6s => RHIFormat.BC6H_SFloat16,
-                        TextureFormat.BC6u => RHIFormat.BC6H_UFloat16,
-                        TextureFormat.BC5u => RHIFormat.BC5_UNorm,
-                        TextureFormat.BC4u => RHIFormat.BC4_UNorm,
-                        TextureFormat.BC3 => RHIFormat.BC3_UNorm,
-                        TextureFormat.BC3n => RHIFormat.BC3_UNorm,
-                        TextureFormat.BC2 => RHIFormat.BC2_UNorm,
-                        TextureFormat.BC1a => RHIFormat.BC1_Typeless,
-                        TextureFormat.BC1 => RHIFormat.BC1_UNorm,
-                        TextureFormat.R8a => RHIFormat.R8_UNorm,
-                        TextureFormat.R8l => RHIFormat.R8_UNorm,
-                        //TextureFormat.BGR8 => RHIFormat.BGRA8un,
-                        //TextureFormat.BGRA8 => RHIFormat.BGRA8un,
-                        //TextureFormat.BGRX8 => RHIFormat.BGRX8un,
-                        TextureFormat.RGB8 => RHIFormat.RGBA8_UNorm,
-                        TextureFormat.RGBA8 => RHIFormat.RGBA8_UNorm,
-                        TextureFormat.R16 => RHIFormat.R16_Float,
-                        TextureFormat.RG16 => RHIFormat.RG16_Float,
-                        TextureFormat.RGBA16 => RHIFormat.RGBA16_Float,
-                        TextureFormat.R32 => RHIFormat.R32_Float,
-                        TextureFormat.RG32 => RHIFormat.RG32_Float,
-                        TextureFormat.RGBA32 => RHIFormat.RGBA32_Float,
-                        _ => RHIFormat.Unknown
-                    };
-
-                    ExceptionUtility.Assert(rhiFormat != RHIFormat.Unknown);
-
-                    RHIDevice device = RHIDevice.Instance!;
-
-                    rhiTexture = device.CreateTexture(new RHITextureDescription
-                    {
-                        Width = header.Width,
-                        Height = Math.Max((int)header.Height, 1),
-                        DepthOrArraySize = Math.Max(header.Depth, header.ArraySize),
-
-                        MipLevels = header.MipLevels,
-
-                        Dimension = dimension,
-                        Format = rhiFormat,
-                        Usage = RHIResourceUsage.ShaderResource,
-
-                        Swizzle = new RHISwizzle(header.Swizzle.Code),
-                    }, planeSlices.AsSpan(), sourcePath);
-
-                    rhiSampler = device.CreateSampler(new RHISamplerDescription
-                    {
-                        Min = RHIFilterType.Linear,
-                        Mag = RHIFilterType.Linear,
-                        Mip = RHIFilterType.Linear,
-                        Reduction = RHIReductionType.Standard,
-
-                        AddressModeU = RHITextureAddressMode.Repeat,
-                        AddressModeV = RHITextureAddressMode.Repeat,
-                        AddressModeW = RHITextureAddressMode.Repeat,
-
-                        ComparisonFunction = RHIComparisonFunction.None,
-
-                        BorderColor = Color.TransparentBlack,
-
-                        MipLODBias = 1.0f,
-                        MinLOD = 0.0f,
-                        MaxLOD = float.MaxValue,
-                        MaxAnisotropy = 1
-                    });
-                }
-                finally
-                {
-                    for (int i = 0; i < planeSlices.Length; i++)
-                    {
-                        if (planeSlices[i] != nint.Zero)
-                        {
-                            NativeMemory.Free(planeSlices[i].ToPointer());
-                        }
+                        mipLevels[i] = new ArrayPtr<byte>(mipData.Pointer, (int)fi.CalculateSize(width, height, depth));
                     }
                 }
+
+                RHIFormat rhiFormat = header.Format switch
+                {
+                    TextureFormat.BC7 => RHIFormat.BC7_UNorm,
+                    TextureFormat.BC6s => RHIFormat.BC6H_SFloat16,
+                    TextureFormat.BC6u => RHIFormat.BC6H_UFloat16,
+                    TextureFormat.BC5u => RHIFormat.BC5_UNorm,
+                    TextureFormat.BC4u => RHIFormat.BC4_UNorm,
+                    TextureFormat.BC3 => RHIFormat.BC3_UNorm,
+                    TextureFormat.BC3n => RHIFormat.BC3_UNorm,
+                    TextureFormat.BC2 => RHIFormat.BC2_UNorm,
+                    TextureFormat.BC1a => RHIFormat.BC1_Typeless,
+                    TextureFormat.BC1 => RHIFormat.BC1_UNorm,
+                    TextureFormat.R8a => RHIFormat.R8_UNorm,
+                    TextureFormat.RG8 => RHIFormat.RG8_UNorm,
+                    TextureFormat.RGB8 => RHIFormat.RGBA8_UNorm,
+                    TextureFormat.RGBA8 => RHIFormat.RGBA8_UNorm,
+                    TextureFormat.R16 => RHIFormat.R16_Float,
+                    TextureFormat.RG16 => RHIFormat.RG16_Float,
+                    TextureFormat.RGBA16 => RHIFormat.RGBA16_Float,
+                    TextureFormat.R32 => RHIFormat.R32_Float,
+                    TextureFormat.RG32 => RHIFormat.RG32_Float,
+                    TextureFormat.RGBA32 => RHIFormat.RGBA32_Float,
+                    _ => RHIFormat.Unknown
+                };
+
+                ExceptionUtility.Assert(rhiFormat != RHIFormat.Unknown);
+
+                RHIDevice device = RHIDevice.Instance!;
+
+                rhiTexture = device.CreateTexture(new RHITextureDescription
+                {
+                    Width = header.Width,
+                    Height = Math.Max((int)header.Height, 1),
+                    DepthOrArraySize = Math.Max(header.Depth, header.ArraySize),
+
+                    MipLevels = header.MipLevels,
+
+                    Dimension = dimension,
+                    Format = rhiFormat,
+                    Usage = RHIResourceUsage.ShaderResource,
+
+                    Swizzle = new RHISwizzle(samplerInfo.Swizzle.Code),
+                }, planeSlices.AsSpan(), sourcePath);
+
+                rhiSampler = device.CreateSampler(new RHISamplerDescription
+                {
+                    Min = Extensions.ToRHIEnum(samplerInfo.MinFilter),
+                    Mag = Extensions.ToRHIEnum(samplerInfo.MinFilter),
+                    Mip = Extensions.ToRHIEnum(samplerInfo.MinFilter),
+                    Reduction = Extensions.ToRHIEnum(samplerInfo.ReductionType),
+
+                    AddressModeU = Extensions.ToRHIEnum(samplerInfo.AddressModeU),
+                    AddressModeV = Extensions.ToRHIEnum(samplerInfo.AddressModeV),
+                    AddressModeW = Extensions.ToRHIEnum(samplerInfo.AddressModeW),
+
+                    ComparisonFunction = Extensions.ToRHIEnum(samplerInfo.ComparisonFunction),
+
+                    BorderColor = samplerInfo.BorderColor,
+
+                    MipLODBias = samplerInfo.MipLODBias,
+                    MinLOD = samplerInfo.MinLOD,
+                    MaxLOD = samplerInfo.MaxLOD,
+                    MaxAnisotropy = samplerInfo.MaxAnisotropy == 0 ? 1 : (uint)samplerInfo.MaxAnisotropy,
+                });
 
                 Debug.Assert(rhiTexture != null && rhiSampler != null);
-
                 textureData.UpdateAssetData(texture, rhiTexture!, rhiSampler!);
 #if false
                     ExceptionUtility.Assert(br.ReadUInt32() == DDSMagicNumber);
@@ -387,37 +372,29 @@ namespace Primary.Assets.Loaders
             catch (Exception ex)
             {
                 textureData.UpdateAssetFailed(texture);
-                Log.Error(ex, "Failed to load texture: {name}", sourcePath);
+                EngLog.Assets.Error(ex, "Failed to load texture: {name}", sourcePath);
             }
 #endif
         }
 
-        private static nint AddAlphaChannelToPixelData(nint pixels, uint width, uint height, uint bpp)
+        private static ScopedPtr<byte> AddAlphaChannelToPixelData(ScopedPtr<byte> oldPixels, uint width, uint height)
         {
             uint totalLocalSize = width * height;
 
-            byte* oldPixels = (byte*)pixels;
-            byte* newPixels = (byte*)NativeMemory.Alloc((nuint)(totalLocalSize * (ulong)bpp));
+            ScopedPtr<byte> newPixels = ScopedMemory.Allocate(totalLocalSize * 4u);
 
-            try
+            for (int i = 0; i < totalLocalSize; i++)
             {
-                for (uint i = 0; i < totalLocalSize; i++)
-                {
-                    ulong originalPixelLoc = i * 3ul;
-                    ulong newPixelLoc = i * 4ul;
+                int originalPixelLoc = i * 3;
+                int newPixelLoc = i * 4;
 
-                    newPixels[newPixelLoc] = oldPixels[originalPixelLoc];
-                    newPixels[newPixelLoc + 1] = oldPixels[originalPixelLoc + 1];
-                    newPixels[newPixelLoc + 2] = oldPixels[originalPixelLoc + 2];
-                    newPixels[newPixelLoc + 3] = 255;
-                }
-            }
-            finally
-            {
-                NativeMemory.Free(newPixels);
+                newPixels[newPixelLoc] = oldPixels[originalPixelLoc];
+                newPixels[newPixelLoc + 1] = oldPixels[originalPixelLoc + 1];
+                newPixels[newPixelLoc + 2] = oldPixels[originalPixelLoc + 2];
+                newPixels[newPixelLoc + 3] = 255;
             }
 
-            return (nint)newPixels;
+            return newPixels;
         }
 
         private const uint DDSMagicNumber = 0x20534444u;
@@ -549,6 +526,48 @@ namespace Primary.Assets.Loaders
             RGBA32
         }
         #endregion
+
+        private static class Extensions
+        {
+            public static RHIFilterType ToRHIEnum(TextureFilterType filterType) => filterType switch
+            {
+                TextureFilterType.Linear => RHIFilterType.Linear,
+                TextureFilterType.Point => RHIFilterType.Point,
+                _ => throw new NotImplementedException(),
+            };
+
+            public static RHIReductionType ToRHIEnum(TextureReductionType reductionType) => reductionType switch
+            {
+                TextureReductionType.Standard => RHIReductionType.Standard,
+                TextureReductionType.Comparison => RHIReductionType.Comparison,
+                TextureReductionType.Minimum => RHIReductionType.Minimum,
+                TextureReductionType.Maximum => RHIReductionType.Maximum,
+                _ => throw new NotImplementedException(),
+            };
+
+            public static RHITextureAddressMode ToRHIEnum(TextureAddressMode addressMode) => addressMode switch
+            {
+                TextureAddressMode.Repeat => RHITextureAddressMode.Repeat,
+                TextureAddressMode.Clamp => RHITextureAddressMode.Clamp,
+                TextureAddressMode.Mirror => RHITextureAddressMode.Mirror,
+                TextureAddressMode.MirrorOnce => RHITextureAddressMode.MirrorOnce,
+                TextureAddressMode.Border => RHITextureAddressMode.Border,
+                _ => throw new NotImplementedException(),
+            };
+
+            public static RHIComparisonFunction ToRHIEnum(TextureComparisonFunction comparisonFunction) => comparisonFunction switch
+            {
+                TextureComparisonFunction.Never => RHIComparisonFunction.Never,
+                TextureComparisonFunction.Always => RHIComparisonFunction.Always,
+                TextureComparisonFunction.Less => RHIComparisonFunction.Less,
+                TextureComparisonFunction.LessEqual => RHIComparisonFunction.LessEqual,
+                TextureComparisonFunction.Greater => RHIComparisonFunction.Greater,
+                TextureComparisonFunction.GreaterEqual => RHIComparisonFunction.GreaterEqual,
+                TextureComparisonFunction.Equal => RHIComparisonFunction.Equal,
+                TextureComparisonFunction.NotEqual => RHIComparisonFunction.NotEqual,
+                _ => throw new NotImplementedException(),
+            };
+        }
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -567,10 +586,33 @@ namespace Primary.Assets.Loaders
         public ushort MipLevels;
         public ushort ArraySize;
 
-        public TextureSwizzle Swizzle;
-
         public const uint Header = 0x44584554;
         public const uint Version = 2;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct TextureSampler
+    {
+        public TextureSwizzle Swizzle;
+
+        public TextureReductionType ReductionType;
+        public TextureFilterType MinFilter;
+        public TextureFilterType MagFilter;
+        public TextureFilterType MipFilter;
+
+        public TextureAddressMode AddressModeU;
+        public TextureAddressMode AddressModeV;
+        public TextureAddressMode AddressModeW;
+
+        public TextureComparisonFunction ComparisonFunction;
+
+        public Color BorderColor;
+
+        public float MipLODBias;
+        public float MinLOD;
+        public float MaxLOD;
+
+        public byte MaxAnisotropy;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -591,6 +633,36 @@ namespace Primary.Assets.Loaders
         public TextureSwizzleChannel B { get => (TextureSwizzleChannel)((Code >> 3) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 3)) | ((int)value << 3)); }
         public TextureSwizzleChannel A { get => (TextureSwizzleChannel)(Code & 0x7); set => Code = (ushort)((Code & ~0x7) | (int)value); }
 
+        public TextureSwizzleChannel this[int i]
+        {
+            get
+            {
+                Guard.IsInRange(i, 0, 4);
+
+                switch (i)
+                {
+                    case 0: return R;
+                    case 1: return G;
+                    case 2: return B;
+                    case 3: return A;
+                    default: throw new IndexOutOfRangeException();
+                }
+            }
+            set
+            {
+                Guard.IsInRange(i, 0, 4);
+
+                switch (i)
+                {
+                    case 0: R = value; break;
+                    case 1: G = value; break;
+                    case 2: B = value; break;
+                    case 3: A = value; break;
+                    default: throw new IndexOutOfRangeException();
+                }
+            }
+        }
+
         public static readonly TextureSwizzle Default = new TextureSwizzle(TextureSwizzleChannel.R, TextureSwizzleChannel.G, TextureSwizzleChannel.B, TextureSwizzleChannel.A);
     }
 
@@ -607,10 +679,7 @@ namespace Primary.Assets.Loaders
         BC1a,
         BC1,
         R8a,
-        R8l,
-        BGR8,
-        BGRA8,
-        BGRX8,
+        RG8,
         RGB8,
         RGBA8,
         R16,
@@ -635,5 +704,40 @@ namespace Primary.Assets.Loaders
         A,
         Zero,
         One
+    }
+
+    public enum TextureFilterType : byte
+    {
+        Linear = 0,
+        Point
+    }
+
+    public enum TextureReductionType : byte
+    {
+        Standard = 0,
+        Comparison,
+        Minimum,
+        Maximum
+    }
+
+    public enum TextureAddressMode : byte
+    {
+        Repeat = 0,
+        Clamp,
+        Mirror,
+        MirrorOnce,
+        Border
+    }
+
+    public enum TextureComparisonFunction : byte
+    {
+        Never = 0,
+        Always,
+        Less,
+        LessEqual,
+        Greater,
+        GreaterEqual,
+        Equal,
+        NotEqual
     }
 }

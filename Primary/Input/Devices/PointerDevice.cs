@@ -24,9 +24,9 @@ namespace Primary.Input.Devices
                 MouseButton button = TranslateButton(@event.button.Button);
                 if (button != MouseButton.Unknown)
                 {
-                    if (!Flags.HasFlag(_states[(int)button - 1], ButtonState.Held))
+                    if (!Flags.HasFlag(_states[(int)button], ButtonState.Held))
                     {
-                        _states[(int)button - 1] |= ButtonState.Held | ButtonState.Updated;
+                        _states[(int)button] |= ButtonState.Held | ButtonState.Updated;
                         return true;
                     }
                 }
@@ -36,9 +36,9 @@ namespace Primary.Input.Devices
                 MouseButton button = TranslateButton(@event.button.Button);
                 if (button != MouseButton.Unknown)
                 {
-                    if (Flags.HasFlag(_states[(int)button - 1], ButtonState.Held))
+                    if (Flags.HasFlag(_states[(int)button], ButtonState.Held))
                     {
-                        _states[(int)button - 1] = ButtonState.Updated;
+                        _states[(int)button] = ButtonState.Updated;
                         return true;
                     }
                 }
@@ -95,16 +95,16 @@ namespace Primary.Input.Devices
             ValueCode code = new ValueCode(valueId);
             switch (code.Type)
             {
-                case CodeType.Button: return new DeviceValue(Flags.HasFlag(_states[(int)code.Button - 1], ButtonState.Held));
+                case CodeType.Button: return new DeviceValue(Flags.HasFlag(_states[(int)code.Button], ButtonState.Held));
                 case CodeType.Motion: return new DeviceValue(_mouseDelta);
                 case CodeType.Wheel: return new DeviceValue(_wheelDelta);
                 default: return default;
             }
         }
 
-        public bool IsButtonHeld(MouseButton button) => Flags.HasFlag(_states[(int)button - 1], ButtonState.Held);
-        public bool IsButtonPressed(MouseButton button) => Flags.HasFlag(_states[(int)button - 1], ButtonState.Held | ButtonState.Updated);
-        public bool IsButtonReleased(MouseButton button) => Flags.HasFlag(_states[(int)button - 1], ButtonState.Updated);
+        public bool IsButtonHeld(MouseButton button) => Flags.HasFlag(_states[(int)button], ButtonState.Held);
+        public bool IsButtonPressed(MouseButton button) => Flags.HasFlag(_states[(int)button], ButtonState.Held | ButtonState.Updated);
+        public bool IsButtonReleased(MouseButton button) => Flags.HasFlag(_states[(int)button], ButtonState.Updated);
 
         public Vector2 MousePosition => _mousePosition;
         public Vector2 MouseDelta => _mouseDelta;
@@ -152,9 +152,9 @@ namespace Primary.Input.Devices
 
     public enum MouseButton : byte
     {
-        Unknown = 0,
+        Unknown = 255,
 
-        Left,
+        Left = 0,
         Middle,
         Right
     }

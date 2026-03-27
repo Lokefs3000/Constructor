@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Layout>
+	<Stylesheet Path="Editor/UI/Default.style" />
+	<Stylesheet Path="Editor/Designer/Base.style" />
+	
+	<Window>
+		<!--<MenuBar Size="1.0 0 0.0 28">
+			<MenuItem Text="File">
+				<MenuItem Text="New">
+					<MenuItem Text="Layout" />
+					<MenuItem Text="Stylesheet" />
+				</MenuItem>
+				<MenuItem Text="Open" />
+				<MenuItem Text="Save" />
+				<MenuItem Text="Save as" />
+			</MenuItem>
+		</MenuBar>-->
+		<SplitContainer Position="0.0 0 0.0 28" Size="1.0 0 1.0 -28">
+			<SplitPanel Position="0.15" Direction="Vertical">
+				<SplitPanel Position="0.333" Direction="Horizontal">
+					<Frame Size="1.0 0 0.0 26" BackgroundColor="#4f4f4f" StrokeColor="#1b1b1b" StrokeWeight="1" CornerRadius="3">
+						<Label Class=".Italic" Position="0.0 3 0.5 0" Anchor="0.0 0.5" AutoSize="FitBoundsToText" FontSize="0.75" TextColor="#dddddd" Text="Add/Create stylesheet.." />
+						<Button Position="1.0 -3 0.0 3" Size="0.0 20 0.0 20" Anchor="1.0 0.0">
+							<Image IsActive="False" Size="1.0 0 1.0 0" Image="Editor/Designer/Icons/StylesheetIcons.png" UVMax="0.5 1.0" />
+						</Button>
+						<Button Position="1.0 -27 0.0 3" Size="0.0 20 0.0 20" Anchor="1.0 0.0">
+							<Image IsActive="False" Size="1.0 0 1.0 0" Image="Editor/Designer/Icons/StylesheetIcons.png" UVMin="0.5 0.0" />
+						</Button>
+					</Frame>
+				</SplitPanel>
+				<SplitPanel Position="0.667" Direction="Horizontal">
+					<TreeView Id="Hierchy" Size="1.0 0 1.0 0" />
+				</SplitPanel>
+				<SplitPanel Id="ToolboxOwner" Position="1.0" Direction="Horizontal">
+					<FlowLayout Padding="0.0 2 0.0 2" />
+				</SplitPanel>
+			</SplitPanel>
+			<SplitPanel Position="0.7" Direction="Vertical" BackgroundColor="#151515">
+				<Canvas Id="MainView" Size="1.0 0 1.0 0" ClientOffset="100.0 100.0" BackgroundColor="#00000000">
+					<Element Id="Interaction" />
+					<Image Id="ViewGrid" IsActive="False" Size="1.0 0 1.0 0" TintColor="255 255 255 20" Image="Editor/Designer/Icons/Grid.png" />
+				</Canvas>
+			</SplitPanel>
+			<SplitPanel Position="1.0" Direction="Vertical">
+				
+			</SplitPanel>
+		</SplitContainer>
+	</Window>
+</Layout>

@@ -18,7 +18,10 @@ using static TerraFX.Interop.DirectX.D3D12_RESOURCE_HEAP_TIER;
 using static TerraFX.Interop.DirectX.DXGI;
 using static TerraFX.Interop.DirectX.DXGI_GPU_PREFERENCE;
 using static TerraFX.Interop.DirectX.D3D12_MESSAGE_ID;
+using static TerraFX.Interop.DirectX.DXGI_MEMORY_SEGMENT_GROUP;
 using D3D12MA = Interop.D3D12MemAlloc;
+using Primary.Common;
+using System.Globalization;
 
 namespace Primary.RHI2.Direct3D12
 {
@@ -26,6 +29,11 @@ namespace Primary.RHI2.Direct3D12
     public unsafe sealed class D3D12RHIDevice : RHIDevice
     {
         private ILogger? _logger;
+
+        private CancellationTokenSource _videoBudgetCts;
+        private HANDLE _videoBudgetChangeEvent;
+        private Thread _videoBudgetThread;
+        private uint _videoBudgetChangeCookie;
 
         private ComPtr<IDXGIFactory7> _factory;
         private ComPtr<IDXGIAdapter4> _adapter;
@@ -77,6 +85,25 @@ namespace Primary.RHI2.Direct3D12
                 if (hr.FAILED)
                 {
                     throw new RHIException($"Failed to enumerate for a valid DXGI adapter: {hr.ToString()}");
+                }
+            }
+
+            //Video budget
+            fixed (uint* cookie = &_videoBudgetChangeCookie)
+            {
+                _videoBudgetCts = new CancellationTokenSource();
+                _videoBudgetChangeEvent = Windows.CreateEventA(null, false, true, null);
+                _videoBudgetThread = new Thread(VideoBudgetThreadProc) { IsBackground = true };
+                _videoBudgetChangeCookie = 0;
+
+                HRESULT hr = _adapter.Get()->RegisterVideoMemoryBudgetChangeNotificationEvent(_videoBudgetChangeEvent, cookie);
+                if (hr.SUCCEEDED)
+                {
+                    _videoBudgetThread.Start();
+                }
+                else
+                {
+                    logger?.Warning("Failed to register event for a video memory budget change event");
                 }
             }
 
@@ -247,6 +274,16 @@ namespace Primary.RHI2.Direct3D12
         {
             if (!_disposedValue)
             {
+                if (_videoBudgetThread.ThreadState == ThreadState.Running)
+                {
+                    _adapter.Get()->UnregisterVideoMemoryBudgetChangeNotification(_videoBudgetChangeCookie);
+                    _videoBudgetCts.Cancel();
+
+                    Windows.SetEvent(_videoBudgetChangeEvent);
+
+                    _videoBudgetThread.Join();
+                }
+
                 _frameIndex = ulong.MaxValue;
                 HandlePendingUpdates();
 
@@ -269,6 +306,9 @@ namespace Primary.RHI2.Direct3D12
 
                 _device.Reset();
                 _debug.Reset();
+
+                Windows.CloseHandle(_videoBudgetChangeEvent);
+                _videoBudgetCts.Dispose();
 
                 _adapter.Reset();
                 _factory.Reset();
@@ -310,7 +350,7 @@ namespace Primary.RHI2.Direct3D12
             return buffer;
         }
 
-        public override RHITexture? CreateTexture(in RHITextureDescription description, Span<nint> planeSlices, [CallerMemberName] string? debugName = "")
+        public override RHITexture? CreateTexture(in RHITextureDescription description, Span<ArrayPtr> planeSlices, [CallerMemberName] string? debugName = "")
         {
             if (!TextureValidator.Validate(in description, _logger, debugName))
                 return null;
@@ -322,7 +362,7 @@ namespace Primary.RHI2.Direct3D12
             if (!planeSlices.IsEmpty)
             {
                 for (int i = 0; i < planeSlices.Length; ++i)
-                    _uploadManager.AddTextureUpload(texture, planeSlices[i], (uint)i, description.Width / (i + 1) * RHIFormatInfo.Query(description.Format).BytesPerPixel);
+                    _uploadManager.AddTextureUpload(texture, planeSlices[i], (uint)i, (int)RHIFormatInfo.Query(description.Format).CalculatePitch(description.Width / (1 << i)));
             }
             return texture;
         }
@@ -426,6 +466,32 @@ namespace Primary.RHI2.Direct3D12
             _pendingFreeCallbacks.Enqueue((callback, _frameIndex + 1));
         }
 
+        private void VideoBudgetThreadProc()
+        {
+            Windows.WaitForSingleObject(_videoBudgetChangeEvent, Windows.INFINITE);
+
+            while (!_videoBudgetCts.IsCancellationRequested)
+            {
+                DXGI_QUERY_VIDEO_MEMORY_INFO queryResult = default;
+                HRESULT hr = _adapter.Get()->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &queryResult);
+
+                if (hr.FAILED)
+                {
+                    _logger?.Debug("Failed to query for new video memory info!");
+                }
+                else
+                {
+                    _logger?.Debug("New video memory budget:\n    Budget: {v1}\n    Current usage: {v2}\n    Available for reservation: {v3}\n    Current reservation: {v4}",
+                        FileUtility.FormatSize((long)queryResult.Budget, "f1", CultureInfo.InvariantCulture),
+                        FileUtility.FormatSize((long)queryResult.CurrentUsage, "f1", CultureInfo.InvariantCulture),
+                        FileUtility.FormatSize((long)queryResult.AvailableForReservation, "f1", CultureInfo.InvariantCulture),
+                        FileUtility.FormatSize((long)queryResult.CurrentReservation, "f1", CultureInfo.InvariantCulture));
+                }
+
+                Windows.WaitForSingleObject(_videoBudgetChangeEvent, Windows.INFINITE);
+            }
+        }
+
         public override unsafe RHIDeviceNative* GetAsNative() => (RHIDeviceNative*)_nativeRep;
 
         public ILogger? Logger => _logger;
@@ -440,7 +506,7 @@ namespace Primary.RHI2.Direct3D12
         public ComPtr<ID3D12CommandQueue> CopyCmdQueue => _copyCmdQueue.Get();
 
         public bool HasPendingUploads => _uploadManager.HasPendingUploads;
-        
+
         internal UploadManager UploadManager => _uploadManager;
 
         public override RHIDeviceAPI DeviceAPI => RHIDeviceAPI.Direct3D12;

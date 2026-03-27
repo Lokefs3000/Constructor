@@ -53,6 +53,14 @@ namespace Primary.Common
             return Vector128.LessThanOrEqualAll(b, a);
         }
 
+        public Boundaries Grow(Vector2 amount)
+        {
+            Vector128<float> growVector = new Boundaries(-amount, amount).AsVector128();
+            Vector128<float> minMaxVector = AsVector128();
+
+            return new Boundaries(minMaxVector + growVector);
+        }
+
         public bool Equals(Boundaries other)
         {
             return Vector128.EqualsAll(AsVector128(), other.AsVector128());
@@ -79,7 +87,7 @@ namespace Primary.Common
             return new Boundaries(Vector128.Add(boundaries.AsVector128(), Vector128.Create(offset.X, offset.Y, offset.X, offset.Y)));
         }
 
-        public static Boundaries Combine(Boundaries a, Boundaries b)
+        public static Boundaries Union(Boundaries a, Boundaries b)
         {
             Vector128<float> aVector = new Boundaries(a.Minimum, -a.Maximum).AsVector128();
             Vector128<float> bVector = new Boundaries(b.Minimum, -b.Maximum).AsVector128();

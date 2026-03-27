@@ -17,6 +17,8 @@ namespace Editor.Shaders.Processors
         private readonly ShaderProcessor _processor;
         private readonly ShaderData _data;
 
+        private List<char[]> _structFunctions;
+
         private bool _encounteredErrors;
 
         private string _diagFile;
@@ -26,6 +28,8 @@ namespace Editor.Shaders.Processors
             _processor = processor;
             _data = data;
 
+            _structFunctions = new List<char[]>();
+
             _encounteredErrors = false;
 
             _diagFile = sourceFileName;
@@ -33,6 +37,8 @@ namespace Editor.Shaders.Processors
 
         internal string? Augment(string orignalSource, int primaryFunctionIndex)
         {
+            _structFunctions.Clear();
+
             using RentedArray<char> augment = RentedArray<char>.Rent(orignalSource.Length);
             orignalSource.CopyTo(augment.Span);
 
@@ -119,6 +125,11 @@ namespace Editor.Shaders.Processors
 
             foreach (ref readonly StructData @struct in _data.Structs)
             {
+                foreach (FunctionData function in @struct.Functions)
+                {
+                    _structFunctions.Add(source.Slice(function.DeclerationRange.Start, function.DeclerationRange.Length).ToArray());
+                }
+
                 for (int i = @struct.DeclerationRange.Start; i < @struct.DeclerationRange.End; i++)
                 {
                     if (!char.IsWhiteSpace(source[i]))
@@ -171,6 +182,8 @@ namespace Editor.Shaders.Processors
 
         private void RegenerateStructs(StringBuilder sb)
         {
+            int funcIdx = 0;
+
             foreach (ref readonly StructData @struct in _data.Structs)
             {
                 sb.Append("struct ");
@@ -196,6 +209,18 @@ namespace Editor.Shaders.Processors
                     }
 
                     sb.AppendLine(";");
+                }
+
+                if (@struct.Functions.Length > 0)
+                {
+                    foreach (ref readonly FunctionData funcData in @struct.Functions.AsSpan())
+                    {
+                        sb.AppendLine();
+                        sb.Append("    ");
+                        sb.Append(_structFunctions[funcIdx++]);
+                    }
+
+                    sb.AppendLine();
                 }
 
                 sb.AppendLine("};");
@@ -600,7 +625,9 @@ namespace Editor.Shaders.Processors
             Dictionary<string, int> bindGroupIndices = new Dictionary<string, int>();
 
             int offset = 0;
-            int i = 0;
+
+            int resId = 0;
+            int propId = 0;
 
             foreach (ref readonly ResourceData resource in _data.Resources)
             {
@@ -630,12 +657,18 @@ namespace Editor.Shaders.Processors
                             bindGroupIndices.Add(bg.Name, bindGroup);
                         }
                     }
+                    //else if (attribute.Signature is AttributeProperty)
+                    //{
+                    //    usage = RawVariableUsage.Property;
+                    //    features |= HeaderFeatures.HasProperties;
+                    //}
                 }
 
-                variableDatas[offset++] = new RawVariableData(RawVariableDataType.Resource, usage, i++, resource.Name, bindGroup, resource.Value);
+                if (usage == RawVariableUsage.Property)
+                    variableDatas[offset++] = new RawVariableData(RawVariableDataType.Property, usage, propId++, resource.Name, bindGroup, resource.Value);
+                else
+                    variableDatas[offset++] = new RawVariableData(RawVariableDataType.Resource, usage, resId++, resource.Name, bindGroup, resource.Value);
             }
-
-            i = 0;
 
             foreach (ref readonly PropertyData property in _data.Properties)
             {
@@ -663,7 +696,7 @@ namespace Editor.Shaders.Processors
 
                 if (usage == RawVariableUsage.Property)
                     features |= HeaderFeatures.HasProperties;
-                variableDatas[offset++] = new RawVariableData(RawVariableDataType.Property, usage, i++, property.Name, bindGroup, property.Generic);
+                variableDatas[offset++] = new RawVariableData(RawVariableDataType.Property, usage, propId++, property.Name, bindGroup, property.Generic);
             }
 
             variableDatas.Sort();
@@ -898,7 +931,10 @@ namespace Editor.Shaders.Processors
             "float",
             "double",
             "int",
-            "uint"
+            "uint",
+            "float16_t",
+            "int16_t",
+            "uint16_t"
             ];
 
         private readonly record struct RawVariableData(RawVariableDataType Type, RawVariableUsage Usage, int Index, string Name, int BindGroup, ValueDataRef Generic) : IComparable<RawVariableData>

@@ -1,47 +1,50 @@
 #include "../Shared.hlsl2"
 #include "../SDF.hlsl"
 
-#define EPSILON 0.00000001
-
 struct CircleMetadata
 {
-    float InfillRadius;
+    uint16_t HasStroke;
+    
+    float16_t4 Color;
+    uint16_t ZIndex;
+
+    float16_t Radius;
+
+    uint16_t __pad;
 };
 
 [vertex]
 DefaultPsInput VertexMain(VsInput input)
 {
-    input.MetadataOffset += cbGlobals.MetadataOffset;
-
+    CircleMetadata metadata = baMetadata.Load<CircleMetadata>(input.MetadataOffset);
     DefaultPsInput output =
     {
-        mul(cbGlobals.Model, float4(input.Position, 0.0, 1.0)),
-        input.UV,
-        input.Color,
+        float4(mul(transpose(cbGlobals.Model), float3(input.Position, 1.0)), metadata.ZIndex * 0.01, 1.0),
+        input.UV * 2.0 - float(metadata.Radius),
+        metadata.Color,
 
-        input.MetadataOffset
+        input.MetadataOffset | (uint(metadata.HasStroke) << 31)
     };
-	
+    
     return output;
 }
 
 [pixel]
 float4 PixelMain(DefaultPsInput input) : SV_Target
 {
-    CircleMetadata metadata = baMetadata.Load<CircleMetadata>(input.MetadataOffset);
+    CircleMetadata metadata = baMetadata.Load<CircleMetadata>(input.GetMetadataOffset());
 
-    [branch]
-    if (input.Color.a < 0.0)
+    float dist = sdCircle(input.UV, metadata.Radius);
+    if (input.HasStroke())
     {
-        input.Color = txGradients.Sample(ssDefaultLinear, input.Color.xy);
+        StrokeMetadata stroke = baMetadata.Load<StrokeMetadata>(input.GetMetadataOffset() + sizeof(CircleMetadata));
+
+        float innerDist = sdCircle(input.UV, metadata.Radius - stroke.Width);
+        float subtraction = opSubtraction(innerDist, dist);
+
+        float4 color = lerp(stroke.Color, input.Color, subtraction);
+        return float4(color.rgb, color.a * SmoothSDF(dist));
     }
 
-    [branch]
-    if (metadata.InfillRadius > EPSILON)
-    {
-        return float4(input.Color.rgb, input.Color.a * -sign(sdCircle(input.UV, 1.0)));
-    }
-
-    float d1 = opSubtraction(sdCircle(input.UV, 1.0), sdCircle(input.UV, metadata.InfillRadius));
-    return float4(input.Color.rgb, input.Color.a * -sign(d1));
+    return float4(input.Color.rgb, float(input.Color.a) * SmoothSDF(dist));
 }

@@ -1,15 +1,17 @@
-﻿using Editor.Processors;
+﻿using CommunityToolkit.HighPerformance;
+using Editor.Processors.Texture;
 using Editor.Storage;
 using Primary.Assets;
 using Primary.Assets.Loaders;
 using Primary.Assets.Types;
+using Primary.Collections;
 using Primary.Common;
+using Primary.Serialization.Toml;
 using Primary.Utility;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Tomlyn;
-using Tomlyn.Model;
-using TextureSwizzleChannel = Editor.Processors.TextureSwizzleChannel;
 
 namespace Editor.Assets.Importers
 {
@@ -17,7 +19,7 @@ namespace Editor.Assets.Importers
     {
         public TextureAssetImporter()
         {
-            TextureProcessor.Logger = EdLog.Assets;
+
         }
 
         public void Dispose()
@@ -28,78 +30,74 @@ namespace Editor.Assets.Importers
         public bool Import(AssetPipeline pipeline, ProjectSubFilesystem filesystem, string fullFilePath, string outputFilePath, string localOutputFile)
         {
             string localInputFile = fullFilePath.Substring(filesystem.AbsolutePath.Length);
+            filesystem.RemapFile(localInputFile, null);
 
             AssetId id = pipeline.Identifier.GetOrRegisterAsset(localInputFile);
-            pipeline.Associator.ClearAssocations(id);
 
-            bool hasLocalConfig = false;
-            string configFile = pipeline.Configuration.GetFilePath(localInputFile, "Texture");
-            if (!File.Exists(configFile))
+            using Stream? outputStream = FileUtility.TryWaitOpenNoThrow(outputFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            if (outputStream == null)
             {
-                configFile = Path.ChangeExtension(fullFilePath, ".toml");
-                hasLocalConfig = true;
-                if (!File.Exists(configFile))
-                    return false;
-
-                AssetId configId = pipeline.Identifier.GetOrRegisterAsset(Path.ChangeExtension(localInputFile, ".toml"));
-                pipeline.Associator.MakeAssocations(id, new ReadOnlySpan<AssetId>(in configId));
+                throw new HiddenException();
             }
 
-            string[]? fileAssociations = Array.Empty<string>();
+            string? configFile = null;
+            bool isLocal = false;
 
-            TextureProcessorArgs args =
-                ReadTomlDocument(Toml.ToModel<TomlTable>(File.ReadAllText(configFile), localInputFile));
-
-            TextureCompositeArgs? compositeArgs = null;
-            TextureCubemapArgs? cubemapArgs = null;
-
+            TextureConfiguration config;
             if (fullFilePath.EndsWith(".texcomp"))
             {
-                compositeArgs = ReadCompositeDocument(Toml.ToModel<TomlTable>(File.ReadAllText(fullFilePath), localInputFile));
-                TextureCompositeArgs comp = compositeArgs.Value;
+                string? sourceText = filesystem.ReadString(localInputFile);
+                if (sourceText == null)
+                {
+                    EdLog.Assets.Error("[{p}]: Failed to read composite texture configuration", localInputFile);
+                    throw new HiddenException();
+                }
 
-                args.Sources = new TextureProcessorArgs.Source[int.PopCount((int)comp.Channels & 0xf)];
-                AssetId[] additionalSources = new AssetId[args.Sources.Length];
+                try
+                {
+                    config = TomlSerializer.Deserialize<CompositeConfiguration>(sourceText, s_tomlOptions)
+                        ?? throw new NullReferenceException("Deserialize returned null");
+                }
+                catch (TomlException ex)
+                {
+                    EdLog.Assets.Error(ex, "[{p}]: Error occured parsing composite texture configuration", localInputFile);
+                    throw new HiddenException();
+                }
+                catch (Exception ex)
+                {
+                    EdLog.Assets.Error(ex, "[{p}]: Unhandled exception occured parsing compsite texture configuration", localInputFile);
+                    throw new HiddenException();
+                }
 
+                CompositeConfiguration composite = Unsafe.As<CompositeConfiguration>(config);
+
+                if (composite.CompositeInfo.Channels == TextureCompositeChannel.None)
+                {
+                    EdLog.Assets.Error("[{p}]: No channels specified for composite texture", localInputFile);
+                    throw new HiddenException();
+                }
+
+                AssetId[] additionalSources = new AssetId[int.PopCount((int)composite.CompositeInfo.Channels)];
                 for (int i = 0, j = 0; i < 4; i++)
                 {
-                    if (Flags.HasFlag(comp.Channels, (TextureCompositeChannel)(1 << i)))
+                    if (Flags.HasFlag(composite.CompositeInfo.Channels, (TextureCompositeChannel)(1 << i)))
                     {
-                        TextureCompositeChannelArgs channelArgs = default;
-
-                        switch (i)
+                        CompositeConfiguration.CompsiteChannel channel = i switch
                         {
-                            case 0: channelArgs = comp.Red; break;
-                            case 1: channelArgs = comp.Green; break;
-                            case 2: channelArgs = comp.Blue; break;
-                            case 3: channelArgs = comp.Alpha; break;
-                        }
-
-                        string? path = pipeline.Identifier.RetrievePathForId(channelArgs.Asset);
-                        if (path == null)
-                        {
-                            EdLog.Assets.Error("Failed to find asset required for composite texture: {a}", channelArgs.Asset);
-                            return false;
-                        }
-
-                        ProjectSubFilesystem? newFilesystem = AssetPipeline.SelectAppropriateFilesystem(AssetPipeline.GetFileNamespace(path));
-                        Debug.Assert(newFilesystem != null);
-
-                        args.Sources[j] = new TextureProcessorArgs.Source
-                        {
-                            AbsoluteFilepath = newFilesystem.GetFullPath(path),
-                            Channel = channelArgs.Source switch
-                            {
-                                TextureCompositeChannel.Red => TextureSwizzleChannel.R,
-                                TextureCompositeChannel.Green => TextureSwizzleChannel.G,
-                                TextureCompositeChannel.Blue => TextureSwizzleChannel.B,
-                                TextureCompositeChannel.Alpha => TextureSwizzleChannel.A,
-                                _ => TextureSwizzleChannel.R
-                            },
+                            0 => composite.CompositeInfo.Red,
+                            1 => composite.CompositeInfo.Green,
+                            2 => composite.CompositeInfo.Blue,
+                            3 => composite.CompositeInfo.Alpha,
+                            _ => default
                         };
-                        additionalSources[j] = channelArgs.Asset;
 
-                        j++;
+                        if (!pipeline.Identifier.IsIdValid(channel.Asset))
+                        {
+                            EdLog.Assets.Error("[{p}]: Composite channel id is not valid: {id} ({ch})", channel.Asset, (TextureCompositeChannel)(1 << i));
+                            throw new HiddenException();
+                        }
+
+                        additionalSources[j++] = channel.Asset;
                     }
                 }
 
@@ -107,244 +105,289 @@ namespace Editor.Assets.Importers
             }
             else if (fullFilePath.EndsWith(".cubemap"))
             {
-                cubemapArgs = ReadCubemapDocument(Toml.ToModel<TomlTable>(File.ReadAllText(fullFilePath), localInputFile));
-                TextureCubemapArgs cubemap = cubemapArgs.Value;
-
-                args.Sources = new TextureProcessorArgs.Source[6];
-                AssetId[] additionalSources = [cubemap.PositiveX, cubemap.NegativeX, cubemap.PositiveY,
-                                               cubemap.NegativeY, cubemap.PositiveZ, cubemap.NegativeZ];
-
-                for (int i = 0; i < additionalSources.Length; i++)
+                string? sourceText = filesystem.ReadString(localInputFile);
+                if (sourceText == null)
                 {
-                    string? path = pipeline.Identifier.RetrievePathForId(additionalSources[i]);
-                    if (path == null)
-                    {
-                        EdLog.Assets.Error("Failed to find asset required for cubemap texture: {a}", additionalSources[i]);
-                        return false;
-                    }
-
-                    ProjectSubFilesystem? newFilesystem = AssetPipeline.SelectAppropriateFilesystem(AssetPipeline.GetFileNamespace(path));
-                    Debug.Assert(newFilesystem != null);
-
-                    additionalSources[i] = additionalSources[i];
-                    args.Sources[i] = new TextureProcessorArgs.Source
-                    {
-                        AbsoluteFilepath = newFilesystem.GetFullPath(path),
-                    };
+                    EdLog.Assets.Error("[{p}]: Failed to read cubemap texture configuration", localInputFile);
+                    throw new HiddenException();
                 }
 
-                pipeline.Associator.MakeAssocations(id, additionalSources);
-                args.ImageType = TextureImageType.Cubemap;
+                try
+                {
+                    config = TomlSerializer.Deserialize<CubemapConfiguration>(sourceText, s_tomlOptions)
+                        ?? throw new NullReferenceException("Deserialize returned null");
+                }
+                catch (TomlException ex)
+                {
+                    EdLog.Assets.Error(ex, "[{p}]: Error occured parsing cubemap texture configuration", localInputFile);
+                    throw new HiddenException();
+                }
+                catch (Exception ex)
+                {
+                    EdLog.Assets.Error(ex, "[{p}]: Unhandled exception occured parsing cubemap texture configuration", localInputFile);
+                    throw new HiddenException();
+                }
+
+                CubemapConfiguration cubemap = Unsafe.As<CubemapConfiguration>(config);
+
+                if (cubemap.CubemapInfo.Source == TextureCubemapSource.Composited)
+                {
+                    CubemapConfiguration.Composited composited = cubemap.CompositedInfo;
+
+                    AssetId[] additionalSources = [composited.PositiveX, composited.NegativeX, composited.PositiveY,
+                                                   composited.NegativeY, composited.PositiveZ, composited.NegativeZ];
+
+                    for (int i = 0; i < additionalSources.Length; ++i)
+                    {
+                        if (!pipeline.Identifier.IsIdValid(additionalSources[i]))
+                        {
+                            string faceName = i switch
+                            {
+                                0 => "X+",
+                                1 => "X-",
+                                2 => "Y+",
+                                3 => "Y-",
+                                4 => "Z+",
+                                5 => "Z-",
+                                _ => string.Empty
+                            };
+
+                            EdLog.Assets.Error("[{p}]: Cubemap composited face id is not valid: {id} ({ch})", additionalSources[i], faceName);
+                            throw new HiddenException();
+                        }
+                    }
+
+                    pipeline.Associator.MakeAssocations(id, additionalSources);
+                }
             }
             else
             {
-                args.Sources = [new TextureProcessorArgs.Source { AbsoluteFilepath = fullFilePath }];
+                configFile = pipeline.Configuration.GetFilePathOrLocal(localInputFile, "Texture", out isLocal);
+                if (configFile == null)
+                {
+                    return false;
+                }
+
+                string? sourceText = filesystem.ReadString(configFile);
+                if (sourceText == null)
+                {
+                    EdLog.Assets.Error("[{p}]: Failed to read texture configuration", localInputFile);
+                    throw new HiddenException();
+                }
+
+                try
+                {
+                    config = TomlSerializer.Deserialize<TextureConfiguration>(sourceText, s_tomlOptions)
+                        ?? throw new NullReferenceException("Deserialize returned null");
+                }
+                catch (TomlException ex)
+                {
+                    EdLog.Assets.Error(ex, "[{p}]: Error occured parsing texture configuration", localInputFile);
+                    throw new HiddenException();
+                }
+                catch (Exception ex)
+                {
+                    EdLog.Assets.Error(ex, "[{p}]: Unhandled exception occured parsing texture configuration", localInputFile);
+                    throw new HiddenException();
+                }
             }
 
-            args.Logger = EdLog.Assets;
-            args.AbsoluteOutputPath = outputFilePath;
+            config.DefaultId = id;
+            config.IdProvider = pipeline.Identifier;
 
-            bool r = new TextureProcessor().Execute(args, compositeArgs, cubemapArgs);
+            outputStream.Write(new TextureHeader());
+            outputStream.Write(new TextureSampler());
 
-            if (!r)
+            ProcessedTextureData textureData = TextureProcessor.Execute(config, outputStream);
+
+            outputStream.Seek(0, SeekOrigin.Begin);
+            outputStream.Write(new TextureHeader
             {
-                EdLog.Assets.Error("Failed to import texture: {local}", fullFilePath.Substring(Editor.GlobalSingleton.ProjectPath.Length));
-                return false;
+                FileHeader = TextureHeader.Header,
+                FileVersion = TextureHeader.Version,
+
+                Width = (ushort)textureData.Width,
+                Height = (ushort)textureData.Height,
+                Depth = 1,
+
+                Format = FormatToFileEquivalent(textureData.Format),
+                Flags = (config is CubemapConfiguration) ? TextureFlags.Cubemap : TextureFlags.None,
+
+                MipLevels = (ushort)textureData.MipCount,
+                ArraySize = (ushort)textureData.ArraySize
+            });
+
+            outputStream.Write(new TextureSampler
+            {
+                Swizzle = textureData.Swizzle,
+
+                ReductionType = config.VisualInfo.ReductionType,
+                MinFilter = config.VisualInfo.MinFilter,
+                MagFilter = config.VisualInfo.MagFilter,
+                MipFilter = config.VisualInfo.MipFilter,
+
+                AddressModeU = config.VisualInfo.AddressModeU,
+                AddressModeV = config.VisualInfo.AddressModeV,
+                AddressModeW = config.VisualInfo.AddressModeW,
+
+                ComparisonFunction = config.VisualInfo.ComparisonFunction,
+
+                BorderColor = config.VisualInfo.BorderColor,
+
+                MipLODBias = config.VisualInfo.MipLODBias,
+                MinLOD = config.VisualInfo.MinLOD,
+                MaxLOD = config.VisualInfo.MaxLOD,
+
+                MaxAnisotropy = (byte)config.VisualInfo.MaxAnisotropy
+            });
+
+            {
+                if (config is CubemapConfiguration cubemap)
+                {
+                    using RentedList<AssetId> idList = new RentedList<AssetId>();
+
+                    if (cubemap.CubemapInfo.Source == TextureCubemapSource.Composited)
+                    {
+                        idList.Add(cubemap.CompositedInfo.PositiveX);
+                        idList.Add(cubemap.CompositedInfo.PositiveY);
+                        idList.Add(cubemap.CompositedInfo.PositiveZ);
+                        idList.Add(cubemap.CompositedInfo.NegativeX);
+                        idList.Add(cubemap.CompositedInfo.NegativeY);
+                        idList.Add(cubemap.CompositedInfo.NegativeZ);
+                    }
+
+                    if (isLocal)
+                    {
+                        AssetId configId = pipeline.Identifier.GetOrRegisterAsset(configFile);
+                        idList.Add(configId);
+                    }
+
+                    pipeline.Associator.MakeAssocations(id, idList.AsSpan(), true);
+                }
+                else if (config is CompositeConfiguration composite)
+                {
+                    using RentedList<AssetId> idList = new RentedList<AssetId>();
+
+                    if (Flags.HasFlag(composite.CompositeInfo.Channels, TextureCompositeChannel.Red))
+                        idList.Add(composite.CompositeInfo.Red.Asset);
+                    if (Flags.HasFlag(composite.CompositeInfo.Channels, TextureCompositeChannel.Green))
+                        idList.Add(composite.CompositeInfo.Green.Asset);
+                    if (Flags.HasFlag(composite.CompositeInfo.Channels, TextureCompositeChannel.Blue))
+                        idList.Add(composite.CompositeInfo.Blue.Asset);
+                    if (Flags.HasFlag(composite.CompositeInfo.Channels, TextureCompositeChannel.Alpha))
+                        idList.Add(composite.CompositeInfo.Alpha.Asset);
+
+                    if (isLocal)
+                    {
+                        AssetId configId = pipeline.Identifier.GetOrRegisterAsset(configFile);
+                        idList.Add(configId);
+                    }
+
+                    pipeline.Associator.MakeAssocations(id, idList.AsSpan(), true);
+                }
+                else
+                {
+                    if (isLocal)
+                    {
+                        AssetId configId = pipeline.Identifier.GetOrRegisterAsset(configFile);
+                        pipeline.Associator.MakeAssocations(id, new ReadOnlySpan<AssetId>(in configId), true);
+                    }
+                    else
+                        pipeline.Associator.ClearAssocations(id);
+                }
             }
 
             filesystem.RemapFile(localInputFile, localOutputFile);
             pipeline.ReloadAsset(id);
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<TextureAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localInputFile), localInputFile, true));
-            return true;
-        }
-
-        public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
-        {
-            using Stream? stream = filesystem.OpenStream(localFilePath);
-
-            if (stream == null)
-            {
-                return pipeline.Configuration.DoesFileHaveConfig(localFilePath, "Texture") || filesystem.Exists(Path.ChangeExtension(localFilePath, ".toml"));
-            }
-            if (stream.Length < Unsafe.SizeOf<TextureHeader>())
-                return false;
-
-            using BinaryReader br = new BinaryReader(stream);
-
-            TextureHeader header = br.Read<TextureHeader>();
-
-            if (header.FileHeader != TextureHeader.Header) return false;
-            if (header.FileVersion != TextureHeader.Version) return false;
-
-            if (header.Width > 16384) return false;
-            if (header.Height > 16384) return false;
-            if (header.Depth > 2048) return false;
-
+            AssetDatabase database = Editor.GlobalSingleton.AssetDatabase;
+            database.AddEntry<TextureAsset>(new AssetDatabaseEntry(id, localInputFile, true));
+            
             return true;
         }
 
         public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
         {
-            if (!ValidateFile(localFilePath, filesystem, pipeline))
-            {
-                Editor.GlobalSingleton.AssetDatabase.AddEntry<TextureAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, false));
-                return;
-            }
+            AssetDatabase database = Editor.GlobalSingleton.AssetDatabase;
+            AssetId id = pipeline.Identifier.GetOrRegisterAsset(localFilePath);
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<TextureAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, true));
+            database.AddEntry<TextureAsset>(new AssetDatabaseEntry(id, localFilePath, ValidateFile(localFilePath, filesystem, pipeline)));
         }
 
-        public static TextureProcessorArgs ReadTomlDocument(TomlTable doc)
+        public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
         {
-            TomlTable root = doc;
+            if (!filesystem.IsFileRemapped(localFilePath))
+                return false;
 
-            TomlArray swizzleArray = (TomlArray)root["swizzle"];
-
-            TextureProcessorArgs args = new TextureProcessorArgs
+            if (localFilePath.EndsWith(".texcomp"))
             {
-                ImageType = Enum.Parse<TextureImageType>((string)root["image_type"]),
-                ImageMetadata = new TextureProcessorArgs.Metadata(),
-
-                TextureSwizzle = new TextureProcessorArgs.Swizzle(
-                    Enum.Parse<TextureSwizzleChannel>((string)swizzleArray[0]!),
-                    Enum.Parse<TextureSwizzleChannel>((string)swizzleArray[1]!),
-                    Enum.Parse<TextureSwizzleChannel>((string)swizzleArray[2]!),
-                    Enum.Parse<TextureSwizzleChannel>((string)swizzleArray[3]!)),
-
-                ImageFormat = Enum.Parse<TextureImageFormat>((string)root["image_format"]),
-                AlphaSource = Enum.Parse<TextureAlphaSource>((string)root["alpha_source"]),
-
-                GammaCorrect = (bool)root["gamma_correct"],
-                PremultipliedAlpha = (bool)root["premultiplied_alpha"],
-
-                CutoutDither = (bool)root["cutout_dither"],
-                CutoutThreshold = (byte)(long)root["cutout_threshold"],
-
-                GenerateMipmaps = (bool)root["generate_mipmaps"],
-                ScaleAlphaForMipmaps = (bool)root["scale_alpha_for_mipmaps"],
-                MaxMipmapCount = (int)(long)root["max_mipmap_count"],
-                MinMipmapSize = (int)(long)root["min_mipmap_size"],
-                MipmapFilter = Enum.Parse<TextureMipmapFilter>((string)root["mipmap_filter"]),
-
-                FlipVertical = (bool)root["flip_vertical"]
-            };
-
-            switch (args.ImageType)
-            {
-                case TextureImageType.Normal:
-                    {
-                        TomlTable node = (TomlTable)root["normal"];
-                        ref TextureProcessorNormalArgs normalArgs = ref args.ImageMetadata.NormalArgs;
-
-                        normalArgs.Source = Enum.Parse<TextureNormalSource>((string)node["source"]);
-                        break;
-                    }
-                case TextureImageType.Specular:
-                    {
-                        TomlTable node = (TomlTable)root["specular"];
-                        ref TextureProcessorSpecularArgs specularArgs = ref args.ImageMetadata.SpecularArgs;
-
-                        specularArgs.Source = Enum.Parse<TextureSpecularSource>((string)node["source"]);
-                        break;
-                    }
+                string? sourceFile = filesystem.ReadString(localFilePath);
+                if (sourceFile == null)
+                    return false;
+                return TomlSerializer.TryDeserialize<CompositeConfiguration>(sourceFile, out _, s_tomlOptions);
             }
-
-            return args;
-        }
-
-        public static TextureCompositeArgs ReadCompositeDocument(TomlTable doc)
-        {
-            TomlTable root = doc;
-
-            TextureCompositeArgs args = new TextureCompositeArgs
+            else if (localFilePath.EndsWith(".cubemap"))
             {
-                Channels = (TextureCompositeChannel)(long)root["channels"],
-            };
-
-            if (Flags.HasFlag(args.Channels, TextureCompositeChannel.Red))
-                args.Red = ReadChannel((TomlTable)root["red"]);
-            else
-                args.Red = new TextureCompositeChannelArgs();
-
-            if (Flags.HasFlag(args.Channels, TextureCompositeChannel.Green))
-                args.Green = ReadChannel((TomlTable)root["green"]);
-            else
-                args.Green = new TextureCompositeChannelArgs();
-
-            if (Flags.HasFlag(args.Channels, TextureCompositeChannel.Blue))
-                args.Blue = ReadChannel((TomlTable)root["blue"]);
-            else
-                args.Blue = new TextureCompositeChannelArgs();
-
-            if (Flags.HasFlag(args.Channels, TextureCompositeChannel.Alpha))
-                args.Alpha = ReadChannel((TomlTable)root["alpha"]);
-            else
-                args.Alpha = new TextureCompositeChannelArgs();
-
-            return args;
-
-            static TextureCompositeChannelArgs ReadChannel(TomlTable table)
-            {
-                return new TextureCompositeChannelArgs
-                {
-                    Asset = (AssetId)(uint)(long)table["asset"],
-                    Source = Enum.Parse<TextureCompositeChannel>((string)table["source"]),
-                    Invert = (bool)table["invert"]
-                };
+                string? sourceFile = filesystem.ReadString(localFilePath);
+                if (sourceFile == null)
+                    return false;
+                return TomlSerializer.TryDeserialize<CubemapConfiguration>(sourceFile, out _, s_tomlOptions);
             }
-        }
-
-        public static TextureCubemapArgs ReadCubemapDocument(TomlTable doc)
-        {
-            TomlTable root = doc;
-
-            return new TextureCubemapArgs
+            else
             {
-                Source = Enum.Parse<TextureCubemapSource>((string)root["source"]),
+                using Stream? stream = filesystem.OpenStream(localFilePath);
 
-                PositiveX = (AssetId)(uint)(long)root["positive_x"],
-                PositiveY = (AssetId)(uint)(long)root["positive_y"],
-                PositiveZ = (AssetId)(uint)(long)root["positive_z"],
+                if (stream == null || stream.Length < Unsafe.SizeOf<TextureHeader>())
+                    return false;
 
-                NegativeX = (AssetId)(uint)(long)root["negative_x"],
-                NegativeY = (AssetId)(uint)(long)root["negative_y"],
-                NegativeZ = (AssetId)(uint)(long)root["negative_z"],
-            };
+                TextureHeader header = stream.Read<TextureHeader>();
+
+                if (header.FileHeader != TextureHeader.Header) return false;
+                if (header.FileVersion != TextureHeader.Version) return false;
+
+                if (header.Width > 16384) return false;
+                if (header.Height > 16384) return false;
+                if (header.Depth > 2048) return false;
+
+                return true;
+            }
         }
 
         public string CustomFileIcon => "Editor/Textures/Icons/FileTexture.png";
 
-        private const string DefaultTomlContents = @"
-flip_vertical = false
-image_format = ""BC1""
-cutout_dither = false
-cutout_threshold = 127
-gamma_correct = false
-premultiplied_alpha = false
-mipmap_filter = ""Box""
-max_mipmap_count = 2147483647
-min_mipmap_size = 1
-generate_mipmaps = false
-image_type = ""Colormap""
-scale_alpha_for_mipmaps = false
-";
-
-        private class TextureConfig
+        private static TextureFormat FormatToFileEquivalent(TextureImageFormat format) => format switch
         {
-            public TextureImageType ImageType { get; set; }
+            TextureImageFormat.BC7 => TextureFormat.BC7,
+            TextureImageFormat.BC6s => TextureFormat.BC6s,
+            TextureImageFormat.BC6u => TextureFormat.BC6u,
+            TextureImageFormat.BC5u => TextureFormat.BC5u,
+            TextureImageFormat.BC4u => TextureFormat.BC4u,
+            TextureImageFormat.BC3 => TextureFormat.BC3,
+            TextureImageFormat.BC3n => TextureFormat.BC3n,
+            TextureImageFormat.BC2 => TextureFormat.BC2,
+            TextureImageFormat.BC1a => TextureFormat.BC1a,
+            TextureImageFormat.BC1 => TextureFormat.BC1,
+            TextureImageFormat.R8a => TextureFormat.R8a,
+            TextureImageFormat.RG8 => TextureFormat.RG8,
+            TextureImageFormat.RGB8 => TextureFormat.RGB8,
+            TextureImageFormat.RGBA8 => TextureFormat.RGBA8,
+            TextureImageFormat.R16 => TextureFormat.R16,
+            TextureImageFormat.RG16 => TextureFormat.RG16,
+            TextureImageFormat.RGBA16 => TextureFormat.RGBA16,
+            TextureImageFormat.R32 => TextureFormat.R32,
+            TextureImageFormat.RG32 => TextureFormat.RG32,
+            TextureImageFormat.RGBA32 => TextureFormat.RGBA32,
+            _ => throw new NotImplementedException(format.ToString()),
+        };
 
-            public bool FlipVertical { get; set; }
-            public TextureImageFormat ImageFormat { get; set; }
-            public bool CutoutDither { get; set; }
-            public byte CutoutThreshold { get; set; }
-            public bool GammaCorrect { get; set; }
-            public bool PremultipliedAlpha { get; set; }
-            public TextureMipmapFilter MipmapFilter { get; set; }
-            public int MaxMipmapCount { get; set; }
-            public int MinMipmapSize { get; set; }
-            public bool GenerateMipmaps { get; set; }
-            public bool ScaleAlphaForMipmaps { get; set; }
-        }
+        private static readonly TomlSerializerOptions s_tomlOptions = new TomlSerializerOptions
+        {
+            Converters = [
+                new AssetIdTomlConverter(),
+                new ColorTomlConverter(),
+                new TextureSwizzleConverter()
+                ],
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        };
     }
 }

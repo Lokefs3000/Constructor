@@ -11,7 +11,7 @@ namespace Editor.Project
 
         internal ProjectConfiguration(string projectFile)
         {
-            TomlTable table = Toml.ToModel<TomlTable>(File.ReadAllText(projectFile));
+            TomlTable table = TomlSerializer.Deserialize<TomlTable>(File.ReadAllText(projectFile))!;
 
             {
                 TomlTable project = (TomlTable)table["general"];

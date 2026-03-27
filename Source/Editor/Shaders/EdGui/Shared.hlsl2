@@ -1,8 +1,9 @@
+#include "Engine/Shaders/Implicit.hlsl"
+
 struct VsInput
 {
     float2 Position : POSITION;
     float2 UV       : TEXCOORD;
-    float4 Color    : COLOR;
 
     nointerpolation uint MetadataOffset : TEXCOORD1;
 };
@@ -11,20 +12,58 @@ struct DefaultPsInput
 {
     float4 Position : SV_Position;
     float2 UV       : TEXCOORD;
-    float4 Color    : COLOR;
+    float16_t4 Color: COLOR;
 
     nointerpolation uint MetadataOffset : TEXCOORD1;
+
+    bool HasStroke() { return MetadataOffset & (1u << 31); }
+    uint GetMetadataOffset() { return MetadataOffset & ~(1u << 31); }
 };
 
 struct CbGlobalData
 {
-    float4x4 Model;
+    float3x2 Model;
+};
+
+struct CbLocalData
+{
     uint MetadataOffset;
 };
 
+struct StrokeMetadata
+{
+    float16_t4 Color;
+    float16_t Width;
+};
+
+static const float2 s_RectTLVertices[6] =
+{
+    float2(0.0, 0.0),
+    float2(1.0, 1.0),
+    float2(0.0, 1.0),
+
+    float2(0.0, 0.0),
+    float2(1.0, 0.0),
+    float2(1.0, 1.0)
+};
+
+static const float2 s_RectCenterVertices[6] =
+{
+    float2(-1.0, -1.0),
+    float2(1.0, 1.0),
+    float2(-1.0, 1.0),
+
+    float2(-1.0, -1.0),
+    float2(1.0, -1.0),
+    float2(1.0, 1.0)
+};
+
 ConstantBuffer<CbGlobalData> cbGlobals;
+//[constants]
+//ConstantBuffer<CbLocalData> cbLocals;
 ByteAddressBuffer baMetadata;
 
 Texture2D<float4> txGradients;
 
 static SamplerState ssDefaultLinear : defaultLinear;
+static SamplerState ssDefaultPoint : defaultPoint;

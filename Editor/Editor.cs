@@ -1,15 +1,20 @@
 ﻿using Editor.Assets;
 using Editor.Assets.Loaders;
 using Editor.Assets.Types;
+using Editor.DearImGui;
 using Editor.Demos;
-using Editor.UI;
-using Editor.UI.Debugging;
-using Editor.UI.Designer;
+using Editor.ExtConsole;
+using Editor.UI.Windows;
 using Editor.Interaction;
 using Editor.Platform.Windows;
 using Editor.Project;
 using Editor.Rendering;
 using Editor.Storage;
+using Editor.UI;
+using Editor.UI.Assets;
+using Editor.UI.Assets.Loaders;
+using Editor.UI.Debugging;
+using Editor.UI.Designer;
 using Hexa.NET.ImGui;
 using Primary;
 using Primary.Assets;
@@ -25,10 +30,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
-using Editor.UI.Assets;
-using Editor.DearImGui;
-using Editor.ExtConsole;
-using Editor.Gui.Windows;
+using Primary.Mathematics;
 
 namespace Editor
 {
@@ -39,13 +41,13 @@ namespace Editor
 
         private DateTime _startTime;
 
-        private ProjectSubFilesystem _projectSubFilesystem;
+        protected ProjectSubFilesystem _projectSubFilesystem;
 
-        private ProjectSubFilesystem _engineFilesystem;
-        private ProjectSubFilesystem _editorFilesystem;
+        protected ProjectSubFilesystem _engineFilesystem;
+        protected ProjectSubFilesystem _editorFilesystem;
 
-        private AssetDatabase _assetDatabase;
-        private AssetPipeline _assetPipeline;
+        protected AssetDatabase _assetDatabase;
+        protected AssetPipeline _assetPipeline;
 
         private DearImGuiStateManager _dearImGuiStateManager;
         private DearImGuiWindowManager _dearImGuiWindowManager;
@@ -76,8 +78,22 @@ namespace Editor
         //private ConsoleView _consoleView;
         //private CubemapTool _cubemapTool;
 
-        internal Editor(string baseProjectPath, string[] args) : base(args.Length > 1 ? args.AsSpan(1) : Span<string>.Empty)
+        internal Editor(string baseProjectPath, string[] args, bool dontLaunch = false) : base(args.Length > 1 ? args.AsSpan(1) : Span<string>.Empty)
         {
+            if (dontLaunch)
+            {
+                if (!baseProjectPath.EndsWith(Path.DirectorySeparatorChar))
+                    baseProjectPath += Path.DirectorySeparatorChar;
+
+                VerifyProjectPath(baseProjectPath);
+
+                _baseProjectPath = baseProjectPath;
+
+                EditorFilepaths.Initialize(baseProjectPath);
+                return;
+            }
+
+            long startupTimestamp = Stopwatch.GetTimestamp();
             using StartupDisplayUI ui = new StartupDisplayUI();
 
             CancellationTokenSource cts = new CancellationTokenSource();
@@ -171,6 +187,8 @@ namespace Editor
             cts.Cancel();
             pumpTask.Wait();
             cts.Dispose();
+
+            EdLog.Core.Information("Editor startup took: {secs:f4}s", Stopwatch.GetElapsedTime(startupTimestamp).TotalSeconds);
         }
 
         public override void Dispose()
@@ -186,7 +204,7 @@ namespace Editor
             base.Dispose();
         }
 
-        public void Run()
+        public virtual void Run()
         {
             EdLog.Gui.Information("Hardware acceleration:");
 
@@ -205,14 +223,14 @@ namespace Editor
             EdLog.Gui.Information("         AVX512: {b}", Avx512F.IsSupported);
             EdLog.Gui.Information("         AVX10.1: {b}", Avx10v1.IsSupported);
 
-            Window window = WindowManager.CreateWindow("Primary", new Vector2(1336, 726), CreateWindowFlags.Resizable);
+            Window window = WindowManager.CreateWindow("Primary", new Int2(1336, 726), CreateWindowFlags.Resizable);
             UIDockHost centralHost = _uiManager.CreateHostedDock(window);
 
             //UIDockHost bottomHost = _uiManager.CreateDockedHost(centralHost, UIDockSide.Bottom);
             //bottomHost.SetHostSize(window.ClientSize.Y * 0.5f);
 
             //_uiManager.OpenWindow<UIDesigner>(centralHost);
-            _uiManager.OpenWindow<AssetBrowser>(centralHost);
+            _uiManager.OpenWindow<AssetBrowser>(centralHost, string.Empty);
 
             RenderingManager.SetNewRenderPath(new EditorRenderPath());
 
@@ -225,7 +243,7 @@ namespace Editor
             _guiAtlasManager.TriggerRebuild();
 
             AssetManager.RegisterCustomAsset<GeoSceneAsset>(new GeoSceneAssetLoader());
-
+   
             SceneManager.CreateScene("Default", LoadSceneMode.Single);
             //Scene scene = SceneManager.CreateScene("Demo");
 
@@ -251,7 +269,7 @@ namespace Editor
             }
         }
 
-        private void PumpEditorLoop()
+        protected virtual void PumpEditorLoop()
         {
             Time.BeginNewFrame();
             ProfilingManager.StartProfilingForFrame();
@@ -278,7 +296,7 @@ namespace Editor
             RenderingManager.Render();
         }
 
-        private void DrawDearImgui()
+        protected void DrawDearImgui()
         {
             using (new ProfilingScope("EditorGui"))
             {
@@ -386,7 +404,10 @@ namespace Editor
         public SelectionManager SelectionManager => _selectionManager;
         public ToolManager ToolManager => _toolManager;
 
+        internal DearImGuiStateManager DearImGuiStateManager => _dearImGuiStateManager;
         public DearImGuiWindowManager DearImGuiWindowManager => _dearImGuiWindowManager;
+
+        internal ExtConsoleManager? ExtConsoleManager => _extConsoleManager;
 
         //internal PropertiesView PropertiesView => _propertiesView;
         //internal SceneView SceneView => _sceneView;

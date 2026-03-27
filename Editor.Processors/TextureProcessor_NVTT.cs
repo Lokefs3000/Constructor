@@ -9,6 +9,10 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json.Serialization;
+using Tomlyn;
+using Tomlyn.Serialization;
+using static Editor.Processors.CompositeConfiguration;
 
 namespace Editor.Processors
 {
@@ -35,7 +39,7 @@ namespace Editor.Processors
         private ILogger? _logger;
 
         public bool Execute(object args_in) => throw new NotImplementedException();
-        public unsafe bool Execute(object args_in, TextureCompositeArgs? compositeArgs, TextureCubemapArgs? cubemapArgs)
+        public unsafe bool Execute(TextureConfiguration config, string outputFilePath)
         {
             TextureProcessorArgs args = (TextureProcessorArgs)args_in;
 
@@ -132,7 +136,7 @@ namespace Editor.Processors
                             args.AlphaSource = TextureAlphaSource.Source;
                             NVTT.nvttSetSurfaceAlphaMode(surface, NvttAlphaMode.Transparency);
 
-                            if (args.ImageFormat == TextureImageFormat.Undefined)
+                            if (args.ImageFormat == TextureImageFormat.Automatic)
                                 args.ImageFormat = TextureImageFormat.BC3; //TODO: 'BC3' (DXT5) might not have a good enough alpha channel for this
                         }
                         else
@@ -317,7 +321,7 @@ namespace Editor.Processors
                 NVTT.nvttSetOutputOptionsErrorHandler(outputOptions, ErrorReporter);
 
                 TextureImageFormat imageFormat = args.ImageFormat;
-                if (imageFormat == TextureImageFormat.Undefined)
+                if (imageFormat == TextureImageFormat.Automatic)
                 {
                     switch (args.ImageType)
                     {
@@ -893,213 +897,5 @@ namespace Editor.Processors
 
             public bool Skip { get => _skip; set => _skip = value; }
         }
-    }
-
-    public record struct TextureProcessorArgs
-    {
-        public Source[] Sources;
-        public string AbsoluteOutputPath;
-
-        public ILogger? Logger;
-
-        public TextureImageType ImageType;
-        public Metadata ImageMetadata;
-
-        public Swizzle TextureSwizzle;
-
-        public TextureImageFormat ImageFormat;
-        public TextureAlphaSource AlphaSource;
-
-        public bool GammaCorrect;
-        public bool PremultipliedAlpha;
-
-        public bool CutoutDither;
-        public byte CutoutThreshold;
-
-        public bool GenerateMipmaps;
-        public bool ScaleAlphaForMipmaps;
-        public int MaxMipmapCount;
-        public int MinMipmapSize;
-        public TextureMipmapFilter MipmapFilter;
-
-        public bool FlipVertical;
-
-        [StructLayout(LayoutKind.Explicit, Pack = 0)]
-        public record struct Metadata
-        {
-            [FieldOffset(0)]
-            public TextureProcessorNormalArgs NormalArgs;
-
-            [FieldOffset(0)]
-            public TextureProcessorSpecularArgs SpecularArgs;
-        }
-
-        public record struct Swizzle
-        {
-            public ushort Code;
-
-            public Swizzle()
-                => this = Default;
-            public Swizzle(TextureSwizzleChannel r, TextureSwizzleChannel g, TextureSwizzleChannel b, TextureSwizzleChannel a)
-                => Code = (ushort)(((int)r << 9) | ((int)g << 6) | ((int)b << 3) | (int)a);
-
-            public Swizzle(ushort code)
-                => Code = code;
-
-            public TextureSwizzleChannel R { get => (TextureSwizzleChannel)((Code >> 9) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 9)) | ((int)value << 9)); }
-            public TextureSwizzleChannel G { get => (TextureSwizzleChannel)((Code >> 6) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 6)) | ((int)value << 6)); }
-            public TextureSwizzleChannel B { get => (TextureSwizzleChannel)((Code >> 3) & 0x7); set => Code = (ushort)((Code & ~(0x7 << 3)) | ((int)value << 3)); }
-            public TextureSwizzleChannel A { get => (TextureSwizzleChannel)(Code & 0x7); set => Code = (ushort)((Code & ~0x7) | (int)value); }
-
-            public static readonly Swizzle Default = new Swizzle(TextureSwizzleChannel.R, TextureSwizzleChannel.G, TextureSwizzleChannel.B, TextureSwizzleChannel.A);
-        }
-
-        public record struct Source
-        {
-            public TextureSwizzleChannel Channel;
-            public string AbsoluteFilepath;
-        }
-    }
-
-    public record struct TextureProcessorNormalArgs
-    {
-        public TextureNormalSource Source;
-    }
-
-    public record struct TextureProcessorSpecularArgs
-    {
-        public TextureSpecularSource Source;
-    }
-
-    public record struct TextureCompositeArgs
-    {
-        public TextureCompositeChannel Channels;
-
-        public TextureCompositeChannelArgs Red;
-        public TextureCompositeChannelArgs Green;
-        public TextureCompositeChannelArgs Blue;
-        public TextureCompositeChannelArgs Alpha;
-    }
-
-    public record struct TextureCompositeChannelArgs
-    {
-        public AssetId Asset;
-        public TextureCompositeChannel Source;
-        public bool Invert;
-
-        public TextureCompositeChannelArgs()
-        {
-            Asset = AssetId.Invalid;
-            Source = TextureCompositeChannel.Red;
-            Invert = false;
-        }
-    }
-
-    public record struct TextureCubemapArgs
-    {
-        public TextureCubemapSource Source;
-
-        public AssetId PositiveX;
-        public AssetId PositiveY;
-        public AssetId PositiveZ;
-
-        public AssetId NegativeX;
-        public AssetId NegativeY;
-        public AssetId NegativeZ;
-    }
-
-    public enum TextureImageFormat : byte
-    {
-        Undefined = 0,
-
-        BC7,
-        BC6s,
-        BC6u,
-        BC5u,
-        BC4u,
-        BC3,
-        BC3n,
-        BC2,
-        BC1a,
-        BC1,
-        R8a,
-        R8l,
-        BGR8,
-        BGRA8,
-        BGRX8,
-        RGB8,
-        RGBA8,
-        R16,
-        RG16,
-        RGBA16,
-        R32,
-        RG32,
-        RGBA32
-    }
-
-    public enum TextureAlphaSource : byte
-    {
-        None = 0,
-        Opaque,
-        Source,
-        Red
-    }
-
-    public enum TextureMipmapFilter : byte
-    {
-        Box = 0,
-        Kaiser,
-        Triangle,
-        Mitchell,
-        Min,
-        Max
-    }
-
-    public enum TextureImageType : byte
-    {
-        Color = 0,
-        Grayscale,
-        Normal,
-        Specular,
-        Cubemap
-    }
-
-    public enum TextureSwizzleChannel : byte
-    {
-        R = 0,
-        G,
-        B,
-        A,
-        Zero,
-        One
-    }
-
-    public enum TextureNormalSource : byte
-    {
-        Tangent = 0,
-        Object,
-        Bump
-    }
-
-    public enum TextureSpecularSource : byte
-    {
-        Colored = 0,
-        Grayscale,
-        Roughness
-    }
-
-    public enum TextureCompositeChannel : byte
-    {
-        None = 0,
-
-        Red = 1 << 0,
-        Green = 1 << 1,
-        Blue = 1 << 2,
-        Alpha = 1 << 3,
-    }
-
-    public enum TextureCubemapSource : byte
-    {
-        Composited = 0
     }
 }

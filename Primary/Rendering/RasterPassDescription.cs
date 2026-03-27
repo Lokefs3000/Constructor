@@ -14,7 +14,7 @@ namespace Primary.Rendering
     {
         private readonly RenderPass _renderPass;
         private readonly string _name;
-        private readonly Type _passDataType;
+        private readonly IPassData _passData;
 
         private PooledList<UsedResourceData> _usedResources;
         private PooledList<UsedRenderTargetData> _usedRenderTargets;
@@ -23,11 +23,11 @@ namespace Primary.Rendering
 
         private bool _allowCulling;
 
-        internal RasterPassDescription(RenderPass renderPass, string name, Type passDataType)
+        internal RasterPassDescription(RenderPass renderPass, string name, IPassData passData)
         {
             _renderPass = renderPass;
             _name = name;
-            _passDataType = passDataType;
+            _passData = passData;
 
             _usedResources = new PooledList<UsedResourceData>();
             _usedRenderTargets = new PooledList<UsedRenderTargetData>();
@@ -39,8 +39,11 @@ namespace Primary.Rendering
 
         public void Dispose()
         {
-            RenderPass.AddGlobalResources(_usedResources, _usedRenderTargets);
-            _renderPass.AddNewRenderPass(new RenderPassDescription(_name, RenderPassType.Graphics, _usedResources, _usedRenderTargets, _passDataType, _function, _allowCulling));
+            if (_function != null)
+            {
+                RenderPass.AddGlobalResources(_usedResources, _usedRenderTargets);
+                _renderPass.AddNewRenderPass(new RenderPassDescription(_name, RenderPassType.Graphics, _usedResources, _usedRenderTargets, _passData, _function, _allowCulling));
+            }
         }
 
         public FrameGraphTexture CreateTexture(FrameGraphTextureDesc desc, string? debugName = null)
@@ -294,16 +297,35 @@ namespace Primary.Rendering
         {
             //validate
             {
-                if (!renderTarget.Description.Format.IsRenderTargetCapable())
+                if (renderTarget.IsExternal)
                 {
-                    _renderPass.ReportError(RPErrorSource.UseRenderTarget, RPErrorType.IncompatibleFormat, renderTarget.ToString());
-                    return;
-                }
+                    ref readonly RHITextureDescription desc = ref renderTarget.Resource!.Description;
 
-                if (!Flags.HasFlag(renderTarget.Description.Usage, FGTextureUsage.RenderTarget))
+                    if (!desc.Format.IsRenderTargetCapable())
+                    {
+                        _renderPass.ReportError(RPErrorSource.UseRenderTarget, RPErrorType.IncompatibleFormat, renderTarget.ToString());
+                        return;
+                    }
+
+                    if (!Flags.HasFlag(desc.Usage, RHIResourceUsage.RenderTarget))
+                    {
+                        _renderPass.ReportError(RPErrorSource.UseRenderTarget, RPErrorType.MissingUsageFlag, renderTarget.ToString());
+                        return;
+                    }
+                }
+                else
                 {
-                    _renderPass.ReportError(RPErrorSource.UseRenderTarget, RPErrorType.MissingUsageFlag, renderTarget.ToString());
-                    return;
+                    if (!renderTarget.Description.Format.IsRenderTargetCapable())
+                    {
+                        _renderPass.ReportError(RPErrorSource.UseRenderTarget, RPErrorType.IncompatibleFormat, renderTarget.ToString());
+                        return;
+                    }
+
+                    if (!Flags.HasFlag(renderTarget.Description.Usage, FGTextureUsage.RenderTarget))
+                    {
+                        _renderPass.ReportError(RPErrorSource.UseRenderTarget, RPErrorType.MissingUsageFlag, renderTarget.ToString());
+                        return;
+                    }
                 }
             }
 
@@ -332,12 +354,12 @@ namespace Primary.Rendering
 
         public void SetRenderFunction<T>(Action<RasterPassContext, T> function) where T : class, IPassData, new()
         {
-            if (_passDataType != typeof(T))
+            if (_passData is not T)
             {
                 _renderPass.ReportError(RPErrorSource.SetRenderFunction, RPErrorType.PassDataTypeMismatch, null);
                 return;
             }
-  
+
             _function = (x, y) => function(Unsafe.As<RasterPassContext>(x), Unsafe.As<T>(y));
         }
 

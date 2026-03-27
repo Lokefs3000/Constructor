@@ -14,7 +14,7 @@ namespace Primary.Rendering
     {
         private readonly RenderPass _renderPass;
         private readonly string _name;
-        private readonly Type _passDataType;
+        private readonly IPassData _passData;
 
         private PooledList<UsedResourceData> _usedResources;
         private PooledList<UsedRenderTargetData> _usedRenderTargets;
@@ -23,11 +23,11 @@ namespace Primary.Rendering
 
         private bool _allowCulling;
 
-        internal ComputePassDescription(RenderPass renderPass, string name, Type passDataType)
+        internal ComputePassDescription(RenderPass renderPass, string name, IPassData passData)
         {
             _renderPass = renderPass;
             _name = name;
-            _passDataType = passDataType;
+            _passData = passData;
 
             _usedResources = new PooledList<UsedResourceData>();
             _usedRenderTargets = new PooledList<UsedRenderTargetData>();
@@ -40,7 +40,7 @@ namespace Primary.Rendering
         public void Dispose()
         {
             RenderPass.AddGlobalResources(_usedResources, _usedRenderTargets);
-            _renderPass.AddNewRenderPass(new RenderPassDescription(_name, RenderPassType.Compute, _usedResources, _usedRenderTargets, _passDataType, _function, _allowCulling));
+            _renderPass.AddNewRenderPass(new RenderPassDescription(_name, RenderPassType.Compute, _usedResources, _usedRenderTargets, _passData, _function, _allowCulling));
         }
 
         public FrameGraphTexture CreateTexture(FrameGraphTextureDesc desc, string? debugName = null)
@@ -332,7 +332,7 @@ namespace Primary.Rendering
 
         public void SetRenderFunction<T>(Action<ComputePassContext, T> function) where T : class, IPassData, new()
         {
-            if (_passDataType != typeof(T))
+            if (_passData is not T)
             {
                 _renderPass.ReportError(RPErrorSource.SetRenderFunction, RPErrorType.PassDataTypeMismatch, null);
                 return;

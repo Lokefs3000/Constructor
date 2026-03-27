@@ -2,6 +2,7 @@
 using Hexa.NET.ImGui;
 using Primary.Assets;
 using Primary.Common;
+using Primary.Memory.Native;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Commands;
@@ -189,7 +190,7 @@ namespace Editor.Rendering.Passes
                             ExceptionUtility.Assert(textureData.TexID == ImTextureID.Null);
                             ExceptionUtility.Assert(textureData.Format == ImTextureFormat.Rgba32);
 
-                            uint* pixels = (uint*)textureData.GetPixels();
+                            ArrayPtr<byte> pixels = new ArrayPtr<byte>((byte*)textureData.GetPixels(), textureData.Width * textureData.Height * 4);
 
                             RHITexture texture = RHIDevice.Instance!.CreateTexture(new RHITextureDescription
                             {
@@ -204,7 +205,7 @@ namespace Editor.Rendering.Passes
                                 Usage = RHIResourceUsage.ShaderResource,
 
                                 Swizzle = RHISwizzle.RGBA,
-                            }, new Span<nint>(&pixels, 1), $"DearImGui - Texture [{textureData.UniqueID}]")!;
+                            }, new Span<ArrayPtr<byte>>(ref pixels), $"DearImGui - Texture [{textureData.UniqueID}]")!;
 
                             RHITextureNative* native = texture.GetAsNative();
 

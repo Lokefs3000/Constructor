@@ -42,17 +42,19 @@ namespace Primary.Assets.Loaders
                     return;
                 }
 
-                TomlTable table = Toml.ToModel<TomlTable>(source, sourcePath);
+                TomlTable table = TomlSerializer.Deserialize<TomlTable>(source);
 
-                if (!table.TryGetValue("shader", out object shaderId) || !(shaderId is string or long))
+                if (!table.TryGetValue("shader", out object shaderId) || shaderId is not string)
                 {
                     materialData.UpdateAssetFailed(material);
                     return;
                 }
 
-                ShaderAsset shader = shaderId is string ?
-                    AssetManager.LoadAsset<ShaderAsset>((string)shaderId, true) :
-                    AssetManager.LoadAsset<ShaderAsset>(new AssetId((ulong)(long)shaderId), true);
+                ShaderAsset shader;
+                if (Guid.TryParse((string)shaderId, out Guid result))
+                    shader = AssetManager.LoadAsset<ShaderAsset>((AssetId)result, true);
+                else
+                    shader = AssetManager.LoadAsset<ShaderAsset>((string)shaderId, true);
 
                 if (shader.Status != ResourceStatus.Success)
                 {
@@ -87,7 +89,7 @@ namespace Primary.Assets.Loaders
                         {
                             case ShPropertyType.Texture:
                                 {
-                                    if (!table.TryGetValue(property.Name, out object assetId) || !(assetId is string or long))
+                                    if (!table.TryGetValue(property.Name, out object assetId) || assetId is not string)
                                     {
                                         EngLog.Assets.Error("[a:{path}]: Failed to find property: {prop}", sourcePath, property.Name);
 
@@ -105,9 +107,13 @@ namespace Primary.Assets.Loaders
                                     }
                                     else
                                     {
-                                        block.SetResource(property.Name, assetId is string ?
-                                            AssetManager.LoadAsset<TextureAsset>((string)assetId) :
-                                            AssetManager.LoadAsset<TextureAsset>(new AssetId((ulong)(long)assetId)));
+                                        TextureAsset texture;
+                                        if (Guid.TryParse((string)shaderId, out Guid guid))
+                                            texture = AssetManager.LoadAsset<TextureAsset>((AssetId)guid, true);
+                                        else
+                                            texture = AssetManager.LoadAsset<TextureAsset>((string)shaderId, true);
+
+                                        block.SetResource(property.Name, texture);
                                     }
 
                                     break;

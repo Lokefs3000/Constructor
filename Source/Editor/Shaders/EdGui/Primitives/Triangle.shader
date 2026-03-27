@@ -1,51 +1,47 @@
 #include "../Shared.hlsl2"
 #include "../SDF.hlsl"
 
-#define EPSILON 0.00000001
-
 struct TriangleMetadata
 {
-    float2 A;
-    float2 B;
-    float2 C;
+    uint16_t HasStroke;
+    
+    float16_t4 Color;
+    uint16_t ZIndex;
 
-    float Rounding;
+    float16_t2 A;
+    float16_t2 B;
+    float16_t2 C;
 };
 
 [vertex]
 DefaultPsInput VertexMain(VsInput input)
 {
-    input.MetadataOffset += cbGlobals.MetadataOffset;
-
+    TriangleMetadata metadata = baMetadata.Load<TriangleMetadata>(input.MetadataOffset);
     DefaultPsInput output =
     {
-        mul(cbGlobals.Model, float4(input.Position, 0.0, 1.0)),
+        float4(mul(transpose(cbGlobals.Model), float3(input.Position, 1.0)), metadata.ZIndex * 0.01, 1.0),
         input.UV,
-        input.Color,
+        metadata.Color,
 
-        input.MetadataOffset
+        input.MetadataOffset | (uint(metadata.HasStroke) << 31)
     };
-	
+    
     return output;
 }
 
 [pixel]
 float4 PixelMain(DefaultPsInput input) : SV_Target
 {
-    TriangleMetadata metadata = baMetadata.Load<TriangleMetadata>(input.MetadataOffset);
+    TriangleMetadata metadata = baMetadata.Load<TriangleMetadata>(input.GetMetadataOffset());
 
-    [branch]
-    if (input.Color.a < 0.0)
+    float dist = sdTriangle(input.UV, metadata.A, metadata.B, metadata.C);
+    if (input.HasStroke())
     {
-        input.Color = txGradients.Sample(ssDefaultLinear, input.Color.xy);
+        StrokeMetadata stroke = baMetadata.Load<StrokeMetadata>(input.GetMetadataOffset() + sizeof(TriangleMetadata));
+
+        if (dist + stroke.Width >= 0.0)
+            return float4(stroke.Color.rgb, float(stroke.Color.a) * SmoothSDF(dist));
     }
 
-    [branch]
-    if (metadata.Rounding < 0.00000001)
-    {
-        return input.Color;
-    }
-
-    float d1 = opRound(sdTriangle(input.UV, metadata.A, metadata.B, metadata.C), metadata.Rounding);
-    return float4(input.Color.rgb, input.Color.a * -sign(d1));
+    return float4(input.Color.rgb, float(input.Color.a) * SmoothSDF(dist));
 }

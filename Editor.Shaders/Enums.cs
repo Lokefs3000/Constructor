@@ -36,6 +36,9 @@
         Double,
         Int,
         UInt,
+        Half,
+        Short,
+        UShort,
 
         Custom
     }

@@ -16,6 +16,13 @@ namespace Primary.Common
             _pointer = @ref;
         }
 
+        public Ptr<T2> As<T2>() where T2 : unmanaged
+        {
+            return (T2*)_pointer;
+        }
+
+        public Span<T> AsSpan(int start, int length) => new Span<T>(_pointer + start, length);
+
         public ref T Ref => ref Unsafe.AsRef<T>(_pointer);
         public T* Pointer { get => _pointer; set => _pointer = value; }
 

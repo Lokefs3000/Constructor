@@ -114,6 +114,12 @@ namespace Editor.Assets
         }
 
         /// <summary>Thread-safe</summary>
+        public bool IsFileRemapped(string localFilePath)
+        {
+            return _fileRemappings.ContainsKey(localFilePath);
+        }
+
+        /// <summary>Thread-safe</summary>
         public string GetFullPath(string path)
         {
             return Path.Combine(_absolutePath, path);
@@ -140,7 +146,7 @@ namespace Editor.Assets
 
             try
             {
-                return File.ReadAllText(absolutePath);
+                return FileUtility.TryReadAllText(absolutePath);
             }
             catch (Exception)
             {

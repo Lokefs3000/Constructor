@@ -37,7 +37,7 @@ namespace Primary.Rendering
 
         public RenderingManager()
         {
-            _graphicsDevice = RHIDeviceFactory.CreateDefaultApi(new RHIDeviceDescription { EnableValidation = Engine.IsDebugBuild }, EngLog.RHI);
+            _graphicsDevice = RHIDeviceFactory.CreateDefaultApi(new RHIDeviceDescription { EnableValidation = Engine.IsDebugBuild && !AppArguments.HasArgument("--r-nodebug") }, EngLog.RHI);
 
             _octreeManager = new OctreeManager();
             _renderWorld = new RenderWorld();
@@ -154,10 +154,15 @@ namespace Primary.Rendering
                 {
                     RenderCameraData cameraData = _contextContainer.GetOrCreate(() => new RenderCameraData());
 
+                    RHISwapChain swapChain = _swapChainCache.GetForWindow(outputData.Window!, true)!;
+                    //TODO: Check conditional first before trying to resize the swapchain
+                    //TODO: Get the NRD to wait on gpu work before resizing
+                    //swapChain.ResizeBuffersToNewSize();
+
                     FrameGraphTextureDesc baseDesc = new FrameGraphTextureDesc
                     {
-                        Width = (int)outputData.ProjectionData.ClientSize.X,
-                        Height = (int)outputData.ProjectionData.ClientSize.Y,
+                        Width = Math.Min((int)outputData.ProjectionData.ClientSize.X, (int)swapChain.Description.WindowSize.X),
+                        Height = Math.Min((int)outputData.ProjectionData.ClientSize.Y, (int)swapChain.Description.WindowSize.Y),
                     };
 
                     cameraData.CameraEntity = outputData.Entity;
@@ -176,44 +181,23 @@ namespace Primary.Rendering
             {
                 RenderCameraData cameraData = _contextContainer.Get<RenderCameraData>()!;
 
-                FrameGraphTexture source = desc.CreateTexture(new FrameGraphTextureDesc(cameraData.ColorTexture.Description)
-                {
-                    Format = RHIFormat.RGBA8_UNorm,
-                    Usage = FGTextureUsage.RenderTarget
-                }, "Source");
-
                 {
                     passData.Shader = _finalBlitSwapChain;
                     passData.Block = _finalBlitSwapChainPB;
 
                     passData.PresentWindow = outputData.Window;
                     passData.Texture = cameraData.ColorTexture;
-                    passData.Source = source;
                 }
 
                 desc.UseResource(FGResourceUsage.Read | FGResourceUsage.NoShaderAccess, cameraData.ColorTexture);
-                desc.UseResource(FGResourceUsage.Read | FGResourceUsage.NoShaderAccess, source);
-
-                desc.UseRenderTarget(source);
                 desc.AllowPassCulling(false);
 
                 desc.SetRenderFunction<PresentForOutputData>(PassFunction);
             }
-
+         
             static void PassFunction(RasterPassContext context, PresentForOutputData passData)
             {
                 RasterCommandBuffer cmd = context.CommandBuffer;
-
-                ////blit compatible format
-                //{
-                //    passData.Block!.SetResource("txFinalTexture", passData.Texture);
-                //
-                //    cmd.SetRenderTarget(0, passData.Source);
-                //    cmd.SetPipeline(passData.Shader!.GraphicsPipeline!);
-                //    cmd.SetProperties(passData.Block!);
-                //    cmd.DrawInstanced(new FGDrawInstancedDesc(3));
-                //}
-
                 cmd.PresentOnWindow(passData.PresentWindow!, passData.Texture);
             }
         }

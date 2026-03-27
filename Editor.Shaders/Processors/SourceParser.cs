@@ -1,12 +1,16 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Editor.Shaders.Attributes;
 using Editor.Shaders.Data;
+using Primary.Collections;
 using Primary.Common;
+using System.Buffers;
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Numerics;
+using System.Runtime.CompilerServices;
+using TerraFX.Interop.Windows;
 
 namespace Editor.Shaders.Processors
 {
@@ -136,7 +140,7 @@ namespace Editor.Shaders.Processors
                 intent = DecodeIdentifierIntent(absoluteStart, identifier, name);
             switch (intent)
             {
-                case IdentifierIntent.Function: ParseFunction(name); break;
+                case IdentifierIntent.Function: ParseFunction(absoluteStart, name); break;
                 case IdentifierIntent.Resource: ParseResource(identifier, name, signatureRange, absoluteStart); break;
                 case IdentifierIntent.Property: ParseProperty(identifier, name, absoluteStart); break;
                 case IdentifierIntent.Struct: ParseStruct(name, absoluteStart); break;
@@ -149,7 +153,8 @@ namespace Editor.Shaders.Processors
             }
         }
 
-        private void ParseFunction(ReadOnlySpan<char> name)
+        private void ParseFunction(int absoluteStart, ReadOnlySpan<char> name) => ParseFunction(absoluteStart, name, ref Unsafe.NullRef<RentedList<FunctionData>>());
+        private void ParseFunction(int absoluteStart, ReadOnlySpan<char> name, ref RentedList<FunctionData> destination)
         {
             AttributeData[] attributes = _attributes.Count > 0 ? _attributes.ToArray() : Array.Empty<AttributeData>();
             _attributes.Clear();
@@ -225,7 +230,12 @@ namespace Editor.Shaders.Processors
             }
 
             string nameToString = name.ToString();
-            _data.AddFunction(new FunctionData(nameToString, attributes, totalVars > 0 ? variables.ToArray(0, totalVars) : Array.Empty<VariableData>(), TravelFunctionIncludes(nameToString, new IndexRange(start, _index)), new IndexRange(start, _index)));
+            FunctionData func = new FunctionData(nameToString, attributes, totalVars > 0 ? variables.ToArray(0, totalVars) : Array.Empty<VariableData>(), TravelFunctionIncludes(nameToString, new IndexRange(start, _index)), new IndexRange(start, _index), new IndexRange(absoluteStart - 1, _index));
+
+            if (Unsafe.IsNullRef(in destination))
+                _data.AddFunction(func);
+            else
+                destination.Add(func);
         }
 
         private void ParseResource(ReadOnlySpan<char> identifier, ReadOnlySpan<char> name, Range signatureRange, int absoluteStart)
@@ -318,72 +328,98 @@ namespace Editor.Shaders.Processors
             SkipUntil('{');
             Advance();
 
-            ValueDataRef currentValue = ValueDataRef.Unspecified;
-
             using RentedArray<VariableData> tempArray = RentedArray<VariableData>.Rent(64);
-            int totalVars = 0;
+            RentedList<FunctionData> tempFuncs = new RentedList<FunctionData>();
 
-            do
+            try
             {
-                char c = Advance();
+                int totalVars = 0;
 
-                if (c == '/')
-                    MoveUntilOutOfComment(ref _index);
-                else if (c == '[')
-                    ParseAttribute();
-                else if (char.IsLetter(c))
+                do
                 {
-                    ReadOnlySpan<char> type = ReadGeneralIdentifier();
+                    char c = Advance();
 
-                    if (currentValue != ValueDataRef.Unspecified)
+                    if (c == '/')
+                        MoveUntilOutOfComment(ref _index);
+                    else if (c == '[')
+                        ParseAttribute();
+                    else if (char.IsLetter(c))
                     {
-                        ReadOnlySpan<char> varName = ReadGeneralIdentifier();
+                        int innerAbsoluteStart = _index;
 
-                        VarSemantic? semantic = null;
-                        if (FindAfterWhitespace(':', _index))
-                        {
-                            SkipUntil(':');
-                            Advance();
+                        ReadOnlySpan<char> innerType = ReadGeneralIdentifier();
+                        if (s_structKeywords.Contains(innerType.GetDjb2HashCode()))
+                            continue;
+
+                        if (char.IsWhiteSpace(Peek()))
                             SkipWhitespace();
 
-                            _start = _index;
-                            semantic = AttemptDecodeSemantic(ReadGeneralIdentifier());
-                        }
+                        int backup = _index;
+                        _start = _index;
 
-                        AttributeData[] attributes = _attributes.Count > 0 ? _attributes.ToArray() : Array.Empty<AttributeData>();
-                        _attributes.Clear();
+                        ReadOnlySpan<char> innerName = ReadGeneralIdentifier();
+                        if (innerName.IsEmpty)
+                            return; //name cannot be empty
 
-                        if (attributes.Length > 0)
+                        IdentifierIntent intent = IdentifierIntent.Unknown;
+                        if (intent == IdentifierIntent.Unknown)
+                            intent = DecodeIdentifierIntent(innerAbsoluteStart, innerType, innerName);
+
+                        switch (intent)
                         {
-                            ValidateAttributes(attributes, AttributeUsage.Property);
+                            case IdentifierIntent.Function: ParseFunction(innerAbsoluteStart, innerName, ref tempFuncs); break;
+                            case IdentifierIntent.Resource: ReportErrorMessage("Struct cannot contain a resource"); break;
+                            case IdentifierIntent.Property:
+                                {
+                                    ValueDataRef valueDataRef = DecodeValueDataRefFromType(innerType);
+
+                                    VarSemantic? semantic = null;
+                                    if (FindAfterWhitespace(':', _index))
+                                    {
+                                        SkipUntil(':');
+                                        Advance();
+                                        SkipWhitespace();
+
+                                        _start = _index;
+                                        semantic = AttemptDecodeSemantic(ReadGeneralIdentifier());
+                                    }
+
+                                    AttributeData[] attributes = _attributes.Count > 0 ? _attributes.ToArray() : Array.Empty<AttributeData>();
+                                    _attributes.Clear();
+
+                                    if (attributes.Length > 0)
+                                    {
+                                        ValidateAttributes(attributes, AttributeUsage.Property);
+                                    }
+
+                                    if (totalVars >= tempArray.Count)
+                                    {
+                                        ReportErrorMessage("Too many elements in struct");
+                                        break;
+                                    }
+
+                                    tempArray[totalVars++] = new VariableData(innerName.ToString(), attributes, valueDataRef, semantic);
+
+                                    SkipUntil(';');
+                                    break;
+                                }
+                            case IdentifierIntent.Struct: ReportErrorMessage("Struct cannot contain another struct"); break;
+                            case IdentifierIntent.StaticSampler: ReportErrorMessage("Struct cannot contain a static sampler"); break;
+                            default: ReportErrorMessage("Unknown identifier in struct"); break;
                         }
-
-                        if (totalVars >= tempArray.Count)
-                        {
-                            ReportErrorMessage("Too many elements in struct");
-                            break;
-                        }
-
-                        tempArray[totalVars++] = new VariableData(varName.ToString(), attributes, currentValue, semantic);
-
-                        SkipUntil(';');
-
-                        currentValue = ValueDataRef.Unspecified;
                     }
-                    else
-                    {
-                        ValueDataRef tempVDR = DecodeValueDataRefFromType(type);
-                        if (tempVDR != ValueDataRef.Unspecified)
-                            currentValue = tempVDR;
-                    }
-                }
 
-                if (!char.IsLetter(c))
-                    _start = _index;
-            } while (Peek() != '}');
+                    if (!char.IsLetter(c))
+                        _start = _index;
+                } while (Peek() != '}');
 
-            _data.AddNewValueRef(name.GetDjb2HashCode());
-            _data.AddStruct(new StructData(name.ToString(), Array.Empty<AttributeData>(), totalVars > 0 ? tempArray.ToArray(0, totalVars) : Array.Empty<VariableData>(), new IndexRange(absoluteStart, _index + 1)));
+                _data.AddNewValueRef(name.GetDjb2HashCode());
+                _data.AddStruct(new StructData(name.ToString(), Array.Empty<AttributeData>(), tempArray.ToArray(0, totalVars), tempFuncs.ToArray(), new IndexRange(absoluteStart, _index + 1)));
+            }
+            finally
+            {
+                tempFuncs.Dispose();
+            }
         }
 
         private void ParseStaticSampler(int absoluteStart)
@@ -1163,7 +1199,7 @@ namespace Editor.Shaders.Processors
                 int idx = signature.FindIndex(char.IsDigit);
                 ReadOnlySpan<char> primitive = idx >= 0 ? signature.Slice(0, idx) : signature;
 
-                if ((s_primitiveNameList.Contains(primitive.GetDjb2HashCode()) || _data.HasValueRef(primitive.GetDjb2HashCode())) && FindAfterWhitespace(';', _index))
+                if ((s_primitiveNameList.Contains(primitive.GetDjb2HashCode()) || _data.HasValueRef(primitive.GetDjb2HashCode())) && FindAfterWhitespace(s_deliminatorSearchValues, _index))
                 {
                     return IdentifierIntent.Property;
                 }
@@ -1178,9 +1214,25 @@ namespace Editor.Shaders.Processors
             int rows = 1;
             int columns = 1;
 
-            int numIdx = type.FindIndex(char.IsDigit);
+            ReadOnlySpan<char> sliced;
+            if (char.IsDigit(type[type.Length - 1]))
+            {
+                if (type[type.Length - 2] == 'x')
+                {
+                    rows = int.Parse(new ReadOnlySpan<char>(in type[type.Length - 3]));
+                    columns = int.Parse(new ReadOnlySpan<char>(in type[type.Length - 1]));
 
-            ReadOnlySpan<char> sliced = numIdx == -1 ? type : type.Slice(0, numIdx);
+                    sliced = type.Slice(0, type.Length - 3);
+                }
+                else
+                {
+                    rows = int.Parse(new ReadOnlySpan<char>(in type[type.Length - 1]));
+                    sliced = type.Slice(0, type.Length - 1);
+                }
+            }
+            else
+                sliced = type;
+
             int djb2 = sliced.GetDjb2HashCode();
 
             int findIdx = Array.FindIndex(s_primitiveNameList, (x) => x == djb2);
@@ -1194,15 +1246,6 @@ namespace Editor.Shaders.Processors
             }
 
             generic = (ValueGeneric)findIdx;
-
-            if (numIdx != -1)
-            {
-                ReadOnlySpan<char> dimension = type.Slice(numIdx);
-                rows = int.Parse(new ReadOnlySpan<char>(in dimension[0]));
-
-                if (dimension.Length > 2)
-                    columns = int.Parse(new ReadOnlySpan<char>(in dimension[2]));
-            }
 
             Debug.Assert(rows >= 1 && rows <= 4);
             Debug.Assert(columns >= 1 && columns <= 4);
@@ -1278,6 +1321,23 @@ namespace Editor.Shaders.Processors
             return _source[index] == c;
         }
 
+        private bool FindAfterWhitespace(SearchValues<char> searchValues, int startIndex = -1)
+        {
+            int index = startIndex != -1 ? startIndex : _index;
+            while (char.IsWhiteSpace(_source[index]))
+            {
+                if (++index >= _source.Length)
+                    return false;
+
+                if (_source[index] == '/')
+                {
+                    MoveUntilOutOfComment(ref index);
+                }
+            }
+
+            return searchValues.Contains(_source[index]);
+        }
+
         private bool Find(char c, int startIndex = -1)
         {
             int index = startIndex != -1 ? startIndex : _index;
@@ -1345,6 +1405,9 @@ namespace Editor.Shaders.Processors
             "double".GetDjb2HashCode(),
             "int".GetDjb2HashCode(),
             "uint".GetDjb2HashCode(),
+            "float16_t".GetDjb2HashCode(),
+            "int16_t".GetDjb2HashCode(),
+            "uint16_t".GetDjb2HashCode()
             ];
 
         private static readonly int[] s_semanticNameList = [
@@ -1408,6 +1471,13 @@ namespace Editor.Shaders.Processors
         private static readonly int s_samplerMinLODName = "MinLOD".GetDjb2HashCode();
         private static readonly int s_samplerMaxLODName = "MaxLOD".GetDjb2HashCode();
         private static readonly int s_samplerBorderName = "Border".GetDjb2HashCode();
+
+        private static readonly SearchValues<char> s_numericSearchValues = SearchValues.Create("0123456789");
+        private static readonly SearchValues<char> s_deliminatorSearchValues = SearchValues.Create(";:");
+
+        private static readonly HashSet<int> s_structKeywords = [
+            "nointerpolation".GetDjb2HashCode()
+            ];
 
         private ref struct IndexBackupStorage(ref SourceParser Parser, int Start, int Index, int Line, int DiagStart, int DiagIndex, int DiagLine) : IDisposable
         {

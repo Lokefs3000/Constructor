@@ -3,6 +3,7 @@ using K4os.Compression.LZ4.Streams;
 using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
+using Primary.Memory.Native;
 using Primary.RHI2;
 using Primary.Utility;
 using System.Buffers;
@@ -195,7 +196,7 @@ namespace Primary.Assets.Loaders
                             Stride = 12 * sizeof(float) + 2 * sizeof(float),
 
                             Usage = RHIResourceUsage.VertexInput,
-                        }, (nint)ptr);
+                        }, new ArrayPtr<byte>(ptr, vertexData.Length));
                     }
 
                     //index buffer
@@ -207,7 +208,7 @@ namespace Primary.Assets.Loaders
                             Stride = Flags.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? 4 : 2,
 
                             Usage = RHIResourceUsage.IndexInput
-                        }, (nint)ptr);
+                        }, new ArrayPtr<byte>(ptr, indexData.Length));
                     }
                 }
 

@@ -3,6 +3,7 @@ using Primary.Assets;
 using Primary.Assets.Types;
 using Tomlyn;
 using Tomlyn.Model;
+using Tomlyn.Parsing;
 using Tomlyn.Syntax;
 
 namespace Editor.Assets.Importers
@@ -45,8 +46,13 @@ namespace Editor.Assets.Importers
         public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
         {
             string? str = filesystem.ReadString(localFilePath);
-            return str == null ? false : Toml.TryToModel(str, out TomlTable? _, out DiagnosticsBag? _);
+            return str == null ? false : !TomlParser.Create(str).HasErrors;
         }
+
+        private static readonly TomlParserOptions s_validateOptions = new TomlParserOptions
+        {
+            Mode = TomlParserMode.Tolerant
+        };
 
         public string CustomFileIcon => "Editor/Textures/Icons/FileMaterial.png";
     }

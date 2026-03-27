@@ -76,8 +76,8 @@ namespace Editor.DearImGui.Popups
                         if (prev != AssetId.Invalid)
                             ImGui.PopID();
 
-                        ulong id = data.Id.Value;
-                        ImGui.PushID(MemoryMarshal.Cast<ulong, byte>(new ReadOnlySpan<ulong>(ref id)));
+                        int id = data.Id.GetHashCode();
+                        ImGui.PushID(MemoryMarshal.Cast<int, byte>(new ReadOnlySpan<int>(ref id)));
 
                         prev = data.Id;
                     }

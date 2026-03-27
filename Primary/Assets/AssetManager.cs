@@ -20,7 +20,7 @@ namespace Primary.Assets
 
         private Dictionary<Type, (IAssetDefinition, IInternalAssetData)> _invalidAssets;
 
-        private object _loadLock;
+        private Lock _loadLock;
 
         private Lazy<ImmutableAssets> _immutableAssets;
 
@@ -41,7 +41,7 @@ namespace Primary.Assets
 
             _invalidAssets = new Dictionary<Type, (IAssetDefinition, IInternalAssetData)>();
 
-            _loadLock = new object();
+            _loadLock = new Lock();
 
             _immutableAssets = new Lazy<ImmutableAssets>(() =>
             {
@@ -325,6 +325,44 @@ namespace Primary.Assets
         }
 
         /// <summary>Thread-safe</summary>
+        public static object LoadAsset(Type type, ReadOnlySpan<char> sourcePath, bool synchronous = false)
+        {
+            if (!type.IsAssignableTo(typeof(IAssetDefinition)))
+            {
+                EngLog.Assets.Error("[a:{id}]: Cannot load asset from generic type that does not inherit from: {t}", sourcePath.ToString(), typeof(IAssetDefinition));
+            }
+
+            AssetManager @this = NullableUtility.ThrowIfNull(s_instance);
+            if (@this._assetIdProvider == null)
+            {
+                EngLog.Assets.Error("[a:{id}]: No asset id provider has been assigned and thus no resources can be loaded.", sourcePath.ToString());
+                return @this.CreateBadAsset(type, AssetId.Invalid);
+            }
+
+            if (@this._assetIdProvider == null)
+            {
+                EngLog.Assets.Error("[a:{path}]: No asset id provider has been assigned and thus no resources can be loaded.", sourcePath.ToString());
+                return @this.CreateBadAsset(type, AssetId.Invalid);
+            }
+
+            AssetId assetId = @this._assetIdProvider.RetriveIdForPath(sourcePath);
+            if (assetId.IsInvalid)
+            {
+                EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
+                return @this.CreateBadAsset(type, AssetId.Invalid);
+            }
+
+            string? realisedPath = @this._assetIdProvider.RetrievePathForId(assetId);
+            if (realisedPath == null)
+            {
+                EngLog.Assets.Error("[a:{id}]: No asset found in filesystem", assetId);
+                return @this.CreateBadAsset(type, assetId);
+            }
+
+            return @this.LoadAssetImpl(type, realisedPath, assetId, synchronous, null);
+        }
+
+        /// <summary>Thread-safe</summary>
         public static void WaitForAssetLoad(AssetId assetId)
         {
             //empty for now
@@ -370,6 +408,8 @@ namespace Primary.Assets
                 _loaders = dict.ToFrozenDictionary();
             }
         }
+
+        public IAssetIdProvider IdProvider => _assetIdProvider!;
 
         public static ImmutableAssets Static => NullableUtility.ThrowIfNull(s_instance)._immutableAssets.Value;
 
