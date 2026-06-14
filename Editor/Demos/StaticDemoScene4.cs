@@ -7,7 +7,7 @@ namespace Editor.Demos
 {
     internal static class StaticDemoScene4
     {
-        public static void Load(Editor editor)
+        public static void Load(EditorRuntime editor)
         {
             Scene scene = editor.SceneManager.Scenes[0];
 

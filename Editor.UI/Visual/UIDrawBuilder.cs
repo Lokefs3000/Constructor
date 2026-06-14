@@ -6,6 +6,7 @@ using Editor.UI.Text;
 using Editor.UI.Visual;
 using Primary.Common;
 using Primary.Common.Memory;
+using Primary.Mathematics;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -100,7 +101,7 @@ namespace Editor.UI.Visual
 
                         if (!textData.IsEmpty)
                         {
-                            UIFontStyle? lastFontStyle = null;
+                            UIFontTypeData? lastFontStyle = null;
                             int lastIndexCount = meshBuilder.IndexCount;
 
                             if (_segments.Count > 0)
@@ -109,7 +110,7 @@ namespace Editor.UI.Visual
 
                                 lastIndexCount = builtSegment.IndexOffset;
                                 if (builtSegment.Type == BuiltSegmentType.Text)
-                                    lastFontStyle = builtSegment.Value as UIFontStyle;
+                                    lastFontStyle = builtSegment.Value as UIFontTypeData;
                             }
 
                             currentSegmentType = BuiltSegmentType.Text;
@@ -129,14 +130,14 @@ namespace Editor.UI.Visual
 
                             foreach (TextRenderSegment render in textData.Iterate())
                             {
-                                if (render.VisualInfo.Style.AtlasTexture == null)
+                                if (render.VisualInfo.TypeData.AtlasTexture == null)
                                     continue;
 
-                                if (lastFontStyle != render.VisualInfo.Style && lastIndexCount < meshBuilder.IndexCount)
+                                if (lastFontStyle != render.VisualInfo.TypeData && lastIndexCount < meshBuilder.IndexCount)
                                 {
-                                    _segments.Add(new BuiltDrawSegment(BuiltSegmentType.Text, meshBuilder.IndexCount, render.VisualInfo.Style));
+                                    _segments.Add(new BuiltDrawSegment(BuiltSegmentType.Text, meshBuilder.IndexCount, render.VisualInfo.TypeData));
 
-                                    lastFontStyle = render.VisualInfo.Style;
+                                    lastFontStyle = render.VisualInfo.TypeData;
                                     lastIndexCount = meshBuilder.IndexCount;
                                 }
 
@@ -154,12 +155,12 @@ namespace Editor.UI.Visual
 
                                     switch (horizontal)
                                     {
-                                        case UITextAlignment.Center: basePosition.X = text.Builder.MaxExtents.X * 0.5f - render.TextSize.X * 0.5f; break;
-                                        case UITextAlignment.Right: basePosition.X = text.Builder.MaxExtents.X - render.TextSize.X; break;
+                                        case UITextAlignment.Center: basePosition.X += text.Builder.MaxExtents.X * 0.5f - render.TextSize.X * 0.5f; break;
+                                        case UITextAlignment.Right: basePosition.X += text.Builder.MaxExtents.X - render.TextSize.X; break;
                                     }
                                 }
 
-                                meshBuilder.AddGlyphs(new Vector2(basePosition.X + render.LeftOffset, basePosition.Y), render.VisualInfo.Style, render.VisualInfo, render.Letters, metadataOffset);
+                                meshBuilder.AddGlyphs(new Vector2(basePosition.X + render.LeftOffset, basePosition.Y), render.VisualInfo.TypeData, render.VisualInfo, render.Letters, metadataOffset);
                             }
                         }
                     }
@@ -225,7 +226,7 @@ namespace Editor.UI.Visual
 
                                     if (rect.Paint.StrokeEnabled)
                                     {
-                                        bounds = rect.Rect.Grow(new Vector2(rect.Paint.StrokeWidth));
+                                        bounds = Boundaries.Grow(rect.Rect, new Vector2(rect.Paint.StrokeWidth));
                                         size = bounds.Size;
                                     }
                                     else
@@ -261,13 +262,13 @@ namespace Editor.UI.Visual
 
                                     if (roundedRect.Paint.StrokeEnabled)
                                     {
-                                        bounds = roundedRect.Rect.Grow(new Vector2(roundedRect.Paint.StrokeWidth));
+                                        bounds = Boundaries.Grow(roundedRect.Rect, new Vector2(roundedRect.Paint.StrokeWidth));
                                         size = bounds.Size;
                                     }
                                     else
                                     {
                                         bounds = roundedRect.Rect;
-                                        size = Vector2.One;
+                                        size = bounds.Size;
                                     }
 
                                     *(RoundedRectMetadata*)ptr = new RoundedRectMetadata(
@@ -363,7 +364,7 @@ namespace Editor.UI.Visual
 
                                     if (image.Paint.StrokeEnabled)
                                     {
-                                        bounds = image.Rect.Grow(new Vector2(image.Paint.StrokeWidth));
+                                        bounds = Boundaries.Grow(image.Rect, new Vector2(image.Paint.StrokeWidth));
                                         size = bounds.Size;
                                     }
                                     else

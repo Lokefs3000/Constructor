@@ -23,6 +23,7 @@
         Pending = 0,
         Running,
         Error,
+        Bad,
         Disposed,
         Success
     }

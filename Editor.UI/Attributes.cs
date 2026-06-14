@@ -38,7 +38,7 @@ namespace Editor.UI
     }
 
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
-    public sealed class UIElementStates(params string[] States) : Attribute
+    public sealed class StyleableStatesAttribute(params string[] States) : Attribute
     {
         private readonly string[] _states = States;
 
@@ -75,5 +75,18 @@ namespace Editor.UI
         private readonly Type _targetType = TargetType;
 
         public Type TargetType => _targetType;
+    }
+
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
+    public sealed class PropertyDefaultAttribute(string DefaultValue) : Attribute
+    {
+        private readonly string _defaultValue = DefaultValue;
+
+        public string DefaultValue => _defaultValue;
+    }
+
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
+    public sealed class NoDefaultValueAttribute : Attribute
+    {
     }
 }

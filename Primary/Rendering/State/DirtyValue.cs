@@ -11,7 +11,7 @@ namespace Primary.Rendering.State
 
         public DirtyValue(T value)
         {
-            _previous = default;
+            _previous = value;
             _value = value;
         }
 

@@ -3,7 +3,7 @@ using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Rendering.Assets;
-using Primary.RHI2;
+using Primary.RHI;
 using System.Numerics;
 
 namespace Primary.Assets
@@ -33,6 +33,9 @@ namespace Primary.Assets
         /// <inheritdoc cref="PropertyBlock.GetTextureAsset(int)"/>
         public TextureAsset? GetTextureAsset(string id) => AssetData.PropertyBlock?.GetTextureAsset(id);
         #endregion
+
+        /// <inheritdoc cref="PropertyBlock.ClearResource(string)"/>
+        public void ClearResource(string id) => AssetData.PropertyBlock?.ClearResource(id);
 
         #endregion
 

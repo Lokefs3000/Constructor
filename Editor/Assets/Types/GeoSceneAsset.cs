@@ -1,191 +1,224 @@
 ﻿using Editor.Geometry;
+using Editor.Geometry.Mesh;
+using Primary.Assets;
 using Primary.Assets.Types;
-using Primary.RHI2;
+using Primary.Common;
+using Primary.Mathematics;
+using Primary.Memory.Native;
+using Primary.Rendering.Assets;
+using Primary.RHI;
 using System.Runtime.CompilerServices;
 
 namespace Editor.Assets.Types
 {
-    internal class GeoSceneAsset : IAssetDefinition
+    public sealed class GeoSceneAsset : BaseAssetDefinition<GeoSceneAsset, GeoSceneAssetData>
     {
-        private readonly GeoSceneAssetData _assetData;
-
-        internal GeoSceneAsset(GeoSceneAssetData assetData)
+        internal GeoSceneAsset(GeoSceneAssetData assetData) : base(assetData)
         {
-            _assetData = assetData;
         }
 
-        internal void Regenerate() => _assetData.Regenerate();
+        public bool RegenerateMeshes()
+        {
+            if (Status != ResourceStatus.Success)
+                return false;
+            return AssetData.RegenerateMeshes();
+        }
 
-        internal GeoBrushScene? BrushScene => _assetData.BrushScene;
-        internal GeoVertexCache? VertexCache => _assetData.VertexCache;
-        internal GeoGenerator? Generator => _assetData.Generator;
+        public void ConsumeNewMeshData()
+        {
+            if (Status != ResourceStatus.Success)
+                return;
+            AssetData.ConsumeNewMeshData();
+        }
 
-        internal bool NeedsRegeneration { get => _assetData.NeedsRegeneration; set => _assetData.NeedsRegeneration = value; }
+        public void ResizeVertexBuffer(out bool isBufferNew)
+        {
+            if (Status != ResourceStatus.Success)
+            {
+                isBufferNew = false;
+                return;
+            }
 
-        internal GeoSceneAssetData AssetData => _assetData;
+            AssetData.ResizeVertexBuffer(out isBufferNew);
+        }
 
-        public ResourceStatus Status => _assetData.Status;
+        internal GeoScene? Scene => Status == ResourceStatus.Success ? AssetData.Scene : null;
+        internal RHIBuffer? VertexBuffer => Status == ResourceStatus.Success ? AssetData.VertexBuffer : null;
 
-        public string Name => _assetData.Name;
-        public AssetId Id => _assetData.Id;
+        internal IReadOnlyDictionary<GeoMeshKey, GeoSceneRenderMesh>? RenderMeshes => Status == ResourceStatus.Success ? AssetData.RenderMeshes : null;
     }
 
-    internal class GeoSceneAssetData : IInternalAssetData//, IRenderMeshSource
+    public sealed class GeoSceneAssetData : BaseInternalAssetData<GeoSceneAsset>, IRenderMeshSource
     {
-        private readonly WeakReference _asset;
+        private GeoScene? _scene;
+        private MaterialAsset? _defaultMaterial;
 
-        private ResourceStatus _status;
-
-        private readonly AssetId _id;
-        private string _name;
-
-        private GeoBrushScene? _brushScene;
-        private GeoVertexCache? _vertexCache;
-        private GeoGenerator? _generator;
-
-        private bool _needsRegenerate;
+        private Dictionary<GeoMeshKey, GeoSceneRenderMesh> _renderMeshes;
+        private HashSet<GeoMeshKey> _activeKeys;
 
         private RHIBuffer? _vertexBuffer;
-        private RHIBuffer? _indexBuffer;
-
         private int _vertexBufferSize;
-        private int _indexBufferSize;
 
-        internal GeoSceneAssetData(AssetId id)
+        private bool _hasNewestUpdateBeenConsumed;
+
+        internal GeoSceneAssetData(AssetId id) : base(id)
         {
-            _asset = new WeakReference(null);
+            _scene = null;
+            _defaultMaterial = null;
 
-            _status = ResourceStatus.Pending;
-
-            _id = id;
-            _name = string.Empty;
-
-            _brushScene = null;
-            _vertexCache = null;
-            _generator = null;
-
-            _needsRegenerate = false;
+            _renderMeshes = new Dictionary<GeoMeshKey, GeoSceneRenderMesh>();
+            _activeKeys = new HashSet<GeoMeshKey>();
 
             _vertexBuffer = null;
-            _indexBuffer = null;
+            _vertexBufferSize = 0;
+
+            _hasNewestUpdateBeenConsumed = true;
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
-            _status = ResourceStatus.Disposed;
+            if (_scene != null)
+                EditorRuntime.GlobalSingleton.GeoSceneManager.RemoveInvalidScene(Definition!, _scene);
 
-            _asset.Target = null;
+            _scene = null;
+            _defaultMaterial = null;
 
-            _generator?.Dispose();
-
-            _brushScene = null;
-            _vertexCache = null;
-            _generator = null;
-
-            _needsRegenerate = false;
+            _renderMeshes.Clear();
+            _activeKeys.Clear();
 
             _vertexBuffer?.Dispose();
-            _indexBuffer?.Dispose();
-
             _vertexBuffer = null;
-            _indexBuffer = null;
+
+            _vertexBufferSize = 0;
+
+            _hasNewestUpdateBeenConsumed = true;
+
+            base.Dispose();
         }
 
-        public void SetAssetInternalStatus(ResourceStatus status)
+        public void UpdateAssetData(GeoSceneAsset asset, GeoScene scene, MaterialAsset material)
         {
-            _status = status;
+            base.UpdateAssetData(asset);
+
+            _scene = scene;
+            _defaultMaterial = material;
+
+            _hasNewestUpdateBeenConsumed = true;
         }
 
-        public void SetAssetInternalName(string name)
+        public bool RegenerateMeshes()
         {
-            _name = name;
-        }
+            if (_scene == null)
+                return false;
 
-        internal void UpdateAssetData(GeoSceneAsset asset, GeoBrushScene brushScene, GeoVertexCache vertexCache, GeoGenerator generator)
-        {
-            _asset.Target = asset;
-
-            _status = ResourceStatus.Success;
-
-            _brushScene = brushScene;
-            _vertexCache = vertexCache;
-            _generator = generator;
-
-            _needsRegenerate = true;
-        }
-
-        internal void UpdateAssetFailed(GeoSceneAsset asset)
-        {
-            _asset.Target = asset;
-
-            _status = ResourceStatus.Error;
-        }
-
-        internal void Regenerate()
-        {
-            if (_needsRegenerate)
+            if (!_hasNewestUpdateBeenConsumed)
             {
-                if (_brushScene != null && _vertexCache != null && _generator != null)
-                {
-                    _generator.GenerateMesh(_brushScene);
-
-                    if (_vertexBuffer == null || _vertexBufferSize < _generator.Vertices.Length)
-                    {
-                        _vertexBufferSize = (int)(_generator.Vertices.Length * 1.5);
-                        unsafe
-                        {
-                            //_vertexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
-                            //{
-                            //    Width = (uint)(Unsafe.SizeOf<GeoVertex>() * _vertexBufferSize),
-                            //    Stride = Unsafe.SizeOf<GeoVertex>(),
-                            //    Usage = RHIResourceUsage.VertexInput,
-                            //}, (nint)Unsafe.AsPointer(ref _generator.Vertices[0]));
-                        }
-                    }
-                    //else
-                    //    FrameUploadManager.ScheduleUpload(_vertexBuffer, _generator.Vertices, new UploadDescription(UploadScheduleTarget.Frame));
-
-                    if (_indexBuffer == null || _indexBufferSize < _generator.Indices.Length)
-                    {
-                        _indexBufferSize = (int)(_generator.Indices.Length * 1.5);
-                        unsafe
-                        {
-                            //_indexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
-                            //{
-                            //    Width = (uint)(Unsafe.SizeOf<ushort>() * _indexBufferSize),
-                            //    Stride = Unsafe.SizeOf<ushort>(),
-                            //    Usage = RHIResourceUsage.VertexInput,
-                            //}, (nint)Unsafe.AsPointer(ref _generator.Indices[0]));
-                        }
-                    }
-                    //else
-                    //    FrameUploadManager.ScheduleUpload(_indexBuffer, _generator.Indices, new UploadDescription(UploadScheduleTarget.Frame));
-                }
-
-                _needsRegenerate = false;
+                EditorRuntime.GlobalSingleton.GeoSceneManager.AddInvalidScene(Definition!, _scene);
+                return false;
             }
+
+            _hasNewestUpdateBeenConsumed = false;
+
+            MeshContainer container = _scene.Container;
+            foreach (MeshSlice slice in container.Slices)
+                _activeKeys.Add(new GeoMeshKey(slice.Group, slice.Material));
+
+            _scene.RegenerateInvalidData(_defaultMaterial);
+
+            int i = 0;
+            foreach (MeshSlice slice in container.Slices)
+            {
+                GeoMeshKey key = new GeoMeshKey(slice.Group, slice.Material);
+                _activeKeys.Remove(key);
+                
+                if (slice.UpdateFlags == MeshSliceUpdateFlags.None)
+                    break;
+
+                if (_renderMeshes.TryGetValue(key, out GeoSceneRenderMesh? renderMesh))
+                {
+                    if (Flags.HasFlag(slice.UpdateFlags, MeshSliceUpdateFlags.VerticesChanged))
+                        renderMesh.Boundaries = MeshContainer.GetAABB(_scene.Container, slice);
+
+                    renderMesh.UniqueId = i++;
+                    renderMesh.VertexOffset = (uint)slice.VtxOffset;
+                    renderMesh.IndexCount = (uint)slice.VtxCount;
+                }
+                else
+                {
+                    _renderMeshes.Add(key, new GeoSceneRenderMesh(
+                        this,
+                        i++,
+                        MeshContainer.GetAABB(_scene.Container, slice),
+                        (uint)slice.VtxOffset,
+                        0,
+                        (uint)slice.VtxCount,
+                        false));
+                }
+            }
+
+            foreach (GeoMeshKey material in _activeKeys)
+            {
+                _renderMeshes.Remove(material);
+            }
+
+            _activeKeys.Clear();
+
+            EditorRuntime.GlobalSingleton.GeoSceneManager.AddInvalidScene(Definition!, _scene);
+            return true;
         }
 
-        internal GeoBrushScene? BrushScene => _brushScene;
-        internal GeoVertexCache? VertexCache => _vertexCache;
-        internal GeoGenerator? Generator => _generator;
+        public void ConsumeNewMeshData() => _hasNewestUpdateBeenConsumed = true;
 
-        internal bool NeedsRegeneration { get => _needsRegenerate; set => _needsRegenerate = value; }
+        public void ResizeVertexBuffer(out bool isBufferNew)
+        {
+            if (_scene == null)
+            {
+                isBufferNew = false;
+                return;
+            }
 
-        internal ResourceStatus Status => _status;
+            if (_vertexBuffer == null || _vertexBufferSize < _scene.Container.VertexCount)
+            {
+                _vertexBufferSize = _scene.Container.VertexCount * 2;
 
-        internal AssetId Id => _id;
-        internal string Name => _name;
+                _vertexBuffer?.Dispose();
+                _vertexBuffer = RHIDevice.Instance!.CreateBuffer(new RHIBufferDescription
+                {
+                    Width = (uint)(Unsafe.SizeOf<BrushVertex>() * _vertexBufferSize),
+                    Stride = Unsafe.SizeOf<BrushVertex>(),
+                    Usage = RHIResourceUsage.VertexInput,
+                }, ArrayPtr<byte>.Null, "GeoSceneVtx");
 
-        public int LoadIndex => 0;
+                isBufferNew = true;
+            }
+            else
+                isBufferNew = false;
+        }
 
-        public Type AssetType => typeof(GeoSceneAsset);
-        public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
+        internal GeoScene? Scene => _scene;
 
-        AssetId IInternalAssetData.Id => Id;
+        public RHIBuffer? VertexBuffer => _vertexBuffer;
+        public RHIBuffer? IndexBuffer => null;
 
-        ResourceStatus IInternalAssetData.Status => Status;
+        public bool IsLoaded => Status == ResourceStatus.Success;
 
-        string IInternalAssetData.Name => Name;
+        internal IReadOnlyDictionary<GeoMeshKey, GeoSceneRenderMesh>? RenderMeshes => _renderMeshes;
+    }
+
+    internal readonly record struct GeoMeshKey(BrushGroup Group, MaterialAsset Material);
+
+    internal sealed class GeoSceneRenderMesh : RawRenderMesh
+    {
+        public GeoSceneRenderMesh(IRenderMeshSource source, int uniqueId, AABB boundaries, uint vertexOffset, uint indexOffset, uint indexCount, bool hasIndices) : base(source, uniqueId, boundaries, vertexOffset, indexOffset, indexCount, hasIndices)
+        {
+        }
+
+        internal new int UniqueId { get => _uniqueId; set => _uniqueId = value; }
+
+        internal new AABB Boundaries { get => _boundaries; set => _boundaries = value; }
+
+        internal new uint VertexOffset { get => _vertexOffset; set => _vertexOffset = value; }
+        internal new uint IndexOffset { get => _indexOffset; set => _indexOffset = value; }
+        internal new uint IndexCount { get => _indexCount; set => _indexCount = value; }
     }
 }

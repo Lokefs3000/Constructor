@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "lokefs3000.constructor/arguments.schema.json",
+    "title": "Arguments specification",
+    "description": "Specification how arguments should be parsed",
+    "type": "array",
+    "properties": {
+        "Name": {
+            "description": "Argument name",
+            "type": "string"
+        },
+        "Shorthand": {
+            "description": "Shorthand for the argument name",
+            "type": [ "string", "null" ]
+        },
+        "AllowMultiple": {
+            "description": "Allow multiple occurences or values",
+            "type": "boolean"
+        },
+        "HasValue": {
+            "description": "Read a value(s) along with the argument",
+            "type": "boolean"
+        },
+        "Include": {
+            "description": "Include a different specification file",
+            "type": "string"
+        }
+    }
+}

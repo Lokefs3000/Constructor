@@ -5,22 +5,41 @@ using System.Text.Json.Serialization;
 
 namespace Primary.Serialization.Json
 {
-    internal class TextureAssetJsonConverter : JsonConverter<TextureAsset>
+    public class AssetJsonConverter : JsonConverter<IAssetDefinition>
     {
-        public override TextureAsset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override IAssetDefinition? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            if (reader.TokenType == JsonTokenType.Number && reader.TryGetUInt32(out uint assetId))
-            {
-                throw new NotImplementedException();
-                //return AssetManager.LoadAsset<TextureAsset>((AssetId)assetId);
-            }
-            return null;
+            if (!typeToConvert.IsAssignableTo(typeof(IAssetDefinition)))
+                throw new JsonException($"{nameof(typeToConvert)} is not a valid asset definition");
+
+            if (reader.TokenType == JsonTokenType.PropertyName)
+                reader.Read();
+
+            if (reader.TokenType == JsonTokenType.Null)
+                return null;
+
+            if (reader.TokenType != JsonTokenType.String)
+                throw new JsonException();
+
+            IAssetDefinition asset;
+            if (Guid.TryParse(reader.ValueSpan, out Guid guid))
+                asset = (IAssetDefinition)AssetManager.LoadAsset(typeToConvert, (AssetId)guid);
+            else
+                asset = (IAssetDefinition)AssetManager.LoadAsset(typeToConvert, reader.GetString());
+
+            return asset;
         }
 
-        public override void Write(Utf8JsonWriter writer, TextureAsset value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, IAssetDefinition value, JsonSerializerOptions options)
         {
-                throw new NotImplementedException();
-            //writer.WriteNumberValue(value.Id);
+            writer.WriteStringValue(value.Id.ToString());
         }
+
+        public override bool CanConvert(Type typeToConvert)
+        {
+            return typeToConvert.IsAssignableTo(typeof(IAssetDefinition));
+        }
+
+        public static readonly AssetJsonConverter Default = new AssetJsonConverter();
     }
 }

@@ -1,4 +1,4 @@
-﻿using Primary.RHI2.Validation;
+﻿using Primary.RHI.Validation;
 using Serilog;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -23,7 +23,7 @@ using D3D12MA = Interop.D3D12MemAlloc;
 using Primary.Common;
 using System.Globalization;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
     [SupportedOSPlatform("windows")]
     public unsafe sealed class D3D12RHIDevice : RHIDevice

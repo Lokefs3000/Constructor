@@ -1,41 +1,48 @@
 ﻿using Editor.Rendering.Passes;
 using Editor.UI;
 using Editor.UI.Visual;
+using Primary.Profiling;
+using Primary.R2.ForwardPlus;
 using Primary.Rendering;
 
 namespace Editor.Rendering
 {
     internal sealed class EditorRenderPath : IRenderPath
     {
-        private Gizmos? _gizmos;
+        private ForwardPlusRenderPath? _forwardPlusRenderPath;
 
         public void Install(RenderingManager manager)
         {
             RenderPassManager passes = manager.RenderPassManager;
             UIRenderer renderer = UIManager.Instance.Renderer;
 
-            _gizmos = new Gizmos();
+            _forwardPlusRenderPath = new ForwardPlusRenderPath();
 
-            passes.AddRenderPass<GizmoRenderPass>();
+            _forwardPlusRenderPath.Install(manager);
+
+            //passes.AddRenderPass<GizmoRenderPass>();
             renderer.InstallRenderPasses(passes);
             passes.AddRenderPass<DearImGuiRenderPass>();
         }
 
-        public void Uinstall(RenderingManager manager)
+        public void Uninstall(RenderingManager manager)
         {
             RenderPassManager passes = manager.RenderPassManager;
             UIRenderer renderer = UIManager.Instance.Renderer;
 
-            _gizmos!.Dispose();
+            _forwardPlusRenderPath?.Uninstall(manager);
 
-            passes.RemoveRenderPass<GizmoRenderPass>();
+            //passes.RemoveRenderPass<GizmoRenderPass>();
             renderer.UninstallRenderPasses(passes);
             passes.RemoveRenderPass<DearImGuiRenderPass>();
         }
 
         public void PreRenderPassSetup(RenderingManager manager)
         {
-
+            using (new ProfilingScope("ForwardPlus"))
+            {
+                _forwardPlusRenderPath?.PreRenderPassSetup(manager);
+            }
         }
     }
 }

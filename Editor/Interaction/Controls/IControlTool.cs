@@ -2,7 +2,7 @@
 
 namespace Editor.Interaction.Controls
 {
-    internal interface IControlTool
+    public interface IControlTool
     {
         public ReadOnlySpan<IToolTransform> Transforms { get; }
 

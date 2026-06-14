@@ -1,4 +1,4 @@
-﻿using Primary.RHI2;
+﻿using Primary.RHI;
 
 namespace Primary.Rendering.NRD
 {

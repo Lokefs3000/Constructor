@@ -3,8 +3,9 @@ using Primary.Components;
 
 namespace Editor.Components
 {
+    [Component]
     [ComponentRequirements(typeof(DontSerializeTag))]
-    internal struct GeoSceneGeneratedTag : IComponent
+    public record struct GeoSceneGeneratedTag : IComponent
     {
         public AssetId SceneAssetId;
     }

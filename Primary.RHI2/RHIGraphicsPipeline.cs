@@ -1,4 +1,4 @@
-﻿namespace Primary.RHI2
+﻿namespace Primary.RHI
 {
     public unsafe abstract class RHIGraphicsPipeline : IDisposable, IAsNativeObject<RHIGraphicsPipelineNative>
     {

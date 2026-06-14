@@ -14,9 +14,9 @@ using static TerraFX.Interop.DirectX.D3D12_RESOURCE_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_TEXTURE_LAYOUT;
 using D3D12MA = Interop.D3D12MemAlloc;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows")]
+    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe sealed class D3D12RHITexture : RHITexture
     {
         private readonly D3D12RHIDevice _device;
@@ -72,6 +72,7 @@ namespace Primary.RHI2.Direct3D12
                 HRESULT hr = D3D12MA.Allocator.CreateResource3(device.Allocator, &alloc, &desc, D3D12_BARRIER_LAYOUT_UNDEFINED, null, 0, null, &temp, UuidOf.Get<ID3D12Resource2>(), (void**)_resource.GetAddressOf());
                 if (hr.FAILED)
                 {
+                    device.FlushPendingMessages();
                     throw new RHIException($"Failed to create D3D12 resource: {hr}");
                 }
 
@@ -107,12 +108,13 @@ namespace Primary.RHI2.Direct3D12
                         NativeMemory.Free(_nativeRep);
                     _nativeRep = null;
 
+                    _resource.Reset();
                     if (_allocation != null)
                         _allocation->Base.Release();
                     _allocation = null;
-                    _resource.Reset();
 
                     _device.UploadManager.RemoveWithResource(this);
+                    _device.ResourceTracker.Untrack(this);
                 });
 
                 _disposedValue = true;
@@ -125,6 +127,11 @@ namespace Primary.RHI2.Direct3D12
             {
                 ResourceHelper.SetResourceName(_resource, debugName);
             }
+        }
+
+        public override string ToString()
+        {
+            return $"RHITexture{{{_debugName}}}";
         }
 
         public override unsafe RHITextureNative* GetAsNative() => (RHITextureNative*)_nativeRep;

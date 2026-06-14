@@ -35,12 +35,20 @@ namespace Primary.Threading
 
                         task.Action();
                         task.TCS.TrySetResult();
+
+                        _tcsPool.Return(currentTcs);
+                        currentTcs = null;
                     }
                 }
                 catch (Exception ex)
                 {
                     Log.Error(ex, "_");
-                    currentTcs?.TrySetException(ex);
+
+                    if (currentTcs != null)
+                    {
+                        currentTcs.TrySetException(ex);
+                        _tcsPool.Return(currentTcs);
+                    }
                 }
             }
         }

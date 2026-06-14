@@ -1,4 +1,5 @@
 ﻿using Primary.Scenes;
+using Primary.Scenes.Components;
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -25,7 +26,7 @@ namespace Primary.Reflection
             if (_componentCaches.TryGetValue(fullName, out ComponentReflection reflectionCache))
                 return reflectionCache;
 
-            Type? type = SceneEntityManager.FindComponentFromFullName(fullName);
+            Type? type = null;//SceneEntityManager.FindComponentFromFullName(fullName);
             if (type == null)
             {
                 return _emptyCache;

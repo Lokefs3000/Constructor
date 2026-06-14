@@ -24,6 +24,11 @@ namespace Editor.UI.Datatypes
             Gradient = gradient;
         }
 
+        public override string ToString()
+        {
+            return Type == UIColorType.Solid ? Solid.ToString() : Gradient.ToString();
+        }
+
         public static implicit operator UIColor(Color color) => new UIColor(color);
         public static implicit operator UIColor(UIGradientColor gradient) => new UIColor(gradient);
 

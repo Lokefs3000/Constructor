@@ -5,6 +5,7 @@ using Primary.Assets;
 using Primary.Components;
 using Primary.Profiling;
 using Primary.Rendering.Assets;
+using Primary.Rendering.Statistics;
 using Primary.Rendering.Tree;
 using Primary.Scenes;
 using System.Diagnostics;
@@ -15,6 +16,7 @@ namespace Primary.Rendering.Batching
     internal sealed class OctreeRenderBatcher
     {
         private readonly byte _id;
+        private readonly RenderingManager _manager;
 
         private Queue<RenderOctant> _octants;
 
@@ -25,9 +27,10 @@ namespace Primary.Rendering.Batching
         private PooledList<RenderKey> _renderingKeys;
         private PooledList<UnbatchedRenderFlag> _renderingData;
 
-        internal OctreeRenderBatcher(byte id)
+        internal OctreeRenderBatcher(byte id, RenderingManager manager)
         {
             _id = id;
+            _manager = manager;
 
             _octants = new Queue<RenderOctant>();
 
@@ -53,6 +56,8 @@ namespace Primary.Rendering.Batching
         {
             using (new ProfilingScope("BatchOctree"))
             {
+                ref BatchStatistics batchStats = ref _manager.Statistics.Batch;
+
                 _octants.Clear();
                 _octants.Enqueue(octree.RootOctant);
 
@@ -60,7 +65,8 @@ namespace Primary.Rendering.Batching
                 {
                     if (octant.Children.Count > 0)
                     {
-                        BatchEntitiesWithinOctant(list, octant);
+                        ++batchStats.OctantsTraversed;
+                        BatchEntitiesWithinOctant(list, octant, ref batchStats);
                     }
 
                     foreach (RenderOctant subOctant in octant.Octants)
@@ -68,10 +74,12 @@ namespace Primary.Rendering.Batching
                         _octants.Enqueue(subOctant);
                     }
                 }
+
+                batchStats.OctantObjectsPassed += _renderingKeys.Count;
             }
         }
 
-        private void BatchEntitiesWithinOctant(RenderList list, RenderOctant octant)
+        private void BatchEntitiesWithinOctant(RenderList list, RenderOctant octant, ref BatchStatistics batchStats)
         {
             World world = Engine.GlobalSingleton.SceneManager.World;
 
@@ -80,6 +88,10 @@ namespace Primary.Rendering.Batching
             {
                 ref readonly SceneEntity entity = ref entities[i];
                 ref readonly EntityData rawData = ref world.GetEntityData(entity.WrappedEntity);
+
+                ref readonly EntityEnabled enabled = ref rawData.Get<EntityEnabled>();
+                if (!enabled.Enabled)
+                    continue;
 
                 ref readonly MeshRenderer renderer = ref rawData.Get<MeshRenderer>();
                 //"renderer" SHOULD not be null but a crash will occur if it is
@@ -95,8 +107,11 @@ namespace Primary.Rendering.Batching
                         TODO: CULL OBJECT 
                     */
 
-                    MaterialAsset material = renderer.Material ?? list.DefaultMaterial!;
+                    MaterialAsset material = (renderer.Material == null || renderer.Material.Shader == null) ? list.DefaultMaterial! : renderer.Material;
                     ShaderAsset? shader = material.Shader;
+
+                    if (shader == null)
+                        continue;
 
                     RawRenderMesh mesh = renderer.Mesh;
 
@@ -105,6 +120,9 @@ namespace Primary.Rendering.Batching
                         material = list.DefaultMaterial!;
                         shader = list.DefaultMaterial!.Shader!;
                     }
+
+                    if (!shader.IsLoaded || !material.IsLoaded || !mesh.Source.IsLoaded)
+                        continue;
 
                     if (!_shaderSourceIndices.TryGetValue(shader, out ushort shaderId))
                     {
@@ -128,6 +146,8 @@ namespace Primary.Rendering.Batching
                     _renderingData.Add(new UnbatchedRenderFlag(material, mesh, transform.Transformation));
                 }
             }
+
+            batchStats.OctantObjectsConsidered += entities.Length;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

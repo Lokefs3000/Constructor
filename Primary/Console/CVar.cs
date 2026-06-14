@@ -8,7 +8,7 @@
         public void SetValue(object value);
     }
 
-    internal struct CVar<T> : IGenericCVar where T : notnull
+    public record struct CVar<T> : IGenericCVar where T : notnull
     {
         public T Value;
 

@@ -11,8 +11,10 @@ namespace Editor.UI.Serialization.Custom
 {
     internal class SplitPanelRoutine : ISerializationRoutine
     {
-        public UIElement? Deserialize(DeserializeContext context, UIElement parentElement, XmlElement xmlElement)
+        public UIElement? Deserialize(DeserializeContext context, UIElement parentElement, XmlElement xmlElement, out bool skipChildren)
         {
+            skipChildren = false;
+
             UISplitPanel? splitPanel = null;
             if (parentElement is not UISplitContainer splitContainer)
             {

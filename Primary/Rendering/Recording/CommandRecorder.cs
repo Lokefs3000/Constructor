@@ -4,7 +4,7 @@ using Primary.Common;
 using Primary.Common.Memory;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Resources;
-using Primary.RHI2;
+using Primary.RHI;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -89,6 +89,16 @@ namespace Primary.Rendering.Recording
 #if DEBUG
             AddValidationCommand();
 #endif
+        }
+
+        internal unsafe void AddString(ReadOnlySpan<byte> text)
+        {
+            int size = Unsafe.SizeOf<RecCommandType>();
+            nint ptr = _allocator.Allocate(text.Length);
+
+            text.CopyTo(new Span<byte>(ptr.ToPointer(), text.Length));
+
+            AddValidationCommand();
         }
 
         [Conditional("DEBUG")]
@@ -183,7 +193,11 @@ namespace Primary.Rendering.Recording
         CommitResources,
         CommitRenderTargets,
         CommitViewports,
-        CommitScissors
+        CommitScissors,
+
+        BeginEvent,
+        EndEvent,
+        MarkEvent
     }
 
     public enum RecCommandContextType : byte

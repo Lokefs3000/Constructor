@@ -433,6 +433,12 @@ namespace Primary.Scenes
 
         public static SceneEntity CreateEntity(Scene? scene) => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target)).CreateReadyEntity(scene);
 
+        public static void DestroyEntity(SceneEntity entity)
+        {
+            Scene scene = entity.Scene;
+            scene.World.Destroy(entity.WrappedEntity);
+        }
+
         public static IEnumerable<Type> RegisteredComponents => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._components.Keys;
 
         private event ComponentEnabledCallback? _componentEnabled;

@@ -28,9 +28,9 @@ using Primary.Collections;
 using Primary.Common;
 using Primary.Interop;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows")]
+    [SupportedOSPlatform("windows10.0.17763.0")]
     internal sealed unsafe class UploadManager : IDisposable
     {
         private readonly D3D12RHIDevice _device;
@@ -157,6 +157,9 @@ namespace Primary.RHI2.Direct3D12
 
             CreateAndFlushBarriers(cmds, uploads.AsSpan());
             CreateUploadBuffer(requiredUploadSize, out ComPtr<ID3D12Resource2> uploadBuffer, out D3D12MemAlloc.Allocation* uploadAllocation);
+
+            if (uploadBuffer.Get() == null || uploadAllocation == null)
+                return;
 
             ArrayPtr<byte> mapped = new ArrayPtr<byte>(null, (int)requiredUploadSize);
             HRESULT hr = uploadBuffer.Get()->Map(0, null, (void**)&mapped);
@@ -368,10 +371,16 @@ namespace Primary.RHI2.Direct3D12
             if (hr.FAILED)
             {
                 _device.FlushPendingMessages();
-                throw new RHIException($"Failed to create resource upload buffer: {hr.ToString()}");
+                _device.Logger?.Error($"Failed to create resource upload buffer: {hr.ToString()}");
+
+                resource = null;
+                allocation = null;
+                return;
             }
 
             allocation = temp;
+
+            ResourceHelper.SetResourceName(resource.Get(), "RHIUploadBuffer");
         }
 
         internal bool HasPendingUploads => _pendingUploads.Count > 0;

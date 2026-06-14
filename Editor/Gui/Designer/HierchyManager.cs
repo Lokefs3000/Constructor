@@ -1,7 +1,9 @@
-﻿using Editor.UI.Assets;
+﻿using Editor.UI;
+using Editor.UI.Assets;
 using Editor.UI.Designer;
 using Editor.UI.Elements;
 using Editor.UI.Elements.Tree;
+using Editor.UI.Reflection;
 using Primary.Assets;
 using Primary.Common;
 using System;
@@ -17,9 +19,10 @@ namespace Editor.Gui.Designer
 
         private readonly UIFontAsset _mainFont;
 
-        private readonly ContextMenu _nodeContextMenu;
+        private readonly ContextMenuAsset _nodeContextMenu;
 
         private TreeNode _rootNode;
+        private Dictionary<UIElement, TreeNode> _nodeDict;
 
         internal HierchyManager(UIDesigner designer)
         {
@@ -29,22 +32,56 @@ namespace Editor.Gui.Designer
             _mainFont = AssetManager.LoadAsset<UIFontAsset>("Editor/Fonts/Inter.uifont")
                 .WaitIfNotLoaded();
 
-            _nodeContextMenu = AssetManager.LoadAsset<ContextMenu>("Editor/Designer/Context/HierchyContext.uimenu");
+            _nodeContextMenu = AssetManager.LoadAsset<ContextMenuAsset>("Editor/Designer/Context/HierchyContext.uimenu");
 
             _rootNode = new TreeNode()
             {
-                Parent = _treeView.RootNode,
-
-                FontStyle = _mainFont.FindStyle("Regular"),
                 Text = "Root element",
 
                 TextColor = s_treeViewColor
             };
+            _nodeDict = new Dictionary<UIElement, TreeNode>();
+
+            _treeView.AddNode(_rootNode);
         }
 
         internal void ClearView()
         {
             _rootNode.ClearChildren();
+            _nodeDict.Clear();
+
+            _nodeDict.Add(_designer.CanvasManager.RootElement, _rootNode);
+        }
+
+        internal TreeNode? AddHierchyElement(UIElement element)
+        {
+            UIElement? parent = element.Parent;
+            if (parent == null)
+                return null;
+
+            if (!_nodeDict.TryGetValue(parent, out TreeNode? parentNode))
+            {
+                EdLog.Gui.Error("No node created for parent: {p}", parent);
+
+                parentNode = AddHierchyElement(parent);
+                if (parentNode == null)
+                    return null;
+            }
+
+            CachedElementData elementData = UIManager.Instance.ReflectionManager.ElementCache.GetElementData(element.GetType());
+
+            TreeNode newNode = new TreeNode()
+            {
+                Font = _mainFont,
+                Text = elementData.PrettyName,
+
+                TextColor = s_treeViewColor
+            };
+
+            parentNode.AddNode(newNode);
+
+            _nodeDict.Add(element, newNode);
+            return newNode;
         }
 
         private static readonly Color s_treeViewColor = Color.FromHex("6da4fc");

@@ -26,7 +26,7 @@ namespace Primary.Timing
             _deltaTimeDouble = 0;
             _deltaTime = 0;
 
-            _frameIndex = 0;
+            _frameIndex = -1;
         }
 
         public void BeginNewFrame()
@@ -50,6 +50,8 @@ namespace Primary.Timing
 
             _frameIndex++;
         }
+
+        public static int GetFrameDifference(int a, int b) => (int)(a > b ? (uint)a - (uint)b : (uint)b - (uint)a);
 
         public static double DeltaTimeDouble => Instance._deltaTimeDouble;
         public static float DeltaTime => Instance._deltaTime;

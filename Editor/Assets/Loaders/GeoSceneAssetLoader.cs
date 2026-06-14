@@ -1,5 +1,7 @@
 ﻿using Editor.Assets.Types;
 using Editor.Geometry;
+using Editor.Geometry.Serialization;
+using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Common.Streams;
 
@@ -29,11 +31,17 @@ namespace Editor.Assets.Loaders
 
             try
             {
-                GeoBrushScene brushScene = new GeoBrushScene();
-                GeoVertexCache vertexCache = new GeoVertexCache();
-                GeoGenerator generator = new GeoGenerator(vertexCache);
+                using Stream? inputStream = AssetFilesystem.OpenStream(sourcePath, bundleToReadFrom) ??
+                    throw new Exception();
 
-                geoSceneData.UpdateAssetData(geoScene, brushScene, vertexCache, generator);
+                byte[] sourceData = new byte[inputStream.Length];
+                inputStream.ReadExactly(sourceData);
+
+                GeoScene scene = new GeoScene();
+                SceneDeserializer.Deserialize(sourceData, scene);
+
+                MaterialAsset material = AssetManager.LoadAsset<MaterialAsset>("Editor/Materials/GeoDefault.mat");
+                geoSceneData.UpdateAssetData(geoScene, scene, material);
             }
 #if !DEBUG
             catch (Exception ex)

@@ -8,17 +8,31 @@ namespace Editor.UI.Visual
 {
     public struct TextBuilder
     {
+        private TextOrigin _origin;
+
         private UITextAlignment _alignment;
         private UITextOverflow _overflow;
 
         private Vector2 _maxExtents;
 
+        private bool _allowRichText;
+
         public TextBuilder()
         {
+            _origin = TextOrigin.Top;
+
             _alignment = UITextAlignment.TopLeft;
             _overflow = UITextOverflow.Overflow;
 
             _maxExtents = Vector2.PositiveInfinity;
+
+            _allowRichText = true;
+        }
+
+        public TextBuilder SetOrigin(TextOrigin origin)
+        {
+            _origin = origin;
+            return this;
         }
 
         public TextBuilder SetAlignment(UITextAlignment alignment)
@@ -39,10 +53,16 @@ namespace Editor.UI.Visual
             return this;
         }
 
-        internal RawTextBuilderData ToRaw() => new RawTextBuilderData(_alignment, _overflow, _maxExtents);
+        public TextBuilder SetAllowRichText(bool allowRichText)
+        {
+            _allowRichText = allowRichText;
+            return this;
+        }
+
+        internal RawTextBuilderData ToRaw() => new RawTextBuilderData(_origin, _alignment, _overflow, _maxExtents, _allowRichText);
 
         public static readonly TextBuilder Default = new TextBuilder();
     }
 
-    internal readonly record struct RawTextBuilderData(UITextAlignment Alignment, UITextOverflow Overflow, Vector2 MaxExtents);
+    internal readonly record struct RawTextBuilderData(TextOrigin Origin, UITextAlignment Alignment, UITextOverflow Overflow, Vector2 MaxExtents, bool AllowRichText);
 }

@@ -8,6 +8,7 @@ using Primary.Common;
 using Primary.Pooling;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -27,14 +28,23 @@ namespace Editor.UI.Text.Wrappers
 
         public unsafe override void WrapText(in TextWrapInfo wrapInfo, ShapedTextData textData, Span<char> text)
         {
-            FontMetrics defaultMetrics = new FontMetrics(wrapInfo.DefaultVisualInfo.Style, wrapInfo.DefaultVisualInfo.FontSize);
+            FontMetrics defaultMetrics = new FontMetrics(wrapInfo.DefaultVisualInfo.TypeData, wrapInfo.DefaultVisualInfo.FontSize);
             FontMetrics currentMetrics = defaultMetrics;
 
-            TextVisualInfo defaultVisualInfo = new TextVisualInfo(wrapInfo.DefaultVisualInfo.DrawColor, defaultMetrics.RelativeScale, wrapInfo.DefaultVisualInfo.Style);
+            TextVisualInfo defaultVisualInfo = new TextVisualInfo(wrapInfo.DefaultVisualInfo.DrawColor, defaultMetrics.RelativeScale, wrapInfo.DefaultVisualInfo.TypeData);
             MutableTextVisualInfo currentVisualInfo = defaultVisualInfo;
 
+            bool richTextEnabled = wrapInfo.AllowRichText;
+
             int currentLineIndex = 0;
-            float currentLineOffset = wrapInfo.DefaultVisualInfo.Style.Metrics.Height * defaultMetrics.RelativeScale;
+            float currentLineOffset = 0.0f;
+
+            if (wrapInfo.Origin == TextOrigin.Top)
+                currentLineOffset = 0.0f;
+            else
+                currentLineOffset = 0.0f;
+
+            float baseLineOffset = wrapInfo.DefaultVisualInfo.TypeData.Metrics.LineHeight * defaultMetrics.RelativeScale;
 
             char lastValidAdvanceLetter = '\0';
             float currentWidth = 0.0f;
@@ -56,11 +66,14 @@ namespace Editor.UI.Text.Wrappers
                 {
                     case '\0':
                         {
+                            if (i != text.Length - 1)
+                                goto default;
+
                             if (i > 0)
                             {
                                 if (lastValidAdvanceLetter != '\0' && advanceVectorCounter > 0)
                                 {
-                                    UIGlyph glyph = currentVisualInfo.Style.RequestGlyph(lastValidAdvanceLetter);
+                                    UIGlyph glyph = currentVisualInfo.TypeData.RequestGlyph(lastValidAdvanceLetter);
                                     advanceVectorSpan[advanceVectorCounter - 1] = glyph.Size.X;
                                 }
 
@@ -72,26 +85,29 @@ namespace Editor.UI.Text.Wrappers
 
                                 textData.AddLetters(text[..i]);
                                 textData.AddLine(currentLineIndex, (currentLineOffset + lineVerticalOffsets.X) * TextManager.PixelsPerEM, new Vector2(currentWidth, 0.0f) * TextManager.PixelsPerEM);
-                                textData.AddSection(currentVisualInfo.Style, currentSectionLineOffset, currentVisualInfo);
+                                textData.AddSection(currentVisualInfo.TypeData, currentSectionLineOffset, currentVisualInfo);
                             }
                             else
                             {
                                 textData.AddLine(currentLineIndex, (currentLineOffset + lineVerticalOffsets.X) * TextManager.PixelsPerEM, new Vector2(currentWidth, 0.0f) * TextManager.PixelsPerEM, true);
                             }
 
-                            textData.SetMetrics(new Vector2(maxHorizontalExtent, currentLineOffset) * TextManager.PixelsPerEM);
+                            textData.SetMetrics(new Vector2(maxHorizontalExtent, currentLineOffset + baseLineOffset) * TextManager.PixelsPerEM);
 
                             return;
                         }
                     case '<':
                         {
+                            if (!richTextEnabled)
+                                goto default;
+
                             int prevIndex = i;
                             if (HandleRichText(text[i..], in wrapInfo, ref i, currentVisualInfo, out MutableTextVisualInfo newVisualInfo, out RichTextEffect effect))
                             {
                                 if (i > prevIndex)
                                 {
                                     textData.AddLetters(text[.. prevIndex]);
-                                    textData.AddSection(currentVisualInfo.Style, currentSectionLineOffset, currentVisualInfo);
+                                    textData.AddSection(currentVisualInfo.TypeData, currentSectionLineOffset, currentVisualInfo);
 
                                     text = text[(i + 1)..];
                                     i = -1;
@@ -107,23 +123,30 @@ namespace Editor.UI.Text.Wrappers
                                 }
 
                                 currentSectionLineOffset = currentWidth * TextManager.PixelsPerEM;
-                            
-                                if (Flags.HasEither(effect, RichTextEffect.Style | RichTextEffect.Size))
-                                {
-                                    FontMetrics newMetrics = new FontMetrics(newVisualInfo.Style, newVisualInfo.FontSize);
-                                    if (currentVisualInfo.FontSize != newVisualInfo.FontSize)
-                                    {
-                                        Vector2 lineOffsets = new Vector2(
-                                            currentMetrics.Ascender - newMetrics.Ascender,
-                                            -(currentMetrics.Descender - newMetrics.Descender));
 
-                                        lineVerticalOffsets = Vector2.Max(lineVerticalOffsets, lineOffsets);
+                                if (Flags.HasFlag(effect, RichTextEffect.Disabled))
+                                {
+                                    richTextEnabled = false;
+                                }
+                                else
+                                {
+                                    if (Flags.HasEither(effect, RichTextEffect.Style | RichTextEffect.Size))
+                                    {
+                                        FontMetrics newMetrics = new FontMetrics(newVisualInfo.TypeData, newVisualInfo.FontSize);
+                                        if (currentVisualInfo.FontSize != newVisualInfo.FontSize)
+                                        {
+                                            Vector2 lineOffsets = new Vector2(
+                                                currentMetrics.Ascender - newMetrics.Ascender,
+                                                -(currentMetrics.Descender - newMetrics.Descender));
+
+                                            lineVerticalOffsets = Vector2.Max(lineVerticalOffsets, lineOffsets);
+                                        }
+
+                                        currentMetrics = newMetrics;
                                     }
 
-                                    currentMetrics = newMetrics;
+                                    currentVisualInfo = newVisualInfo;
                                 }
-
-                                currentVisualInfo = newVisualInfo;
                             }
 
                             break;
@@ -134,7 +157,7 @@ namespace Editor.UI.Text.Wrappers
                             {
                                 if (advanceVectorCounter > 0)
                                 {
-                                    UIGlyph glyph = currentVisualInfo.Style.RequestGlyph(lastValidAdvanceLetter);
+                                    UIGlyph glyph = currentVisualInfo.TypeData.RequestGlyph(lastValidAdvanceLetter);
                                     advanceVectorSpan[advanceVectorCounter - 1] = glyph.Size.X;
 
                                     if (advanceVectorCounter == 8)
@@ -146,7 +169,7 @@ namespace Editor.UI.Text.Wrappers
                                 }
                                 else
                                 {
-                                    UIGlyph glyph = currentVisualInfo.Style.RequestGlyph(lastValidAdvanceLetter);
+                                    UIGlyph glyph = currentVisualInfo.TypeData.RequestGlyph(lastValidAdvanceLetter);
                                     currentWidth -= (glyph.Advance - glyph.Size.X) * currentMetrics.RelativeScale;
                                 }
                                 
@@ -154,7 +177,7 @@ namespace Editor.UI.Text.Wrappers
 
                                 textData.AddLetters(text[..i]);
                                 textData.AddLine(currentLineIndex, (currentLineOffset + lineVerticalOffsets.X) * TextManager.PixelsPerEM, new Vector2(currentWidth, 0.0f) * TextManager.PixelsPerEM);
-                                textData.AddSection(currentVisualInfo.Style, currentSectionLineOffset, currentVisualInfo);
+                                textData.AddSection(currentVisualInfo.TypeData, currentSectionLineOffset, currentVisualInfo);
                             }
                             else if (lastValidAdvanceLetter != '\0')
                             {
@@ -179,21 +202,19 @@ namespace Editor.UI.Text.Wrappers
                         {
                             if (!char.IsControl(letter))
                             {
-                                UIGlyph glyph = currentVisualInfo.Style.RequestGlyph(letter);
-                                if (!Unsafe.IsNullRef(in glyph))
+                                UIGlyph glyph = currentVisualInfo.TypeData.RequestGlyph(letter);
+
+                                if (advanceVectorCounter == 8)
                                 {
-                                    if (advanceVectorCounter == 8)
-                                    {
-                                        currentWidth += Vector256.Sum(advanceVector) * currentMetrics.RelativeScale;
+                                    currentWidth += Vector256.Sum(advanceVector) * currentMetrics.RelativeScale;
 
-                                        advanceVectorSpan[0] = glyph.Advance;
-                                        advanceVectorCounter = 1;
-                                    }
-                                    else
-                                        advanceVectorSpan[advanceVectorCounter++] = glyph.Advance;
-
-                                    lastValidAdvanceLetter = letter;
+                                    advanceVectorSpan[0] = glyph.Advance;
+                                    advanceVectorCounter = 1;
                                 }
+                                else
+                                    advanceVectorSpan[advanceVectorCounter++] = glyph.Advance;
+
+                                lastValidAdvanceLetter = letter;
                             }
 
                             break;
@@ -201,7 +222,7 @@ namespace Editor.UI.Text.Wrappers
                 }
             }
 
-            throw new NotSupportedException();
+            throw new UnreachableException();
 
             //slower but all inclusive method for getting width
             //NOTE: 'vector' never gets moved because it is local and therefore on the stack and not the heap

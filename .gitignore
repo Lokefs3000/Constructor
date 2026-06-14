@@ -404,3 +404,6 @@ FodyWeavers.xsd
 /Project
 /Project/Library
 /Source/DemoGame1
+
+# Temporary
+/infra_import

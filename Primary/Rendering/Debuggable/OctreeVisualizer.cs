@@ -1,5 +1,6 @@
 ﻿using Primary.Common;
 using Primary.Rendering.Tree;
+using Primary.Mathematics;
 using System.Numerics;
 
 namespace Primary.Rendering.Debuggable

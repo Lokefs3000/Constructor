@@ -48,7 +48,7 @@ namespace Editor.DearImGui.Popups
         {
             if (_iconSet == null)
             {
-                DynamicAtlasManager atlasManager = Editor.GlobalSingleton.GuiAtlasManager;
+                DynamicAtlasManager atlasManager = EditorRuntime.GlobalSingleton.GuiAtlasManager;
                 _iconSet = atlasManager.CreateIconSet(
                     "Editor/Textures/Icons/ImportIcon.png");
 
@@ -124,7 +124,7 @@ namespace Editor.DearImGui.Popups
         {
             _searched.Clear();
 
-            AssetCategoryDatabase? category = Editor.GlobalSingleton.AssetDatabase.GetCategory(_type, false);
+            AssetCategoryDatabase? category = EditorRuntime.GlobalSingleton.AssetDatabase.GetCategory(_type, false);
             if (category == null)
             {
                 EdLog.Gui.Warning("{t} category is not within database", _type);

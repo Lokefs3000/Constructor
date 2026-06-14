@@ -2,9 +2,9 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows")]
+    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe sealed class D3D12RHISampler : RHISampler
     {
         private readonly D3D12RHIDevice _device;
@@ -34,6 +34,8 @@ namespace Primary.RHI2.Direct3D12
                     if (_nativeRep != null)
                         NativeMemory.Free(_nativeRep);
                     _nativeRep = null;
+
+                    _device.ResourceTracker.Untrack(this);
                 });
 
                 _disposedValue = true;
@@ -43,6 +45,11 @@ namespace Primary.RHI2.Direct3D12
         protected override void SetDebugName(string? debugName)
         {
 
+        }
+
+        public override string ToString()
+        {
+            return $"RHISampler{{{_debugName}}}";
         }
 
         public override unsafe RHISamplerNative* GetAsNative() => (RHISamplerNative*)_nativeRep;

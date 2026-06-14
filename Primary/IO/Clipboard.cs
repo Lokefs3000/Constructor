@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using TerraFX.Interop.Windows;
 
 namespace Primary.IO
@@ -50,6 +51,7 @@ namespace Primary.IO
             return false;
         }
 
+        [SupportedOSPlatform("windows")]
         private static unsafe class Win32Impl
         {
             internal static bool SetUtf16Text(ReadOnlySpan<char> text)

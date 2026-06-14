@@ -50,6 +50,10 @@ namespace Editor.Interop.Ed
 
         [LibraryImport(LibraryName)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        public static partial MSDF_ShapedGlyph* MSDF_DeserializeShapedGlyph(byte* sourceData, double scale);
+
+        [LibraryImport(LibraryName)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         public static partial void MSDF_DestroyShapedGlyph(MSDF_ShapedGlyph* glyph);
 
         [LibraryImport(LibraryName)]
@@ -59,12 +63,16 @@ namespace Editor.Interop.Ed
 
         [LibraryImport(LibraryName)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        [return: MarshalAs(UnmanagedType.I1)]
-        public static partial bool MSDF_GetWhitespaceWidth(MSDF_FontFace* font, double* spaceAdvance, double* tabAdvance);
+        public static partial ushort MSDF_GetUnitsPerEM(MSDF_FontFace* font);
 
         [LibraryImport(LibraryName)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        public static partial void MSDF_GetMetrics(MSDF_FontFace* face, double* ascender, double* descender, double* lineHeight, double* underlineY, double* height);
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static partial bool MSDF_GetWhitespaceWidth(MSDF_FontFace* font, int* spaceAdvance, int* tabAdvance);
+
+        [LibraryImport(LibraryName)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        public static partial void MSDF_GetMetrics(MSDF_FontFace* face, short* ascender, short* descender, short* lineHeight, short* underlineY, short* height);
 
         [LibraryImport(LibraryName)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
@@ -91,6 +99,18 @@ namespace Editor.Interop.Ed
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         [return: MarshalAs(UnmanagedType.I1)]
         public static partial bool MSDF_ShapeGlyph(MSDF_FontFace* face, uint glyph, MSDF_ShapedGlyph* outData);
+
+        [LibraryImport(LibraryName)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        public static partial uint MSDF_QueryShapeContours(MSDF_ShapedGlyph* shapedGlyph);
+
+        [LibraryImport(LibraryName)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        public static partial uint MSDF_QueryContourEdges(MSDF_ShapedGlyph* shapedGlyph, uint contourIndex);
+
+        [LibraryImport(LibraryName)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        public static partial void MSDF_GetContourEdges(MSDF_ShapedGlyph* shapedGlyph, uint contourIndex, uint edgeIndex, MSDF_EdgeData* edgeData);
 
         [LibraryImport(LibraryName)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
@@ -198,5 +218,12 @@ namespace Editor.Interop.Ed
     {
         public double X;
         public double Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public unsafe struct MSDF_EdgeData
+    {
+        public uint Type;
+        public MSDF_Vector2* Points;
     }
 }

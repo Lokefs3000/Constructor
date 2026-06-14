@@ -51,6 +51,11 @@ namespace Editor.UI.Datatypes
             return hash;
         }
 
+        public override string ToString()
+        {
+            return $"<{Type}, #{Keys.Length} keys>";
+        }
+
         public Color Sample(float time)
         {
             for (int i = 0; i < Keys.Length; ++i)

@@ -1,9 +1,12 @@
 ﻿using Primary.Assets.Types;
-using Primary.RHI2;
+using Primary.RHI;
+using Primary.Serialization.Json;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace Primary.Assets
 {
+    [JsonConverter(typeof(AssetJsonConverter))]
     public class TextureAsset : BaseAssetDefinition<TextureAsset, TextureAssetData>
     {
         public TextureAsset(TextureAssetData assetData) : base(assetData)

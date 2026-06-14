@@ -18,7 +18,7 @@ using static TerraFX.Interop.DirectX.D3D12_SAMPLER_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_SHADER_VISIBILITY;
 using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
     [SupportedOSPlatform("windows")]
     public unsafe sealed class D3D12RHIGraphicsPipeline : RHIGraphicsPipeline

@@ -1,11 +1,13 @@
-﻿using Primary.Common;
+﻿using Primary.Assets;
+using Primary.Common;
 using Primary.Common.Memory;
 using Primary.Rendering.Pass;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.Rendering.State;
 using Primary.Rendering.Structures;
-using Primary.RHI2;
+using Primary.RHI;
+using Primary.Windowing;
 using System.Runtime.CompilerServices;
 
 namespace Primary.Rendering.Commands
@@ -35,7 +37,7 @@ namespace Primary.Rendering.Commands
 
         public void SetDepthStencil(FrameGraphTexture depthStencil)
         {
-            if (!depthStencil.IsExternal && !_stateData.ContainsOutput(depthStencil, FGRenderTargetType.DepthStencil))
+            if (!depthStencil.IsNull && !depthStencil.IsExternal && !_stateData.ContainsOutput(depthStencil, FGRenderTargetType.DepthStencil))
             {
                 _errorReporter.ReportError(RPErrorSource.SetRenderTarget, RPErrorType.InvalidOutput, depthStencil.ToString());
                 return;
@@ -135,6 +137,22 @@ namespace Primary.Rendering.Commands
             Raster.SetIndexBuffer(new SetIndexBufferData(desc.Buffer, (uint)desc.Stride));
         }
 
+        public void SetPipeline(ShaderAsset shader)
+        {
+            RHIGraphicsPipeline? pipeline = shader.IsLoaded ? shader.GraphicsPipeline : null;
+            if (pipeline == null)
+            {
+                Raster.SetPipeline(-1);
+            }
+            else
+            {
+                int index = _resources.AddPotentialPipeline(pipeline);
+
+                Raster.SetPipeline(index);
+                Raster.SetPipelineLimits(pipeline);
+            }
+        }
+
         public void SetPipeline(RHIGraphicsPipeline pipeline)
         {
             int index = _resources.AddPotentialPipeline(pipeline);
@@ -172,21 +190,12 @@ namespace Primary.Rendering.Commands
             }
         }
 
-        internal unsafe void PresentOnWindow(Window window, FrameGraphTexture texture)
+        internal void PresentOnWindow(Window window)
         {
-            if (!_stateData.ContainsResource(texture, FGResourceUsage.Read | FGResourceUsage.NoShaderAccess))
-            {
-                _errorReporter.ReportError(RPErrorSource.PresentOnWindow, RPErrorType.NoResourceAccess, texture.ToString());
-                return;
-            }
-
             _recorder.AddCommand(RecCommandType.PresentOnWindow, new CmdPresentOnWindow
             {
-                Texture = texture,
                 WindowId = window.WindowId
             });
-
-            _recorder.AddResourceToSet(texture);
         }
 
         private RasterState Raster => Unsafe.As<RasterState>(_state);

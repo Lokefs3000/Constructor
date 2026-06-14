@@ -1,6 +1,6 @@
 ﻿using Serilog;
 
-namespace Primary.RHI2.Validation
+namespace Primary.RHI.Validation
 {
     public static class SwapChainValidator
     {

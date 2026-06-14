@@ -1,0 +1,26 @@
+texture = "Editor/UI/Icons/GeoContextMenuIcons.png"
+
+[[sprites]]
+name = "NewBrush"
+offset = [0, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "AtCamera"
+offset = [32, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "AtCenter"
+offset = [64, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "NewGroup"
+offset = [96, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "SnapVertices"
+offset = [128, 0]
+size = [32, 32]

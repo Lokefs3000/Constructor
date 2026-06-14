@@ -19,11 +19,17 @@ namespace Primary.Common
             End = length;
         }
 
-        public bool Equals(IndexRange other) => Start == other.Start && End == other.End;
-        public override bool Equals([NotNullWhen(true)] object? obj) => obj is IndexRange other && Equals(other);
+        public readonly bool Equals(IndexRange other) => Start == other.Start && End == other.End;
+        public readonly override bool Equals([NotNullWhen(true)] object? obj) => obj is IndexRange other && Equals(other);
 
-        public override int GetHashCode() => HashCode.Combine(Start, End);
-        public override string ToString() => $"{Start} - {End}";
+        public override readonly int GetHashCode() => HashCode.Combine(Start, End);
+        public override readonly string ToString() => $"{Start}..{End}";
+
+        public readonly bool IsWithinRange(int index) => index >= Start && index < End;
+        public readonly bool IsWithinFullRange(int index) => index >= Start && index <= End;
+
+        public readonly bool IsOverlappingRange(IndexRange range) => Start < range.End && End > range.Start;
+        public readonly bool IsOverlappingFullRange(IndexRange range) => Start <= range.End && End >= range.Start;
 
         public int Length => End - Start;
         public bool IsEmpty => End <= Start;

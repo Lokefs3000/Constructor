@@ -7,6 +7,7 @@ using ExtConsole.Communication.Serialization;
 using Hexa.NET.ImGui;
 using Hexa.NET.SDL3;
 using Primary.Common;
+using Primary.Mathematics;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

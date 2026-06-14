@@ -1,6 +1,7 @@
 ﻿using Primary.Common;
 using Primary.Input.Devices;
 using Primary.Polling;
+using Primary.Profiling;
 using SDL;
 using System.Runtime.CompilerServices;
 
@@ -49,17 +50,20 @@ namespace Primary.Input
 
         public void UpdatePending()
         {
-            if (_hasUpdatePending)
+            using (new ProfilingScope("UpdateInput"))
             {
-                foreach (InputScheme scheme in _schemes)
+                if (_hasUpdatePending)
                 {
-                    scheme.UpdateActions();
+                    foreach (InputScheme scheme in _schemes)
+                    {
+                        scheme.UpdateActions();
+                    }
                 }
-            }
 
-            foreach (var kvp in _devices)
-            {
-                kvp.Value.UpdateFrame();
+                foreach (var kvp in _devices)
+                {
+                    kvp.Value.UpdateFrame();
+                }
             }
         }
 

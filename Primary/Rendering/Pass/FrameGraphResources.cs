@@ -4,7 +4,7 @@ using Primary.Common;
 using Primary.Pooling;
 using Primary.Rendering.NRD;
 using Primary.Rendering.Resources;
-using Primary.RHI2;
+using Primary.RHI;
 using System;
 using System.Diagnostics;
 using System.Numerics;
@@ -118,11 +118,17 @@ namespace Primary.Rendering.Pass
             _usedPipelines.Clear();
         }
 
+        internal void ClearLocalData()
+        {
+            _events.Clear();
+
+            _virtualFreeSpace.Clear();
+            _allocatedResources.Clear();
+        }
+
         internal void SortAndFinish()
         {
             _events.Sort();
-
-            _currentMemoryExtent = 0;
 
             foreach (FGResourceEvent @event in _events.Span)
             {
@@ -162,7 +168,7 @@ namespace Primary.Rendering.Pass
                 {
                     if (_allocatedResources.TryGetValue(@event.Resource, out MemoryRange range))
                     {
-                        FreeVirtualSpace(range);
+                        //FreeVirtualSpace(range);
                     }
                     else
                     {

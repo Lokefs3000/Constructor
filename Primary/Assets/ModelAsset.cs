@@ -1,67 +1,45 @@
 ﻿using Primary.Assets.Types;
 using Primary.Common;
+using Primary.Mathematics;
 using Primary.Rendering.Assets;
-using Primary.RHI2;
+using Primary.RHI;
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace Primary.Assets
 {
-    public sealed class ModelAsset : IAssetDefinition
+    public sealed class ModelAsset : BaseAssetDefinition<ModelAsset, ModelAssetData>
     {
-        private readonly ModelAssetData _assetData;
-
-        internal ModelAsset(ModelAssetData assetData)
+        internal ModelAsset(ModelAssetData assetData) : base(assetData)
         {
-            _assetData = assetData;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetRenderMesh(ReadOnlySpan<char> name, out RenderMesh renderMesh)
+        public bool TryGetRenderMesh(ReadOnlySpan<char> name, [NotNullWhen(true)] out RenderMesh? renderMesh)
         {
-            return _assetData.TryGetRenderMesh(name.ToString(), out renderMesh);
+            return AssetData.TryGetRenderMesh(name.ToString(), out renderMesh);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public RenderMesh GetRenderMesh(ReadOnlySpan<char> name)
         {
-            if (_assetData.TryGetRenderMesh(name.ToString(), out RenderMesh renderMesh))
+            if (AssetData.TryGetRenderMesh(name.ToString(), out RenderMesh? renderMesh))
                 return renderMesh;
             throw new KeyNotFoundException($"No render mesh with name: {name}");
         }
-
-        internal ModelAssetData AssetData => _assetData;
-
-        public ResourceStatus Status => _assetData.Status;
-
-        public string Name => _assetData.Name;
-        public AssetId Id => _assetData.Id;
     }
 
-    internal sealed class ModelAssetData : IInternalAssetData, IRenderMeshSource
+    public sealed class ModelAssetData : BaseInternalAssetData<ModelAsset>, IRenderMeshSource
     {
-        private readonly WeakReference _asset;
-
-        private ResourceStatus _status;
-
-        private readonly AssetId _id;
-        private string _name;
-
         private RenderMesh[] _meshes;
         private ModelNode? _node;
 
         private RHIBuffer? _vertexBuffer;
         private RHIBuffer? _indexBuffer;
 
-        internal ModelAssetData(AssetId id)
+        internal ModelAssetData(AssetId id) : base(id)
         {
-            _asset = new WeakReference(null);
-
-            _status = ResourceStatus.Pending;
-
-            _id = id;
-            _name = string.Empty;
-
             _meshes = Array.Empty<RenderMesh>();
             _node = null;
 
@@ -69,54 +47,34 @@ namespace Primary.Assets
             _indexBuffer = null;
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
-            _status = ResourceStatus.Disposed;
+            base.Dispose();
 
             _vertexBuffer?.Dispose();
             _indexBuffer?.Dispose();
 
-            _asset.Target = null;
-
             //foreach (RenderMesh rm in _meshes)
             //    rm.FreeHandle();
 
-            _meshes = Array.Empty<RenderMesh>();
+            _meshes = [];
             _node = null;
 
             _vertexBuffer = null;
             _indexBuffer = null;
         }
 
-        public void SetAssetInternalStatus(ResourceStatus status)
-        {
-            _status = status;
-        }
-
-        public void SetAssetInternalName(string name)
-        {
-            _name = name;
-        }
-
         internal void UpdateAssetData(ModelAsset asset, RenderMesh[] meshes, ModelNode node, RHIBuffer vertexBuffer, RHIBuffer indexBuffer)
         {
-            _asset.Target = asset;
+            base.UpdateAssetData(asset);
+
             _meshes = meshes;
             _node = node;
             _vertexBuffer = vertexBuffer;
             _indexBuffer = indexBuffer;
-
-            _status = ResourceStatus.Success;
         }
 
-        internal void UpdateAssetFailed(ModelAsset asset)
-        {
-            _asset.Target = asset;
-
-            _status = ResourceStatus.Error;
-        }
-
-        internal bool TryGetRenderMesh(string id, out RenderMesh renderMesh)
+        internal bool TryGetRenderMesh(string id, [NotNullWhen(true)] out RenderMesh? renderMesh)
         {
             for (int i = 0; i < _meshes.Length; i++)
             {
@@ -128,34 +86,39 @@ namespace Primary.Assets
                 }
             }
 
-            Unsafe.SkipInit(out renderMesh);
+            renderMesh = null;
             return false;
         }
+
+        public ReadOnlySpan<RenderMesh> Meshes => _meshes;
 
         public RHIBuffer? VertexBuffer => _vertexBuffer;
         public RHIBuffer? IndexBuffer => _indexBuffer;
 
-        internal ResourceStatus Status => _status;
-
-        internal AssetId Id => _id;
-        internal string Name => _name;
-
-        public int LoadIndex => 0;
-
-        public Type AssetType => typeof(ModelAsset);
-        public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
-
-        AssetId IInternalAssetData.Id => Id;
-        ResourceStatus IInternalAssetData.Status => Status;
-        string IInternalAssetData.Name => Name;
+        public bool IsLoaded => Status == ResourceStatus.Success;
     }
 
     public class RenderMesh : RawRenderMesh
     {
-        private readonly string _id;
+        protected string _id;
 
-        internal RenderMesh(ModelAssetData modelAssetData, int uniqueId, string id, AABB boundaries, uint vertexOffset, uint indexOffset, uint indexCount) : base(modelAssetData, uniqueId, boundaries, vertexOffset, indexOffset, indexCount)
+        internal RenderMesh(ModelAssetData modelAssetData, int uniqueId, string id, AABB boundaries, uint vertexOffset, uint indexOffset, uint indexCount, bool hasIndices) : base(modelAssetData, uniqueId, boundaries, vertexOffset, indexOffset, indexCount, hasIndices)
         {
+            _id = id;
+        }
+
+        internal void UpdateMeshData(int uniqueId, string id, AABB boundaries, uint vertexOffset, uint indexOffset, uint indexCount, bool hasIndices)
+        {
+            _uniqueId = uniqueId;
+
+            _boundaries = boundaries;
+
+            _vertexOffset = vertexOffset;
+            _indexOffset = indexCount;
+            _indexCount = indexCount;
+
+            _hasIndices = hasIndices;
+
             _id = id;
         }
 

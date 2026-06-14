@@ -17,6 +17,8 @@ namespace Primary.Assets
             s_instance = this;
 
             _filesystem = new List<ISubFilesystem>();
+
+            Engine.GlobalSingleton.SetupFilesystems();
         }
 
         public void AddFilesystem(ISubFilesystem filesystem)

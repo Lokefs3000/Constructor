@@ -12,24 +12,18 @@ using System.Text;
 namespace Editor.UI.Modifiers
 {
     [ModifierPrettyName("FitterLayout")]
-    public class UIFitterLayout : IUILayoutModifier
+    public class UIFitterLayout : BaseLayoutModifier
     {
-        private readonly UIElement _element;
-
         private UIFitterAxis _axis;
         private UIValue2 _margin;
 
-        public UIFitterLayout(UIElement element)
+        public UIFitterLayout(UIElement element) : base(element)
         {
-            _element = element;
-
             _axis = UIFitterAxis.None;
             _margin = UIValue2.Zero;
         }
 
-        public void MeasureSize(UIMeasureContext context) { }
-
-        public void ModifyElement(UILayoutContext context)
+        public override void ModifyLayout(UILayoutContext context)
         {
             Vector2 calc = _margin.Evaluate(_element.CurrentSize);
             Vector2 calc2x = calc + calc;
@@ -49,8 +43,6 @@ namespace Editor.UI.Modifiers
 
             context.Measurements.MarkAsOutdated();
         }
-
-        public void DrawVisual(UIPainterContext painter) { }
 
         #region Properties
         [EditableProperty(nameof(_axis))] public UIFitterAxis Axis { get => _axis; set { _axis = value; _element.AddStateFlags(UIStateFlags.InvalidLayout); } }

@@ -4,6 +4,7 @@ using ExtConsole.Communication.Messages;
 using ExtConsole.Communication.Messages.General;
 using Primary;
 using Primary.Common;
+using Primary.Profiling;
 using Primary.Threading;
 using System;
 using System.Collections.Generic;
@@ -95,7 +96,10 @@ namespace Editor.ExtConsole
 
         internal void PollUpdates()
         {
-            _client.PumpEvents();
+            using (new ProfilingScope("ExtConsolePoll"))
+            {
+                _client.PumpEvents();
+            }
         }
 
         private void NetworkThreadUpdate()

@@ -1,6 +1,6 @@
 ﻿using Primary.Assets.Types;
 using Primary.Rendering.Assets;
-using Primary.RHI2;
+using Primary.RHI;
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
@@ -18,7 +18,7 @@ namespace Primary.Assets
 
         public bool TryFindKernel(string kernelName, [NotNullWhen(true)] out ComputeShaderKernel? kernel)
         {
-            if (Status != ResourceStatus.Success)
+            if (!IsLoaded)
             {
                 kernel = null;
                 return false;
@@ -117,6 +117,7 @@ namespace Primary.Assets
         }
 
         public int LoadIndex => _asset.LoadIndex;
+        public bool IsLoaded => _asset.IsLoaded;
 
         public KernelThreadSize ThreadSize => _threadSize;
 

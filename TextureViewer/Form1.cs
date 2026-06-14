@@ -2,7 +2,7 @@ using BCnEncoder.Decoder;
 using BCnEncoder.Shared;
 using CommunityToolkit.HighPerformance;
 using Primary.Assets.Loaders;
-using Primary.RHI2;
+using Primary.RHI;
 using System.Drawing.Imaging;
 
 namespace TextureViewer

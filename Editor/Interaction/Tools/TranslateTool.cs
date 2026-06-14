@@ -1,334 +1,298 @@
-﻿using CommunityToolkit.HighPerformance;
-using Editor.DearImGui;
+﻿using Editor.Gui.View;
+using Editor.Gui.Windows;
 using Editor.Interaction.Controls;
-using Primary.Input;
+using Editor.Rendering;
+using Editor.Rendering.Tools;
+using Primary.Collections.ReadOnly;
+using Primary.Common;
 using Primary.Input.Devices;
 using Primary.Mathematics;
+using Primary.Rendering;
+using Primary.Utility;
+using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.Intrinsics;
+using System.Text;
+using TerraFX.Interop.DirectX;
+using TerraFX.Interop.Windows;
 
 namespace Editor.Interaction.Tools
 {
-    public sealed class TranslateTool : ITool
+    internal class TranslateTool : ITool
     {
-        private ToolManager _tools;
+        private bool _isActive;
+        private bool _isAnyTransformActive;
 
-        private bool _hasBegunDragging;
-        private float _startDist;
-        private Vector3 _axisLock;
-        private DragAxis _dragAxis;
-        private Quaternion _baseRotation;
+        private Vector3 _toolOrigin;
+        private Quaternion _toolQuat;
 
-        private Vector3 _lastDragDelta;
-        private float _currentPlaneDist;
+        private bool _isDragActive;
 
-        private bool _isHoveringAxis;
-        private Vector3 _hoveredAxis;
+        private ToolHandleAxis _activeAxis;
+        private Ray _axisRay;
+        private Vector3 _hitStartPosition;
 
-        private List<StoredData> _storedPositions;
+        private Vector3 _lastHitPosition;
+        private Vector3 _dragDelta;
 
-        internal TranslateTool(ToolManager toolManager)
+        private List<StoredTransformData> _activeTransforms;
+
+        public TranslateTool()
         {
-            _tools = toolManager;
-
-            _storedPositions = new List<StoredData>();
+            _activeTransforms = new List<StoredTransformData>();
         }
 
-        public void Selected()
+        public void Selected(ToolManager tools)
         {
-            _storedPositions.Clear();
+            _isActive = true;
+            _isAnyTransformActive = false;
+        }
 
-            IControlTool control = _tools.ActiveControlTool;
-            foreach (ref readonly IToolTransform @base in control.Transforms)
+        public void Deselected(ToolManager tools)
+        {
+            _isActive = false;
+            _isAnyTransformActive = false;
+
+            _isDragActive = false;
+            _activeTransforms.Clear();
+        }
+
+        public void Update(ToolManager tools)
+        {
+            ROList<ToolTransformData> transforms = tools.Transforms;
+            if (transforms.Count == 0)
             {
-                _storedPositions.Add(new StoredData(@base, @base.WorldMatrix.Translation));
-            }
-
-            control.NewTransformSelected += Event_NewTransformSelected;
-            control.OldTransformDeselected += Event_OldTransformDeselected;
-
-            _isHoveringAxis = false;
-            _hoveredAxis = Vector3.Zero;
-
-            //InputManager.AddLayout()
-        }
-
-        public void Deselected()
-        {
-            _storedPositions.Clear();
-
-            IControlTool control = _tools.ActiveControlTool;
-            control.NewTransformSelected -= Event_NewTransformSelected;
-            control.OldTransformDeselected -= Event_OldTransformDeselected;
-        }
-
-        public void Reset()
-        {
-            Deselected();
-            Selected();
-        }
-
-        private void Event_NewTransformSelected(IToolTransform transform)
-        {
-            _storedPositions.Add(new StoredData(transform, transform.WorldMatrix.Translation));
-        }
-
-        private void Event_OldTransformDeselected(IToolTransform transform)
-        {
-            int idx = _storedPositions.FindIndex((x) => x.Selected == transform);
-            if (idx != -1)
-            {
-                _storedPositions.RemoveAt(idx);
-            }
-        }
-
-        public void Update()
-        {
-            if (!_hasBegunDragging)
-                CheckForDragBegin();
-            else
-                HandleActiveDrag();
-        }
-
-        private void CheckForDragBegin()
-        {
-            SceneView sceneView = Editor.GlobalSingleton.SceneView;
-            if (!sceneView.IsViewActive)
+                _isDragActive = false;
+                _isAnyTransformActive = false;
                 return;
-
-            Vector3 absoluteMin = Vector3.PositiveInfinity;
-            Vector3 absoluteMax = Vector3.NegativeInfinity;
-
-            Quaternion baseQuat = Quaternion.Identity;
-            Matrix4x4 baseMatrix = Matrix4x4.Identity;
-            bool isFirstQuat = false;
-
-            Span<StoredData> span = _storedPositions.AsSpan();
-            for (int i = 0; i < span.Length; i++)
-            {
-                ref StoredData data = ref span[i];
-
-                data.BasePosition = data.Selected.WorldMatrix.Translation;
-
-                absoluteMin = Vector3.Min(absoluteMin, data.BasePosition);
-                absoluteMax = Vector3.Max(absoluteMax, data.BasePosition);
-
-                if (!isFirstQuat)
-                {
-                    isFirstQuat = Matrix4x4.Decompose(data.Selected.WorldMatrix, out _, out baseQuat, out _);
-                }
             }
 
-            Vector3 origin = Vector3.Lerp(absoluteMin, absoluteMax, 0.5f);
-            Matrix4x4 lookMatrix = Matrix4x4.CreateFromQuaternion(baseQuat) * Matrix4x4.CreateTranslation(origin);
-
-            Vector3 cameraPos = sceneView.CameraTranslation;
-            Matrix4x4 vp = sceneView.ViewMatrix * sceneView.ProjectionMatrix;
-
-            Vector3 relative = Vector3.Transform(cameraPos - origin, Matrix4x4.Transpose(lookMatrix));
-
-            bool negX = relative.X < 0.0f;
-            bool negY = relative.Y < 0.0f;
-            bool negZ = relative.Z < 0.0f;
-
-            float scale = 1.0f; //MathF.Max(MathF.Min(Vector3.Distance(origin, cameraPos) * 0.1f, 1.5f), 0.25f);
-
-            float shortLength = 3.0f * scale;
-            float longLength = 3.5f * scale;
-
-            float startLength = scale * 0.75f;
-
-            Vector2 clientSize = sceneView.OutputClientSize * 0.5f;
-
-            Vector2 mouseHit = Editor.GlobalSingleton.SceneView.LocalMouseHit;
-            mouseHit = new Vector2(mouseHit.X - clientSize.X, clientSize.Y - mouseHit.Y);
-
-            DragAxis axis = DragAxis.None;
-
-            _isHoveringAxis = false;
-
-            //x axis
-            {
-                float xValue = (negX ? -shortLength : longLength);
-                float yValue = (negY ? -0.25f : 0.25f) * scale;
-                float zValue = (negZ ? -0.25f : 0.25f) * scale;
-
-                Vector3 hit1 = Vector3.Transform(new Vector3(negX ? -startLength : startLength, 0.0f, 0.0f), lookMatrix);
-                Vector3 hit2 = Vector3.Transform(new Vector3(negX ? -shortLength : shortLength, yValue + yValue, 0.0f), lookMatrix);
-                Vector3 hit3 = Vector3.Transform(new Vector3(negX ? -longLength : longLength, 0.0f, 0.0f), lookMatrix);
-                Vector3 hit4 = Vector3.Transform(new Vector3(negX ? -shortLength : shortLength, 0.0f, zValue + zValue), lookMatrix);
-
-                bool hovered = ScreenRectDetection(vp, clientSize, mouseHit, hit1, hit2, hit3, hit4);
-
-                if (hovered)
-                {
-                    _isHoveringAxis = true;
-                    _hoveredAxis = Vector3.Transform(Vector3.UnitX, baseQuat);
-
-                    axis = DragAxis.X;
-
-                    goto HasFoundAxis;
-                }
-            }
-
-            //y axis
-            {
-                float xValue = (negX ? -0.25f : 0.25f) * scale;
-                float yValue = (negY ? -shortLength : longLength);
-                float zValue = (negZ ? -0.25f : 0.25f) * scale;
-
-                Vector3 hit1 = Vector3.Transform(new Vector3(0.0f, negY ? -startLength : startLength, 0.0f), lookMatrix);
-                Vector3 hit2 = Vector3.Transform(new Vector3(xValue + xValue, negY ? -shortLength : shortLength, 0.0f), lookMatrix);
-                Vector3 hit3 = Vector3.Transform(new Vector3(0.0f, negY ? -longLength : longLength, 0.0f), lookMatrix);
-                Vector3 hit4 = Vector3.Transform(new Vector3(0.0f, negY ? -shortLength : shortLength, zValue + zValue), lookMatrix);
-
-                bool hovered = ScreenRectDetection(vp, clientSize, mouseHit, hit1, hit2, hit3, hit4);
-
-                if (hovered)
-                {
-                    _isHoveringAxis = true;
-                    _hoveredAxis = Vector3.Transform(Vector3.UnitY, baseQuat);
-
-                    axis = DragAxis.Y;
-
-                    goto HasFoundAxis;
-                }
-            }
-
-            //z axis
-            {
-                float xValue = (negX ? -0.25f : 0.25f) * scale;
-                float yValue = (negY ? -0.25f : 0.25f) * scale;
-                float zValue = (negZ ? -shortLength : longLength);
-
-                Vector3 hit1 = Vector3.Transform(new Vector3(0.0f, 0.0f, negZ ? -startLength : startLength), lookMatrix);
-                Vector3 hit2 = Vector3.Transform(new Vector3(xValue + xValue, 0.0f, negZ ? -shortLength : shortLength), lookMatrix);
-                Vector3 hit3 = Vector3.Transform(new Vector3(0.0f, 0.0f, negZ ? -longLength : longLength), lookMatrix);
-                Vector3 hit4 = Vector3.Transform(new Vector3(0.0f, yValue + yValue, negZ ? -shortLength : shortLength), lookMatrix);
-
-                bool hovered = ScreenRectDetection(vp, clientSize, mouseHit, hit1, hit2, hit3, hit4);
-
-                if (hovered)
-                {
-                    _isHoveringAxis = true;
-                    _hoveredAxis = Vector3.Transform(Vector3.UnitZ, baseQuat);
-
-                    axis = DragAxis.Z;
-
-                    goto HasFoundAxis;
-                }
-            }
-
-            //Ray ray = ExMath.ViewportToWorld(sceneView.ProjectionMatrix, sceneView.ViewMatrix, sceneView.RelativeMouseHit);
-            //float dist = InfinitePlane.Intersect(new InfinitePlane(origin, planeNormal), ray);
-            //if (dist >= 0.0f)
-            //{
-            //    Log.Information("{x}", ray.AtDistance(dist));
-            //}
-
-            return;
-
-        HasFoundAxis:
-
-            Ray ray = ExMath.ViewportToWorld(sceneView.ProjectionMatrix, sceneView.ViewMatrix, sceneView.RelativeMouseHit);
-            float dist = GetPlaneDistance(axis, origin, ray, baseQuat, Vector3.Normalize(_hoveredAxis));
-
-            if (float.IsRealNumber(dist))
-            {
-                if (InputSystem.Pointer.IsButtonPressed(MouseButton.Left))
-                {
-                    _hasBegunDragging = true;
-                    _startDist = float.PositiveInfinity;
-                    _axisLock = Vector3.Normalize(_hoveredAxis);
-                    _dragAxis = axis;
-                    _baseRotation = baseQuat;
-                }
-            }
+            if (_isDragActive)
+                HandleDragLogic(transforms);
             else
+                HandlePickingLogic(transforms);
+        }
+
+        private void HandleDragLogic(ROList<ToolTransformData> transforms)
+        {
+            EditorCamera camera = EditorCamera.Instance;
+            EditorView view = EditorView.Instance;
+
+            Ray ray = camera.ProjectToRay(view.MousePosition);
+            Vector3 hit = _axisRay.AtDistance(_axisRay.FindClosest(ray));
+            if (hit != _lastHitPosition)
             {
-                _isHoveringAxis = false;
+                Vector3 delta = hit - _hitStartPosition;
+                if (ToolManager.IsSnappingActive)
+                    delta = Vector3.Round(delta / ToolManager.SnapScale) * ToolManager.SnapScale;
+
+                foreach (StoredTransformData transformData in _activeTransforms)
+                {
+                    transformData.Transform.SetWorldTransform(hit, delta);
+                }
+
+                _lastHitPosition = hit;
+                _dragDelta = delta;
+            }
+
+            if (!view.IsButtonHeld(MouseButton.Left))
+            {
+                foreach (StoredTransformData transformData in _activeTransforms)
+                {
+                    transformData.Transform.CommitTransform();
+                }
+
+                _activeTransforms.Clear();
+                _isDragActive = false;
             }
         }
 
-        private void HandleActiveDrag()
+        private void HandlePickingLogic(ROList<ToolTransformData> transforms)
         {
-            SceneView sceneView = Editor.GlobalSingleton.SceneView;
-            if (!InputSystem.Pointer.IsButtonHeld(MouseButton.Left) || !sceneView.IsViewVisible)
-                _hasBegunDragging = false;
+            Vector3 center = Vector3.Zero;
+            Quaternion quat = Quaternion.Identity;
 
-            Vector3 absoluteMin = Vector3.Zero;
-            Vector3 absoluteMax = Vector3.Zero;
-
-            Span<StoredData> span = _storedPositions.AsSpan();
-            for (int i = 0; i < span.Length; i++)
             {
-                ref StoredData data = ref span[i];
+                Vector3 min = Vector3.PositiveInfinity;
+                Vector3 max = Vector3.NegativeInfinity;
 
-                absoluteMin = Vector3.Min(absoluteMin, data.BasePosition);
-                absoluteMax = Vector3.Max(absoluteMax, data.BasePosition);
-            }
+                bool isFirst = true;
 
-            Vector3 origin = Vector3.Lerp(absoluteMin, absoluteMax, 0.5f);
-
-            Vector3 cameraPos = sceneView.CameraTranslation;
-            Matrix4x4 vp = sceneView.ViewMatrix * sceneView.ProjectionMatrix;
-
-            Ray ray = ExMath.ViewportToWorld(sceneView.ProjectionMatrix, sceneView.ViewMatrix, sceneView.RelativeMouseHit);
-            float dist = GetPlaneDistance(_dragAxis, origin, ray, _baseRotation, _axisLock);
-
-            if (float.IsPositiveInfinity(_startDist))
-            {
-                _startDist = dist;
-            }
-
-            if (dist != 0.0f)
-            {
-                _currentPlaneDist = dist;
-                Vector3 delta = _axisLock * (dist - _startDist);
-                //if (ToolManager.IsSnappingActive)
-                //{
-                //    delta = Vector3.Round(delta / ToolManager.SnapScale) * ToolManager.SnapScale;
-                //}
-
-                if (_lastDragDelta != delta)
+                foreach (ToolTransformData transformData in transforms)
                 {
-                    _lastDragDelta = Vector3.Zero;
+                    IToolTransform transform = transformData.Transform;
+                    if (!transform.IsActive)
+                        continue;
 
-                    for (int i = 0; i < span.Length; i++)
+                    if (Matrix4x4.Decompose(transform.WorldMatrix, out _, out Quaternion transformQuat, out Vector3 transformPos))
                     {
-                        ref StoredData data = ref span[i];
-                        data.Selected.SetWorldTransform(data.BasePosition + delta, delta);
-
-                        if (!_hasBegunDragging)
+                        if (isFirst)
                         {
-                            data.Selected.CommitTransform();
+                            min = transformPos;
+                            max = transformPos;
+
+                            quat = transformQuat;
+
+                            isFirst = false;
+                        }
+                        else
+                        {
+                            min = Vector3.Min(min, transformPos);
+                            max = Vector3.Max(max, transformPos);
                         }
                     }
                 }
+
+                _isAnyTransformActive = !isFirst;
+                if (isFirst)
+                    return;
+
+                center = Vector3.Lerp(min, max, 0.5f);
+            }
+
+            _toolOrigin = center;
+            _toolQuat = quat;
+
+            _activeAxis = unchecked((ToolHandleAxis)(-1));
+
+            EditorCamera camera = EditorCamera.Instance;
+            EditorView view = EditorView.Instance;
+
+            float handleScale = Math.Clamp(Vector3.Distance(camera.Position, _toolOrigin) * 0.15f, 0.25f, 2.0f);
+
+            const float ArrowWidth = 0.3f;
+
+            (Vector2 screenOrigin, bool isBehindViewer) = camera.ProjectToScreen(_toolOrigin);
+            if (isBehindViewer)
+                return;
+
+            Vector3 xAxis = Vector3.Transform(Vector3.UnitX, quat) * handleScale;
+            Vector3 yAxis = Vector3.Transform(Vector3.UnitY, quat) * handleScale;
+            Vector3 zAxis = Vector3.Transform(Vector3.UnitZ, quat) * handleScale;
+
+            Vector3 xArrowAxis = xAxis * ArrowWidth;
+            Vector3 yArrowAxis = yAxis * ArrowWidth;
+            Vector3 zArrowAxis = zAxis * ArrowWidth;
+
+            ProjectAndHandleAxis(camera, view, ToolHandleAxis.X, view.MousePosition, screenOrigin, xAxis, yArrowAxis, zArrowAxis, false, false, out Vector2 extentX);
+            ProjectAndHandleAxis(camera, view, ToolHandleAxis.Y, view.MousePosition, screenOrigin, yAxis, -xArrowAxis, zArrowAxis, false, false, out Vector2 extentY);
+            ProjectAndHandleAxis(camera, view, ToolHandleAxis.Z, view.MousePosition, screenOrigin, zAxis, xArrowAxis, -yArrowAxis, false, false, out Vector2 extentZ);
+
+            Vector2 screenMin = Vector2.Min(Vector2.Min(extentX, extentY), extentZ);
+            Vector2 screenMax = Vector2.Max(Vector2.Max(extentX, extentY), extentZ);
+
+            if (screenMin.X > camera.ClientSize.X || screenMin.Y > camera.ClientSize.Y || screenMax.X < 0.0f || screenMax.Y < 0.0f)
+            {
+                _activeAxis = unchecked((ToolHandleAxis)(-1));
+                _isDragActive = false;
+                return;
+            }
+
+            if (_isDragActive)
+            {
+                foreach (ToolTransformData transformData in transforms)
+                {
+                    _activeTransforms.Add(new StoredTransformData(transformData.Transform, transformData.Transform.Position));
+                }
             }
         }
 
-        private static bool ScreenRectDetection(Matrix4x4 matrix, Vector2 clientSize, Vector2 hit, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4)
+        private void ProjectAndHandleAxis(EditorCamera camera, EditorView view, ToolHandleAxis axis, Vector2 point, Vector2 screenOrigin, Vector3 direction, Vector3 axis1, Vector3 axis2, bool flipAxis1, bool flipAxis2, out Vector2 extent)
         {
-            Vector4 proj1 = Vector4.Transform(p1, matrix); ;
-            Vector4 proj2 = Vector4.Transform(p2, matrix); ;
-            Vector4 proj3 = Vector4.Transform(p3, matrix); ;
-            Vector4 proj4 = Vector4.Transform(p4, matrix); ;
+            const float ArrowStep = 0.7f;
 
-            Vector256<float> combined = Vector256.Create(proj1.X, proj1.Y, proj2.X, proj2.Y, proj3.X, proj3.Y, proj4.X, proj4.Y);
+            Vector3 camPosition = camera.Position - _toolOrigin;
 
-            combined /= Vector256.Create(proj1.W, proj1.W, proj2.W, proj2.W, proj3.W, proj3.W, proj4.W, proj4.W);
-            combined *= Vector256.Create(clientSize.X, clientSize.Y, clientSize.X, clientSize.Y, clientSize.X, clientSize.Y, clientSize.X, clientSize.Y);
+            bool isBeside = Vector3.Dot(direction, camPosition) < 0.0f;
+            bool isBelow = flipAxis1 ? (Vector3.Dot(axis1, camPosition) >= 0.0f) : (Vector3.Dot(axis1, camPosition) < 0.0f);
+            bool isBehind = flipAxis2 ? (Vector3.Dot(axis2, camPosition) >= 0.0f) : (Vector3.Dot(axis2, camPosition) < 0.0f);
 
-            Vector2 ab1 = new Vector2(combined.GetElement(0), combined.GetElement(1));
-            Vector2 ab2 = new Vector2(combined.GetElement(2), combined.GetElement(3));
-            Vector2 ab3 = new Vector2(combined.GetElement(4), combined.GetElement(5));
-            Vector2 ab4 = new Vector2(combined.GetElement(6), combined.GetElement(7));
+            if (isBeside)
+                direction = -direction;
+            if (isBelow)
+                axis1 = -axis1;
+            if (isBehind)
+                axis2 = -axis2;
 
-            return IsWithinTri(hit, ab1, ab2, ab4) || IsWithinTri(hit, ab2, ab3, ab4);
+            Vector3 partialOrigin = Vector3.Lerp(_toolOrigin, _toolOrigin + direction, ArrowStep);
+
+            Vector2 end = camera.ProjectToScreen(_toolOrigin + direction * 1.15f).Position;
+            Vector2 axis1End = camera.ProjectToScreen(partialOrigin + axis1).Position;
+            Vector2 axis2End = camera.ProjectToScreen(partialOrigin + axis2).Position;
+
+            ScreenGizmos.DrawWireTriangle(axis1End, axis2End, screenOrigin);
+            ScreenGizmos.DrawWireTriangle(axis1End, axis2End, end);
+
+            if (IsWithinTriangle(point, axis1End, axis2End, screenOrigin) || IsWithinTriangle(point, axis1End, axis2End, end))
+            {
+                _activeAxis = axis;
+
+                if (view.IsButtonPressed(MouseButton.Left))
+                {
+                    Ray ray = camera.ProjectToRay(view.MousePosition);
+
+                    Quaternion quat = axis switch
+                    {
+                        ToolHandleAxis.X => Quaternion.CreateFromYawPitchRoll(0.0f, 0.0f, float.DegreesToRadians(90.0f)),
+                        ToolHandleAxis.Y => Quaternion.CreateFromYawPitchRoll(0.0f, float.DegreesToRadians(90.0f), 0.0f),
+                        ToolHandleAxis.Z => Quaternion.CreateFromYawPitchRoll(0.0f, float.DegreesToRadians(90.0f), 0.0f),
+                        _ => throw new NotImplementedException()
+                    };
+                    Vector3 normal = Vector3.Normalize(Vector3.Transform(direction, quat));
+
+                    Vector3 axisNormal = Vector3.Normalize(-Vector3.Abs(direction));
+
+                    _axisRay = new Ray(_toolOrigin, axisNormal);
+                    _hitStartPosition = _axisRay.AtDistance(_axisRay.FindClosest(ray));
+
+                    _lastHitPosition = _hitStartPosition;
+                    _dragDelta = Vector3.Zero;
+
+                    _isDragActive = true;
+                }
+            }
+
+            extent = end;
         }
 
-        private static bool IsWithinTri(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
+        public bool Render(ToolManager tools, ToolDrawData drawData)
+        {
+            if (!_isAnyTransformActive)
+                return false;
+
+            drawData.HandleType = ToolHandleType.Translate;
+
+            drawData.HandleOrigin = _toolOrigin;
+            drawData.HandleRotation = _toolQuat;
+
+            if (_activeAxis != unchecked((ToolHandleAxis)(-1)))
+            {
+                drawData.HandleAxisColors[(int)_activeAxis] = Color.Yellow;
+            }
+
+            if (_isDragActive)
+                drawData.HandleOrigin += _dragDelta;
+
+            return true;
+        }
+
+        private void OldTransformDeselected(IToolTransform transform)
+        {
+            for (int i = 0; i < _activeTransforms.Count; ++i)
+            {
+                if (_activeTransforms[i].Transform == transform)
+                {
+                    _activeTransforms.RemoveAt(i);
+                    break;
+                }
+            }
+        }
+
+        public bool IsActive => _isActive;
+        public bool IsInteracting => _isDragActive;
+
+        private static bool IsWithinTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
         {
             float d1 = Sign(p, a, b);
             float d2 = Sign(p, b, c);
@@ -348,76 +312,6 @@ namespace Editor.Interaction.Tools
             }
         }
 
-        public bool IsInteracting => _isHoveringAxis || _hasBegunDragging;
-        public bool IsActive => _hasBegunDragging;
-
-        internal DragAxis Axis => _dragAxis;
-        internal float PlaneDistance => _currentPlaneDist;
-        internal float Delta => _currentPlaneDist - _startDist;
-
-        private static Vector3 FindNearestOnInfiniteLine(Vector3 origin, Vector3 direction, Vector3 point)
-        {
-            Vector3 lhs = point - origin;
-
-            float dotP = Vector3.Dot(lhs, direction);
-            return origin + direction * dotP;
-        }
-
-        private static float GetPlaneDistance(DragAxis axis, Vector3 origin, Ray ray, Quaternion rotation, Vector3 vectorAxis)
-        {
-            float dist1;
-            float dist2;
-
-            switch (axis)
-            {
-                case DragAxis.X:
-                    {
-                        dist1 = InfinitePlane.Intersect(new InfinitePlane(origin, Vector3.Transform(Vector3.UnitY, rotation)), ray);
-                        dist2 = InfinitePlane.Intersect(new InfinitePlane(origin, Vector3.Transform(Vector3.UnitZ, rotation)), ray);
-                        break;
-                    }
-                case DragAxis.Y:
-                    {
-                        dist1 = InfinitePlane.Intersect(new InfinitePlane(origin, Vector3.Transform(Vector3.UnitX, rotation)), ray);
-                        dist2 = InfinitePlane.Intersect(new InfinitePlane(origin, Vector3.Transform(Vector3.UnitZ, rotation)), ray);
-                        break;
-                    }
-                case DragAxis.Z:
-                    {
-                        dist1 = InfinitePlane.Intersect(new InfinitePlane(origin, Vector3.Transform(Vector3.UnitY, rotation)), ray);
-                        dist2 = InfinitePlane.Intersect(new InfinitePlane(origin, Vector3.Transform(Vector3.UnitX, rotation)), ray);
-                        break;
-                    }
-                default: return float.MinValue;
-            }
-
-            if (dist1 < 0.0f && dist2 < 0.0f)
-                return 0.0f;
-
-            float globalDist = float.MinValue;
-            if (dist1 < 0.0f)
-                globalDist = dist2;
-            else if (dist2 < 0.0f)
-                globalDist = dist1;
-            else
-                globalDist = MathF.Min(dist1, dist2);
-
-            Vector3 rayAt = ray.AtDistance(globalDist);
-            Vector3 result = rayAt - origin;
-            float length = result.Length();
-
-            return Vector3.Dot(vectorAxis, rayAt);
-        }
-
-        private record struct StoredData(IToolTransform Selected, Vector3 BasePosition);
-
-        internal enum DragAxis : byte
-        {
-            None = 0,
-
-            X,
-            Y,
-            Z
-        }
+        private readonly record struct StoredTransformData(IToolTransform Transform, Vector3 Position);
     }
 }

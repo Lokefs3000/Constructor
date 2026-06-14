@@ -2,8 +2,8 @@
 using Primary.Components;
 using Primary.Mathematics;
 using Primary.Profiling;
-using Primary.Rendering;
 using Primary.Scenes;
+using Primary.Windowing;
 using Schedulers;
 using System.Numerics;
 

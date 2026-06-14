@@ -2,6 +2,7 @@
 using Editor.UI.Layout;
 using Editor.UI.Visual;
 using Primary.Common;
+using Primary.Mathematics;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -29,20 +30,18 @@ namespace Editor.UI.Elements
         {
             float currentOffset = ItemPadding;
 
-            foreach (UIMenuItem menuItem in Children)
-            {
-                menuItem.RelativeOffset = new Vector2(currentOffset, ItemPadding);
-                currentOffset += menuItem.CurrentSize.X + ItemPadding;
-            }
+            
+
+            _viewOffset = Vector2.Zero;
         }
 
         public override bool DrawVisual(UIPainterContext painter)
         {
-            painter.DrawRect(PixelCoordinates, UIPaint.FromColor(_backgroundColor));
+            painter.DrawRect(ViewCoordinates, UIPaint.FromColor(_backgroundColor));
 
             if (_strokeWeight > 0.0f)
             {
-                painter.DrawRect(new Boundaries(new Vector2(PixelCoordinates.Minimum.X, PixelCoordinates.Maximum.Y - _strokeWeight), PixelCoordinates.Maximum), UIPaint.FromColor(_strokeColor));
+                painter.DrawRect(new Boundaries(new Vector2(ViewCoordinates.Minimum.X, ViewCoordinates.Maximum.Y - _strokeWeight), ViewCoordinates.Maximum), UIPaint.FromColor(_strokeColor));
             }
 
             return base.DrawVisual(painter);

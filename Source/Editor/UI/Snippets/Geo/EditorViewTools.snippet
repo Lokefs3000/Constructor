@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Snippet>
+    <Stylesheet Path="Editor/UI/Styles/EditorViewSnippet.style" />
+
+    <Frame Position="0.0 8 0.0 8" Class="root-element">
+        <ListLayout Direction="Vertical" Padding="0.0 4" />
+        <FitterLayout Axis="Both" Margin="0.0 3 0.0 3" />
+
+        <Button Id="move-handle" Class="move-handle-button">
+            <Image IsActive="False" Class="move-handle-image" />
+        </Button>
+
+        <ToggleButton Id="create-btn" Class="tool-button">
+            <Image IsActive="False" Class="tool-button-icon" Image="Editor/UI/Icons/GeoToolIcons.png" UVMin="0.0 0.0" UVMax="0.25 1.0" />
+        </ToggleButton>
+        <ToggleButton Id="edit-brush-btn" Class="tool-button">
+            <Image IsActive="False" Class="tool-button-icon" Image="Editor/UI/Icons/GeoToolIcons.png" UVMin="0.25 0.0" UVMax="0.5 1.0" />
+        </ToggleButton>
+        <ToggleButton Id="edit-face-btn" Class="tool-button">
+            <Image IsActive="False" Class="tool-button-icon" Image="Editor/UI/Icons/GeoToolIcons.png" UVMin="0.5 0.0" UVMax="0.75 1.0" />
+        </ToggleButton>
+        <ToggleButton Id="edit-vertex-btn" Class="tool-button">
+            <Image IsActive="False" Class="tool-button-icon" Image="Editor/UI/Icons/GeoToolIcons.png" UVMin="0.75 0.0" UVMax="1.0 1.0" />
+        </ToggleButton>
+    </Frame>
+</Snippet>

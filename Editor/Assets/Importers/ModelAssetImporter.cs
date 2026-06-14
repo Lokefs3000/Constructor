@@ -64,9 +64,9 @@ namespace Editor.Assets.Importers
             pipeline.ReloadAsset(pipeline.Identifier.GetOrRegisterAsset(localInputFile));
 
             AssetId modelId = pipeline.Identifier.GetOrRegisterAsset(localInputFile);
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localInputFile, true));
+            EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localInputFile, true));
 
-            AssetCategoryDatabase category = Editor.GlobalSingleton.AssetDatabase.GetCategory<RenderMesh>()!;
+            AssetCategoryDatabase category = EditorRuntime.GlobalSingleton.AssetDatabase.GetCategory<RenderMesh>()!;
             for (int i = 0; i < proc.MeshInfos.Length; i++)
             {
                 ref ModelMeshInfo mmi = ref proc.MeshInfos[i];
@@ -102,20 +102,20 @@ namespace Editor.Assets.Importers
 
             if (stream == null || stream.Length < Unsafe.SizeOf<PMFHeader>())
             {
-                Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, false));
+                EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, false));
                 return;
             }
 
             PMFHeader header = stream.Read<PMFHeader>();
             if (header.Header != PMFHeader.ConstHeader || header.Version != PMFHeader.ConstVersion)
             {
-                Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, false));
+                EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, false));
                 return;
             }
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, true));
+            EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, true));
 
-            AssetCategoryDatabase category = Editor.GlobalSingleton.AssetDatabase.GetCategory<RenderMesh>()!;
+            AssetCategoryDatabase category = EditorRuntime.GlobalSingleton.AssetDatabase.GetCategory<RenderMesh>()!;
 
             Stream dataReadStream = stream;
             if (Flags.HasFlag(header.Flags, PMFHeaderFlags.IsCompressed))

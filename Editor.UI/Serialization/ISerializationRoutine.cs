@@ -13,7 +13,7 @@ namespace Editor.UI.Serialization
 {
     public interface ISerializationRoutine
     {
-        public UIElement? Deserialize(DeserializeContext context, UIElement parentElement, XmlElement xmlElement);
+        public UIElement? Deserialize(DeserializeContext context, UIElement? parentElement, XmlElement xmlElement, out bool skipChildren);
     }
 
     public readonly record struct DeserializeContext(XmlElement Xml, ReflectionManager ReflectionManager, ValueSerializerTable ValueSerializerTable)
@@ -60,6 +60,10 @@ namespace Editor.UI.Serialization
                 {
                     UIManager.Logger?.Error("[{p}]: Failed to deserialize element property value: {v}", Xml.Name, attrib.Value);
                     return false;
+                }
+                else
+                {
+                    element.SetAsOverriden(styleProperty.Name);
                 }
             }
             else

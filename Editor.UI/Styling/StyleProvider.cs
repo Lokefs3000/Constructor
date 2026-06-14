@@ -1,4 +1,5 @@
 ﻿using Editor.UI.Assets;
+using Primary.Collections.ReadOnly;
 using Primary.Utility;
 using System;
 using System.Collections.Generic;
@@ -18,7 +19,7 @@ namespace Editor.UI.Styling
             _classes = new Dictionary<string, ClassData[]>();
         }
 
-        public void AddStylesheet(StylesheetAsset asset)
+        public bool AddStylesheet(StylesheetAsset asset)
         {
             if (_stylesheets.AddUnique(asset))
             {
@@ -27,17 +28,21 @@ namespace Editor.UI.Styling
                     if (_classes.TryGetValue(kvp.Key, out ClassData[]? classes))
                     {
                         Array.Resize(ref classes, classes.Length + 1);
-                        classes[classes.Length - 1] = new ClassData(asset, kvp.Value);
+                        classes[^1] = new ClassData(asset, kvp.Value);
                     }
                     else
                     {
                         _classes.Add(kvp.Key, [new ClassData(asset, kvp.Value)]);
                     }
                 }
+
+                return true;
             }
+
+            return false;
         }
 
-        public void RemoveStylesheet(StylesheetAsset asset)
+        public bool RemoveStylesheet(StylesheetAsset asset)
         {
             if (_stylesheets.Remove(asset))
             {
@@ -59,7 +64,18 @@ namespace Editor.UI.Styling
                         }
                     }
                 }
+
+                return true;
             }
+
+            return false;
+        }
+
+        // TODO: remake so it keeps the original order of styling
+        public void ReloadStylesheet(StylesheetAsset stylesheet)
+        {
+            RemoveStylesheet(stylesheet);
+            AddStylesheet(stylesheet);
         }
 
         public IEnumerable<StylesheetClass> GetClassesWithName(string className)
@@ -86,6 +102,10 @@ namespace Editor.UI.Styling
             value = null;
             return false;
         }
+
+        public bool ContainsStylesheet(StylesheetAsset stylesheet) => _stylesheets.Contains(stylesheet);
+
+        public ROList<StylesheetAsset> Stylesheets => _stylesheets;
 
         private readonly record struct ClassData(StylesheetAsset Source, StylesheetClass Value);
     }

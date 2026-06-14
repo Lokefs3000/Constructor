@@ -1,0 +1,24 @@
+[
+    {
+        "Id": "snapping",
+        "Appearances": [
+            {
+                "Key": "False",
+                "Text": null,
+                "Texture": "Editor/UI/Icons/EditorViewToolbar.png",
+                "Atlas": [ 0, 0, 32, 32 ]
+            },
+            {
+                "Key": "True",
+                "Text": null,
+                "Texture": "Editor/UI/Icons/EditorViewToolbar.png",
+                "Atlas": [ 32, 0, 32, 32 ]
+            }
+        ],
+        "Logic": {
+            "Key": "Dropdown",
+            "Path": "Editor/UI/EditorView/Dropdown/SnappingDropdown.snippet",
+            "IsToggleable": true
+        }
+    }
+]

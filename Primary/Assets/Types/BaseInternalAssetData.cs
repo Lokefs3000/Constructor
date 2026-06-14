@@ -29,8 +29,6 @@ namespace Primary.Assets.Types
 
             _status = ResourceStatus.Disposed;
             _name = string.Empty;
-
-            _loadIndex = -1;
         }
 
         public virtual void UpdateAssetData(T asset)
@@ -39,7 +37,7 @@ namespace Primary.Assets.Types
 
             _status = ResourceStatus.Success;
 
-            _loadIndex++;
+            ++_loadIndex;
         }
 
         public virtual void UpdateAssetFailed(T asset)
@@ -48,7 +46,7 @@ namespace Primary.Assets.Types
 
             _status = ResourceStatus.Error;
 
-            _loadIndex++;
+            ++_loadIndex;
         }
 
         public virtual void SetAssetInternalName(string name) => _name = name;

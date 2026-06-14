@@ -48,7 +48,7 @@ namespace Editor.UI.Elements
                 paint.SetStrokeColor(_strokeColor);
             }
 
-            painter.DrawRect(PixelCoordinates, paint, _cornerRadius);
+            painter.DrawRect(ViewCoordinates, paint, _cornerRadius);
             return base.DrawVisual(painter);
         }
 

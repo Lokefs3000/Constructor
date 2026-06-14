@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Stylesheet>
+    <Class Name="root-element" Type="Frame">
+        <Anchor Value="0.5 0.5" />
+		<CornerRadius Value="8" />
+    </Class>
+    <Class Name="face-button" Type="Button">
+        <State Name="Normal">
+            <Size Value="0.0 32 0.0 32" />
+            <BackgroundColor Value="#00000000" />
+            <StrokeColor Value="#303030" />
+			<CornerRadius Value="8" />
+        </State>
+        <State Name="Hovered">
+			<BackgroundColor Value="#6d6d6d" />
+			<StrokeColor Value="#252525" />
+		</State>
+		<State Name="Pressed">
+			<BackgroundColor Value="#3f3f3f" />
+			<StrokeColor Value="#808080" />
+		</State>
+    </Class>
+
+    <Class Name="face-icon" Type="Image">
+        <Position Value="0.0 1 0.0 1" />
+        <Size Value="1.0 -2 1.0 -2" />
+        <Image Value="Editor/UI/Icons/GeoFaceIcons.png" />
+    </Class>
+
+    <Class Name="visible-button" Type="Image">
+        <UVMin Value="0.0 0.0" />
+        <UVMax Value="0.5 1.0" />
+    </Class>
+    <Class Name="material-button" Type="Image">
+        <UVMin Value="0.5 0.0" />
+        <UVMax Value="1.0 1.0" />
+    </Class>
+</Stylesheet>

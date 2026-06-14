@@ -1,6 +1,6 @@
 ﻿using Primary.Assets.Types;
 using Primary.Rendering.Assets;
-using Primary.RHI2;
+using Primary.RHI;
 using System.Collections.Frozen;
 
 namespace Primary.Assets
@@ -54,6 +54,20 @@ namespace Primary.Assets
             _graphicsPipeline = null;
         }
 
+        public override void Dispose()
+        {
+            base.Dispose();
+
+            _properties = Array.Empty<ShaderProperty>();
+            _remappingTable = FrozenDictionary<int, int>.Empty;
+
+            _propertyBlockSize = 0;
+            _headerBlockSize = 0;
+
+            _graphicsPipeline?.Dispose();
+            _graphicsPipeline = null;
+        }
+
         public void UpdateAssetData(ShaderAsset asset, ShaderProperty[] properties, FrozenDictionary<int, int> remappingTable, int propertyBlockSize, int headerBlockSize, ShHeaderFlags headerFlags, RHIGraphicsPipeline graphicsPipeline)
         {
             UpdateAssetData(asset);
@@ -89,7 +103,7 @@ namespace Primary.Assets
         internal int ResourceCount => _resourceCount;
     }
 
-    public readonly record struct ShaderProperty(string Name, ushort IndexOrByteOffset, ushort ByteWidth, ushort ChildIndex, ShPropertyType Type, ShPropertyDefault Default, ShPropertyStages Stages, ShPropertyFlags Flags, ShPropertyDisplay Display);
+    public readonly record struct ShaderProperty(string Name, string DisplayName, ushort IndexOrByteOffset, ushort ByteWidth, ushort ChildIndex, ShPropertyType Type, ShPropertyDefault Default, ShPropertyStages Stages, ShPropertyFlags Flags, ShPropertyDisplay Display);
     public readonly record struct ShaderResource(string Name, ShResourceType Type, ShPropertyStages Stages, ShResourceFlags Flags);
 
     public enum ShPropertyType : byte
@@ -138,6 +152,7 @@ namespace Primary.Assets
         SamplerState
     }
 
+    [Flags]
     public enum ShResourceFlags : byte
     {
         None = 0,
@@ -152,6 +167,7 @@ namespace Primary.Assets
         Color
     }
 
+    [Flags]
     public enum ShPropertyFlags : byte
     {
         None = 0,
@@ -176,6 +192,7 @@ namespace Primary.Assets
         TexNormal
     }
 
+    [Flags]
     public enum ShHeaderFlags : byte
     {
         None = 0,

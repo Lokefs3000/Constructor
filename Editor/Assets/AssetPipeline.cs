@@ -11,24 +11,26 @@ using SharpGen.Runtime;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Text;
 
 namespace Editor.Assets
 {
     public sealed class AssetPipeline : IDisposable
     {
-        private object _importLock;
-        private object _reloadLock;
+        private Lock _importLock;
+        private Lock _reloadLock;
 
         private AssetIdentifier _identifier;
         private AssetConfiguration _configuration;
         private AssetAssociator _associator;
+        private AssetCache _cache;
 
         private AssetFilesystemWatcher _contentWatcher;
         private AssetFilesystemWatcher _sourceWatcher;
 
         private AssetFilesystemWatcher? _engineContentWatcher;
-        private AssetFilesystemWatcher? _editorCotentWatcher;
+        private AssetFilesystemWatcher? _editorContentWatcher;
 
         private List<AssetImporterData> _importerList;
         private Dictionary<string, IAssetImporter> _importerLookup;
@@ -39,6 +41,8 @@ namespace Editor.Assets
         private Dictionary<AssetId, Task> _runningImports;
 
         private ConcurrentDictionary<AssetId, DateTime> _importedAssets;
+
+        private HashSet<AssetId> _currentlySkippedAssets;
 
         private ProjectSubFilesystem[] _filesystems;
 
@@ -62,19 +66,25 @@ namespace Editor.Assets
                 needsDbRefresh = true;
             }
 
-            _importLock = new object();
-            _reloadLock = new object();
+            if (!Directory.Exists(EditorFilepaths.LibraryCachePath))
+            {
+                Directory.CreateDirectory(EditorFilepaths.LibraryCachePath);
+            }
+
+            _importLock = new Lock();
+            _reloadLock = new Lock();
 
             _identifier = new AssetIdentifier();
             _configuration = new AssetConfiguration(this);
             _associator = new AssetAssociator();
+            _cache = new AssetCache();
 
-            _contentWatcher = new AssetFilesystemWatcher(EditorFilepaths.ContentPath, Editor.GlobalSingleton.ProjectSubFilesystem, this);
+            _contentWatcher = new AssetFilesystemWatcher(EditorFilepaths.ContentPath, EditorRuntime.GlobalSingleton.ProjectSubFilesystem, this);
             _sourceWatcher = new AssetFilesystemWatcher(EditorFilepaths.SourcePath, null!, this);
 
 #if true || DEBUG
-            _engineContentWatcher = new AssetFilesystemWatcher(EditorFilepaths.EnginePath, Editor.GlobalSingleton.EngineFilesystem, this);
-            _editorCotentWatcher = new AssetFilesystemWatcher(EditorFilepaths.EditorPath, Editor.GlobalSingleton.EditorFilesystem, this);
+            _engineContentWatcher = new AssetFilesystemWatcher(EditorFilepaths.EnginePath, EditorRuntime.GlobalSingleton.EngineFilesystem, this);
+            _editorContentWatcher = new AssetFilesystemWatcher(EditorFilepaths.EditorPath, EditorRuntime.GlobalSingleton.EditorFilesystem, this);
 #endif
 
             _importerList = new List<AssetImporterData>();
@@ -87,9 +97,11 @@ namespace Editor.Assets
 
             _importedAssets = new ConcurrentDictionary<AssetId, DateTime>();
 
+            _currentlySkippedAssets = new HashSet<AssetId>();
+
             _importerTasksTotal = 0;
 
-            _filesystems = [Editor.GlobalSingleton.ProjectSubFilesystem, Editor.GlobalSingleton.EditorFilesystem, Editor.GlobalSingleton.EngineFilesystem];
+            _filesystems = [EditorRuntime.GlobalSingleton.ProjectSubFilesystem, EditorRuntime.GlobalSingleton.EditorFilesystem, EditorRuntime.GlobalSingleton.EngineFilesystem];
 
             if (!_associator.ReadAssocations())
             {
@@ -106,17 +118,17 @@ namespace Editor.Assets
                 needsDbRefresh = true;
             }
 
-            if (!File.Exists(Path.Combine(EditorFilepaths.LibraryIntermediatePath, Editor.GlobalSingleton.ProjectSubFilesystem.FileRemappingsFile)))
+            if (!File.Exists(Path.Combine(EditorFilepaths.LibraryIntermediatePath, EditorRuntime.GlobalSingleton.ProjectSubFilesystem.FileRemappingsFile)))
             {
                 EdLog.Assets.Warning("Missing project remappings file");
                 needsDbRefresh = true;
             }
-            if (!File.Exists(Path.Combine(EditorFilepaths.LibraryIntermediatePath, Editor.GlobalSingleton.EngineFilesystem.FileRemappingsFile)))
+            if (!File.Exists(Path.Combine(EditorFilepaths.LibraryIntermediatePath, EditorRuntime.GlobalSingleton.EngineFilesystem.FileRemappingsFile)))
             {
                 EdLog.Assets.Warning("Missing engine remappings file");
                 needsDbRefresh = true;
             }
-            if (!File.Exists(Path.Combine(EditorFilepaths.LibraryIntermediatePath, Editor.GlobalSingleton.EditorFilesystem.FileRemappingsFile)))
+            if (!File.Exists(Path.Combine(EditorFilepaths.LibraryIntermediatePath, EditorRuntime.GlobalSingleton.EditorFilesystem.FileRemappingsFile)))
             {
                 EdLog.Assets.Warning("Missing editor remapping file");
                 needsDbRefresh = true;
@@ -136,6 +148,10 @@ namespace Editor.Assets
             AddImporter<ComputeShaderAssetImporter>(".compute");
             AddImporter<UIFontAssetImporter>(".uifont");
             AddImporter<StylesheetAssetImporter>(".style");
+            AddImporter<UILayoutFileImporter>(".layout");
+            AddImporter<UISnippetFileImporter>(".snippet");
+            AddImporter<TextureAtlasAssetImporter>(".atlas");
+            AddImporter<ContextMenuAssetImporter>(".ctxmenu");
 
             if (needsDbRefresh)
                 EdLog.Assets.Information("Refreshing asset database..");
@@ -149,17 +165,17 @@ namespace Editor.Assets
                 if (disposing)
                 {
                     _engineContentWatcher?.Dispose();
-                    _editorCotentWatcher?.Dispose();
+                    _editorContentWatcher?.Dispose();
 
                     _contentWatcher.Dispose();
                     _sourceWatcher.Dispose();
 
                     File.WriteAllText(AssetIdentifier.DataFilePath, _identifier.TrySerializeAssetIds());
 
-                    Editor.GlobalSingleton.ProjectSubFilesystem.FlushFileRemappings();
+                    EditorRuntime.GlobalSingleton.ProjectSubFilesystem.FlushFileRemappings();
 
-                    Editor.GlobalSingleton.EngineFilesystem.FlushFileRemappings();
-                    Editor.GlobalSingleton.EditorFilesystem.FlushFileRemappings();
+                    EditorRuntime.GlobalSingleton.EngineFilesystem.FlushFileRemappings();
+                    EditorRuntime.GlobalSingleton.EditorFilesystem.FlushFileRemappings();
 
                     _associator.FlushAssociations();
                     FlushImportedAssets();
@@ -259,7 +275,7 @@ namespace Editor.Assets
             if (assetId.IsInvalid)
                 return;
 
-            lock (_reloadLock)
+            using (_reloadLock.EnterScope())
             {
                 _assetsToReload.Add(assetId);
             }
@@ -423,13 +439,13 @@ namespace Editor.Assets
                     _sourceWatcher.ResetInternalState();
 
                     _engineContentWatcher?.ResetInternalState();
-                    _editorCotentWatcher?.ResetInternalState();
+                    _editorContentWatcher?.ResetInternalState();
 
                     _contentWatcher.ClearEventQueue();
                     _sourceWatcher.ClearEventQueue();
 
                     _engineContentWatcher?.ClearEventQueue();
-                    _editorCotentWatcher?.ClearEventQueue();
+                    _editorContentWatcher?.ClearEventQueue();
 
                     _associator.ClearAllAssocations();
                     _assetsToReload.Clear();
@@ -438,7 +454,7 @@ namespace Editor.Assets
                     Directory.CreateDirectory(EditorFilepaths.LibraryImportedPath);
                 }
 
-                Editor.GlobalSingleton.AssetDatabase.PurgeDatabase();
+                EditorRuntime.GlobalSingleton.AssetDatabase.PurgeDatabase();
 
                 bool showImports = AppArguments.HasArgument("--s-show-imports");
 
@@ -485,15 +501,15 @@ namespace Editor.Assets
                                     importer?.Preload(localPath, filesystem, this);
                                     filesPreloaded++;
                                 }
-                            }
 
-                            if (ImportNewFile(id) != null)
-                            {
-                                if (showImports)
-                                    EdLog.Assets.Information("[{idx}]: Importing new asset with local path: {lc} (id: {id})", filesImported + 1, localPath, id);
+                                if (ImportNewFile(id) != null)
+                                {
+                                    if (showImports)
+                                        EdLog.Assets.Information("[{idx}]: Importing new asset with local path: {lc} (id: {id})", filesImported + 1, localPath, id);
 
-                                foundImportableFile = true;
-                                filesImported++;
+                                    foundImportableFile = true;
+                                    filesImported++;
+                                }
                             }
                         }
                     }
@@ -530,10 +546,10 @@ namespace Editor.Assets
 
                 File.WriteAllText(AssetIdentifier.DataFilePath, _identifier.TrySerializeAssetIds());
 
-                Editor.GlobalSingleton.ProjectSubFilesystem.FlushFileRemappings();
+                EditorRuntime.GlobalSingleton.ProjectSubFilesystem.FlushFileRemappings();
 
-                Editor.GlobalSingleton.EngineFilesystem.FlushFileRemappings();
-                Editor.GlobalSingleton.EditorFilesystem.FlushFileRemappings();
+                EditorRuntime.GlobalSingleton.EngineFilesystem.FlushFileRemappings();
+                EditorRuntime.GlobalSingleton.EditorFilesystem.FlushFileRemappings();
 
                 _associator.FlushAssociations();
                 FlushImportedAssets();
@@ -601,7 +617,7 @@ namespace Editor.Assets
                                     string realPath = Path.Combine(filesystem.AbsolutePath, localPath);
                                     string assetPath = GetAssetPath(localPath);
 
-                                    bool ret = importer.Importer.Import(this, filesystem, realPath, assetPath, assetPath.Substring(Editor.GlobalSingleton.ProjectPath.Length));
+                                    bool ret = importer.Importer.Import(this, filesystem, realPath, assetPath, assetPath.Substring(EditorRuntime.GlobalSingleton.ProjectPath.Length));
                                     _importedAssets[_identifier.GetOrRegisterAsset(localPath)] = File.GetLastWriteTime(realPath);
                                 }
                                 catch (Exception ex)
@@ -644,13 +660,26 @@ namespace Editor.Assets
         }
 
         /// <summary>Thread-safe</summary>
-        private void CleanOldFile(string localPath)
+        internal void DeleteImportedAsset(string localPath)
         {
             string assetPath = GetAssetPath(localPath);
+            if (File.Exists(assetPath))
+            {
+                File.Delete(assetPath);
+            }
 
+            ProjectSubFilesystem? filesystem = SelectAppropriateFilesystem(GetFileNamespace(localPath));
+            filesystem?.RemapFile(localPath, null);
+
+            if (_identifier.TryGetAssetId(localPath, out AssetId asset))
+                _importedAssets.TryRemove(asset, out _);
+            else
+                EdLog.Assets.Warning("No id associated with imported asset: {p}", localPath);
         }
 
         private HashSet<AssetId> _assocationRingAvoidance = new HashSet<AssetId>();
+        private AssetId[] _temporaryAssociatedIds = Array.Empty<AssetId>();
+
         /// <summary>Not thread-safe</summary>
         private void ImportAssociatedFiles(AssetId localPath)
         {
@@ -659,21 +688,32 @@ namespace Editor.Assets
 
             void Logic(AssetId path)
             {
-                if (!_assocationRingAvoidance.Add(path))
+                if (!_assocationRingAvoidance.Add(path) || _currentlySkippedAssets.Remove(path))
                 {
                     return;
                 }
 
+                int count = 0;
                 using (_associator.GetDependentsWithLockScope(path, out HashSet<AssetId>? dependencies))
                 {
                     if (dependencies != null)
                     {
-                        foreach (AssetId association in dependencies)
-                        {
-                            ImportNewFile(association);
-                            Logic(association);
-                        }
+                        if (_temporaryAssociatedIds.Length < dependencies.Count)
+                            _temporaryAssociatedIds = new AssetId[BitOperations.RoundUpToPowerOf2((uint)dependencies.Count)];
+
+                        dependencies.CopyTo(_temporaryAssociatedIds);
+                        count = dependencies.Count;
                     }
+                    else
+                        return;
+                }
+
+                for (int i = 0; i < count; ++i)
+                {
+                    AssetId association = _temporaryAssociatedIds[i];
+
+                    ImportNewFile(association);
+                    Logic(association);
                 }
             }
         }
@@ -695,15 +735,15 @@ namespace Editor.Assets
         /// <summary>Not thread-safe</summary>
         private void PollContentUpdates(bool waitForSemaphore = false)
         {
-            if (Monitor.TryEnter(_importLock, waitForSemaphore ? Timeout.Infinite : 0))
+            if (_importLock.TryEnter(waitForSemaphore ? Timeout.Infinite : 0))
             {
                 try
                 {
                     PumpWatcher(_contentWatcher);
                     if (_engineContentWatcher != null)
                         PumpWatcher(_engineContentWatcher);
-                    if (_editorCotentWatcher != null)
-                        PumpWatcher(_editorCotentWatcher);
+                    if (_editorContentWatcher != null)
+                        PumpWatcher(_editorContentWatcher);
 
                     void PumpWatcher(AssetFilesystemWatcher watcher)
                     {
@@ -716,12 +756,14 @@ namespace Editor.Assets
                                 case FilesystemEventType.FileChanged:
                                     {
                                         AssetId id = _identifier.GetOrRegisterAsset(@event.LocalPath);
+                                        if (_currentlySkippedAssets.Remove(id))
+                                            continue;
 
                                         ImportAssociatedFiles(id);
                                         ImportNewFile(id);
                                         break;
                                     }
-                                case FilesystemEventType.FileRemoved: CleanOldFile(@event.LocalPath); break;
+                                case FilesystemEventType.FileRemoved: DeleteImportedAsset(@event.LocalPath); break;
                                 case FilesystemEventType.FileRenamed:
                                     {
                                         Debug.Assert(@event.NewLocalPath != null);
@@ -738,7 +780,7 @@ namespace Editor.Assets
                 }
                 finally
                 {
-                    Monitor.Exit(_importLock);
+                    _importLock.Exit();
                 }
 
                 if (_importerTasksTotal > 0)
@@ -756,11 +798,11 @@ namespace Editor.Assets
         private void ReloadPendingAssets()
         {
             //avoiding a deadlock that can occur somehow when the filesystem waits on a file import on the main thread
-            if (Monitor.TryEnter(_reloadLock, 0))
+            if (_reloadLock.TryEnter())
             {
                 try
                 {
-                    AssetManager manager = Editor.GlobalSingleton.AssetManager;
+                    AssetManager manager = EditorRuntime.GlobalSingleton.AssetManager;
                     foreach (AssetId asset in _assetsToReload)
                     {
                         EdLog.Assets.Debug("Force reloading asset {id} within asset manager..", asset);
@@ -771,14 +813,14 @@ namespace Editor.Assets
                 }
                 finally
                 {
-                    Monitor.Exit(_reloadLock);
+                    _reloadLock.Exit();
                 }
             }
         }
 
         /// <summary>Thread-safe</summary>
         /// <param name="key">Accepts as format: "Path/To/File.extension" or ".extension"</param>
-        private bool TryGetImporter(ReadOnlySpan<char> key, [NotNullWhen(true)] out IAssetImporter? importer)
+        internal bool TryGetImporter(ReadOnlySpan<char> key, [NotNullWhen(true)] out IAssetImporter? importer)
         {
             importer = null;
 
@@ -792,6 +834,12 @@ namespace Editor.Assets
             return _importerLookup.TryGetValue(key.ToString(), out importer);
         }
 
+        /// <summary>Not thread-safe</summary>
+        internal void SkipNextAssetFileChange(AssetId id)
+        {
+            _currentlySkippedAssets.Add(id);
+        }
+
         public bool IsImporting => _importerTasksTotal > 0;
         public float ImportProgress => (_importerTasksTotal - (_runningImports.Count + _pendingImports.Count)) / (float)_importerTasksTotal;
 
@@ -801,11 +849,12 @@ namespace Editor.Assets
         internal AssetFilesystemWatcher SourceWatcher => _sourceWatcher;
 
         internal AssetFilesystemWatcher? EngineWatcher => _engineContentWatcher;
-        internal AssetFilesystemWatcher? EditorWatcher => _editorCotentWatcher;
+        internal AssetFilesystemWatcher? EditorWatcher => _editorContentWatcher;
 
         public AssetIdentifier Identifier => _identifier;
         public AssetConfiguration Configuration => _configuration;
         public AssetAssociator Associator => _associator;
+        public AssetCache Cache => _cache;
 
         internal event Action<ProjectSubFilesystem, FilesystemEvent>? NewFilesystemEvent;
         internal event Action<string, string>? FileRenamed;
@@ -855,13 +904,13 @@ namespace Editor.Assets
             int hash = (int)@namespace.GetDjb2HashCode();
 
             if (hash == s_contentNamespaceHash)
-                return Editor.GlobalSingleton.ProjectSubFilesystem;
+                return EditorRuntime.GlobalSingleton.ProjectSubFilesystem;
             else if (hash == s_sourceNamespaceHash)
                 throw new NotImplementedException();
             else if (hash == s_engineNamespaceHash)
-                return Editor.GlobalSingleton.EngineFilesystem;
+                return EditorRuntime.GlobalSingleton.EngineFilesystem;
             else if (hash == s_editorNamespaceHash)
-                return Editor.GlobalSingleton.EditorFilesystem;
+                return EditorRuntime.GlobalSingleton.EditorFilesystem;
 
             return null;
         }
@@ -925,6 +974,12 @@ namespace Editor.Assets
         /// <summary>Thread-safe</summary>
         public static bool TryGetFullPathFromLocal(string localPath, [NotNullWhen(true)] out string? fullPath)
         {
+            if (Path.IsPathFullyQualified(localPath))
+            {
+                fullPath = localPath;
+                return true;
+            }
+
             fullPath = null;
 
             ProjectSubFilesystem? filesystem = SelectAppropriateFilesystem(GetFileNamespace(localPath));
@@ -935,6 +990,12 @@ namespace Editor.Assets
             return true;
         }
 
+        /// <inheritdoc cref="AssetPipeline.SkipNextAssetFileChange"/>
+        public static void SkipNextFileChange(AssetId id)
+        {
+            EditorRuntime.GlobalSingleton.AssetPipeline.SkipNextAssetFileChange(id);
+        }
+
         private static readonly int s_contentNamespaceHash = "Content".GetDjb2HashCode();
         private static readonly int s_sourceNamespaceHash = "Source".GetDjb2HashCode();
         private static readonly int s_engineNamespaceHash = "Engine".GetDjb2HashCode();
@@ -943,7 +1004,6 @@ namespace Editor.Assets
         public string ImportedAssetsFilePath = Path.Combine(EditorFilepaths.LibraryIntermediatePath, "ImportedAssets.dat");
 
         internal record struct AssetImporterData(HashSet<string> AssociatedExtensions, IAssetImporter Importer);
-        private record struct FileAssociationData(Lock Lock, HashSet<AssetVariantId> ExternalAssociates);
     }
 
     public readonly record struct AssetVariantId : IEquatable<AssetVariantId>

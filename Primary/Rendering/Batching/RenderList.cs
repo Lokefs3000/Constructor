@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Primary.Rendering.Batching
 {
@@ -19,9 +20,13 @@ namespace Primary.Rendering.Batching
         private Dictionary<ShaderAsset, ShaderRenderBatcher> _shaderBatchers;
         private Dictionary<ShaderAsset, ShaderKeyRange> _shaderKeyRanges;
 
-        private ConcurrentDictionary<ShaderAsset, ushort> _shaderIds;
-        private ConcurrentDictionary<IRenderMeshSource, ushort> _modelIds;
-        private ConcurrentDictionary<MaterialAsset, uint> _materialIds;
+        private Dictionary<ShaderAsset, ushort> _shaderIds;
+        private Dictionary<IRenderMeshSource, ushort> _modelIds;
+        private Dictionary<MaterialAsset, uint> _materialIds;
+
+        private Lock _shaderIdsLock;
+        private Lock _modelIdsLock;
+        private Lock _materialIdsLock;
 
         private List<ShaderRenderBatcher> _usedBatchers;
 
@@ -37,9 +42,13 @@ namespace Primary.Rendering.Batching
             _shaderBatchers = new Dictionary<ShaderAsset, ShaderRenderBatcher>();
             _shaderKeyRanges = new Dictionary<ShaderAsset, ShaderKeyRange>();
 
-            _shaderIds = new ConcurrentDictionary<ShaderAsset, ushort>();
-            _modelIds = new ConcurrentDictionary<IRenderMeshSource, ushort>();
-            _materialIds = new ConcurrentDictionary<MaterialAsset, uint>();
+            _shaderIds = new Dictionary<ShaderAsset, ushort>();
+            _modelIds = new Dictionary<IRenderMeshSource, ushort>();
+            _materialIds = new Dictionary<MaterialAsset, uint>();
+
+            _shaderIdsLock = new Lock();
+            _modelIdsLock = new Lock();
+            _materialIdsLock = new Lock();
 
             _usedBatchers = new List<ShaderRenderBatcher>();
 
@@ -141,13 +150,32 @@ namespace Primary.Rendering.Batching
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ushort GetShaderId(ShaderAsset asset) => _shaderIds.GetOrAdd(asset, (_) => (ushort)_shaderIds.Count);
+        internal ushort GetShaderId(ShaderAsset asset) => GetIdFromDictionaryWithLock(_shaderIds, _shaderIdsLock, asset);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ushort GetModelId(IRenderMeshSource asset) => _modelIds.GetOrAdd(asset, (_) => (ushort)_modelIds.Count);
+        internal ushort GetModelId(IRenderMeshSource asset) => GetIdFromDictionaryWithLock(_modelIds, _modelIdsLock, asset);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal uint GetMaterialId(MaterialAsset asset) => _materialIds.GetOrAdd(asset, (_) => (uint)_materialIds.Count);
+        internal uint GetMaterialId(MaterialAsset asset) => GetIdFromDictionaryWithLock(_materialIds, _materialIdsLock, asset);
+
+        private TValue GetIdFromDictionaryWithLock<TKey, TValue>(Dictionary<TKey, TValue> dict, Lock @lock, TKey key) where TKey : class where TValue : struct, IUnsignedNumber<TValue>
+        {
+            // too large to inline anyway
+            using var _ = @lock.EnterScope();
+
+            ref TValue id = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out bool exists);
+            if (exists)
+                return id;
+
+            if (typeof(TValue) == typeof(ushort))
+                id = Unsafe.BitCast<ushort, TValue>((ushort)(dict.Count - 1));
+            else if (typeof(TValue) == typeof(uint))
+                id = Unsafe.BitCast<uint, TValue>((uint)(dict.Count - 1));
+            else
+                throw new NotSupportedException();
+
+            return id;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal bool GetKeyRangeForShader(ShaderAsset asset, out ShaderKeyRange keyRange) => _shaderKeyRanges.TryGetValue(asset, out keyRange);
@@ -173,7 +201,7 @@ namespace Primary.Rendering.Batching
         Primary (59 bits):
             ShaderId (16 bits / 65535)
             ModelId (16 bits / 65535)
-            Materialid (17 bits / 131070)
+            MaterialId (17 bits / 131070)
             MeshId (10 bits / 1023)
         Auxiliary: (1 bits):
             Transparent (1 bit / 1)
@@ -183,20 +211,17 @@ namespace Primary.Rendering.Batching
         public ulong Key = Create(ShaderId, ModelId, MaterialId, MeshId);
         public uint ListIndex = (((uint)BatcherIndex) << 31) | ((uint)ListIndex);
 
-        public ushort ShaderId => (ushort)((Key >> 48) & 0xffffu);
-        public ushort ModelId => (ushort)((Key >> 32) & 0xffffu);
-        public uint MaterialId => (uint)((Key >> 15) & 0x1ffffu);
-        public ushort MeshId => (ushort)((Key >> 5) & 0x400u);
+        public readonly ushort ShaderId => (ushort)((Key >> 48) & 0xffffu);
+        public readonly ushort ModelId => (ushort)((Key >> 32) & 0xffffu);
+        public readonly uint MaterialId => (uint)((Key >> 15) & 0x1ffffu);
+        public readonly ushort MeshId => (ushort)((Key >> 5) & 0x400u);
 
-        public int Index => (int)((ListIndex) & 0x1ffffffu);
-        public int Batcher => (byte)((ListIndex >> 31) & 0x1u);
+        public readonly int Index => (int)((ListIndex) & 0x1ffffffu);
+        public readonly int Batcher => (byte)((ListIndex >> 31) & 0x1u);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Compare(RenderKey x, RenderKey y) => x.Key.CompareTo(y.Key);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int CompareTo(RenderKey other) => Key.CompareTo(other.Key);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(RenderKey other) => Key.Equals(other.Key);
+        public readonly int Compare(RenderKey x, RenderKey y) => x.Key.CompareTo(y.Key);
+        public readonly int CompareTo(RenderKey other) => Key.CompareTo(other.Key);
+        public readonly bool Equals(RenderKey other) => Key.Equals(other.Key);
 
         public static ulong Create(ushort shaderId, ushort modelId, uint materialId, ushort meshId)
         {

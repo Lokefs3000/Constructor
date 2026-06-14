@@ -11,7 +11,7 @@ using Editor.Storage;
 using Editor.UI;
 using Editor.UI.Assets;
 using Editor.UI.Assets.Loaders;
-using Editor.UI.Debugging;
+using Editor.UI.Diagnostics;
 using Editor.UI.Designer;
 using Primary.Rendering;
 using Primary.Scenes;
@@ -22,10 +22,14 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Primary.Components;
 using Primary.Mathematics;
+using Primary.GUI.ImGui;
+using Editor.Gui.Debugging;
+using Primary.Profiling;
+using Primary.Windowing;
 
 namespace Editor.UI.Designer
 {
-    internal sealed class UIDesignerEngine : Editor
+    internal sealed class UIDesignerEngine : EditorRuntime
     {
         internal UIDesignerEngine(string baseProjectPath, string[] args) : base(baseProjectPath, args)
         {
@@ -38,17 +42,16 @@ namespace Editor.UI.Designer
 
             RenderingManager.SetNewRenderPath(new EditorRenderPath());
 
+            ImGuiManager.AddDrawer(new LayoutDebugger());
+            ImGuiManager.AddDrawer(new DebugProfiler());
+
             DearImGuiStateManager.InitWindow(window);
             DearImGuiWindowManager.Open<UILayoutDebugger>();
 
             UIManager.OpenWindow<UIDesigner>(centralHost, "Editor/Designer/Base.layout");
 
-            {
-                Scene defaultScene = SceneManager.CreateScene("Default", LoadSceneMode.Single);
-
-                SceneEntity cameraEntity = defaultScene.CreateEntity(SceneEntity.Null);
-                cameraEntity.AddComponent<Camera>();
-            }
+            EventManager.AddHandler(ImGuiManager.Context.StateController);
+            RenderingManager.RenderPassManager.AddRenderPass<ImGuiRenderPass>();
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -58,23 +61,24 @@ namespace Editor.UI.Designer
                 Time.BeginNewFrame();
                 ProfilingManager.StartProfilingForFrame();
 
-                ExtConsoleManager?.PollUpdates();
+                using (new ProfilingScope("Editor"))
+                {
+                    ExtConsoleManager?.PollUpdates();
 
-                AssetDatabase.HandlePendingUpdates();
-                AssetPipeline.PollRemainingEvents();
+                    _assetDatabase.HandlePendingUpdates();
+                    _assetPipeline.PollRemainingEvents();
+                    UIManager.UpdatePendingLayouts();
+                    ToolManager.Update();
+
+                    DrawDearImgui();
+                }
 
                 ThreadHelper.ExecutePendingTasks();
-                SystemManager.RunSystems();
-
-                UIManager.UpdatePendingLayouts();
-
-                DrawDearImgui();
-
-                UIDebugRenderer.Draw(Gizmos.Instance, centralHost);
 
                 InputSystem.UpdatePending();
                 EventManager.PollEvents();
-
+                SystemManager.RunSystems();
+                ImGuiManager.UpdateAndRender();
                 RenderingManager.Render();
             }
         }

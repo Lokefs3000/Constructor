@@ -1,11 +1,15 @@
 ﻿using Arch.Core;
 using Primary.Common;
+using Primary.Mathematics;
 using Primary.Components;
 using Primary.Profiling;
 using Primary.Scenes;
+using Primary.Scenes.Components;
 using Primary.Timing;
 using System.Numerics;
 using System.Runtime.Intrinsics;
+
+using SceneEntityManager = Primary.Scenes.Components.SceneEntityManager;
 
 namespace Primary.Rendering.Tree
 {
@@ -19,12 +23,12 @@ namespace Primary.Rendering.Tree
             _regions = new Dictionary<OctreePoint, RegionOctree>();
             _pendingUpdates = new Queue<EntityUpdateData>();
 
-            SceneEntityManager.AddComponentAddedCallback<RenderBounds>((e) =>
+            SceneEntityManager.Instance.AddComponentAddedCallback<RenderBounds>((e) =>
             {
                 _pendingUpdates.Enqueue(new EntityUpdateData(EntityUpdateType.Created, e));
             });
 
-            SceneEntityManager.AddComponentRemovedCallback<RenderBounds>((e) =>
+            SceneEntityManager.Instance.AddComponentRemovedCallback<RenderBounds>((e) =>
             {
                 _pendingUpdates.Enqueue(new EntityUpdateData(EntityUpdateType.Removed, e));
             });
@@ -97,7 +101,7 @@ namespace Primary.Rendering.Tree
             return octree;
         }
 
-        internal IReadOnlyDictionary<OctreePoint, RegionOctree> Regions => _regions;
+        public Dictionary<OctreePoint, RegionOctree> Regions => _regions;
 
         public static OctreePoint GetOctreeRegionForPoint(Vector3 position)
         {

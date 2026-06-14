@@ -14,9 +14,9 @@ using static TerraFX.Interop.DirectX.D3D12_STENCIL_OP;
 using static TerraFX.Interop.DirectX.D3D12_TEXTURE_ADDRESS_MODE;
 using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows")]
+    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe static class ConversionHelper
     {
         public static DXGI_FORMAT ToTextureFormat(this RHIFormat format) => format switch
@@ -270,6 +270,24 @@ namespace Primary.RHI2.Direct3D12
             RHIFormat.RGBA8_UNorm_sRGB => DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
             RHIFormat.RGB10A2_UNorm => DXGI_FORMAT_R10G10B10A2_UNORM,
             _ => DXGI_FORMAT_UNKNOWN,
+        };
+
+        public static RHIFormat ToDepthFormat(this RHIFormat format) => format switch
+        {
+            RHIFormat.D16_UNorm => RHIFormat.R16_Float,
+            RHIFormat.D24_UNorm_S8_UInt => RHIFormat.R24_UNorm_X8_Typeless,
+            RHIFormat.D32_Float => RHIFormat.R32_Float,
+            RHIFormat.D32_Float_S8X24_UInt => RHIFormat.R32_Float_X8X24_Typeless,
+            _ => RHIFormat.Unknown,
+        };
+
+        public static RHIFormat ToStencilFormat(this RHIFormat format) => format switch
+        {
+            RHIFormat.D24_UNorm_S8_UInt => RHIFormat.X24_Typeless_G8_UInt,
+            RHIFormat.D32_Float_S8X24_UInt => RHIFormat.X32_Typeless_G8X24_UInt,
+            RHIFormat.X24_Typeless_G8_UInt => RHIFormat.X24_Typeless_G8_UInt,
+            RHIFormat.X32_Typeless_G8X24_UInt => RHIFormat.X32_Typeless_G8X24_UInt,
+            _ => RHIFormat.Unknown,
         };
 
         public static D3D12_FILL_MODE ToFillMode(this RHIFillMode fillMode) => fillMode switch

@@ -4,7 +4,11 @@ using Editor.UI.Elements;
 using Editor.UI.Helpers;
 using Editor.UI.Text;
 using Editor.UI.Visual;
+using Primary.Assets;
+using Primary.Collections.ReadOnly;
 using Primary.Common;
+using Primary.Mathematics;
+using Primary.RHI;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -15,54 +19,78 @@ namespace Editor.UI.Menu
 {
     public class ContextMenuItem : ContextMenuBase
     {
-        private List<ContextMenuBase> _children;
+        private List<ContextMenuBase>? _items;
 
-        private string _text;
+        private UIFontAsset? _font;
+        private FontStyle _fontStyle;
+        private FontWeight _fontWeight;
+
+        private string? _text;
+        private object? _image;
 
         public ContextMenuItem()
         {
-            _children = new List<ContextMenuBase>();
+            _items = null;
 
-            _text = "Menu item";
+            _font = null;
+            _fontStyle = FontStyle.Normal;
+            _fontWeight = FontWeight._300;
+
+            _text = GetType().Name;
+            _image = null;
         }
 
-        internal override void ChangeOwner(ContextMenuAsset? newOwner)
+        public override void SetOwner(ContextMenuHost? newHost)
         {
-            if (_owner != newOwner)
-            {
-                _owner = newOwner;
+            if (_host == newHost)
+                return;
 
-                foreach (ContextMenuBase child in _children)
+            _host = newHost;
+
+            if (_items != null)
+            {
+                foreach (ContextMenuBase item in _items)
                 {
-                    child.ChangeOwner(newOwner);
+                    item.SetOwner(newHost);
                 }
             }
         }
 
+        protected override bool AddChild(ContextMenuBase item)
+        {
+            (_items ??= []).Add(item);
+            return true;
+        }
+
+        protected override void RemoveChild(ContextMenuBase item)
+        {
+            _items?.Remove(item);
+        }
+
         public override Vector2 MeasureSize()
         {
+            float totalSize = 0.0f;
+            if (_image != null)
+            {
+                totalSize += TextManager.PixelsPerEM + 4.0f;
+            }
+
             if (string.IsNullOrEmpty(_text))
-                return Vector2.Zero;
+                return new Vector2(totalSize, TextManager.PixelsPerEM);
 
-            if (Owner == null)
-                return Vector2.Zero;
-
-            UIFontStyle? fontStyle = Owner.Style;
+            UIFontTypeData? fontStyle = _font?.FindStyle(_fontStyle, _fontWeight);
             if (fontStyle == null)
-                return Vector2.Zero;
+                return new Vector2(totalSize, TextManager.PixelsPerEM);
 
             TextVisualInfo visualInfo = new TextVisualInfo(new PaintColor(Color.White), 1.0f, fontStyle);
-            TextWrapInfo wrapInfo = new TextWrapInfo(Vector2.PositiveInfinity, visualInfo);
+            TextWrapInfo wrapInfo = new TextWrapInfo(TextOrigin.Top, Vector2.PositiveInfinity, true, visualInfo);
 
-            using RentedArray<char> tempText = RentedArray<char>.Rent(_text.Length + 1);
+            TextManager text = UIManager.Instance.TextManager;
 
-            _text.CopyTo(tempText.Span);
-            tempText.Span[_text.Length] = '\0';
+            StringHandle stringHandle = text.GetStringHandle(_text);
+            ShapedTextData textData = text.ShapeText(wrapInfo, UITextOverflow.Overflow, stringHandle.String, stringHandle.Hash);
 
-            UIManager manager = UIManager.Instance;
-            ShapedTextData textData = manager.TextManager.ShapeText(wrapInfo, UITextOverflow.Overflow, tempText.Span, _text.Length < 200 ? _text.GetDjb2HashCode() : StringHandle.InvalidHashCode);
-
-            return textData.TotalSize;
+            return new Vector2(totalSize + textData.TotalSize.X + 10.0f, TextManager.PixelsPerEM);
         }
 
         public override void DrawVisual(Vector2 basePosition, Vector2 availRegion, UIPainterContext painter)
@@ -70,14 +98,39 @@ namespace Editor.UI.Menu
             if (string.IsNullOrEmpty(_text))
                 return;
 
-            if (Owner == null)
-                return;
-
-            UIFontStyle? fontStyle = Owner.Style;
+            UIFontTypeData? fontStyle = _font?.FindStyle(_fontStyle, _fontWeight);
             if (fontStyle == null)
                 return;
 
-            painter.DrawText(basePosition, UIPaint.FromColor(Color.White), TextBuilder.Default, fontStyle, 1.0f, _text);
+            if (_image != null)
+            {
+                if (_image is TextureAsset texture)
+                    painter.DrawImage(new Boundaries(basePosition, basePosition + new Vector2(TextManager.PixelsPerEM)), UIPaint.FromColor(Color.White), texture);
+                else if (_image is RHITexture rhiTexture)
+                    painter.DrawImage(new Boundaries(basePosition, basePosition + new Vector2(TextManager.PixelsPerEM)), UIPaint.FromColor(Color.White), rhiTexture);
+                else if (_image is Sprite sprite)
+                    painter.DrawImage(new Boundaries(basePosition, basePosition + new Vector2(TextManager.PixelsPerEM)), UIPaint.FromColor(Color.White), sprite);
+                else
+                    painter.DrawRect(new Boundaries(basePosition, basePosition + new Vector2(TextManager.PixelsPerEM)), UIPaint.FromColor(Color.Pink));
+
+                basePosition.X += TextManager.PixelsPerEM + 4.0f;
+            }
+
+            painter.DrawText(new Vector2(basePosition.X, basePosition.Y + TextManager.PixelsPerEM - 2.0f), UIPaint.FromColor(Color.White), new TextBuilder().SetOrigin(TextOrigin.Bottom), fontStyle, 1.0f, _text);
         }
+
+        public ROList<ContextMenuBase> Items => _items ?? ROList<ContextMenuBase>.Empty;
+
+        #region Properties
+        public UIFontAsset? Font { get => _font; set => _font = value; }
+        public FontStyle FontStyle { get => _fontStyle; set => _fontStyle = value; }
+        public FontWeight FontWeight { get => _fontWeight; set => _fontWeight = value; }
+
+        public string? Text { get => _text; set => _text = value; }
+
+        public TextureAsset? Image { get => _image as TextureAsset; set => _image = value; }
+        public RHITexture? RHITexture { get => _image as RHITexture; set => _image = value; }
+        public Sprite? Sprite { get => _image as Sprite; set => _image = value; }
+        #endregion
     }
 }

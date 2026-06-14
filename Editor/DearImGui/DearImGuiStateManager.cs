@@ -5,6 +5,7 @@ using Primary.Common;
 using Primary.Polling;
 using Primary.Profiling;
 using Primary.Rendering;
+using Primary.Windowing;
 using SDL;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -15,14 +16,14 @@ namespace Editor.DearImGui
 {
     internal sealed unsafe class DearImGuiStateManager : IDisposable
     {
-        private Editor _editor;
+        private EditorRuntime _editor;
 
         private ImGuiContextPtr _context;
         //private DearImGuiRenderPass _renderPass;
 
         private bool _disposedValue;
 
-        internal DearImGuiStateManager(Editor editor)
+        internal DearImGuiStateManager(EditorRuntime editor)
         {
             _editor = editor;
             _context = ImGui.CreateContext();

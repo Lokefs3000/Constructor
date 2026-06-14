@@ -1,318 +1,291 @@
-﻿using Editor.Interaction.Logic;
+﻿using Editor.Interaction.Controls;
+using Editor.Interaction.Logic;
+using MathNet.Numerics;
 using Primary.Scenes;
+using Primary.Scenes.Components;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using TerraFX.Interop.Windows;
 
 namespace Editor.Interaction
 {
     public sealed class SelectionManager
     {
-        private List<SelectedBase> _selected;
-        private SelectedBase? _currentContext;
+        private SelectionGroup[] _groupStack;
+        private int _groupStackHead;
 
-        private Dictionary<Type, GenericSelectionLogic> _selectionLogicCache;
-        private Dictionary<Type, GenericSelectionLogic?> _selectionObjectCache;
+        private SelectionGroup _defaultGroup;
+
+        private Dictionary<Type, ISelectionLocator> _locators;
+
+        private HashSet<SelectionGroup> _usedGroups;
+        private HashSet<object> _usedObjects;
 
         internal SelectionManager()
         {
-            _selected = new List<SelectedBase>();
-            _currentContext = null;
+            _groupStack = Array.Empty<SelectionGroup>();
+            _groupStackHead = 0;
 
-            _selectionLogicCache = new Dictionary<Type, GenericSelectionLogic>();
-            _selectionObjectCache = new Dictionary<Type, GenericSelectionLogic?>();
+            _defaultGroup = new SelectionGroup(this);
 
-            SceneEntityManager.SceneEntityDeleted += (e) =>
+            _locators = new Dictionary<Type, ISelectionLocator>();
+
+            _usedGroups = new HashSet<SelectionGroup>();
+            _usedObjects = new HashSet<object>();
+
+            EditorRuntime runtime = EditorRuntime.GlobalSingleton;
+            runtime.ReflectionManager.TypeLoader.AddCallback<SelectionLocatorTypesAttribute>(SelectionLocatorTypeLoaded);
+
+            AddCallbacks(_defaultGroup);
+        }
+
+        private void SelectionLocatorTypeLoaded(Type type, object obj)
+        {
+            if (!type.IsAssignableTo(typeof(ISelectionLocator)))
+                return;
+
+            ISelectionLocator? locator = Activator.CreateInstance(type) as ISelectionLocator;
+            if (locator == null)
             {
-                while (true)
+                EdLog.Interaction.Error("Failed to create selection locator {t}", type);
+                return;
+            }
+
+            SelectionLocatorTypesAttribute attribute = (SelectionLocatorTypesAttribute)obj;
+            foreach (Type selectionType in attribute.Types)
+            {
+                if (!_locators.TryAdd(selectionType, locator))
                 {
-                    bool hasFoundEntry = false;
+                    EdLog.Interaction.Error("A selection locator is already assigned to the type {t}", selectionType);
+                    return;
+                }
+            }
+        }
 
-                    for (int i = 0; i < _selected.Count; i++)
+        private SelectionGroup? LocateGroupForObject(object obj)
+        {
+            Type type = obj.GetType();
+            if (_locators.TryGetValue(type, out ISelectionLocator? locator))
+                return locator.Locate(this, obj);
+            else
+                return _defaultGroup;
+        }
+
+        internal void Clear()
+        {
+            SelectionGroup group = _groupStackHead > 0 ? _groupStack[_groupStackHead - 1] : _defaultGroup;
+            group.ClearSelection();
+        }
+
+        internal void SelectRange(ReadOnlySpan<object> range, SelectMode mode)
+        {
+            if (!range.IsEmpty)
+            {
+                for (int i = 0; i < range.Length; i++)
+                {
+                    object obj = range[i];
+                    SelectionGroup? group = LocateGroupForObject(obj);
+
+                    if (group != null)
                     {
-                        if (_selected[i] is SelectedSceneEntity selected && selected.Entity == e)
-                        {
-                            _selected.RemoveAt(i);
-                            Deselected?.Invoke(selected);
+                        bool isFirstUse = _usedGroups.Add(group);
+                        if (mode == SelectMode.Clear && isFirstUse)
+                            group.ClearSelection();
 
-                            hasFoundEntry = true;
+                        group.AddObject(obj, isFirstUse);
+                    }
+                }
+
+                _usedGroups.Clear();
+            }
+        }
+
+        internal void DeselectRange(ReadOnlySpan<object> range)
+        {
+            if (!range.IsEmpty)
+            {
+                int top = _groupStackHead - 1;
+
+                for (int i = 0; i < range.Length; i++)
+                {
+                    object obj = range[i];
+                    for (int j = top; j >= -1; --j)
+                    {
+                        SelectionGroup group = j >= 0 ? _groupStack[j] : _defaultGroup;
+                        if (group.IsSelected(obj))
+                        {
+                            group.RemoveObject(obj);
                             break;
                         }
                     }
-
-                    if (!hasFoundEntry)
-                        break;
                 }
-            };
+            }
         }
 
-        /// <summary>Not thread-safe</summary>
-        private GenericSelectionLogic? FindSelectionLogic(Type type)
+        internal IEnumerable<object> GetSelection()
         {
-            if (_selectionLogicCache.TryGetValue(type, out GenericSelectionLogic? selectionLogic))
-            {
-                return selectionLogic;
-            }
-
-            ConstructorInfo? constructor = type.GetConstructor(Array.Empty<Type>());
-            if (constructor == null)
-            {
-                EdLog.Interaction.Error("Failed to find public parameterless constructor for selection logic: {lg}", type.Name);
-                return null;
-            }
-
-            GenericSelectionLogic generic = Unsafe.As<GenericSelectionLogic>(constructor.Invoke(null));
-            _selectionLogicCache[type] = generic;
-
-            return generic;
+            SelectionGroup group = _groupStackHead > 0 ? _groupStack[_groupStackHead - 1] : _defaultGroup;
+            return group.Selection;
         }
 
-        /// <summary>Not thread-safe</summary>
-        private GenericSelectionLogic? TryGetObjectLogic(Type type)
+        internal object? GetContext()
         {
-            if (_selectionObjectCache.TryGetValue(type, out GenericSelectionLogic? logic))
-            {
-                return logic;
-            }
-
-            SelectionLogicAttribute? attribute = type.GetCustomAttribute<SelectionLogicAttribute>();
-            if (attribute == null)
-            {
-                _selectionObjectCache[type] = null;
-                return null;
-            }
-
-            logic = FindSelectionLogic(attribute.Logic);
-            _selectionObjectCache[type] = logic;
-
-            return logic;
+            SelectionGroup group = _groupStackHead > 0 ? _groupStack[_groupStackHead - 1] : _defaultGroup;
+            return group.Context;
         }
 
-        /// <summary>Not thread-safe</summary>
-        internal void SetOnlySelectedContext(SelectedBase selected)
+        internal SelectionGroup GetCurrentGroup()
         {
-            bool hasFound = false;
-            for (int i = 0; i < _selected.Count; i++)
+            return _groupStackHead > 0 ? _groupStack[_groupStackHead - 1] : _defaultGroup;
+        }
+
+        internal void PushSelectionGroup(SelectionGroup group)
+        {
+            if (group == _defaultGroup)
+                return;
+
+            int index = _groupStack.IndexOf(group);
+            if (index != -1)
             {
-                if (!_selected[i].Equals(selected))
+                if (index < _groupStackHead - 1)
                 {
-                    SelectedBase @base = _selected[i];
-                    _selected.RemoveAt(i--);
-
-                    Deselected?.Invoke(@base);
-                }
-                else
-                {
-                    _currentContext = _selected[i];
-                    hasFound = true;
+                    Array.Copy(_groupStack, index + 1, _groupStack, index, _groupStackHead - index);
+                    _groupStack[_groupStackHead - 1] = group;
                 }
             }
-
-            if (!hasFound)
-            {
-                GenericSelectionLogic? logic = TryGetObjectLogic(selected.GetType());
-                logic?.RunGeneric(selected);
-
-                _selected.Add(selected);
-                _currentContext = selected;
-
-                Selected?.Invoke(selected);
-            }
-        }
-
-        /// <summary>Not thread-safe</summary>
-        internal void AddSelectedAndSetContext(SelectedBase selected)
-        {
-            Debug.Assert(!_selected.Contains(selected));
-
-            GenericSelectionLogic? logic = TryGetObjectLogic(selected.GetType());
-            logic?.RunGeneric(selected);
-
-            _selected.Add(selected);
-            _currentContext = selected;
-
-            Selected?.Invoke(selected);
-        }
-
-        /// <summary>Not thread-safe</summary>
-        internal void AddSelected(SelectedBase selected)
-        {
-            Debug.Assert(!_selected.Contains(selected));
-
-            GenericSelectionLogic? logic = TryGetObjectLogic(selected.GetType());
-            logic?.RunGeneric(selected);
-
-            _selected.Add(selected);
-
-            Selected?.Invoke(selected);
-        }
-
-        /// <summary>Not thread-safe</summary>
-        internal void RemoveSelected(SelectedBase selected)
-        {
-            _selected.Remove(selected);
-
-            Deselected?.Invoke(selected);
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public static void Select(SelectedBase selected, SelectionMode mode = SelectionMode.Single)
-        {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            if (mode == SelectionMode.Single)
-                @this.SetOnlySelectedContext(selected);
             else
-                @this.AddSelectedAndSetContext(selected);
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public static void Deselect(SelectedBase selected)
-        {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            @this.RemoveSelected(selected);
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public static void Deselect(Predicate<SelectedBase> predicate)
-        {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            SelectedBase? selected = @this._selected.Find(predicate);
-            if (selected != null)
-                @this.RemoveSelected(selected);
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public static void Deselect<T>(Predicate<T> predicate) where T : SelectedBase
-        {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            SelectedBase? selected = @this._selected.Find((x) => x is T t && predicate(t));
-            if (selected != null)
-                @this.RemoveSelected(selected);
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public static bool IsSelected(SelectedBase selected)
-        {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            return @this._selected.Contains(selected);
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public static bool IsSelected(Predicate<SelectedBase> predicate)
-        {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            return @this._selected.Find(predicate) != null;
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public static bool IsSelected<T>(Predicate<T> predicate) where T : SelectedBase
-        {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            return @this._selected.Find((x) => x is T t && predicate(t)) != null;
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public static SelectedBase? FindSelected(Predicate<SelectedBase> predicate)
-        {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            return @this._selected.Find(predicate);
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public static T? FindSelected<T>(Predicate<T> predicate) where T : SelectedBase
-        {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            return Unsafe.As<T>(@this._selected.Find((x) => x is T t && predicate(t)));
-        }
-
-        /// <summary>Not thread-safe</summary>
-        public static void DeselectMultiple(params SelectedBase[] selected) => DeselectMultiple(selected.AsSpan());
-
-        /// <summary>Not thread-safe</summary>
-        public static void DeselectMultiple(ReadOnlySpan<SelectedBase> selected)
-        {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            for (int i = 0; i < selected.Length; i++)
             {
-                @this.RemoveSelected(selected[i]);
+                if (_groupStack.Length == _groupStackHead)
+                    Array.Resize(ref _groupStack, Math.Max(_groupStack.Length * 2, 4));
+
+                AddCallbacks(group);
+                _groupStack[_groupStackHead++] = group;
             }
         }
 
-        /// <summary>Not thread-safe</summary>
-        public static void DeselectMultiple(Predicate<SelectedBase> predicate)
+        internal void PopSelectionGroup(SelectionGroup group)
         {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            SelectedBase? selected = null;
-            while ((selected = @this._selected.Find(predicate)) != null)
+            if (group == _defaultGroup)
+                return;
+
+            int index = _groupStack.IndexOf(group);
+            if (index != -1 && _groupStackHead > 0)
             {
-                @this.RemoveSelected(selected);
+                if (index < _groupStackHead - 1)
+                {
+                    Array.Copy(_groupStack, index + 1, _groupStack, index, _groupStackHead - index);
+                }
+
+                _groupStack[--_groupStackHead] = default!;
+                RemoveCallbacks(group);
             }
         }
 
-        /// <summary>Not thread-safe</summary>
-        public static void DeselectMultiple<T>(Predicate<T> predicate) where T : SelectedBase
+        private void AddCallbacks(SelectionGroup group)
         {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            SelectedBase? selected = null;
-            while ((selected = @this._selected.Find((x) => x is T t && predicate(t))) != null)
+            group.ObjectSelected += ObjectSelectedCallback;
+            group.ObjectDeselected += ObjectDeselectedCallback;
+
+            foreach (object obj in group.Selection)
             {
-                @this.RemoveSelected(selected);
+                ObjectSelectedCallback(obj);
             }
         }
 
-        /// <summary>Not thread-safe</summary>
-        public static void Clear()
+        private void RemoveCallbacks(SelectionGroup group)
         {
-            SelectionManager @this = Editor.GlobalSingleton.SelectionManager;
-            for (int i = 0; i < @this._selected.Count; i++)
+            group.ObjectSelected -= ObjectSelectedCallback;
+            group.ObjectDeselected -= ObjectDeselectedCallback;
+
+            foreach (object obj in group.Selection)
             {
-                @this.Deselected?.Invoke(@this._selected[i]);
+                ObjectDeselectedCallback(obj);
             }
-
-            @this._selected.Clear();
         }
 
-        internal static SelectedBase? ActiveContext => Editor.GlobalSingleton.SelectionManager._currentContext;
-        internal static IReadOnlyList<SelectedBase> ActiveSelection => Editor.GlobalSingleton.SelectionManager._selected;
-
-        internal SelectedBase? CurrentContext => _currentContext;
-
-        internal IReadOnlyList<SelectedBase> Selection => _selected;
-
-        internal event Action<SelectedBase>? Selected;
-        internal event Action<SelectedBase>? Deselected;
-
-        internal static event Action<SelectedBase> NewSelected
+        private void ObjectSelectedCallback(object obj)
         {
-            add => Editor.GlobalSingleton.SelectionManager.Selected += value;
-            remove => Editor.GlobalSingleton.SelectionManager.Selected -= value;
+            if (_usedObjects.Add(obj))
+                ObjectSelected?.Invoke(obj);
+        }
+        private void ObjectDeselectedCallback(object obj)
+        {
+            if (_usedObjects.Remove(obj))
+                ObjectDeselected?.Invoke(obj);
         }
 
-        internal static event Action<SelectedBase> OldDeselected
+        public SelectionGroup DefaultGroup => _defaultGroup;
+
+        /// <summary>Not thread-safe</summary>
+        public static void ClearSelection()
         {
-            add => Editor.GlobalSingleton.SelectionManager.Deselected += value;
-            remove => Editor.GlobalSingleton.SelectionManager.Deselected -= value;
+            EditorRuntime runtime = EditorRuntime.GlobalSingleton;
+            runtime.SelectionManager.Clear();
         }
+
+        /// <summary>Not thread-safe</summary>
+        public static void Select(object selection, SelectMode selectMode = SelectMode.Clear)
+        {
+            EditorRuntime runtime = EditorRuntime.GlobalSingleton;
+            runtime.SelectionManager.SelectRange(new ReadOnlySpan<object>(in selection), selectMode);
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public static void Select(ReadOnlySpan<object> selection, SelectMode selectMode = SelectMode.Clear)
+        {
+            EditorRuntime runtime = EditorRuntime.GlobalSingleton;
+            runtime.SelectionManager.SelectRange(selection, selectMode);
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public static void Deselect(object selection)
+        {
+            EditorRuntime runtime = EditorRuntime.GlobalSingleton;
+            runtime.SelectionManager.DeselectRange(new ReadOnlySpan<object>(in selection));
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public static void Deselect(ReadOnlySpan<object> selection)
+        {
+            EditorRuntime runtime = EditorRuntime.GlobalSingleton;
+            runtime.SelectionManager.DeselectRange(selection);
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public static void SetNewSelectionGroup(SelectionGroup group)
+        {
+            EditorRuntime runtime = EditorRuntime.GlobalSingleton;
+            runtime.SelectionManager.PushSelectionGroup(group);
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public static void RemoveSelectionGroup(SelectionGroup group)
+        {
+            EditorRuntime runtime = EditorRuntime.GlobalSingleton;
+            runtime.SelectionManager.PopSelectionGroup(group);
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public static IEnumerable<object> Selection => EditorRuntime.GlobalSingleton.SelectionManager.GetSelection();
+
+        /// <summary>Not thread-safe</summary>
+        public static object? Context => EditorRuntime.GlobalSingleton.SelectionManager.GetContext();
+
+        /// <summary>Not thread-safe</summary>
+        public static SelectionGroup? CurrentGroup => EditorRuntime.GlobalSingleton.SelectionManager.GetCurrentGroup();
+
+        public static event Action<object>? ObjectSelected;
+        public static event Action<object>? ObjectDeselected;
     }
 
-    public enum SelectionMode : byte
+    public enum SelectMode : byte
     {
-        Single = 0,
-        Multi,
-        Unique
-    }
+        /// <summary>Add the new selection without clearing the old one</summary>
+        Append = 0,
 
-    public abstract class SelectedBase
-    {
-
-    }
-
-    internal sealed class SelectedSceneEntity : SelectedBase
-    {
-        public SceneEntity Entity;
-
-        public override bool Equals(object? obj) => obj is SelectedSceneEntity other && other.Entity == Entity;
-
-        public override int GetHashCode() => Entity.GetHashCode();
+        /// <summary>Clear the current selection and add the new one</summary>
+        Clear,
     }
 }

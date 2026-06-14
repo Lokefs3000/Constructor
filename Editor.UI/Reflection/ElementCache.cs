@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Diagnostics;
 using Editor.UI.Elements;
+using Editor.UI.Modifiers;
 using Editor.UI.Serialization.Values;
 using Editor.UI.Styling;
 using System;
@@ -15,89 +16,96 @@ namespace Editor.UI.Reflection
 {
     public sealed class ElementCache
     {
-        private Dictionary<Type, CachedElementData> _cache;
+        private ConcurrentDictionary<Type, CachedElementData> _cache;
         private HashSet<Assembly> _discovered;
 
-        private Dictionary<string, Type> _nameTraceDict;
+        private ConcurrentDictionary<string, Type> _nameTraceDict;
+
+        private Lock _discoveredLock;
 
         internal ElementCache()
         {
-            _cache = new Dictionary<Type, CachedElementData>();
+            _cache = new ConcurrentDictionary<Type, CachedElementData>();
             _discovered = new HashSet<Assembly>();
 
-            _nameTraceDict = new Dictionary<string, Type>();
+            _nameTraceDict = new ConcurrentDictionary<string, Type>();
+
+            _discoveredLock = new Lock();
         }
 
         internal void DiscoverAssembly(Assembly assembly)
         {
             long timeStart = Stopwatch.GetTimestamp();
 
-            ConcurrentDictionary<Type, CachedElementData> tempDict = new ConcurrentDictionary<Type, CachedElementData>();
+            ConcurrentDictionary<Type, bool> tempDict = new ConcurrentDictionary<Type, bool>();
 
             Type[] allTypes = assembly.GetTypes();
             Parallel.ForEach(allTypes, (t) =>
             {
-                if (t.IsAssignableTo(typeof(UIElement)))
+                if (t.IsGenericType)
+                    return;
+
+                if ((t.IsAssignableTo(typeof(StyleBase)) && t != typeof(StyleBase)) || (t.IsAssignableTo(typeof(IUILayoutModifier)) && t != typeof(StyledBaseLayoutModifier)))
                 {
-                    string prettyName;
+                    if (ReflectType(t, out CachedElementData elementData))
                     {
-                        UIElementPrettyName? attrib = t.GetCustomAttribute<UIElementPrettyName>();
-                        if (attrib != null && attrib.PrettyName != string.Empty)
-                            prettyName = attrib.PrettyName;
-                        else
-                            prettyName = t.Name;
+                        _cache.TryAdd(t, elementData);
+                        _nameTraceDict.TryAdd(elementData.PrettyName, t);
+
+                        tempDict.TryAdd(t, true);
                     }
-
-                    ConstructorInfo? constructor = t.GetConstructor(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, Type.EmptyTypes);
-                    if (constructor == null)
-                    {
-                        UIManager.Logger?.Error("Failed to properly cache element: {el} because it does not contain a public parameterless constructor", t);
-                        return;
-                    }
-
-                    Type? customRoutine = null;
-                    {
-                        CustomSerilizationRoutineAttribute? attrib = t.GetCustomAttribute<CustomSerilizationRoutineAttribute>();
-                        if (attrib != null)
-                            customRoutine = attrib.RoutineType;
-                    }
-
-                    string[] states = s_defaultState;
-                    {
-                        UIElementStates? attribute = t.GetCustomAttribute<UIElementStates>(true);
-                        if (attribute != null)
-                        {
-                            states = attribute.States.Length == 0 ? s_defaultState : attribute.States;
-                        }
-                    }
-
-                    FrozenDictionary<string, int> stateMap = states.Select((x, i) => new KeyValuePair<string, int>(x, i - 1)).ToFrozenDictionary();
-                    FrozenDictionary<int, string> stateNameMap = states.Select((x, i) => new KeyValuePair<int, string>(i - 1, x)).ToFrozenDictionary();
-
-                    ElementStateData stateData = new ElementStateData(stateMap, stateNameMap, states);
-
-                    tempDict.TryAdd(t, new CachedElementData(prettyName, constructor, t, customRoutine, stateData));
                 }
             });
 
-            _cache = _cache.Concat(tempDict).ToDictionary();
             _discovered.Add(assembly);
-
-            foreach (var kvp in tempDict)
-                _nameTraceDict.Add(kvp.Value.PrettyName, kvp.Key);
 
             UIManager.Logger?.Debug("Discovering elements in assembly: {asm} took: {secs:f3}s!", assembly.GetName().Name, Stopwatch.GetElapsedTime(timeStart).TotalSeconds);
         }
 
+        private CachedElementData CacheValueFactory(Type type)
+        {
+            if (type.IsGenericType && type.IsGenericTypeDefinition)
+            {
+                using (_discoveredLock.EnterScope())
+                {
+                    if (_discovered.Contains(type.Assembly))
+                        return default;
+
+                    DiscoverAssembly(type.Assembly);
+                    return _cache[type];
+                }
+            }
+
+            if (ReflectType(type, out CachedElementData elementData))
+                return elementData;
+            return default;
+        }
+
         public CachedElementData GetElementData(Type type)
         {
-            Guard.IsTrue(type.IsAssignableTo(typeof(StyleBase)));
+            Guard.IsTrue(!type.IsAbstract && (type.IsAssignableTo(typeof(StyleBase)) || type.IsAssignableTo(typeof(IUILayoutModifier))));
+
+            return _cache.GetOrAdd(type, CacheValueFactory);
 
             if (_cache.TryGetValue(type, out CachedElementData value))
                 return value;
 
             if (!_discovered.Contains(type.Assembly))
             {
+                if (type.IsGenericType && !type.IsGenericTypeDefinition)
+                {
+                    if (ReflectType(type, out value))
+                    {
+                        _cache.TryAdd(type, value);
+                        return value;
+                    }
+                    else
+                        return default;
+                }
+
+                if (_discovered.Contains(type.Assembly))
+                    return default;
+
                 DiscoverAssembly(type.Assembly);
                 return GetElementData(type);
             }
@@ -107,10 +115,50 @@ namespace Editor.UI.Reflection
 
         public bool TryGetElementData(Type type, out CachedElementData value)
         {
-            Guard.IsTrue(type.IsAssignableTo(typeof(StyleBase)));
+            Guard.IsTrue(type.IsAssignableTo(typeof(StyleBase)) || type.IsAssignableTo(typeof(IUILayoutModifier)));
 
             if (!_cache.TryGetValue(type, out value))
             {
+                if (type.IsGenericType && !type.IsGenericTypeDefinition)
+                {
+                    if (ReflectType(type, out value))
+                    {
+                        _cache.TryAdd(type, value);
+                        return true;
+                    }
+
+                    return false;
+                }
+                else
+                {
+                    using (_discoveredLock.EnterScope())
+                    {
+                        if (_discovered.Contains(type.Assembly))
+                            return false;
+
+                        DiscoverAssembly(type.Assembly);
+                        return _cache.TryGetValue(type, out value);
+                    }
+                }
+
+                return false;
+            }
+
+            return value.PrettyName != null;
+
+            if (!_cache.TryGetValue(type, out value))
+            {
+                if (type.IsGenericType && !type.IsGenericTypeDefinition)
+                {
+                    if (ReflectType(type, out value))
+                    {
+                        _cache.TryAdd(type, value);
+                        return true;
+                    }
+                    else
+                        return false;
+                }
+
                 if (_discovered.Contains(type.Assembly))
                     return false;
 
@@ -132,11 +180,75 @@ namespace Editor.UI.Reflection
             return TryFindElementFromName(prettyName, out Type? result) && TryGetElementData(result, out value);
         }
 
+        public bool Exists(string prettyName) => _nameTraceDict.ContainsKey(prettyName);
+
         public IReadOnlyDictionary<Type, CachedElementData> Cache => _cache;
+
+        private static bool ReflectType(Type type, out CachedElementData elementData)
+        {
+            elementData = default;
+
+            bool isElement = type.IsAssignableTo(typeof(UIElement));
+
+            string? prettyName = type.Name;
+            {
+                if (type.IsGenericType)
+                {
+                    prettyName = prettyName[..^2];
+                }
+
+                if (isElement)
+                {
+                    UIElementPrettyName? attrib = type.GetCustomAttribute<UIElementPrettyName>();
+                    if (attrib != null && attrib.PrettyName != string.Empty)
+                        prettyName = attrib.PrettyName;
+                }
+                else
+                {
+                    ModifierPrettyName? attrib = type.GetCustomAttribute<ModifierPrettyName>();
+                    if (attrib != null && attrib.PrettyName != string.Empty)
+                        prettyName = attrib.PrettyName;
+                }
+            }
+
+            ConstructorInfo? constructor = type.GetConstructor(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, Type.EmptyTypes);
+            if (type.IsAssignableTo(typeof(UIElement)))
+            {
+                if (constructor == null)
+                {
+                    UIManager.Logger?.Error("Failed to properly cache element: {el} because it does not contain a public parameterless constructor", type);
+                    return false;
+                }
+            }
+
+            Type? customRoutine = null;
+            {
+                CustomSerilizationRoutineAttribute? attrib = type.GetCustomAttribute<CustomSerilizationRoutineAttribute>();
+                if (attrib != null)
+                    customRoutine = attrib.RoutineType;
+            }
+
+            string[] states = s_defaultState;
+            {
+                StyleableStatesAttribute? attribute = type.GetCustomAttribute<StyleableStatesAttribute>(true);
+                if (attribute != null)
+                {
+                    states = attribute.States.Length == 0 ? s_defaultState : attribute.States;
+                }
+            }
+
+            FrozenDictionary<string, int> stateMap = states.Select((x, i) => new KeyValuePair<string, int>(x, i - 1)).ToFrozenDictionary();
+            FrozenDictionary<int, string> stateNameMap = states.Select((x, i) => new KeyValuePair<int, string>(i - 1, x)).ToFrozenDictionary();
+
+            ElementStateData stateData = new ElementStateData(stateMap, stateNameMap, states);
+
+            elementData = new CachedElementData(prettyName, constructor, type, customRoutine, stateData);
+            return true;
+        }
 
         private static readonly string[] s_defaultState = ["Normal"];
     }
 
-    public readonly record struct CachedElementData(string PrettyName, ConstructorInfo Constructor, Type TypeInfo, Type? CustomRoutine, ElementStateData StateData);
+    public readonly record struct CachedElementData(string PrettyName, ConstructorInfo? Constructor, Type TypeInfo, Type? CustomRoutine, ElementStateData StateData);
     public readonly record struct ElementStateData(FrozenDictionary<string, int> StateMap, FrozenDictionary<int, string> StateNameMap, string[] StateNames);
 }

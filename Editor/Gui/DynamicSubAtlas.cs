@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Primary.Mathematics;
-using Primary.RHI2;
+using Primary.RHI;
 using Primary.Threading;
 using System.Collections.Concurrent;
 using System.Diagnostics;

@@ -1,7 +1,7 @@
 ﻿using Primary.Memory.Native;
 using System.Runtime.CompilerServices;
 
-namespace Primary.RHI2
+namespace Primary.RHI
 {
     public unsafe abstract class RHIDevice : IDisposable, IAsNativeObject<RHIDeviceNative>
     {
@@ -26,6 +26,8 @@ namespace Primary.RHI2
 
         /// <summary>Not thread-safe</summary>
         public abstract void HandlePendingUpdates();
+        /// <summary>Not thread-safe</summary>
+        public abstract void IncrementFrame();
 
         /// <summary>Thread-safe</summary>
         public abstract RHIBuffer? CreateBuffer(in RHIBufferDescription description, ArrayPtr<byte> rawData, [CallerMemberName] string? debugName = "");
@@ -42,6 +44,9 @@ namespace Primary.RHI2
 
         /// <summary>Thread-safe</summary>
         public abstract void FlushPendingMessages();
+
+        /// <summary>Not thread-safe</summary>
+        public abstract RHIUsedMemoryInfo QueryUsedMemory();
 
         public abstract RHIDeviceNative* GetAsNative();
 
@@ -76,4 +81,8 @@ namespace Primary.RHI2
     {
 
     }
+
+    public readonly record struct RHIUsedMemoryInfo(RHIUsedMemoryBudget Local, RHIUsedMemoryBudget NonLocal);
+
+    public readonly record struct RHIUsedMemoryBudget(int BlockCount, int AllocationCount, long BlockBytes, long AllocationBytes, long TotalBudget, long TotalUsage);
 }

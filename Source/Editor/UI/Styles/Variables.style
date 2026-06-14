@@ -1,0 +1,5 @@
+// Fonts
+$primary-font-family: "Editor/Fonts/Inter.uifont";
+
+// Colours
+$primary-bg-colour: #242424;

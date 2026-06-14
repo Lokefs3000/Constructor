@@ -5,7 +5,7 @@ using Editor.Shaders.Data;
 using Primary.Assets;
 using Primary.Assets.Loaders;
 using Primary.Common;
-using Primary.RHI2;
+using Primary.RHI;
 using Serilog;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;

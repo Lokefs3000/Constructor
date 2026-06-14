@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace Primary.RHI2
+namespace Primary.RHI
 {
     public unsafe abstract class RHISwapChain : IDisposable, IAsNativeObject<RHISwapChainNative>
     {

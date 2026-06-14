@@ -17,9 +17,8 @@ namespace Editor.UI.Elements
     public class UILabel : UIElement
     {
         private UIFontAsset? _font;
-        protected string? _fontStyle;
-
-        protected UIFontStyle? _cachedFontStyle;
+        private FontStyle _style;
+        private FontWeight _weight;
 
         private string _text;
         private float _fontSize;
@@ -34,9 +33,8 @@ namespace Editor.UI.Elements
         public UILabel()
         {
             _font = null;
-            _fontStyle = null;
-
-            _cachedFontStyle = null;
+            _style = FontStyle.Normal;
+            _weight = FontWeight.Normal;
 
             _text = string.Empty;
             _fontSize = 1.0f;
@@ -49,31 +47,21 @@ namespace Editor.UI.Elements
             _textColor = Color.Black;
         }
 
+        public UILabel(UIElement parent) : base()
+        {
+            SetParent(parent);
+        }
+
         public override void MeasureSize(UIMeasureContext context)
         {
             if (Flags.HasFlag(_autoSize, UITextAutoSize.FitBoundsToText))
             {
-                if (_text.Length == 0)
+                if (_text.Length == 0 || _font == null)
                     _currentSize = Vector2.Zero;
                 else
                 {
-                    if (_cachedFontStyle == null)
-                    {
-                        if (Flags.HasFlag(StateFlags, (UIStateFlags)ExtraUIStateFlags.InvalidStyle))
-                        {
-                            _cachedFontStyle = _font?.FindStyle(_fontStyle);
-                            RemoveStateFlags((UIStateFlags)ExtraUIStateFlags.InvalidStyle);
-                        }
-
-                        if (_cachedFontStyle == null)
-                        {
-                            _currentSize = Vector2.Zero;
-                            return;
-                        }
-                    }
-
-                    TextVisualInfo visualInfo = new TextVisualInfo(new PaintColor(_textColor.Solid), _fontSize, _cachedFontStyle);
-                    TextWrapInfo wrapInfo = new TextWrapInfo(context.LocalRegion, visualInfo);
+                    TextVisualInfo visualInfo = new TextVisualInfo(new PaintColor(_textColor.Solid), _fontSize, _font.FindStyle(_style, _weight));
+                    TextWrapInfo wrapInfo = new TextWrapInfo(TextOrigin.Top, context.LocalRegion, true, visualInfo);
 
                     using RentedArray<char> tempText = RentedArray<char>.Rent(_text.Length + 1);
 
@@ -86,39 +74,40 @@ namespace Editor.UI.Elements
                     _currentSize = textData.TotalSize;
                 }
 
+                _viewSize = Vector2.Zero;
                 return;
             }
+
+            base.MeasureSize(context);
         }
 
         public override bool DrawVisual(UIPainterContext painter)
         {
             if (_font != null)
             {
-                if (Flags.HasFlag(StateFlags, (UIStateFlags)ExtraUIStateFlags.InvalidStyle))
-                {
-                    _cachedFontStyle = _font?.FindStyle(_fontStyle);
-                    RemoveStateFlags((UIStateFlags)ExtraUIStateFlags.InvalidStyle);
-                }
-
-                if (_cachedFontStyle != null)
+                UIFontTypeData? typeData = _font.FindStyle(_style, _weight);
+                if (typeData != null)
                 {
                     TextBuilder text = new TextBuilder();
                     text.SetAlignment(_alignment);
                     text.SetOverflow(_overflow);
-                    text.SetMaxExtents(PixelCoordinates.Size);
+                    text.SetMaxExtents(_viewSize);
+                    text.SetOrigin(TextOrigin.Bottom);
 
-                    painter.DrawText(PixelCoordinates.Minimum, UIPaint.FromColor(_textColor), text, _cachedFontStyle, _fontSize, _text);
+                    Vector2 position = ViewCoordinates.Minimum;
+                    position.Y -= typeData.Metrics.Ascender * _fontSize * TextManager.PixelsPerEM;
+
+                    painter.DrawText(position, UIPaint.FromColor(_textColor), text, typeData, _fontSize, _text);
                 }
             }
-            else
-                _fontStyle = null;
 
             return base.DrawVisual(painter);
         }
 
         #region Properties
-        [StyleableProperty(nameof(_font), UIStateFlags.InvalidVisual | (UIStateFlags)ExtraUIStateFlags.InvalidStyle)] public UIFontAsset? Font { get => _font; set => SetStyleProperty(value); }
-        [StyleableProperty(nameof(_fontStyle), UIStateFlags.InvalidVisual | (UIStateFlags)ExtraUIStateFlags.InvalidStyle)] public string? FontStyle { get => _fontStyle; set => SetStyleProperty(value); }
+        [StyleableProperty(nameof(_font), UIStateFlags.InvalidVisual)] public UIFontAsset? Font { get => _font; set => SetStyleProperty(value); }
+        [StyleableProperty(nameof(_style), UIStateFlags.InvalidVisual)] public FontStyle FontStyle { get => _style; set => SetStyleProperty(value); }
+        [StyleableProperty(nameof(_weight), UIStateFlags.InvalidVisual)] public FontWeight FontWeight { get => _weight; set => SetStyleProperty(value); }
 
         [StyleableProperty(nameof(_fontSize), UIStateFlags.InvalidVisual)] public float FontSize { get => _fontSize; set => SetStyleProperty(value); }
 
@@ -131,11 +120,6 @@ namespace Editor.UI.Elements
 
         [EditableProperty(nameof(_text), UIStateFlags.InvalidVisual)] public string Text { get => _text; set => SetEditableProperty(value); }
         #endregion
-
-        private enum ExtraUIStateFlags : byte
-        {
-            InvalidStyle = 1 << 4
-        }
     }
 
     public enum UITextAlignment : byte

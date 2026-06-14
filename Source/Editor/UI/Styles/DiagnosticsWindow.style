@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Stylesheet>
+    <Class Name="side-tab-bar" Type="Frame">
+        <Size Value="0.0 33 1.0 -29" />
+        <BackgroundColor Value="#1a1a1a" />
+    </Class>
+    <Class Name="content-frame" Type="Frame">
+        <Position Value="0.0 33 0.0 0" />
+        <Size Value="1.0 -33 1.0 -29" />
+    </Class>
+     <Class Name="bottom-ribbon" Type="Frame">
+        <Position Value="0.0 0 1.0 -28" />
+        <Size Value="1.0 0 0.0 28" />
+        <StrokeWeight Value="1.0" />
+        <StrokeColor Value="#101010" />
+    </Class>
+    <Class Name="content-tab" Type="Element">
+        <Size Value="1.0 0 1.0 0" />
+    </Class>
+
+    <Class Name="tab-button" Type="Button">
+        <Size Value="0.0 32 0.0 32" />
+    </Class>
+
+    <Class Name="tab-layout-icon" Type="Sprite">
+        <Position Value="0.0 2 0.0 2" />
+        <Size Value="1.0 -4 1.0 -4" />
+        <Sprite Value="Editor/UI/Atlases/DiagnosticTabIcons.atlas?LayoutTab" />
+    </Class>
+    <Class Name="tab-interaction-icon" Type="Sprite">
+        <Position Value="0.0 2 0.0 2" />
+        <Size Value="1.0 -4 1.0 -4" />
+        <Sprite Value="Editor/UI/Atlases/DiagnosticTabIcons.atlas?InteractionTab" />
+    </Class>
+
+    <Class Name="active-window-label" Type="Label">
+        <Anchor Value="0.0 0.5" />
+        <Position Value="0.0 12 0.5 0" />
+        <Alignment Value="Middle" />
+    </Class>
+    <Class Name="no-active-window" Type="Label">
+        <FontStyle Value="Italic" />
+        <FontWeight Value="_300" />
+        <TextColor Value="#808080" />
+    </Class>
+    <Class Name="ribbon-select-window" Type="Button">
+        <Position Value="1.0 -10 0.5 0" />
+        <Size Value="0.0 130 0.0 20" />
+        <Anchor Value="1.0 0.5" />
+    </Class>
+    <Class Name="ribbon-select-window-label" Type="Label">
+        <Size Value="1.0 0 1.0 0" />
+        <FontWeight Value="_300" />
+        <FontSize Value="0.95" />
+        <Alignment Value="MiddleCenter" />
+    </Class>
+
+    <Class Name="layout-sh-button" Type="Button">
+        <Position Value="1.0 -10 1.0 -10" />
+        <Size Value="0.0 170 0.0 20" />
+        <Anchor Value="1.0 1.0" />
+    </Class>
+
+    <Class Name="select-window-bg" Type="Frame">
+        <Size Value="1.0 0 1.0 0" />
+        <BackgroundColor Value="#000000a0" />
+    </Class>
+    <Class Name="select-window-view" Type="ScrollView">
+        <Anchor Value="0.5 0.5" />
+        <Size Value="0.6 0 0.5 0" />
+        <Position Value="0.5 0 0.5 0" />
+    </Class>
+    <Class Name="goback-button" Type="Button">
+        <Anchor Value="1.0 0.0" />
+        <Position Value="1.0 -10 0.0 10" />
+        <Size Value="0.0 24 0.0 24" />
+    </Class>
+
+    <Class Name="sw-popup-list-button" Type="Button">
+        <Size Value="1.0 0 0.0 26" />
+    </Class>
+    <Class Name="sw-popup-list-label" Type="Label">
+        <Size Value="1.0 0 1.0 0" />
+        <FontWeight Value="_300" />
+        <FontSize Value="0.95" />
+        <Alignment Value="MiddleLeft" />
+    </Class>
+</Stylesheet>

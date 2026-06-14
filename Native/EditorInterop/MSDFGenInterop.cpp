@@ -6,7 +6,33 @@
 #include "msdfgen/msdfgen.h"
 #include "msdfgen/msdfgen-ext.h"
 
-#pragma pack(1)
+#pragma pack(show)
+struct SzFontGlyph
+{
+	uint8_t ContourCount;
+	int Advance;
+	int DataSize;
+};
+
+struct SzFontContour
+{
+	uint8_t EdgeCount;
+};
+
+enum class SzFontEdgeType : uint8_t
+{
+	Linear = 0,
+	Quadratic,
+	Cubic
+};
+
+struct SzFontPoint
+{
+	int X;
+	int Y;
+};
+
+#pragma pack(push, 1)
 struct MSDF_FontFace
 {
 	FT_Face Face;
@@ -67,7 +93,19 @@ struct MSDF_RenderBox
 	msdfgen::Range Range;
 	msdfgen::Projection Projection;
 };
+
+struct MSDF_EdgeData
+{
+	uint32_t Type;
+	msdfgen::Point2* Points;
+};
+
 #pragma pack(pop)
+
+//#define ConvertToPoint2(p) msdfgen::Point2(p.FixedX / (double)SzFontPoint::DecimalPlaces, p.FixedY / (double)SzFontPoint::DecimalPlaces)
+#define ConvertToPoint2(p, scale) msdfgen::Point2(p.X * scale, p.Y * scale)
+
+#define ArrayLength(arr) (sizeof(arr) / sizeof(arr[0]))
 
 extern "C"
 {
@@ -97,7 +135,7 @@ extern "C"
 			return nullptr;
 
 		FT_Select_Charmap(face, FT_ENCODING_UNICODE);
-		
+
 		return new MSDF_FontFace{
 			face,
 			msdfgen::adoptFreetypeFont(face),
@@ -143,6 +181,74 @@ extern "C"
 		return new MSDF_ShapedGlyph{};
 	}
 
+	__declspec(dllexport) MSDF_ShapedGlyph* MSDF_DeserializeShapedGlyph(char* sourceData, double scale)
+	{
+		char* head = sourceData;
+
+		SzFontGlyph glyph = *(SzFontGlyph*)head;
+		head += sizeof(SzFontGlyph);
+
+		msdfgen::Shape shape{};
+		shape.contours.reserve(glyph.ContourCount);
+
+		for (size_t i = 0; i < glyph.ContourCount; i++)
+		{
+			SzFontContour contourData = *(SzFontContour*)head;
+			head += sizeof(SzFontContour);
+
+			msdfgen::Contour contour{};
+			contour.edges.reserve(contourData.EdgeCount);
+
+			for (size_t j = 0; j < contourData.EdgeCount; j++)
+			{
+				SzFontEdgeType edgeType = *(SzFontEdgeType*)head;
+				head += sizeof(SzFontEdgeType);
+
+				SzFontPoint* points = (SzFontPoint*)head;
+				head += ((size_t)edgeType + 2) * sizeof(SzFontPoint);
+
+				switch (edgeType)
+				{
+				case SzFontEdgeType::Linear:
+				{
+					msdfgen::Point2 p0 = ConvertToPoint2(points[0], scale);
+					msdfgen::Point2 p1 = ConvertToPoint2(points[1], scale);
+
+					contour.addEdge(msdfgen::EdgeHolder(p0, p1));
+					break;
+				}
+				case SzFontEdgeType::Quadratic:
+				{
+					msdfgen::Point2 p0 = ConvertToPoint2(points[0], scale);
+					msdfgen::Point2 p1 = ConvertToPoint2(points[1], scale);
+					msdfgen::Point2 p2 = ConvertToPoint2(points[2], scale);
+
+					contour.addEdge(msdfgen::EdgeHolder(p0, p1, p2));
+					break;
+				}
+				case SzFontEdgeType::Cubic:
+				{
+					msdfgen::Point2 p0 = ConvertToPoint2(points[0], scale);
+					msdfgen::Point2 p1 = ConvertToPoint2(points[1], scale);
+					msdfgen::Point2 p2 = ConvertToPoint2(points[2], scale);
+					msdfgen::Point2 p3 = ConvertToPoint2(points[3], scale);
+
+					contour.addEdge(msdfgen::EdgeHolder(p0, p1, p2, p3));
+					break;
+				}
+				}
+			}
+
+			shape.addContour(contour);
+		}
+
+		MSDF_ShapedGlyph* shapedGlyph = MSDF_CreateShapedGlyph();
+		shapedGlyph->Advance = glyph.Advance * scale;
+		shapedGlyph->Shape = shape;
+
+		return shapedGlyph;
+	}
+
 	__declspec(dllexport) void MSDF_DestroyShapedGlyph(MSDF_ShapedGlyph* glyph)
 	{
 		if (glyph != nullptr)
@@ -156,30 +262,31 @@ extern "C"
 		FT_Set_Pixel_Sizes(face->Face, width, height);
 	}
 
-	__declspec(dllexport) bool MSDF_GetWhitespaceWidth(MSDF_FontFace* face, double* spaceAdvance, double* tabAdvance)
+	__declspec(dllexport) uint16_t MSDF_GetUnitsPerEM(MSDF_FontFace* face)
 	{
-		double scale = 1.0 / (face->Face->units_per_EM ? face->Face->units_per_EM : 1);
+		return face->Face->units_per_EM ? face->Face->units_per_EM : 1;
+	}
 
+	__declspec(dllexport) bool MSDF_GetWhitespaceWidth(MSDF_FontFace* face, int* spaceAdvance, int* tabAdvance)
+	{
 		if (FT_Load_Char(face->Face, ' ', FT_LOAD_NO_SCALE))
 			return false;
-		*spaceAdvance = face->Face->glyph->advance.x * scale;
+		*spaceAdvance = face->Face->glyph->advance.x;
 
 		if (FT_Load_Char(face->Face, '\t', FT_LOAD_NO_SCALE))
 			return false;
-		*tabAdvance = face->Face->glyph->advance.x * scale;
+		*tabAdvance = face->Face->glyph->advance.x;
 
 		return true;
 	}
 
-	__declspec(dllexport) void MSDF_GetMetrics(MSDF_FontFace* face, double* ascender, double* descender, double* lineHeight, double* underlineY, double* fontHeight)
+	__declspec(dllexport) void MSDF_GetMetrics(MSDF_FontFace* face, short* ascender, short* descender, short* lineHeight, short* underlineY, short* fontHeight)
 	{
-		double scale = 1.0 / (face->Face->units_per_EM ? face->Face->units_per_EM : 1);
-
-		*ascender = face->Face->ascender * -scale;
-		*descender = face->Face->descender * -scale;
-		*lineHeight = (face->Face->ascender - face->Face->descender) * scale;
-		*underlineY = face->Face->underline_position * -scale;
-		*fontHeight = face->Face->height * scale;
+		*ascender = -face->Face->ascender;
+		*descender = -face->Face->descender;
+		*lineHeight = (face->Face->ascender - face->Face->descender);
+		*underlineY = -face->Face->underline_position;
+		*fontHeight = face->Face->height;
 	}
 
 	__declspec(dllexport) FT_MM_Var* MSDF_GetVarFontData(MSDF_FontFace* face, MSDF_VarFontMetrics* metrics)
@@ -216,7 +323,7 @@ extern "C"
 
 		FT_SfntName name{};
 		FT_Error err = FT_Get_Sfnt_Name(face->Face, varAxis.strid, &name);
-		
+
 		*axis = {
 			(const char*)name.string,
 			name.string_len,
@@ -241,11 +348,11 @@ extern "C"
 		{
 			name = {};
 			FT_Error err = FT_Get_Sfnt_Name(face->Face, i, &name);
-			
+
 			if (name.name_id == varStyle.strid)
 				break;
 		}
-		
+
 		*style = {
 			(const char*)name.string,
 			name.string_len
@@ -271,8 +378,12 @@ extern "C"
 
 	__declspec(dllexport) bool MSDF_ShapeGlyph(MSDF_FontFace* face, uint32_t glyph, MSDF_ShapedGlyph* outData)
 	{
-		if (msdfgen::loadGlyph(outData->Shape, face->MSDFFont, glyph, msdfgen::FONT_SCALING_EM_NORMALIZED, &outData->Advance) && outData->Shape.validate())
+		if (msdfgen::loadGlyph(outData->Shape, face->MSDFFont, glyph, msdfgen::FONT_SCALING_NONE, &outData->Advance) && outData->Shape.validate())
 		{
+			// no glyph data
+			if (outData->Shape.contours.empty())
+				return false;
+
 			outData->Shape.normalize();
 
 			double scale = 1.0 / (face->Face->units_per_EM ? face->Face->units_per_EM : 1);
@@ -280,11 +391,89 @@ extern "C"
 
 			outData->BearingX = face->Face->glyph->metrics.horiBearingX * -scale;
 			outData->BearingY = face->Face->glyph->metrics.horiBearingY * -scale;
-		
+
 			return true;
 		}
 
 		return false;
+	}
+
+	__declspec(dllexport) void MSDF_ScaleGlyph(MSDF_ShapedGlyph* shapedGlyph, double emScale)
+	{
+		for (size_t i = 0; i < shapedGlyph->Shape.contours.size(); i++)
+		{
+			msdfgen::Contour& contour = shapedGlyph->Shape.contours[i];
+			for (size_t j = 0; j < contour.edges.size(); j++)
+			{
+				msdfgen::EdgeSegment* edge = contour.edges[j];
+				switch (edge->type())
+				{
+					case msdfgen::LinearSegment::EDGE_TYPE:
+					{
+						msdfgen::LinearSegment* linear = (msdfgen::LinearSegment*)edge;
+						for (size_t k = 0; k < ArrayLength(linear->p); k++)
+						{
+							msdfgen::Vector2& p = linear->p[k];
+
+							p.x *= emScale;
+							p.y *= emScale;
+						}
+
+						break;
+					}
+					case msdfgen::QuadraticSegment::EDGE_TYPE:
+					{
+						msdfgen::QuadraticSegment* quadratic = (msdfgen::QuadraticSegment*)edge;
+						for (size_t k = 0; k < ArrayLength(quadratic->p); k++)
+						{
+							msdfgen::Vector2& p = quadratic->p[k];
+
+							p.x *= emScale;
+							p.y *= emScale;
+						}
+
+						break;
+					}
+					case msdfgen::CubicSegment::EDGE_TYPE:
+					{
+						msdfgen::CubicSegment* cubic = (msdfgen::CubicSegment*)edge;
+						for (size_t k = 0; k < ArrayLength(cubic->p); k++)
+						{
+							msdfgen::Vector2& p = cubic->p[k];
+
+							p.x *= emScale;
+							p.y *= emScale;
+						}
+
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	__declspec(dllexport) uint32_t MSDF_QueryShapeContours(MSDF_ShapedGlyph* shapedGlyph)
+	{
+		return shapedGlyph->Shape.contours.size();
+	}
+
+	__declspec(dllexport) uint32_t MSDF_QueryContourEdges(MSDF_ShapedGlyph* shapedGlyph, uint32_t contourIndex)
+	{
+		return shapedGlyph->Shape.contours[contourIndex].edges.size();
+	}
+
+	__declspec(dllexport) void MSDF_GetContourEdges(MSDF_ShapedGlyph* shapedGlyph, uint32_t contourIndex, uint32_t edgeIndex, MSDF_EdgeData* edgeData)
+	{
+		msdfgen::EdgeSegment* edge = shapedGlyph->Shape.contours[contourIndex].edges[edgeIndex];
+
+		edgeData->Type = edge->type();
+		switch (edgeData->Type)
+		{
+		case msdfgen::LinearSegment::EDGE_TYPE: edgeData->Points = ((msdfgen::LinearSegment*)edge)->p; break;
+		case msdfgen::QuadraticSegment::EDGE_TYPE: edgeData->Points = ((msdfgen::QuadraticSegment*)edge)->p; break;
+		case msdfgen::CubicSegment::EDGE_TYPE: edgeData->Points = ((msdfgen::CubicSegment*)edge)->p; break;
+		default: abort(); break;
+		}
 	}
 
 	__declspec(dllexport) void MSDF_GenerateGlyph(MSDF_ShapedGlyph* shapedGlyph, MSDF_RenderBox* renderBox, MSDF_RenderBitmap* bitmap)

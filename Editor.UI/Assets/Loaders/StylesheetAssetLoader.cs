@@ -72,30 +72,26 @@ namespace Editor.UI.Assets.Loaders
                             if (targetType == null)
                             {
                                 logger.Error("[{p}]: No target defined for class in stylesheet", sourcePath);
-
-                                stylesheetData.UpdateAssetFailed(stylesheet);
-                                return;
+                                continue;
                             }
 
                             string className = element.GetAttributeNode("Name")?.Value ?? targetType;
                             if (classes.ContainsKey(className))
                             {
                                 logger.Error("[{p}]: Class with name: {n} has already been defined in previously in the stylesheet", sourcePath, className);
-
-                                stylesheetData.UpdateAssetFailed(stylesheet);
-                                return;
+                                continue;
                             }
 
                             if (!elementCache.TryGetElementData(targetType, out CachedElementData elementData))
                             {
                                 logger.Error("[{p}]: Class target: {n} has either not been cached yet or does not exist", sourcePath, targetType);
-
-                                stylesheetData.UpdateAssetFailed(stylesheet);
-                                return;
+                                continue;
                             }
 
-                            StylesheetClass stylesheetClass = new StylesheetClass();
+                            StylesheetClass stylesheetClass = new StylesheetClass(false);
+                            
                             classes.Add(className, stylesheetClass);
+                            activeStates.Clear();
 
                             if (element.HasChildNodes)
                             {
@@ -121,9 +117,7 @@ namespace Editor.UI.Assets.Loaders
                                             if (!activeStates.Add(stateName))
                                             {
                                                 logger.Error("[{p}]: Stylesheet class already has a previous decleration with state name: {n}", sourcePath, stateName);
-
-                                                stylesheetData.UpdateAssetFailed(stylesheet);
-                                                return;
+                                                continue;
                                             }
 
                                             ParseClassValues(valueElement, stylesheetClass, elementData.TypeInfo, $"{className}:{stateName}", stateName);
@@ -131,9 +125,7 @@ namespace Editor.UI.Assets.Loaders
                                         else
                                         {
                                             logger.Error("[{p}]: Expected state node within class but instead found: {n}", sourcePath, valueElement.Name);
-
-                                            stylesheetData.UpdateAssetFailed(stylesheet);
-                                            return;
+                                            continue;
                                         }
                                     }
                                 }
@@ -142,9 +134,7 @@ namespace Editor.UI.Assets.Loaders
                         else
                         {
                             logger.Error("[{p}]: Undefined stylesheet element name found as top level node: {n}", sourcePath, element.Name);
-
-                            stylesheetData.UpdateAssetFailed(stylesheet);
-                            return;
+                            continue;
                         }
                     }
                 }
@@ -164,17 +154,13 @@ namespace Editor.UI.Assets.Loaders
                             if (value == null)
                             {
                                 logger.Error("[{p}]: Expected value for stylesheet class property: {n}", sourcePath, element.Name);
-
-                                stylesheetData.UpdateAssetFailed(stylesheet);
-                                return;
+                                continue;
                             }
 
                             if (stylesheetClass.HasProperty(element.Name, stateName))
                             {
                                 logger.Error("[{p}]: Stylesheet class already has a property defined with name: {n}", sourcePath, element.Name);
-
-                                stylesheetData.UpdateAssetFailed(stylesheet);
-                                return;
+                                continue;
                             }
 
                             if (propertyCache.TryFindProperty(elementType, node.Name, out StyleProperty styleProperty) && styleProperty.Type == StylePropertyType.Styleable)
@@ -184,17 +170,13 @@ namespace Editor.UI.Assets.Loaders
                                 else
                                 {
                                     logger.Error("[{p}]: Failed to deserialize style property value: {n} on property: {p}", sourcePath, value, styleProperty.Name);
-
-                                    stylesheetData.UpdateAssetFailed(stylesheet);
-                                    return;
+                                    continue;
                                 }
                             }
                             else
                             {
                                 logger.Error("[{p}]: Element {t} does not have a styleable property with name: {n}", sourcePath, elementType, element.Name);
-
-                                stylesheetData.UpdateAssetFailed(stylesheet);
-                                return;
+                                continue;
                             }
                         }
                     }
@@ -211,7 +193,7 @@ namespace Editor.UI.Assets.Loaders
             catch (Exception ex)
             {
                 stylesheetData.UpdateAssetFailed(stylesheet);
-                EngLog.Assets.Error(ex, "Failed to load stylesheet: {name}", sourcePath);
+                UIManager.Logger?.Error(ex, "Failed to load stylesheet: {name}", sourcePath);
             }
 #endif
         }

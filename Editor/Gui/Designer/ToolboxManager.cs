@@ -29,7 +29,7 @@ namespace Editor.Gui.Designer
             _currentActiveButton = null;
 
             //generate default
-            UISplitPanel panel = designer.FindElementWithId<UISplitPanel>("ToolboxOwner") ?? throw new NullReferenceException("Failed to find toolbox panel");
+            UIScrollView panel = designer.FindElementWithId<UIScrollView>("ToolboxOwner") ?? throw new NullReferenceException("Failed to find toolbox panel");
 
             string source = AssetFilesystem.ReadString("Editor/Designer/Data/TypeIconData.toml") ?? throw new NullReferenceException("No type icons data");
             TomlTable table = TomlSerializer.Deserialize<TomlTable>(source) ?? throw new NullReferenceException("Failed to deserialize");
@@ -44,6 +44,9 @@ namespace Editor.Gui.Designer
 
             foreach (var kvp in elements)
             {
+                if (kvp.Value.Constructor == null)
+                    continue;
+
                 TomlTable? imageData = null;
                 {
                     if (table.TryGetValue(kvp.Value.PrettyName, out object? value))
@@ -96,7 +99,7 @@ namespace Editor.Gui.Designer
 
                 button.AddClass("toolbox-item");
 
-                button.OnMouseRelease += (x) =>
+                button.OnMouseActivate += (x) =>
                 {
                     if (x == MouseButton.Left)
                         ElementButtonReleased(button, kvp.Key);

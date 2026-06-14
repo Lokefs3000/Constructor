@@ -1,8 +1,9 @@
-﻿using Primary.Common.Memory;
+﻿using Primary.Assets;
+using Primary.Common.Memory;
 using Primary.Rendering.Pass;
 using Primary.Rendering.Recording;
 using Primary.Rendering.State;
-using Primary.RHI2;
+using Primary.RHI;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -14,6 +15,22 @@ namespace Primary.Rendering.Commands
     {
         public CSCommandBuffer(RenderPassErrorReporter errorReporter, RenderPassStateData stateData, CommandRecorder recorder, LinearBlockAllocator intermediateAllocator, FrameGraphResources resources, RenderState state) : base(errorReporter, stateData, recorder, intermediateAllocator, resources, state)
         {
+        }
+
+        public void SetPipeline(ComputeShaderKernel? kernel)
+        {
+            RHIComputePipeline? pipeline = kernel?.Pipeline;
+            if (pipeline == null)
+            {
+                Compute.SetPipeline(-1);
+            }
+            else
+            {
+                int index = _resources.AddPotentialPipeline(pipeline);
+
+                Compute.SetPipeline(index);
+                Compute.SetPipelineLimits(pipeline);
+            }
         }
 
         public void SetPipeline(RHIComputePipeline pipeline)

@@ -78,6 +78,8 @@ namespace Primary.Pooling
             }
         }
 
+        public bool Contains(T value) => _pool.Contains(value);
+
         public int Count => _count;
         public int Capacity => _pool.Length;
     }

@@ -7,7 +7,7 @@ using TerraFX.Interop.Windows;
 
 namespace Editor.Assets
 {
-    internal sealed class StandaloneAssetWatcher : Editor
+    internal sealed class StandaloneAssetWatcher : EditorRuntime
     {
         private CancellationTokenSource _cts;
 
@@ -23,7 +23,7 @@ namespace Editor.Assets
 
             _cts = new CancellationTokenSource();
 
-            base.Initialize(_assetPipeline.Identifier);
+            base.Initialize(_assetPipeline.Identifier, _assetPipeline.Cache);
         }
 
         public override void Dispose()

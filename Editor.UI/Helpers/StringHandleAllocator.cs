@@ -3,6 +3,7 @@ using Primary.Common.Memory;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Editor.UI.Helpers
 {
@@ -21,6 +22,7 @@ namespace Editor.UI.Helpers
 
         internal void Clear()
         {
+            _allocator.Reset();
             _cachedHandles.Clear();
         }
 
@@ -52,5 +54,31 @@ namespace Editor.UI.Helpers
                 return new StringHandle(start, text.Length + 1, int.MinValue);
             }
         }
+
+        internal StringHandle GetStringHandle<T>(T array) where T : IJaggedString
+        {
+            int length = array.Length;
+            char* start = (char*)_allocator.Allocate((length + 1) * 2);
+
+            int offset = 0;
+
+            ReadOnlySpan<char> temp;
+            while (!(temp = array.MoveNext()).IsEmpty)
+            {
+                temp.CopyTo(new Span<char>(start + offset, length - offset));
+                offset += temp.Length;
+            }
+
+            start[length] = '\0';
+
+            return new StringHandle(start, length + 1, int.MinValue);
+        }
+    }
+
+    public interface IJaggedString
+    {
+        public int Length { get; }
+
+        public ReadOnlySpan<char> MoveNext();
     }
 }

@@ -14,9 +14,9 @@ using static TerraFX.Interop.DirectX.DXGI_SCALING;
 using static TerraFX.Interop.DirectX.DXGI_SWAP_CHAIN_FLAG;
 using static TerraFX.Interop.DirectX.DXGI_SWAP_EFFECT;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows")]
+    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe sealed class D3D12RHISwapChain : RHISwapChain
     {
         private readonly D3D12RHIDevice _device;
@@ -118,6 +118,8 @@ namespace Primary.RHI2.Direct3D12
                     _buffers = null;
 
                     _swapChain.Reset();
+
+                    _device.ResourceTracker.Untrack(this);
                 });
 
                 _disposedValue = true;
@@ -141,7 +143,7 @@ namespace Primary.RHI2.Direct3D12
         public override void Present()
         {
             DXGI_PRESENT_PARAMETERS @params = default;
-            HRESULT hr = _swapChain.Get()->Present1(1, 0, &@params);
+            HRESULT hr = _swapChain.Get()->Present1(0, DXGI.DXGI_PRESENT_ALLOW_TEARING, &@params);
 
             if (hr.FAILED)
             {
@@ -219,6 +221,11 @@ namespace Primary.RHI2.Direct3D12
             _nativeRep->Base.Description.WindowSize = newSize;
 
             _nativeRep->ActiveBufferIndex = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
+        }
+
+        public override string ToString()
+        {
+            return $"RHISwapChain{{{_debugName}}}";
         }
 
         public ComPtr<IDXGISwapChain4> SwapChain => _swapChain;

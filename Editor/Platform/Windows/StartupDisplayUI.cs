@@ -241,7 +241,7 @@ namespace Editor.Platform.Windows
 
             DrawText(new Vector2(10.0f, 248.0f), 24.0f, "???");
             //DrawText(new Vector2(10.0f, 266.0f), 14.0f, $"{_completed}/{_total} - {(DateTime.UtcNow - _startTime).ToString(@"hh\.mm\:ss\:ff", CultureInfo.InvariantCulture)}");
-            DrawText(new Vector2(10.0f, 20.0f), 16.0f, typeof(Editor).Assembly.GetName().Version!.ToString());
+            DrawText(new Vector2(10.0f, 20.0f), 16.0f, typeof(EditorRuntime).Assembly.GetName().Version!.ToString());
             DrawText(new Vector2(10.0f, 40.0f), 16.0f, typeof(Engine).Assembly.GetName().Version!.ToString());
 
             SDL_SetRenderDrawBlendMode(_renderer, SDL_BlendMode.SDL_BLENDMODE_NONE);

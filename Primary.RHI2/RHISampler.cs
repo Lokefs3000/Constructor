@@ -2,7 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
-namespace Primary.RHI2
+namespace Primary.RHI
 {
     public unsafe abstract class RHISampler : RHIResource, IAsNativeObject<RHISamplerNative>
     {

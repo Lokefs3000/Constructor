@@ -83,7 +83,9 @@ namespace Primary.Collections
 
                 if (_array != Array.Empty<T>())
                     _sourcePool.Return(_array, _clearOnReturn);
+
                 _array = newArray;
+                _capacity = newArray.Length;
             }
 
             Array.Copy(_array, index, _array, index + 1, _count - index);
@@ -116,7 +118,9 @@ namespace Primary.Collections
 
                 if (_array != Array.Empty<T>())
                     _sourcePool.Return(_array, _clearOnReturn);
+
                 _array = newArray;
+                _capacity = newArray.Length;
             }
 
             _array[_count++] = item;
@@ -241,6 +245,8 @@ namespace Primary.Collections
 
         public ArrayPool<T> SourcePool => _sourcePool;
         public bool ClearOnReturn { get => _clearOnReturn; set => _clearOnReturn = value; }
+
+        public readonly T[] BackingArray => _array;
 
         public struct Enumerator : IEnumerator<T>
         {

@@ -1,0 +1,44 @@
+[
+    {
+        "Id": "tool-space",
+        "Appearances": [
+            {
+                "Key": "Local",
+                "Text": "Space",
+                "Texture": "Editor/UI/Icons/EditorViewToolbar.png",
+                "Atlas": [ 64, 0, 32, 32 ]
+            },
+            {
+                "Key": "Global",
+                "Text": "Space",
+                "Texture": "Editor/UI/Icons/EditorViewToolbar.png",
+                "Atlas": [ 80, 0, 32, 32 ]
+            }
+        ],
+        "Logic": {
+            "Key": "Enum",
+            "Type": "Editor?Editor.Interaction.EditorToolSpace"
+        }
+    },
+    {
+        "Id": "tool-origin",
+        "Appearances": [
+            {
+                "Key": "Individual",
+                "Text": "Origin",
+                "Texture": "Editor/UI/Icons/EditorViewToolbar.png",
+                "Atlas": [ 96, 0, 32, 32 ]
+            },
+            {
+                "Key": "Center",
+                "Text": "Origin",
+                "Texture": "Editor/UI/Icons/EditorViewToolbar.png",
+                "Atlas": [ 112, 0, 32, 32 ]
+            }
+        ],
+        "Logic": {
+            "Key": "Enum",
+            "Type": "Editor?Editor.Interaction.EditorOriginMode"
+        }
+    }
+]

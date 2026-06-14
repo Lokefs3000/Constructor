@@ -1,6 +1,10 @@
 ﻿using Editor.UI.Interaction;
+using Editor.UI.Layout;
+using Editor.UI.Visual;
+using Primary.Common;
 using Primary.Mathematics;
-using Primary.RHI2;
+using Primary.RHI;
+using Primary.Windowing;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -8,25 +12,12 @@ using System.Text;
 
 namespace Editor.UI
 {
-    public interface IWindowHost
+    public interface IWindowHost : IInteractable, IInterfaceHost, IRenderableHost, ILayoutHost
     {
-        public Int2 ClientOffset { get; }
-        public Int2 ClientSize { get; }
-
         public HostInteractionManager InteractionManager { get; }
 
-        public ReadOnlySpan<UIWindow> Windows { get; }
-        public UIWindow? ActiveWindow { get; }
+        public IWindow? ActiveWindow { get; }
 
-        public RHITexture? HostTexture { get; }
-
-        public void DockNewWindow(UIWindow window);
-        public void UndockWindow(UIWindow window);
-
-        public void RecalculateLayout();
-
-        public void TryChangeWindowSize(UIWindow window, Int2 newClientSize);
-
-        public void AddStateFlags(UIStateFlags flags);
+        public void TryChangeWindowSize(IWindow window, Int2 newClientSize);
     }
 }

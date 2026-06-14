@@ -1,4 +1,5 @@
 ﻿using Primary.Common;
+using Primary.Mathematics;
 using Primary.Components;
 using Primary.Scenes;
 using System.Diagnostics;
@@ -182,10 +183,10 @@ namespace Primary.Rendering.Tree
             octant.OctantsList = null;
         }
 
-        internal AABB WorldBounds => _worldBounds;
-        internal OctreePoint Point => _octreePoint;
+        public AABB WorldBounds => _worldBounds;
+        public OctreePoint Point => _octreePoint;
 
-        internal RenderOctant RootOctant => _rootOctant;
+        public RenderOctant RootOctant => _rootOctant;
 
         private static float FindExtentsOutOfBounds(AABB octant, AABB entity)
         {

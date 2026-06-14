@@ -2,7 +2,7 @@
 using Primary.Assets;
 using Primary.Common;
 using Primary.Rendering.Resources;
-using Primary.RHI2;
+using Primary.RHI;
 using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Numerics;
@@ -80,16 +80,23 @@ namespace Primary.Rendering.Assets
         /// <summary>Not thread-safe</summary>
         public void Clear()
         {
-            NativeMemory.Clear(_propertyData.ToPointer(), (nuint)_propertyBlockSize);
+            if (_propertyBlockSize > 0)
+                NativeMemory.Clear(_propertyData.ToPointer(), (nuint)_propertyBlockSize);
             Array.Clear(_properties);
 
             ++_updateIndex;
         }
 
         /// <summary>Not thread-safe</summary>
-        public void Reload(IShaderResourceSource? replacementShader = null)
+        public bool Reload(IShaderResourceSource? replacementShader = null)
         {
             _shader = replacementShader ?? _shader;
+            if (_shader != null && !_shader.IsLoaded)
+            {
+                _loadIndex = -2;
+                return false;
+            }
+
             _loadIndex = _shader?.LoadIndex ?? -1;
 
             if (_shader == null)
@@ -136,21 +143,37 @@ namespace Primary.Rendering.Assets
                 {
                     Dictionary<FastStringHash, PropertyRemapData> remapDict = new Dictionary<FastStringHash, PropertyRemapData>();
 
-                    int index = 0;
+                    ReadOnlySpan<ShaderProperty> span = _shader.Properties;
+                    for (int i = 0; i < span.Length; ++i)
+                    {
+                        ref readonly ShaderProperty property = ref span[i];
+                        if (property.ChildIndex != ushort.MaxValue)
+                        {
+                            _properties[property.ChildIndex] = new PropertyData(property.IndexOrByteOffset, FrameGraphResource.Invalid);
+                        }
+                    }
+
                     foreach (ref readonly ShaderProperty property in _shader.Properties)
                     {
                         if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
                         {
-                            remapDict[property.Name] = new PropertyRemapData
+                            PropertyRemapData remapData = new PropertyRemapData
                             {
                                 Type = property.Type,
-                                IndexOrByteOffset = (ushort)(property.Type <= ShPropertyType.Texture ? index++ : property.IndexOrByteOffset),
-                                ByteWidthOrChildIndex = property.Type <= ShPropertyType.Texture ? property.ChildIndex : property.ByteWidth
+                                IndexOrByteOffset = property.IndexOrByteOffset,
+                                ByteWidthOrChildIndex = property.Type <= ShPropertyType.Texture ? property.ChildIndex : property.ByteWidth,
+
+                                ParentIndex = property.Type <= ShPropertyType.Sampler ? _properties[property.IndexOrByteOffset].ParentIndex : ushort.MaxValue
                             };
 
-                            if (property.Type <= ShPropertyType.Sampler)
-                                _resourceCount++;
+                            remapDict[property.Name] = remapData;
+
+                            if (property.DisplayName != property.Name)
+                                remapDict[property.DisplayName] = remapData;
                         }
+
+                        if (property.Type <= ShPropertyType.Sampler)
+                            _resourceCount++;
                     }
 
                     _remapDict = remapDict.ToFrozenDictionary();
@@ -158,6 +181,7 @@ namespace Primary.Rendering.Assets
             }
 
             ++_updateIndex;
+            return true;
         }
 
         private T GetRawPropertyValue<T>(string id, ShPropertyType type, T @default = default) where T : unmanaged
@@ -197,13 +221,13 @@ namespace Primary.Rendering.Assets
                 if (remap.Type != ShPropertyType.Buffer)
                     return;
 
-                _properties[remap.IndexOrByteOffset] = new PropertyData(buffer);
+                _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, buffer);
                 ++_updateIndex;
             }
         }
 
         /// <summary>Not thread-safe</summary>
-        public void SetResource(string id, FrameGraphTexture texture)
+        public void SetResource(string id, FrameGraphTexture texture, PropertyBindIntent intent = PropertyBindIntent.Default)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -212,9 +236,9 @@ namespace Primary.Rendering.Assets
                     return;
 
                 if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
-                    _properties[remap.ByteWidthOrChildIndex] = PropertyData.Null;
+                    _properties[remap.ByteWidthOrChildIndex] = new PropertyData(remap.IndexOrByteOffset, FrameGraphResource.Invalid);
 
-                _properties[remap.IndexOrByteOffset] = new PropertyData(texture);
+                _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, texture, Intent: intent);
                 ++_updateIndex;
             }
         }
@@ -228,13 +252,13 @@ namespace Primary.Rendering.Assets
                 if (remap.Type != ShPropertyType.Buffer)
                     return;
 
-                _properties[remap.IndexOrByteOffset] = new PropertyData(new FrameGraphResource(buffer, null));
+                _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, new FrameGraphResource(buffer, null));
                 ++_updateIndex;
             }
         }
 
         /// <summary>Not thread-safe</summary>
-        public void SetResource(string id, RHITexture texture)
+        public void SetResource(string id, RHITexture texture, PropertyBindIntent intent = PropertyBindIntent.Default)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -243,9 +267,9 @@ namespace Primary.Rendering.Assets
                     return;
 
                 if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
-                    _properties[remap.ByteWidthOrChildIndex] = PropertyData.Null;
+                    _properties[remap.ByteWidthOrChildIndex] = new PropertyData(remap.IndexOrByteOffset, FrameGraphResource.Invalid);
 
-                _properties[remap.IndexOrByteOffset] = new PropertyData(new FrameGraphResource(texture, null));
+                _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, new FrameGraphResource(texture, null), Intent: intent);
                 ++_updateIndex;
             }
         }
@@ -259,11 +283,11 @@ namespace Primary.Rendering.Assets
                 if (remap.Type != ShPropertyType.Texture)
                     return;
 
-                _properties[remap.IndexOrByteOffset] = new PropertyData(FrameGraphResource.Invalid, texture);
+                _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, FrameGraphResource.Invalid, texture);
 
                 if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
                 {
-                    _properties[remap.ByteWidthOrChildIndex] = new PropertyData(FrameGraphResource.Invalid, texture.RawRHISampler);
+                    _properties[remap.ByteWidthOrChildIndex] = new PropertyData(remap.IndexOrByteOffset, FrameGraphResource.Invalid);
                 }
 
                 ++_updateIndex;
@@ -348,6 +372,27 @@ namespace Primary.Rendering.Assets
             }
 
             return null;
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public void ClearResource(string id)
+        {
+            ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
+            if (!Unsafe.IsNullRef(in remap))
+            {
+                if (remap.Type > ShPropertyType.Sampler)
+                    return;
+
+                if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
+                {
+                    PropertyData currentData = _properties[remap.IndexOrByteOffset];
+                    if (currentData.Aux != null)
+                        _properties[remap.ByteWidthOrChildIndex] = PropertyData.Null;
+                }
+
+                _properties[remap.IndexOrByteOffset] = PropertyData.Null;
+                ++_updateIndex;
+            }
         }
         #endregion
 
@@ -440,6 +485,7 @@ namespace Primary.Rendering.Assets
     public interface IShaderResourceSource
     {
         public int LoadIndex { get; }
+        public bool IsLoaded { get; }
 
         public ReadOnlySpan<ShaderProperty> Properties { get; }
         public IReadOnlyDictionary<int, int> RemappingTable { get; }
@@ -451,9 +497,9 @@ namespace Primary.Rendering.Assets
         public int ResourceCount { get; }
     }
 
-    internal readonly record struct PropertyData(FrameGraphResource Resource, object? Aux = null)
+    internal readonly record struct PropertyData(ushort ParentIndex, FrameGraphResource Resource, object? Aux = null, PropertyBindIntent Intent = PropertyBindIntent.Default)
     {
-        internal static readonly PropertyData Null = new PropertyData(FrameGraphResource.Invalid, null);
+        internal static readonly PropertyData Null = new PropertyData(ushort.MaxValue, FrameGraphResource.Invalid, null);
     }
 
     internal struct PropertyRemapData
@@ -461,5 +507,14 @@ namespace Primary.Rendering.Assets
         public ShPropertyType Type;
         public ushort IndexOrByteOffset;
         public ushort ByteWidthOrChildIndex;
+
+        public ushort ParentIndex;
+    }
+
+    public enum PropertyBindIntent : byte
+    {
+        Default = 0,
+
+        AsStencil
     }
 }

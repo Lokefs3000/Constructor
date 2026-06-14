@@ -2,10 +2,10 @@
 using Primary.Assets;
 using Primary.Common;
 using Primary.Common.Memory;
-using Primary.Rendering.Assets; 
+using Primary.Rendering.Assets;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.RHI2;
+using Primary.RHI;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -77,7 +77,12 @@ namespace Primary.Rendering.State
 
         internal virtual void SoftResetForNextPass()
         {
+            _dataBlock.Value = null;
+            _lastDataBlockUpdateIndex = long.MinValue;
 
+            if (_constantsDataSetSize > 0)
+                _changeFlags |= PropertyChangeFlags.Constants;
+            _constantsDataSetSize = 0;
         }
 
         internal void SetPipelineLimits(RHIGraphicsPipeline pipeline)
@@ -102,12 +107,17 @@ namespace Primary.Rendering.State
 
         internal virtual bool CommitState(LinearBlockAllocator allocator, CommandRecorder recorder)
         {
-            if (_dataBlock.IsDirty || (_dataBlock.Value != null && (_dataBlock.Value.IsOutOfDate || _dataBlock.Value.UpdateIndex != _lastDataBlockUpdateIndex)))
+            PropertyChangeFlags changeFlags = PropertyChangeFlags.None;
+
+            if (_dataBlock.Value != null && (_dataBlock.IsDirty || (_dataBlock.Value.IsOutOfDate || _dataBlock.Value.UpdateIndex != _lastDataBlockUpdateIndex)))
             {
                 PropertyBlock block = _dataBlock.Value!;
 
                 if (block.IsOutOfDate)
-                    block.Reload();
+                {
+                    if (!block.Reload())
+                        return false;
+                }
                 if (_dataBlock.IsDirty)
                     _lastDataBlockUpdateIndex = long.MinValue;
 
@@ -122,7 +132,7 @@ namespace Primary.Rendering.State
                 }
 
                 _lastDataBlockUpdateIndex = block.UpdateIndex;
-                _changeFlags |= PropertyChangeFlags.Block;
+                changeFlags |= PropertyChangeFlags.Block;
 
                 if (block.BlockSize > 0)
                 {
@@ -153,6 +163,18 @@ namespace Primary.Rendering.State
                             if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
                             {
                                 data = block.GetPropertyValue(property.IndexOrByteOffset);
+
+                                if (data.ParentIndex != ushort.MaxValue)
+                                {
+                                    if (data.Aux == null && property.Type == ShPropertyType.Sampler)
+                                    {
+                                        ref readonly PropertyData parentData = ref block.GetPropertyValue(data.ParentIndex);
+                                        if (parentData.Aux is TextureAsset asset)
+                                        {
+                                            data = new PropertyData(data.ParentIndex, FrameGraphResource.Invalid, asset.RawRHISampler);
+                                        }
+                                    }
+                                }
                             }
                             else if (!globalsManager.TryGetPropertyValue(property.Name, out data))
                             {
@@ -168,7 +190,9 @@ namespace Primary.Rendering.State
                                         ShPropertyType.Texture => CmdDataResource.NullTexture,
                                         ShPropertyType.Sampler => CmdDataResource.NullSampler,
                                         _ => throw new NotSupportedException()
-                                    }
+                                    },
+
+                                    Intent = PropertyBindIntent.Default
                                 });
 
                                 dataBaseOffset += 4;
@@ -244,7 +268,9 @@ namespace Primary.Rendering.State
                                 Flags = property.Flags,
 
                                 DataOffset = dataBaseOffset,
-                                Resource = resource
+                                Resource = resource,
+
+                                Intent = data.Intent
                             });
 
                             dataBaseOffset += 4;
@@ -274,9 +300,11 @@ namespace Primary.Rendering.State
                     DataSize = _constantsDataSize,
                     DataPointer = dataPtr
                 });
+
+                changeFlags |= PropertyChangeFlags.Constants;
             }
 
-            if (_changeFlags > 0)
+            if (changeFlags > 0)
             {
                 recorder.AddBlankCommand(RecCommandType.CommitResources);
             }

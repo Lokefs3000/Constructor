@@ -23,7 +23,7 @@ namespace Editor.Serialization
         {
             try
             {
-                SceneDeserializer deserializer = Editor.GlobalSingleton.SceneManager.Deserializer;
+                SceneDeserializer deserializer = EditorRuntime.GlobalSingleton.SceneManager.Deserializer;
                 return deserializer.DeserializeEntity(source, scene);
             }
             catch (Exception ex)

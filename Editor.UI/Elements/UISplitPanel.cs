@@ -1,10 +1,8 @@
 ﻿using Editor.UI.Layout;
-using Editor.UI.Visual;
 using Editor.UI.Serialization.Custom;
+using Editor.UI.Visual;
 using Primary.Common;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Numerics;
 
 namespace Editor.UI.Elements
 {
@@ -48,14 +46,20 @@ namespace Editor.UI.Elements
             _owningSplit = panel;
         }
 
+        public override void ClearPreviousLayoutData()
+        {
+            _viewOffset = Vector2.Zero;
+            _viewSize = Vector2.Zero;
+
+            _childExtents = Vector2.Zero;
+        }
+
         public override void MeasureSize(UIMeasureContext context)
         {
-            
         }
 
         public override void RecalculateLayout(UILayoutContext context)
         {
-            
         }
 
         public override bool DrawVisual(UIPainterContext painter)

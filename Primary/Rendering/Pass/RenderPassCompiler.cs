@@ -34,11 +34,8 @@ namespace Primary.Rendering.Pass
             _resourceLifetimeDict = new Dictionary<FrameGraphResource, IndexRange>();
         }
 
-        internal void Compile(FrameGraphTexture finalTexture, ReadOnlySpan<RenderPassDescription> passes, FrameGraphTimeline timeline, FrameGraphResources resources, FrameGraphState stateManager)
+        internal void Compile(ReadOnlySpan<RenderPassDescription> passes, ReadOnlySpan<RenderPassGroup> groups, FrameGraphTimeline timeline, FrameGraphResources resources, FrameGraphState stateManager)
         {
-            timeline.ClearTimeline();
-            resources.ClearResources();
-
             if (passes.IsEmpty)
                 return;
 
@@ -57,43 +54,51 @@ namespace Primary.Rendering.Pass
                 containers[j] = container;
             }
 
-            int i = passes.Length - 1;
-            int dependencyIndex = 0;
-
-            while (i >= 0)
+            for (int groupIndex = 0; groupIndex < groups.Length; groupIndex++)
             {
-                ref readonly RenderPassDescription currentPassDesc = ref passes[i];
-                RenderPassContainer currentPass = containers[i];
+                ref readonly RenderPassGroup passGroup = ref groups[groupIndex];
 
-                //TODO: cull passes with only state setting commands
-                if (!_noPassCulling && currentPassDesc.AllowCulling && i == passes.Length - 1 && (!currentPass.HasOutput(finalTexture) || currentPassDesc.Type != RenderPassType.Graphics))
+                ReadOnlySpan<RenderPassDescription> groupPasses = passes[(Range)passGroup.Range];
+
+                int i = groupPasses.Length - 1;
+                int dependencyIndex = 0;
+
+                while (i >= 0)
                 {
-                    i--;
-                    continue;
-                }
+                    ref readonly RenderPassDescription currentPassDesc = ref groupPasses[i];
 
-                int startDependencyIndex = dependencyIndex;
-                for (int j = i - 1; j >= 0; j--)
-                {
-                    ref readonly RenderPassDescription previousPassDesc = ref passes[j];
-                    RenderPassContainer previousPass = containers[j];
+                    RenderPassContainer currentPass = containers[passGroup.Range.Start + i];
 
-                    if (DoesPassModifyRequiredState(currentPass, previousPass))
+                    //TODO: cull passes with only state setting commands
+                    if (!_noPassCulling && currentPassDesc.AllowCulling && i == groupPasses.Length - 1 && (!currentPass.HasOutput(passGroup.FinalTexture) || currentPassDesc.Type != RenderPassType.Graphics))
                     {
-                        _dependencySet.Add((i << 16) | j);
-                        _pooledDependencyArray[dependencyIndex++] = j;
+                        i--;
+                        continue;
+                    }
 
-                        if (_pooledDependencyArray.Length < dependencyIndex)
+                    int startDependencyIndex = dependencyIndex;
+                    for (int j = i - 1; j >= 0; j--)
+                    {
+                        ref readonly RenderPassDescription previousPassDesc = ref groupPasses[j];
+                        RenderPassContainer previousPass = containers[j];
+
+                        if (DoesPassModifyRequiredState(currentPass, previousPass))
                         {
-                            Array.Resize(ref _pooledDependencyArray, _pooledDependencyArray.Length * 2);
+                            _dependencySet.Add((i << 16) | j);
+                            _pooledDependencyArray[dependencyIndex++] = j;
+
+                            if (_pooledDependencyArray.Length < dependencyIndex)
+                            {
+                                Array.Resize(ref _pooledDependencyArray, _pooledDependencyArray.Length * 2);
+                            }
                         }
                     }
+
+                    if (dependencyIndex != startDependencyIndex)
+                        _dependencyDict[i] = new IndexRange(startDependencyIndex, dependencyIndex);
+
+                    i--;
                 }
-
-                if (dependencyIndex != startDependencyIndex)
-                    _dependencyDict[i] = new IndexRange(startDependencyIndex, dependencyIndex);
-
-                i--;
             }
 
             CreateTimelineUntilBarrier(timeline, passes, containers.Span, 0, passes[0].Type);
@@ -109,7 +114,8 @@ namespace Primary.Rendering.Pass
             int rasterIndex = 0;
             int computeIndex = 0;
 
-            int index = 0;
+            int baseIndex = timeline.TotalPassCount;
+            int index = timeline.TotalPassCount;
 
             for (int i = startPassIndex; i < descriptions.Length; i++)
             {
@@ -167,8 +173,8 @@ namespace Primary.Rendering.Pass
 
                 switch (desc.Type)
                 {
-                    case RenderPassType.Graphics: timeline.AddRasterEvent(i); break;
-                    case RenderPassType.Compute: timeline.AddComputeEvent(i); break;
+                    case RenderPassType.Graphics: timeline.AddRasterEvent(baseIndex + i); break;
+                    case RenderPassType.Compute: timeline.AddComputeEvent(baseIndex + i); break;
                 }
 
                 ++lifetimeIndex;
@@ -221,12 +227,12 @@ namespace Primary.Rendering.Pass
 
             internal void Initialize(ref readonly RenderPassDescription desc)
             {
-                foreach (ref readonly UsedResourceData resourceData in desc.Resources.Span)
+                foreach (ref readonly UsedResourceData resourceData in desc.Resources.AsSpan())
                 {
                     _resources[resourceData.Resource] = resourceData.Usage;
                 }
 
-                foreach (ref readonly UsedRenderTargetData renderTargetData in desc.RenderTargets.Span)
+                foreach (ref readonly UsedRenderTargetData renderTargetData in desc.RenderTargets.AsSpan())
                 {
                     _outputs.Add(renderTargetData.Target);
 
@@ -254,7 +260,7 @@ namespace Primary.Rendering.Pass
                 return false;
             }
 
-            internal IReadOnlyDictionary<FrameGraphResource, FGResourceUsage> Resources => _resources;
+            internal Dictionary<FrameGraphResource, FGResourceUsage> Resources => _resources;
 
             internal readonly record struct PoolingPolicy : IObjectPoolPolicy<RenderPassContainer>
             {

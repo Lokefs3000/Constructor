@@ -66,7 +66,7 @@ namespace Editor.Assets
                 string realFile = source.Substring(find + 1, j - 1 - find);
 
                 string fullRemapPath = Path.Combine(_absolutePath, remapFile);
-                string fullRealPath = Path.Combine(Editor.GlobalSingleton.ProjectPath, realFile);
+                string fullRealPath = Path.Combine(EditorRuntime.GlobalSingleton.ProjectPath, realFile);
 
                 if (File.Exists(fullRemapPath) && File.Exists(fullRealPath))
                 {
@@ -172,7 +172,7 @@ namespace Editor.Assets
 
             bool isRemapped = false;
 
-            AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
+            AssetPipeline pipeline = EditorRuntime.GlobalSingleton.AssetPipeline;
             if (_fileRemappings.TryGetValue(localPath, out string? remap))
             {
                 if (pipeline != null && pipeline.IsImportingAsset(localPath))
@@ -186,7 +186,7 @@ namespace Editor.Assets
                     }
                 }
 
-                absolutePath = Path.Combine(Editor.GlobalSingleton.ProjectPath, remap);
+                absolutePath = Path.Combine(EditorRuntime.GlobalSingleton.ProjectPath, remap);
                 isRemapped = true;
             }
             else if (pipeline != null)
@@ -204,7 +204,7 @@ namespace Editor.Assets
 
                         if (_fileRemappings.TryGetValue(localPath, out remap))
                         {
-                            absolutePath = Path.Combine(Editor.GlobalSingleton.ProjectPath, remap);
+                            absolutePath = Path.Combine(EditorRuntime.GlobalSingleton.ProjectPath, remap);
                             hasNewRemap = true;
                             isRemapped = true;
                         }

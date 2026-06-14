@@ -17,7 +17,7 @@ namespace Primary.Rendering.Pass
             _entries = new Dictionary<Type, StorageEntry>();
         }
 
-        internal void ClearEntries()
+        internal void ClearEntries(bool sample)
         {
             Type? pendingRemoval = null;
 
@@ -28,21 +28,27 @@ namespace Primary.Rendering.Pass
                 for (int i = 0; i < entry.Index; ++i)
                     entry.Data[i].Clear();
 
-                entry.Analyser.Sample(entry.Index, Time.DeltaTime);
-
-                if (entry.Analyser.IsValid)
+                entry.MaxIndex = Math.Max(entry.MaxIndex, entry.Index);
+                if (sample)
                 {
-                    int calculated = Math.Max(entry.Analyser.Max(), entry.Index);
-                    if (calculated == 0)
-                    {
-                        pendingRemoval ??= kvp.Key;
-                    }
-                    else if (calculated < entry.Data.Length)
-                    {
-                        EngLog.Render.Debug("Culling excess render pass data: {fr} -> {to} ({t})", entry.Data, calculated, kvp.Key);
+                    entry.Analyser.Sample(entry.MaxIndex, Time.DeltaTime);
 
-                        Array.Resize(ref entry.Data, calculated);
+                    if (entry.Analyser.IsValid)
+                    {
+                        int calculated = Math.Max(entry.Analyser.Max(), entry.MaxIndex);
+                        if (calculated == 0)
+                        {
+                            pendingRemoval ??= kvp.Key;
+                        }
+                        else if (calculated < entry.Data.Length)
+                        {
+                            EngLog.Render.Debug("Culling excess render pass data: {fr} -> {to} ({t})", entry.Data, calculated, kvp.Key);
+
+                            Array.Resize(ref entry.Data, calculated);
+                        }
                     }
+
+                    entry.MaxIndex = 0;
                 }
 
                 entry.Index = 0;
@@ -66,6 +72,7 @@ namespace Primary.Rendering.Pass
                 if (entry.Index == entry.Data.Length)
                 {
                     T data = new T();
+                    data.Clear();
 
                     Array.Resize(ref entry.Data, entry.Index + 1);
                     entry.Data[entry.Index++] = data;
@@ -78,6 +85,8 @@ namespace Primary.Rendering.Pass
             else
             {
                 T data = new T();
+                data.Clear();
+
                 entry = new StorageEntry(data);
 
                 return data;
@@ -88,13 +97,17 @@ namespace Primary.Rendering.Pass
         {
             public AverageAnalyser<int> Analyser;
             public IPassData[] Data;
+
             public int Index;
+            public int MaxIndex;
 
             public StorageEntry(IPassData first)
             {
                 Analyser = new AverageAnalyser<int>(8, 0.5f);
                 Data = [first];
+
                 Index = 1;
+                MaxIndex = 0;
             }
         }
     }

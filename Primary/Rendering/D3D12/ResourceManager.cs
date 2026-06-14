@@ -2,8 +2,8 @@
 using Primary.Profiling;
 using Primary.Rendering.Pass;
 using Primary.Rendering.Resources;
-using Primary.RHI2;
-using Primary.RHI2.Direct3D12;
+using Primary.RHI;
+using Primary.RHI.Direct3D12;
 using System.Diagnostics;
 using System.Runtime.Versioning;
 using TerraFX.Interop.DirectX;
@@ -29,6 +29,7 @@ namespace Primary.Rendering.D3D12
     {
         private readonly NRDDevice _device;
 
+        private D3D12MemAlloc.Pool* _resourcesPool;
         private D3D12MemAlloc.Allocation* _resourcesMemory;
         private int _resourceMemorySize;
 
@@ -46,6 +47,7 @@ namespace Primary.Rendering.D3D12
         {
             _device = device;
 
+            _resourcesPool = null;
             _resourcesMemory = null;
             _resourceMemorySize = 0;
 
@@ -68,6 +70,10 @@ namespace Primary.Rendering.D3D12
 
                 if (_resourcesMemory != null)
                     _resourcesMemory->Base.Release();
+                if (_resourcesPool != null)
+                    _resourcesPool->Base.Release();
+
+                _resourcesPool = null;
                 _resourcesMemory = null;
 
                 _disposedValue = true;
@@ -85,7 +91,7 @@ namespace Primary.Rendering.D3D12
             GC.SuppressFinalize(this);
         }
 
-        internal void PrepareForExecution(FrameGraphResources resources)
+        internal bool PrepareForExecution(FrameGraphResources resources)
         {
             using (new ProfilingScope("Resources"))
             {
@@ -107,33 +113,67 @@ namespace Primary.Rendering.D3D12
                     {
                         _resourcesMemory->Base.Release();
                         _resourcesMemory = null;
+
+                        _resourcesPool->Base.Release();
+                        _resourcesPool = null;
                     }
 
-                    D3D12MemAlloc.ALLOCATION_DESC allocDesc = new D3D12MemAlloc.ALLOCATION_DESC
                     {
-                        Flags = D3D12MemAlloc.ALLOCATION_FLAGS.ALLOCATION_FLAG_CAN_ALIAS,
-                        HeapType = D3D12_HEAP_TYPE_DEFAULT,
-                        ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES,
-                    };
+                        D3D12MemAlloc.POOL_DESC poolDesc = new D3D12MemAlloc.POOL_DESC
+                        {
+                            Flags = D3D12MemAlloc.POOL_FLAGS.POOL_FLAG_ALGORITHM_LINEAR,
+                            HeapProperties = new D3D12_HEAP_PROPERTIES
+                            {
+                                Type = D3D12_HEAP_TYPE_DEFAULT
+                            },
+                            HeapFlags = D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES,
+                        };
 
-                    D3D12_RESOURCE_ALLOCATION_INFO resAllocDesc = new D3D12_RESOURCE_ALLOCATION_INFO
-                    {
-                        SizeInBytes = (ulong)memoryUsageRequired,
-                        Alignment = 256
-                    };
+                        D3D12MemAlloc.Pool* tempAllocPtr = null;
 
-                    D3D12MemAlloc.Allocation* tempAllocPtr = null;
+                        int r = D3D12MemAlloc.Allocator.CreatePool(_device.Allocator, &poolDesc, &tempAllocPtr);
+                        if (r != 0)
+                        {
+                            _device.RHIDevice.FlushPendingMessages();
+                            throw new NotImplementedException("Add error message");
+                        }
 
-                    int r = D3D12MemAlloc.Allocator.AllocateMemory(_device.Allocator, &allocDesc, &resAllocDesc, &tempAllocPtr);
-                    if (r != 0)
-                    {
-                        _device.RHIDevice.FlushPendingMessages();
-                        throw new NotImplementedException("Add error message");
+                        _resourcesPool = tempAllocPtr;
                     }
 
-                    _resourcesMemory = tempAllocPtr;
+                    {
+                        D3D12MemAlloc.ALLOCATION_DESC allocDesc = new D3D12MemAlloc.ALLOCATION_DESC
+                        {
+                            Flags = D3D12MemAlloc.ALLOCATION_FLAGS.ALLOCATION_FLAG_CAN_ALIAS,
+                            HeapType = D3D12_HEAP_TYPE_DEFAULT,
+                            ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES,
+                            CustomPool = _resourcesPool
+                        };
+
+                        D3D12_RESOURCE_ALLOCATION_INFO resAllocDesc = new D3D12_RESOURCE_ALLOCATION_INFO
+                        {
+                            SizeInBytes = (ulong)memoryUsageRequired,
+                            Alignment = 256
+                        };
+
+                        D3D12MemAlloc.Allocation* tempAllocPtr = null;
+
+                        int r = D3D12MemAlloc.Allocator.AllocateMemory(_device.Allocator, &allocDesc, &resAllocDesc, &tempAllocPtr);
+                        if (r != 0)
+                        {
+                            _device.RHIDevice.FlushPendingMessages();
+                            throw new NotImplementedException("Add error message");
+                        }
+
+                        _resourcesMemory = tempAllocPtr;
+                    }
+
                     _resourceMemorySize = memoryUsageRequired;
                 }
+
+                //TODO: add support for a placed resource memory as the alias buffer aswell
+                ulong heapOffset = D3D12MemAlloc.Allocation.GetOffset(_resourcesMemory);
+                Debug.Assert(heapOffset == 0);
 
                 Guid* resourceGuid = UuidOf.Get<ID3D12Resource2>();
                 foreach (ref readonly FGResourceLocation location in resources.Locations)
@@ -235,7 +275,7 @@ namespace Primary.Rendering.D3D12
                     if (r.FAILED)
                     {
                         _device.RHIDevice.FlushPendingMessages();
-                        throw new NotImplementedException("Add error message");
+                        return false;
                     }
 
                     if (location.Resource.DebugName != null)
@@ -245,6 +285,8 @@ namespace Primary.Rendering.D3D12
 
                     _allocatedResources[ResourceUtility.AsNRDResource(location.Resource)] = resourcePtr;
                 }
+
+                return true;
             }
         }
 
@@ -365,9 +407,17 @@ namespace Primary.Rendering.D3D12
         internal void SetAsInitialized(NRDResource resource)
         {
             if (resource.IsExternal)
-                return;
+                ((D3D12RHITextureNative*)resource.Native)->IsInitialized = true;
+            else
+                _initializedResources.Add(resource);
+        }
 
-            _initializedResources.Add(resource);
+        internal bool IsInitialized(NRDResource resource)
+        {
+            if (resource.Id == NRDResourceId.Buffer)
+                return true;
+
+            return resource.IsExternal ? ((D3D12RHITextureNative*)resource.Native)->IsInitialized : _initializedResources.Contains(resource);
         }
 
         internal void FlushPendingInits(ID3D12GraphicsCommandList10* cmdList)

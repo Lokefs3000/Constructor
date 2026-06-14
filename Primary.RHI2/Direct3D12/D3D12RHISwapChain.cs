@@ -14,7 +14,7 @@ using static TerraFX.Interop.DirectX.DXGI_SCALING;
 using static TerraFX.Interop.DirectX.DXGI_SWAP_CHAIN_FLAG;
 using static TerraFX.Interop.DirectX.DXGI_SWAP_EFFECT;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
     [SupportedOSPlatform("windows")]
     public unsafe sealed class D3D12RHISwapChain : RHISwapChain

@@ -11,13 +11,13 @@ namespace Primary.Scenes
         private readonly string _name;
 
         private readonly World _world;
-        private readonly SceneEntityManager _entityManager;
+        private readonly Components.SceneEntityManager _entityManager;
 
         private readonly SceneEntity _root;
 
         private bool _disposedValue;
 
-        internal Scene(int id, string name, World world, SceneEntityManager entityManager)
+        internal Scene(int id, string name, World world, Components.SceneEntityManager entityManager)
         {
             _id = id;
             _name = name;
@@ -28,7 +28,6 @@ namespace Primary.Scenes
             _root = _entityManager.CreateReadyEntity(this);
             _root.WrappedEntity.Add(new SceneTagComponent(_id));
 
-            _root.Name = id.ToString();
             _root.AddComponent<Transform>();
         }
 
@@ -46,7 +45,7 @@ namespace Primary.Scenes
             {
                 if (disposing)
                 {
-                    //_root.Destroy();
+                    _root.Destroy();
                 }
 
                 _disposedValue = true;
@@ -64,6 +63,8 @@ namespace Primary.Scenes
 
         public int Id => _id;
         public SceneEntity Root => _root;
+
+        internal World World => _world;
 
         public string Name => _name;
     }

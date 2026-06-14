@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.HighPerformance;
+﻿using CommunityToolkit.Diagnostics;
+using CommunityToolkit.HighPerformance;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -9,10 +10,12 @@ namespace Editor.UI.Styling
 {
     public sealed class StylesheetClass
     {
+        private bool _isStaged;
         private Dictionary<PropertyKey, object> _values;
 
-        internal StylesheetClass()
+        internal StylesheetClass(bool isStaged)
         {
+            _isStaged = isStaged;
             _values = new Dictionary<PropertyKey, object>();
         }
 
@@ -72,9 +75,12 @@ namespace Editor.UI.Styling
             }
         }
 
-        private readonly record struct PropertyKey(string PropertyName, string StateName)
-        {
-            public override int GetHashCode() => PropertyName.GetDjb2HashCode() ^ StateName.GetDjb2HashCode();
-        }
+        public bool IsStaged => _isStaged;
+        public IReadOnlyDictionary<PropertyKey, object> Values => _values;
+    }
+
+    public readonly record struct PropertyKey(string PropertyName, string StateName)
+    {
+        public override int GetHashCode() => PropertyName.GetDjb2HashCode() ^ StateName.GetDjb2HashCode();
     }
 }

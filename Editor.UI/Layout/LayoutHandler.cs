@@ -38,7 +38,7 @@ namespace Editor.UI.Layout
 
         internal void Handle(UIElement root)
         {
-            using (new ProfilingScope($"Layout-{root.WindowOwner!.WindowTitle}"))
+            using (new ProfilingScope($"Layout-{root.WindowOwner!.ToString()}"))
             {
                 RecalculateLayout(root);
                 //PerformMeasurePass(root);
@@ -46,7 +46,7 @@ namespace Editor.UI.Layout
 
                 //ClearInternals();
 
-                ThreadHelper.ExecuteOnMainThread(root.WindowOwner!.Invoke_LayoutRecalculated);
+                ThreadHelper.ExecuteOnMainThread(root.WindowOwner!.OnLayoutRecalculatedCallback);
             }
         }
 
@@ -59,25 +59,36 @@ namespace Editor.UI.Layout
             {
                 UIElement element = _elements[i].Element;
 
-                Vector2 localRegion = element.Parent?.CurrentSize ?? root.WindowOwner!.ClientSize.AsVector2();
+                Vector2 localRegion = element.Parent == null ? root.WindowOwner!.ClientSize.AsVector2() : element.Parent.ViewSize;
 
                 UIMeasureContext context = new UIMeasureContext(_layoutManager, localRegion);
 
+                element.ClearPreviousLayoutData();
+
                 element.MeasureSize(context);
                 element.ExecuteMeasureMods(context);
+
+                element.ViewSize += element.CurrentSize;
             }
 
             for (int i = _elements.Count - 1; i >= 0; --i)
             {
                 UIElement element = _elements[i].Element;
-                Vector2 localRegion = element.Parent?.CurrentSize ?? root.WindowOwner!.ClientSize.AsVector2();
+                Vector2 localRegion = element.Parent == null ? root.WindowOwner!.ClientSize.AsVector2() : element.Parent.ViewSize;
 
                 _measurements.SetupNewElement(element);
+                element.ChildExtents = Vector2.Max(element.ChildExtents, _measurements.TreeSize);
 
                 UILayoutContext context = new UILayoutContext(this, _measurements, localRegion);
 
                 element.RecalculateLayout(context);
+                _measurements.GetSourceChildExtents();
+
                 element.ExecuteLayoutMods(context);
+                element.ChildExtents = _measurements.ChildExtents;
+
+                if (!element.Anchor.Equals(Vector2.Zero))
+                    element.RelativeOffset -= element.CurrentSize * element.Anchor;
             }
 
             CalculateBounds(root, Vector2.Zero);
@@ -103,8 +114,13 @@ namespace Editor.UI.Layout
             {
                 Vector2 baseOffset = offset + parent.RelativeOffset;
                 parent.PixelCoordinates = new Boundaries(baseOffset, baseOffset + parent.CurrentSize);
+                parent.ViewCoordinates = Boundaries.Clip(Boundaries.Offset(new Boundaries(parent.PixelCoordinates.Minimum, parent.PixelCoordinates.Maximum + parent.ViewSize), parent.ViewOffset), parent.PixelCoordinates);
+
+                parent.FinalizeLayout();
 
                 Boundaries treeBounds = parent.PixelCoordinates;
+                //Vector2 childExtents = parent.ChildExtents;
+
                 foreach (UIElement child in parent.Children)
                 {
                     if (Flags.HasFlag(child.StateFlags, UIStateFlags.InvalidLayout))
@@ -112,10 +128,13 @@ namespace Editor.UI.Layout
                         CalculateBounds(child, baseOffset);
                     }
 
-                    treeBounds = Boundaries.Union(treeBounds, child.PixelCoordinates);
+                    treeBounds = Boundaries.Union(treeBounds, child.ElementTreeBounds);
+                    //childExtents = Vector2.Max(childExtents, child.RelativeOffset + child.CurrentSize);
                 }
 
                 parent.ElementTreeBounds = treeBounds;
+                parent.ScrollPosition = Vector2.Clamp(parent.ScrollPosition, Vector2.Zero, Vector2.Max(parent.ChildExtents - parent.ViewSize, Vector2.Zero));
+                //parent.ChildExtents = childExtents;
 
                 parent.RemoveStateFlags(UIStateFlags.InvalidLayout);
             }
@@ -144,7 +163,10 @@ namespace Editor.UI.Layout
     {
         private UIElement? _element;
 
+        private Vector2 _sourceChildExtents;
+
         private Vector2 _treeSize;
+        private Vector2 _childExtents;
 
         private bool _needsRefresh;
         private bool _isOutdated;
@@ -158,7 +180,10 @@ namespace Editor.UI.Layout
         {
             _element = element;
 
+            _sourceChildExtents = Vector2.Zero;
+
             _treeSize = Vector2.Zero;
+            _childExtents = Vector2.Zero;
 
             _needsRefresh = true;
             _isOutdated = true;
@@ -167,6 +192,14 @@ namespace Editor.UI.Layout
         internal void Clear()
         {
             _element = null;
+        }
+
+        internal void GetSourceChildExtents()
+        {
+            _sourceChildExtents = _element!.ChildExtents;
+
+            _isOutdated = true;
+            _needsRefresh = true;
         }
 
         internal void RefreshIfRequired()
@@ -179,10 +212,12 @@ namespace Editor.UI.Layout
             Vector2 treeSize = Vector2.Zero;
             foreach (UIElement child in _element!.Children)
             {
-                treeSize = Vector2.Max(treeSize, child.RelativeOffset + child.CurrentSize);
+                if (child.IsEnabled)
+                    treeSize = Vector2.Max(treeSize, child.RelativeOffset + child.CurrentSize);
             }
 
             _treeSize = treeSize;
+            _childExtents = Vector2.Max(_sourceChildExtents, treeSize);
 
             _needsRefresh = false;
             _isOutdated = false;
@@ -200,6 +235,16 @@ namespace Editor.UI.Layout
                 if (_needsRefresh)
                     RecalculateTreeSize();
                 return _treeSize;
+            }
+        }
+
+        public Vector2 ChildExtents
+        {
+            get
+            {
+                if (_needsRefresh)
+                    RecalculateTreeSize();
+                return _childExtents;
             }
         }
     }

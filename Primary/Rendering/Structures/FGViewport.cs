@@ -7,15 +7,21 @@ namespace Primary.Rendering.Structures
     {
         public bool Equals(FGViewport other)
         {
-            return Vector128.EqualsAll(AsVector128(ref this), AsVector128(ref other)) && MinDepth == other.MinDepth && MaxDepth == other.MaxDepth;
+            return Vector128.EqualsAll(AsVector128(), other.AsVector128()) && MinDepth == other.MinDepth && MaxDepth == other.MaxDepth;
         }
 
-        private static Vector128<float> AsVector128(ref FGViewport viewport)
+        public override int GetHashCode()
         {
-            Vector128<float> vector;
-            Unsafe.SkipInit(out vector);
-            Unsafe.WriteUnaligned(ref Unsafe.As<Vector128<float>, byte>(ref vector), viewport);
-            return vector;
+            return base.GetHashCode();
+        }
+
+        private Vector128<float> AsVector128()
+        {
+            return Unsafe.ReadUnaligned<Vector128<float>>(ref Unsafe.As<FGViewport, byte>(ref this));
+            //fixed (FGViewport* ptr = &viewport)
+            //{
+            //    return Vector128.Load((float*)ptr);
+            //}
         }
     }
 }

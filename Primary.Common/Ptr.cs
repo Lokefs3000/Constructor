@@ -31,5 +31,6 @@ namespace Primary.Common
         public static readonly Ptr<T> Null = new Ptr<T>();
 
         public static implicit operator Ptr<T>(T* ptr) => new Ptr<T>(ptr);
+        public static implicit operator T*(Ptr<T> ptr) => ptr.Pointer;
     }
 }

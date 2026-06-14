@@ -3,7 +3,7 @@ using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
-using Primary.RHI2;
+using Primary.RHI;
 using Primary.Utility;
 using System.Collections.Frozen;
 using System.Diagnostics;
@@ -34,6 +34,8 @@ namespace Primary.Assets.Loaders
                 throw new ArgumentException(nameof(asset));
             if (assetData is not ShaderAssetData shaderData)
                 throw new ArgumentException(nameof(assetData));
+
+            shaderData.Dispose();
 
             try
             {
@@ -122,7 +124,7 @@ namespace Primary.Assets.Loaders
                             //Must be a property as there are only property-based attributes that can be assigned to a resource
                             if (Flags.HasFlag(resourceFlags, ShResourceFlags.Property))
                             {
-                                ShPropertyFlags propFlags = ShPropertyFlags.Property;
+                                ShPropertyFlags propFlags = ShPropertyFlags.None;
                                 ShPropertyDisplay propDisplay = ShPropertyDisplay.Default;
                                 ShPropertyDefault propDefault = ShPropertyDefault.TexWhite;
 
@@ -153,6 +155,8 @@ namespace Primary.Assets.Loaders
                                 }
                                 if (Flags.HasFlag(flags, SBCResourceFlags.Property))
                                 {
+                                    propFlags |= ShPropertyFlags.Property;
+
                                     SBCAttributeProperty attribute = stream.Read<SBCAttributeProperty>();
                                     propDefault = attribute.Default switch
                                     {
@@ -180,7 +184,7 @@ namespace Primary.Assets.Loaders
                                         auxilary = name + "_Sampler";
                                 }
 
-                                properties.Add(new ShaderProperty(name, (ushort)i, ushort.MaxValue, ushort.MaxValue, type switch
+                                properties.Add(new ShaderProperty(name, customName ?? name, (ushort)i, ushort.MaxValue, ushort.MaxValue, type switch
                                 {
                                     SBCResourceType.Texture1D => ShPropertyType.Texture,
                                     SBCResourceType.Texture2D => ShPropertyType.Texture,
@@ -310,7 +314,7 @@ namespace Primary.Assets.Loaders
                                     customName = br.ReadString();
                             }
 
-                            properties.Add(new ShaderProperty(name, byteOffset, size, ushort.MaxValue, type, propDefault, ShPropertyStages.AllShading, propFlags, propDisplay));
+                            properties.Add(new ShaderProperty(name, customName ?? name, byteOffset, size, ushort.MaxValue, type, propDefault, ShPropertyStages.AllShading, propFlags, propDisplay));
 
                             if (customName != null)
                                 customNameDict[(1 << 15) | i] = customName;
@@ -338,13 +342,14 @@ namespace Primary.Assets.Loaders
                             if (Flags.HasEither(property.Flags, ShPropertyFlags.HasParent | ShPropertyFlags.Constants))
                                 continue;
 
-                            actualUnique++;
-
                             PsSortDummyType type = PsSortDummyType.Resource;
                             if (property.Type == ShPropertyType.Struct)
                                 type = PsSortDummyType.Struct;
                             else if (property.Type > ShPropertyType.Texture)
                                 type = PsSortDummyType.Property;
+
+                            if (type != PsSortDummyType.Resource && Flags.HasFlag(header.Flags, SBCHeaderFlags.ExternalProperties))
+                                continue;
 
                             PsSortDummyUsage usage = PsSortDummyUsage.Property;
                             if (Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
@@ -354,11 +359,12 @@ namespace Primary.Assets.Loaders
                             else if (type == PsSortDummyType.Resource)
                                 usage = PsSortDummyUsage.Resource;
 
+                            actualUnique++;
                             dummies[j++] = new PropertySortDummy(i | (property.IndexOrByteOffset << 16), property.Name, type, usage);
                         }
                     }
 
-                    if (!Flags.HasFlag(header.Flags, SBCHeaderFlags.ExternalProperties))
+                    //if (!Flags.HasFlag(header.Flags, SBCHeaderFlags.ExternalProperties))
                     {
                         Span<ShaderResource> span = resources.AsSpan();
                         for (int i = 0; i < span.Length; i++)
@@ -413,7 +419,7 @@ namespace Primary.Assets.Loaders
                                 _ => throw new NotImplementedException(),
                             };
 
-                            outputProperties[outputIdx++] = new ShaderProperty(resource.Name, (ushort)propIndex++, sizeof(uint), ushort.MaxValue, propertyType, ShPropertyDefault.TexWhite, ShPropertyStages.AllShading, ShPropertyFlags.None, ShPropertyDisplay.Default);
+                            outputProperties[outputIdx++] = new ShaderProperty(resource.Name, resource.Name, (ushort)propIndex++, sizeof(uint), ushort.MaxValue, propertyType, ShPropertyDefault.TexWhite, ShPropertyStages.AllShading, ShPropertyFlags.None, ShPropertyDisplay.Default);
                             localByteOffset += sizeof(uint);
 
                             customNameDict.TryGetValue(sourceIndex, out string? customName);
@@ -443,7 +449,7 @@ namespace Primary.Assets.Loaders
                                         childIndex = (ushort)find;
                                 }
 
-                                outputProperties[outputIdx++] = new ShaderProperty(property.Name, (ushort)propIndex++, sizeof(uint), childIndex, property.Type, property.Default, property.Stages, property.Flags, property.Display);
+                                outputProperties[outputIdx++] = new ShaderProperty(property.Name, property.DisplayName, (ushort)propIndex++, sizeof(uint), childIndex, property.Type, property.Default, property.Stages, property.Flags, property.Display);
                                 byteOffset += sizeof(uint);
 
                                 customNameDict.TryGetValue(sourceIndex, out string? customName);
@@ -458,7 +464,7 @@ namespace Primary.Assets.Loaders
                                 if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
                                     propertyBlockSize += property.ByteWidth;
 
-                                outputProperties[outputIdx++] = new ShaderProperty(property.Name, (ushort)byteOffset, property.ByteWidth, ushort.MaxValue, property.Type, property.Default, property.Stages, property.Flags | ShPropertyFlags.Property, property.Display);
+                                outputProperties[outputIdx++] = new ShaderProperty(property.Name, property.DisplayName, (ushort)byteOffset, property.ByteWidth, ushort.MaxValue, property.Type, property.Default, property.Stages, property.Flags | ShPropertyFlags.Property, property.Display);
 
                                 customNameDict.TryGetValue(sourceIndex | (1 << 15), out string? customName);
                                 remapTable.Add((customName ?? property.Name).GetDjb2HashCode(), outputIdx - 1);
@@ -474,8 +480,9 @@ namespace Primary.Assets.Loaders
                                     if (subProperty.Type == ShPropertyType.Struct)
                                     {
                                         string path = $"{@namespace}.{subProperty.Name}";
+                                        string displayPath = $"{@namespace}.{subProperty.DisplayName}";
                                         propertyQueue.Enqueue((path, byteOffset + subProperty.ByteWidth));
-                                        outputProperties[outputIdx++] = new ShaderProperty(path, (ushort)byteOffset, subProperty.ByteWidth, ushort.MaxValue, subProperty.Type, subProperty.Default, subProperty.Stages, subProperty.Flags, subProperty.Display);
+                                        outputProperties[outputIdx++] = new ShaderProperty(path, displayPath, (ushort)byteOffset, subProperty.ByteWidth, ushort.MaxValue, subProperty.Type, subProperty.Default, subProperty.Stages, subProperty.Flags, subProperty.Display);
 
                                         customNameDict.TryGetValue(sourceIndex | (1 << 15), out customName);
                                         remapTable.Add((customName ?? path).GetDjb2HashCode(), outputIdx - 1);
@@ -483,7 +490,8 @@ namespace Primary.Assets.Loaders
                                     else
                                     {
                                         string path = $"{@namespace}.{subProperty.Name}";
-                                        outputProperties[outputIdx++] = new ShaderProperty(path, (ushort)byteOffset, subProperty.ByteWidth, ushort.MaxValue, subProperty.Type, subProperty.Default, subProperty.Stages, subProperty.Flags, subProperty.Display);
+                                        string displayPath = $"{@namespace}.{subProperty.DisplayName}";
+                                        outputProperties[outputIdx++] = new ShaderProperty(path, displayPath, (ushort)byteOffset, subProperty.ByteWidth, ushort.MaxValue, subProperty.Type, subProperty.Default, subProperty.Stages, subProperty.Flags, subProperty.Display);
 
                                         customNameDict.TryGetValue(sourceIndex | (1 << 15), out customName);
                                         remapTable.Add((customName ?? path).GetDjb2HashCode(), outputIdx - 1);
@@ -842,7 +850,7 @@ namespace Primary.Assets.Loaders
 #else
             catch (Exception ex)
             {
-                materialData.UpdateAssetFailed(material);
+                shaderData.UpdateAssetFailed(shader);
                 EngLog.Assets.Error(ex, "Failed to load shader: {name}", sourcePath);
             }
 #endif

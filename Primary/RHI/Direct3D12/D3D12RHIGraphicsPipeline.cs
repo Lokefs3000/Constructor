@@ -4,6 +4,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 using System.Runtime.Versioning;
 using TerraFX.Interop.DirectX;
 using TerraFX.Interop.Windows;
@@ -18,15 +19,15 @@ using static TerraFX.Interop.DirectX.D3D12_SAMPLER_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_SHADER_VISIBILITY;
 using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows")]
+    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe sealed class D3D12RHIGraphicsPipeline : RHIGraphicsPipeline
     {
         private readonly D3D12RHIDevice _device;
 
         private ComPtr<ID3D12RootSignature> _rootSignature;
-        private ConcurrentDictionary<D3D12RasterState, ComPtr<ID3D12PipelineState>> _createdPipelines;
+        private Dictionary<D3D12RasterState, ComPtr<ID3D12PipelineState>> _createdPipelines;
 
         private D3D12RHIGraphicsPipelineNative* _nativeRep;
 
@@ -151,7 +152,7 @@ namespace Primary.RHI2.Direct3D12
                 }
             }
 
-            _createdPipelines = new ConcurrentDictionary<D3D12RasterState, ComPtr<ID3D12PipelineState>>();
+            _createdPipelines = new Dictionary<D3D12RasterState, ComPtr<ID3D12PipelineState>>();
 
             {
                 _nativeRep = (D3D12RHIGraphicsPipelineNative*)NativeMemory.Alloc((nuint)Unsafe.SizeOf<D3D12RHIGraphicsPipelineNative>());
@@ -240,15 +241,15 @@ namespace Primary.RHI2.Direct3D12
                             FrontFace = new D3D12_DEPTH_STENCILOP_DESC
                             {
                                 StencilFailOp = _description.DepthStencil.FrontFace.FailOp.ToStencilOp(),
-                                StencilDepthFailOp = _description.DepthStencil.FrontFace.FailOp.ToStencilOp(),
-                                StencilPassOp = _description.DepthStencil.FrontFace.FailOp.ToStencilOp(),
+                                StencilDepthFailOp = _description.DepthStencil.FrontFace.DepthFailOp.ToStencilOp(),
+                                StencilPassOp = _description.DepthStencil.FrontFace.PassOp.ToStencilOp(),
                                 StencilFunc = _description.DepthStencil.FrontFace.Function.ToComparisonFunc(),
                             },
                             BackFace = new D3D12_DEPTH_STENCILOP_DESC
                             {
                                 StencilFailOp = _description.DepthStencil.BackFace.FailOp.ToStencilOp(),
-                                StencilDepthFailOp = _description.DepthStencil.BackFace.FailOp.ToStencilOp(),
-                                StencilPassOp = _description.DepthStencil.BackFace.FailOp.ToStencilOp(),
+                                StencilDepthFailOp = _description.DepthStencil.BackFace.DepthFailOp.ToStencilOp(),
+                                StencilPassOp = _description.DepthStencil.BackFace.PassOp.ToStencilOp(),
                                 StencilFunc = _description.DepthStencil.BackFace.Function.ToComparisonFunc(),
                             }
                         },
@@ -345,6 +346,8 @@ namespace Primary.RHI2.Direct3D12
                     _createdPipelines.Clear();
 
                     _rootSignature.Reset();
+
+                    _device.ResourceTracker.Untrack(this);
                 });
 
                 _disposedValue = true;
@@ -367,6 +370,11 @@ namespace Primary.RHI2.Direct3D12
             }
         }
 
+        public override string ToString()
+        {
+            return $"RHIGraphicsPipeline{{{_debugName}}}";
+        }
+
         public override unsafe RHIGraphicsPipelineNative* GetAsNative() => (RHIGraphicsPipelineNative*)_nativeRep;
 
         public ComPtr<ID3D12RootSignature> RootSignature => _rootSignature;
@@ -380,15 +388,25 @@ namespace Primary.RHI2.Direct3D12
     }
 
     [SupportedOSPlatform("windows")]
-    public struct D3D12RasterState
+    [StructLayout(LayoutKind.Sequential, Pack = 8)]
+    public struct D3D12RasterState : IEquatable<D3D12RasterState>
     {
-        public DXGI_FORMAT DSVFormat;
         public __RTVs RTVFormats;
+        public DXGI_FORMAT DSVFormat;
 
         public D3D12RasterState()
         {
             DSVFormat = DXGI_FORMAT_UNKNOWN;
             RTVFormats = new __RTVs();
+        }
+
+        public bool Equals(D3D12RasterState other)
+        {
+            return
+                RTVFormats.Count == other.RTVFormats.Count &&
+                DSVFormat == other.DSVFormat &&
+                Vector256.LoadUnsafe(ref Unsafe.As<D3D12RasterState, uint>(ref this)) == Vector256.LoadUnsafe(ref Unsafe.As<D3D12RasterState, uint>(ref this));
+
         }
 
         public struct __RTVs

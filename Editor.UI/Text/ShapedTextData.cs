@@ -154,12 +154,12 @@ namespace Editor.UI.Text
                 _lastSectionLineStart = _lines.Count;
         }
 
-        internal void AddSection(UIFontStyle fontStyle, float leftOffset, TextVisualInfo visualInfo)
+        internal void AddSection(UIFontTypeData typeData, float leftOffset, TextVisualInfo visualInfo)
         {
             if (_lastSectionTextStart == _letterIndex && _lastSectionLineStart == _lines.Count)
                 return;
 
-            _sections.Add(new TextLineSection(fontStyle, leftOffset, visualInfo, new IndexRange(_lastSectionLineStart, _lines.Count), new IndexRange(_lastSectionTextStart, _letterIndex)));
+            _sections.Add(new TextLineSection(typeData, leftOffset, visualInfo, new IndexRange(_lastSectionLineStart, _lines.Count), new IndexRange(_lastSectionTextStart, _letterIndex)));
 
             _lastSectionTextStart = _letterIndex;
             _lastSectionLineStart = _lines.Count;
@@ -189,7 +189,7 @@ namespace Editor.UI.Text
         {
             public int Compare(TextLineSection x, TextLineSection y)
             {
-                return HashCode.Combine(x.FontStyle.Index, x.FontStyle.Font.Id).CompareTo(HashCode.Combine(y.FontStyle.Index, y.FontStyle.Font.Id));
+                return HashCode.Combine(x.TypeData.Style, x.TypeData.Weight, x.TypeData.Font.Id).CompareTo(HashCode.Combine(y.TypeData.Style, y.TypeData.Weight, y.TypeData.Font.Id));
             }
 
             public static readonly TextLineSectionComparer Default = new TextLineSectionComparer();
@@ -197,10 +197,10 @@ namespace Editor.UI.Text
     }
 
     public readonly record struct TextLineData(int LineIndex, float LineOffset, Vector2 LineSize, IndexRange TextRange);
-    public readonly record struct TextLineSection(UIFontStyle FontStyle, float LeftOffset, TextVisualInfo VisualInfo, IndexRange LineRange, IndexRange TextRange);
-    public readonly record struct TextVisualInfo(PaintColor DrawColor, float FontSize, UIFontStyle Style);
+    public readonly record struct TextLineSection(UIFontTypeData TypeData, float LeftOffset, TextVisualInfo VisualInfo, IndexRange LineRange, IndexRange TextRange);
+    public readonly record struct TextVisualInfo(PaintColor DrawColor, float FontSize, UIFontTypeData TypeData);
 
-    public record struct MutableTextVisualInfo(PaintColor DrawColor, float FontSize, UIFontStyle Style)
+    public record struct MutableTextVisualInfo(PaintColor DrawColor, float FontSize, UIFontTypeData TypeData)
     {
         public static implicit operator MutableTextVisualInfo(TextVisualInfo info) => Unsafe.ReadUnaligned<MutableTextVisualInfo>(ref Unsafe.As<TextVisualInfo, byte>(ref info));
         public static implicit operator TextVisualInfo(MutableTextVisualInfo info)

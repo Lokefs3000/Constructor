@@ -2,6 +2,7 @@
 
 namespace Primary.Components
 {
+    [Component, DontSerializeComponent]
     [InspectorHidden]
     public record struct EntityEnabled : IComponent
     {

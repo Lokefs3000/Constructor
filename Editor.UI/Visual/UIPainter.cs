@@ -7,7 +7,8 @@ using Editor.UI.Text;
 using Primary.Assets;
 using Primary.Common;
 using Primary.Common.Memory;
-using Primary.RHI2;
+using Primary.Mathematics;
+using Primary.RHI;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -173,14 +174,14 @@ namespace Editor.UI.Visual
                 _currentSegment.BlendMode = UIBlendMode.Undefined;
         }
 
-        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdPointsData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, data));
-        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdLinesData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, data));
-        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdRectData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, data));
-        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdRoundedRectData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, data));
-        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdCircleData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, data));
-        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdTriangleData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, data));
-        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdImageData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, data));
-        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdTextData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, data));
+        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdPointsData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, (uint)_cmds.Count, data));
+        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdLinesData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, (uint)_cmds.Count, data));
+        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdRectData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, (uint)_cmds.Count, data));
+        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdRoundedRectData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, (uint)_cmds.Count, data));
+        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdCircleData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, (uint)_cmds.Count, data));
+        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdTriangleData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, (uint)_cmds.Count, data));
+        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdImageData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, (uint)_cmds.Count, data));
+        internal void AddCmd(ushort zIndex, ushort objectIndex, CmdTextData data) => _cmds.Add(new PaintCmd(zIndex, objectIndex, (uint)_cmds.Count, data));
 
         internal int GetObjectIndex(object obj) => _storedObjects.AddOrGet(obj);
         
@@ -197,7 +198,7 @@ namespace Editor.UI.Visual
 
         internal DataIdentifier<object> StoredObjects => _storedObjects;
 
-        internal record struct MutableSegment(int BaseCommandIndex, int MatrixId = int.MinValue, int ClipId = int.MinValue, UIBlendMode BlendMode = UIBlendMode.Undefined)
+        internal record struct MutableSegment(int BaseCommandIndex, int MatrixId = -1, int ClipId = -1, UIBlendMode BlendMode = UIBlendMode.Undefined)
         {
             public static implicit operator PaintDrawSegment(MutableSegment segment) => new PaintDrawSegment(segment.BaseCommandIndex, segment.MatrixId, segment.ClipId, segment.BlendMode);
         }
@@ -265,22 +266,63 @@ namespace Editor.UI.Visual
             int imageIdx = Painter.GetObjectIndex(image);
             Painter.AddCmd(ZIndex, ObjectIndex, new CmdImageData(rect, paint.ToRaw(Painter), uvMin, uvMax, imageIdx));
         }
-        public void DrawText(Vector2 position, UIPaint paint, TextBuilder builder, UIFontStyle fontStyle, float fontSize, ReadOnlySpan<char> text)
+        public void DrawText(Vector2 position, UIPaint paint, TextBuilder builder, UIFontTypeData? typeData, float fontSize, ReadOnlySpan<char> text)
         {
+            if (typeData == null || text.IsEmpty)
+                return;
+
             TextManager textManager = UIManager.Instance.TextManager;
 
             RawPaintData paintData = paint.ToRaw(Painter);
             RawTextBuilderData builderData = builder.ToRaw();
 
-            TextVisualInfo visualInfo = new TextVisualInfo(paintData.Color, fontSize, fontStyle);
-            TextWrapInfo wrapInfo = new TextWrapInfo(builderData.MaxExtents, visualInfo);
+            TextVisualInfo visualInfo = new TextVisualInfo(paintData.Color, fontSize, typeData);
+            TextWrapInfo wrapInfo = new TextWrapInfo(builderData.Origin, builderData.MaxExtents, builderData.AllowRichText, visualInfo);
+
+            int textDataIdx = Painter.GetObjectIndex(textManager.ShapeTextDeferred(wrapInfo, builderData.Overflow, text));
+
+            Painter.AddCmd(ZIndex, ObjectIndex, new CmdTextData(position, paintData, builderData, textDataIdx));
+        }
+        public void DrawText<T>(Vector2 position, UIPaint paint, TextBuilder builder, UIFontTypeData? typeData, float fontSize, T text) where T : IJaggedString
+        {
+            if (typeData == null)
+                return;
+
+            TextManager textManager = UIManager.Instance.TextManager;
+
+            RawPaintData paintData = paint.ToRaw(Painter);
+            RawTextBuilderData builderData = builder.ToRaw();
+
+            TextVisualInfo visualInfo = new TextVisualInfo(paintData.Color, fontSize, typeData);
+            TextWrapInfo wrapInfo = new TextWrapInfo(builderData.Origin, builderData.MaxExtents, builderData.AllowRichText, visualInfo);
 
             int textDataIdx = Painter.GetObjectIndex(textManager.ShapeTextDeferred(wrapInfo, builderData.Overflow, text));
 
             Painter.AddCmd(ZIndex, ObjectIndex, new CmdTextData(position, paintData, builderData, textDataIdx));
         }
 
-        //Extended helper api
+        // Output modification
+        public void PushClippingRect(Boundaries boundaries)
+        {
+            Painter.PushClipRect(boundaries, true);
+        }
+
+        public void PopClippingRect()
+        {
+            Painter.PopClipRect();
+        }
+
+        public void PushMatrix(Matrix3x2 matrix)
+        {
+            Painter.PushMatrix(matrix, true);
+        }
+
+        public void PopMatrix()
+        {
+            Painter.PopMatrix();
+        }
+
+        // Extended helper api
         public void DrawPoint(Vector2 position, UIPaint paint)
         {
             Ptr<Vector2> ptr = Painter.AllocateTemporary<Vector2>();
@@ -311,6 +353,11 @@ namespace Editor.UI.Visual
         {
             int imageIdx = Painter.GetObjectIndex(image);
             Painter.AddCmd(ZIndex, ObjectIndex, new CmdImageData(rect, paint.ToRaw(Painter), Vector2.Zero, Vector2.One, imageIdx));
+        }
+        public void DrawImage(Boundaries rect, UIPaint paint, Sprite image)
+        {
+            int imageIdx = Painter.GetObjectIndex(image.Texture);
+            Painter.AddCmd(ZIndex, ObjectIndex, new CmdImageData(rect, paint.ToRaw(Painter), image.UVMin, image.UVMax, imageIdx));
         }
     }
 
@@ -358,5 +405,11 @@ namespace Editor.UI.Visual
 
         None = 0,
         All = TopLeft | TopRight | BottomLeft | BottomRight
+    }
+
+    public enum TextOrigin : byte
+    {
+        Top = 0,
+        Bottom
     }
 }

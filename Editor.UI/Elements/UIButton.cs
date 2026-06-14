@@ -8,8 +8,7 @@ using System.Text;
 
 namespace Editor.UI.Elements
 {
-    [UIElementPrettyName("Button")]
-    [UIElementStates("Normal", "Hovered", "Pressed")]
+    [UIElementPrettyName("Button"), StyleableStates("Normal", "Hovered", "Pressed")]
     public class UIButton : UIFrame
     {
         public UIButton()
@@ -17,15 +16,25 @@ namespace Editor.UI.Elements
 
         }
 
-        public override void HandleEvent(HostInteractionManager interaction, ref readonly UIEvent @event)
+        public UIButton(UIElement parent) : base()
+        {
+            SetParent(parent);
+        }
+
+        public override void HandleEvent(ref readonly UIEvent @event)
         {
             switch (@event.Type)
             {
                 case UIEventType.MouseEnter: SetState("Hovered", true); break;
                 case UIEventType.MouseLeave: SetState("Hovered", false); break;
-                case UIEventType.MouseActivate: SetState("Pressed", true); break;
-                case UIEventType.MouseDeactivate: SetState("Pressed", false); break;
+                case UIEventType.MouseDown: SetState("Pressed", true); break;
+                case UIEventType.MouseUp: SetState("Pressed", false); break;
+                case UIEventType.MouseActivate: OnPressed?.Invoke(); break;
             }
         }
+
+        #region Events
+        public event Action? OnPressed;
+        #endregion
     }
 }

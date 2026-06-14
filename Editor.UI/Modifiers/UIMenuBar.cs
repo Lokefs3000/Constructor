@@ -11,31 +11,22 @@ using TerraFX.Interop.Windows;
 
 namespace Editor.UI.Modifiers
 {
-    public sealed class UIMenuBar : IUILayoutModifier
+    public sealed class UIMenuBar : BaseLayoutModifier
     {
-        private readonly UIElement _element;
-
         private UIColor _fillColor;
         private UIColor _strokeColor;
 
         private float _strokeWeight;
 
-        public UIMenuBar(UIElement element)
+        public UIMenuBar(UIElement element) : base(element)
         {
-            _element = element;
-
             _fillColor = Color.White;
             _strokeColor = new Color(0.5f);
 
             _strokeWeight = 1.0f;
         }
 
-        public void MeasureSize(UIMeasureContext context)
-        {
-            //not implemented
-        }
-
-        public void ModifyElement(UILayoutContext context)
+        public override void ModifyLayout(UILayoutContext context)
         {
             float height = MenuBarHeight + _strokeWeight;
             foreach (UIElement element in _element.Children)
@@ -45,11 +36,6 @@ namespace Editor.UI.Modifiers
             }
 
             context.Measurements.MarkAsOutdated();
-        }
-
-        public void DrawVisual(UIPainterContext painter)
-        {
-            
         }
 
         public UIColor FillColor { get => _fillColor; set { _fillColor = value; _element.AddStateFlags(UIStateFlags.InvalidVisual); } }

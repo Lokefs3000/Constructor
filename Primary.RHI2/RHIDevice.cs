@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace Primary.RHI2
+namespace Primary.RHI
 {
     public unsafe abstract class RHIDevice : IDisposable, IAsNativeObject<RHIDeviceNative>
     {

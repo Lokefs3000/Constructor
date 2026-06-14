@@ -1,4 +1,5 @@
 ﻿using Editor.UI.Elements;
+using Editor.UI.Modifiers;
 using Primary.Common;
 using Primary.Profiling;
 using System;
@@ -22,15 +23,20 @@ namespace Editor.UI.Styling
             {
                 using (new ProfilingScope(profilingName ?? "UpdateStyles"))
                 {
-                    using RentedArray<(UIElement, UIStateFlags)> flags = RentedArray<(UIElement, UIStateFlags)>.Rent(_invalidStyleBases.Count, true);
+                    using RentedArray<(StyleBase, UIStateFlags)> flags = RentedArray<(StyleBase, UIStateFlags)>.Rent(_invalidStyleBases.Count, true);
 
-                    (UIElement, UIStateFlags)[] internalArray = flags.BackingArray;
-                    Parallel.ForEach(_invalidStyleBases, (x, _, i) => internalArray[i] = ((UIElement)x, x.UpdateInvalidProperties()));
+                    (StyleBase, UIStateFlags)[] internalArray = flags.BackingArray;
+                    Parallel.ForEach(_invalidStyleBases, (x, _, i) => internalArray[i] = (x, x.UpdateInvalidProperties()));
 
-                    foreach ((UIElement element, UIStateFlags state) in flags.Span)
+                    foreach ((StyleBase styleBase, UIStateFlags state) in flags.Span)
                     {
                         if (state > UIStateFlags.None)
-                            element.AddStateFlags(state);
+                        {
+                            if (styleBase is UIElement element)
+                                element.AddStateFlags(state);
+                            else if (styleBase is IUILayoutModifier modifier)
+                                modifier.Owner.AddStateFlags(state);
+                        }
                     }
 
                     _invalidStyleBases.Clear();

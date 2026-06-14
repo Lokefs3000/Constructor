@@ -57,7 +57,7 @@ namespace Primary.Assets.Loaders
 #else
             catch (Exception ex)
             {
-                materialData.UpdateAssetFailed(material);
+                effectVolumeData.UpdateAssetFailed(effectVolume);
                 EngLog.Assets.Error(ex, "Failed to load effect volume: {name}", sourcePath);
             }
 #endif

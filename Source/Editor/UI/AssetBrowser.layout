@@ -1,19 +1,15 @@
-<Root>
-    <Frame Size="0,1.0,25,0.0" Fill="85,85,85,255">
-        <Element Size="0,1.0,-1,0.0">
-            <TextBox Position="0,0.5,2,0.0" Size="0,0.5,-4,1.0" Anchor="0.5,0.0" Fill="25,25,25,255" Stroke="15,15,15,255" StrokeWeight="1.0" StrokePosition="Outside" Id="SearchBar" />
-        </Element>
-        <Frame Position="0,0.0,-1,1.0" Size="0,1.0,1,0.0" Fill="15,15,15,255" />
-    </Frame>
-    <SplitContainer Position="0,0.0,25,0.0" Size="0,1.0,-25,1.0" Fill="15,15,15,255">
-        <SplitPanel Position="0.15" Fill="45,45,45,255">
-            <TreeView Size="0,1.0,0,1.0" Id="FileTreeView" /> 
-        </SplitPanel>
-        <SplitPanel Position="1.0" Fill="45,45,45,255">
-            <modMenuBar Id="FilePathMenuBar" />
-            <Element Size="0,1.0,0,1.0" Id="FileGridView">
-                <modGridLayout Padding="8,0,8,0" />
-            </Element>
-        </SplitPanel>
-    </SplitContainer>
-</Root>
+<?xml version="1.0" encoding="UTF-8"?>
+<Layout>
+	<Stylesheet Path="Editor/UI/Default.style" />
+
+	<Window>
+		<SplitContainer Position="0.0 0 0.0 28" Size="1.0 0 1.0 -28">
+			<SplitPanel Position="0.15" Direction="Vertical">
+				
+			</SplitPanel>
+			<SplitPanel ClipDescendents="True" Position="1.0" Direction="Vertical">
+				
+			</SplitPanel>
+		</SplitContainer>
+	</Window>
+</Layout>

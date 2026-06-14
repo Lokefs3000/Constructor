@@ -24,9 +24,33 @@ struct ImageMetrics
 
 #pragma pack(pop)
 
+static const char* CopyMessageWithTerminator(const char* reason)
+{
+	if (reason != nullptr)
+	{
+		size_t len = strlen(reason);
+		if (len > 0)
+		{
+			bool endsWithTerminator = reason[len - 1] == '\0';
+			char* newString = (char*)malloc(len + (endsWithTerminator ? 0 : 1));
+
+			if (newString == nullptr)
+				return nullptr;
+
+			memcpy(newString, reason, len);
+			if (!endsWithTerminator)
+				newString[len] = '\0';
+
+			return newString;
+		}
+	}
+
+	return nullptr;
+}
+
 extern "C"
 {
-	__declspec(dllexport) bool LoadPNG(ImageLoadData* imageData, ImageBitmap* output)
+	__declspec(dllexport) bool LoadPNG(ImageLoadData* imageData, ImageBitmap* output, const char** errorOutput)
 	{
 		/*
 		if (dataLength < 8 || !png_sig_cmp(data, 0, 8))
@@ -60,6 +84,7 @@ extern "C"
 		stbi_uc* pixels = stbi_load_from_memory(imageData->Data, imageData->Length, &w, &h, &ch, 0);
 		if (pixels == nullptr)
 		{
+			*errorOutput = CopyMessageWithTerminator(stbi_failure_reason());
 			return false;
 		}
 
@@ -75,11 +100,18 @@ extern "C"
 		stbi_image_free(bitmap->Pixels);
 	}
 
-	__declspec(dllexport) bool QueryPNG(ImageLoadData* imageData, ImageMetrics* metrics)
+	__declspec(dllexport) void FreePNGError(const char* errorOutput)
+	{
+		if (errorOutput != nullptr)
+			free((void*)errorOutput);
+	}
+
+	__declspec(dllexport) bool QueryPNG(ImageLoadData* imageData, ImageMetrics* metrics, const char** errorOutput)
 	{
 		int w, h, ch;
 		if (stbi_info_from_memory(imageData->Data, imageData->Length, &w, &h, &ch) == 0)
 		{
+			*errorOutput = CopyMessageWithTerminator(stbi_failure_reason());
 			return false;
 		}
 
@@ -89,12 +121,13 @@ extern "C"
 		return true;
 	}
 
-	__declspec(dllexport) bool LoadJPEG(ImageLoadData* imageData, ImageBitmap* output)
+	__declspec(dllexport) bool LoadJPEG(ImageLoadData* imageData, ImageBitmap* output, const char** errorOutput)
 	{
 		tjhandle tj = tj3Init(TJINIT_DECOMPRESS);
 
-		if (tj3DecompressHeader(tj, imageData->Data, imageData->Length) < 1)
+		if (tj3DecompressHeader(tj, imageData->Data, imageData->Length) < 0)
 		{
+			*errorOutput = CopyMessageWithTerminator(tj3GetErrorStr(tj));
 			tj3Destroy(tj);
 			return false;
 		}
@@ -116,6 +149,7 @@ extern "C"
 
 		if (tj3Decompress8(tj, imageData->Data, imageData->Length, outBuf, 0, pixelFormat) < 0)
 		{
+			*errorOutput = CopyMessageWithTerminator(tj3GetErrorStr(tj));
 			tj3Destroy(tj);
 			return false;
 		}
@@ -134,12 +168,19 @@ extern "C"
 		tj3Free(bitmap->Pixels);
 	}
 
-	__declspec(dllexport) bool QueryJPEG(ImageLoadData* imageData, ImageMetrics* metrics)
+	__declspec(dllexport) void FreeJPEGError(const char* errorOutput)
+	{
+		if (errorOutput != nullptr)
+			free((void*)errorOutput);
+	}
+
+	__declspec(dllexport) bool QueryJPEG(ImageLoadData* imageData, ImageMetrics* metrics, const char** errorOutput)
 	{
 		tjhandle tj = tj3Init(TJINIT_DECOMPRESS);
 
-		if (tj3DecompressHeader(tj, imageData->Data, imageData->Length) < 1)
+		if (tj3DecompressHeader(tj, imageData->Data, imageData->Length) < 0)
 		{
+			*errorOutput = CopyMessageWithTerminator(tj3GetErrorStr(tj));
 			tj3Destroy(tj);
 			return false;
 		}

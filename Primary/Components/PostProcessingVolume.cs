@@ -2,6 +2,7 @@
 
 namespace Primary.Components
 {
+    [Component]
     public struct PostProcessingVolume : IComponent
     {
         public VolumeBoundaries Boundaries;

@@ -42,7 +42,7 @@
         public bool HasSelfReference => _hasSelfRef;
     }
 
-    [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public sealed class DontSerializeComponentAttribute : Attribute
     {
 
@@ -59,5 +59,11 @@
         }
 
         public Type[] ComponentTypes => _components;
+    }
+
+    [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+    public sealed class ComponentAttribute : Attribute
+    {
+
     }
 }

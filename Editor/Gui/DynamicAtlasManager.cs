@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
 using Primary.Common;
-using Primary.RHI2;
+using Primary.RHI;
 using StbImageSharp;
 using System.Collections.Concurrent;
 using System.Numerics;

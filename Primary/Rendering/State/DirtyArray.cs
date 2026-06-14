@@ -22,8 +22,8 @@ namespace Primary.Rendering.State
 
             _changed = 0;
 
-            Array.Fill(_previous, default);
-            Array.Fill(_value, default);
+            Array.Fill(_previous, value);
+            Array.Fill(_value, value);
         }
 
         public void Fill(T value, bool makeInternalDataDirty)

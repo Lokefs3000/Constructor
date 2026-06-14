@@ -2,7 +2,7 @@ primitive_topology = "Triangle"
 
 [rasterizer]
 fill_mode = "Solid"
-cull_mode = "None"
+cull_mode = "Back"
 front_counter_clockwise = false
 depth_bias = 0
 depth_bias_clamp = 0.0

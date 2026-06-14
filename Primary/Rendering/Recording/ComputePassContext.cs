@@ -11,31 +11,32 @@ namespace Primary.Rendering.Recording
         private readonly RenderPassErrorReporter _errorReporter;
         private readonly LinearBlockAllocator _intermediateAllocator;
         private readonly FrameGraphResources _resources;
-        private readonly RenderContextContainer _contextContainer;
         private readonly ComputeState _state;
 
         private RenderPassStateData? _stateData;
         private CommandRecorder? _recorder;
+        private RenderContextContainer? _contextContainer;
 
-        internal ComputePassContext(RenderPassErrorReporter errorReporter, LinearBlockAllocator intermediateAllocator, FrameGraphResources resources, RenderContextContainer contextContainer, ComputeState state)
+        internal ComputePassContext(RenderPassErrorReporter errorReporter, LinearBlockAllocator intermediateAllocator, FrameGraphResources resources, ComputeState state)
         {
             _errorReporter = errorReporter;
             _intermediateAllocator = intermediateAllocator;
             _resources = resources;
-            _contextContainer = contextContainer;
             _state = state;
 
             _stateData = null;
             _recorder = null;
+            _contextContainer = null;
         }
 
-        internal void SetupContext(RenderPassStateData stateData, CommandRecorder recorder)
+        internal void SetupContext(RenderPassStateData stateData, CommandRecorder recorder, RenderContextContainer contextContainer)
         {
             _stateData = stateData;
             _recorder = recorder;
+            _contextContainer = contextContainer;
         }
 
-        public ComputeCommandBuffer CommandBuffer => new ComputeCommandBuffer(new CSCommandBuffer(_errorReporter, _stateData, _recorder, _intermediateAllocator, _resources, _state));
-        public RenderContextContainer Container => _contextContainer;
+        public ComputeCommandBuffer CommandBuffer => new ComputeCommandBuffer(new CSCommandBuffer(_errorReporter, _stateData!, _recorder!, _intermediateAllocator, _resources, _state));
+        public RenderContextContainer Container => _contextContainer!;
     }
 }

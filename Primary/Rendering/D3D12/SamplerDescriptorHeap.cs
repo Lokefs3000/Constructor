@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Common;
-using Primary.RHI2;
-using Primary.RHI2.Direct3D12;
+using Primary.RHI;
+using Primary.RHI.Direct3D12;
 using Primary.Utility;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;

@@ -1,5 +1,5 @@
 ﻿using Editor.Components;
-using Primary.Scenes;
+using Primary.Scenes.Components;
 
 namespace Primary.Components
 {
@@ -7,10 +7,11 @@ namespace Primary.Components
     {
         public static void RegisterDefault()
         {
-            SceneEntityManager.Register<GeoSceneComponent>();
-            SceneEntityManager.Register<GeoSceneGeneratedTag>();
+            SceneEntityManager.Instance.RegisterComponent<GeoSceneComponent>();
+            SceneEntityManager.Instance.RegisterComponent<GeoSceneGeneratedTag>();
+            SceneEntityManager.Instance.RegisterComponent<GizmoTriangleComponent>();
 
-            SceneEntityManager.BuildRequirementHierchies();
+            SceneEntityManager.Instance.RebuildDependencyGraph();
         }
     }
 }

@@ -75,7 +75,7 @@ namespace Editor.UI.Assets
 
             if (!alreadyExits)
             {
-                value = new StylesheetClass();
+                value = new StylesheetClass(false);
                 _classes.Add(className, value);
             }
 

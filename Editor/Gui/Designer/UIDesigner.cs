@@ -1,5 +1,5 @@
 ﻿using Editor.Gui.Designer;
-using System.Diagnostics.CodeAnalysis;
+using Editor.UI.Elements;
 
 namespace Editor.UI.Designer
 {
@@ -9,9 +9,13 @@ namespace Editor.UI.Designer
         private CanvasManager _canvasManager;
         private ToolboxManager _toolboxManager;
 
+        private UIElement? _activeElement;
+
         public UIDesigner(int uniqueWindowId) : base(uniqueWindowId)
         {
             WindowTitle = "UI designer";
+
+            _activeElement = null;
         }
 
         protected override void InitializePostLoad()
@@ -27,6 +31,8 @@ namespace Editor.UI.Designer
         {
             _hierchyManager.ClearView();
             _canvasManager.ClearView();
+
+            _activeElement = null;
         }
 
         internal HierchyManager HierchyManager => _hierchyManager;

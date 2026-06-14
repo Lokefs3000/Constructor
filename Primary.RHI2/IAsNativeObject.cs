@@ -1,4 +1,4 @@
-﻿namespace Primary.RHI2
+﻿namespace Primary.RHI
 {
     public unsafe interface IAsNativeObject<T> where T : unmanaged
     {

@@ -51,7 +51,7 @@ namespace Editor.UI.Text
                     line.LineOffset,
                     section.LeftOffset,
                     line.LineSize,
-                    section.FontStyle,
+                    section.TypeData,
                     section.VisualInfo,
                     _textData.Letters.Slice(textRange.Start, textRange.Length));
 
@@ -92,16 +92,16 @@ namespace Editor.UI.Text
         public readonly float LineOffset;
         public readonly float LeftOffset;
         public readonly Vector2 TextSize;
-        public readonly UIFontStyle FontStyle;
+        public readonly UIFontTypeData TypeData;
         public readonly TextVisualInfo VisualInfo;
         public readonly ReadOnlySpan<char> Letters;
 
-        public TextRenderSegment(float lineOffset, float leftOffset, Vector2 textSize, UIFontStyle fontStyle, TextVisualInfo visualInfo, ReadOnlySpan<char> letters)
+        public TextRenderSegment(float lineOffset, float leftOffset, Vector2 textSize, UIFontTypeData typeData, TextVisualInfo visualInfo, ReadOnlySpan<char> letters)
         {
             LineOffset = lineOffset;
             LeftOffset = leftOffset;
             TextSize = textSize;
-            FontStyle = fontStyle;
+            TypeData = typeData;
             VisualInfo = visualInfo;
             Letters = letters;
         }

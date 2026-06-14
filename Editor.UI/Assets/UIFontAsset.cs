@@ -1,15 +1,19 @@
-﻿using CommunityToolkit.HighPerformance;
+﻿using CommunityToolkit.Diagnostics;
+using CommunityToolkit.HighPerformance;
 using Editor.Interop.Ed;
+using Editor.UI.Font;
 using Editor.UI.Text;
 using Primary.Assets.Types;
+using Primary.Collections.ReadOnly;
 using Primary.Common;
 using Primary.Mathematics;
-using Primary.RHI2;
+using Primary.RHI;
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -25,170 +29,106 @@ namespace Editor.UI.Assets
         {
         }
 
-        public UIFontStyle? FindStyle(string? styleName)
+        public UIFontTypeData? FindStyle(FontWeight weight = FontWeight.Normal)
         {
-            styleName ??= string.Empty;
-
-            if (AssetData.Styles.TryGetValue(styleName, out UIFontStyle? style))
-                return style;
-
-            return null;
+            if (Status != ResourceStatus.Success)
+                return null;
+            return AssetData.GetFontType(FontStyle.Normal, weight);
         }
 
-        public UIFontStyle? FindStyle(int styleId)
+        public UIFontTypeData? FindStyle(FontStyle style, FontWeight weight = FontWeight.Normal)
         {
-            if (AssetData.IdStyles.TryGetValue(styleId, out UIFontStyle? style))
-                return style;
-
-            return null;
+            if (Status != ResourceStatus.Success)
+                return null;
+            return AssetData.GetFontType(style, weight);
         }
-
-        public IReadOnlyDictionary<string, UIFontStyle> Styles => AssetData.Styles;
 
         public int GlyphSize => AssetData.GlyphSize;
     }
 
     public sealed class UIFontAssetData : BaseInternalAssetData<UIFontAsset>
     {
-        private nint _ft;
-        private nint _fontFace;
-        private nint _fontVars;
+        private byte[] _sourceData;
 
         private int _glyphSize;
 
-        private Ptr<MSDF_ShapedGlyph> _shapedGlyph;
-
-        private int _activeFontStyle;
-
-        private FrozenDictionary<string, UIFontStyle> _styles;
-        private FrozenDictionary<int, UIFontStyle> _idStyles;
-
-        private Lock _lock;
+        private UIFontStyleData[] _styles;
 
         public UIFontAssetData(AssetId id) : base(id)
         {
-            _ft = nint.Zero;
-            _fontFace = nint.Zero;
-            _fontVars = nint.Zero;
+            _sourceData = Array.Empty<byte>();
 
             _glyphSize = 0;
 
-            _shapedGlyph = Ptr<MSDF_ShapedGlyph>.Null;
-
-            _activeFontStyle = 0;
-
-            _styles = FrozenDictionary<string, UIFontStyle>.Empty;
-            _idStyles = FrozenDictionary<int, UIFontStyle>.Empty;
-
-            _lock = new Lock();
+            _styles = [];
         }
 
         public unsafe override void Dispose()
         {
-            foreach (var kvp in _styles)
-                kvp.Value.Dispose();
-
-            if (!_shapedGlyph.IsNull)
-                EdInterop.MSDF_DestroyShapedGlyph(_shapedGlyph.Pointer);
-
-            if (_ft != nint.Zero && _fontVars != nint.Zero)
-                EdInterop.MSDF_DestroyVarData(_ft, _fontVars);
-            if (_fontFace != nint.Zero)
-                EdInterop.MSDF_DestroyFont((MSDF_FontFace*)_fontFace);
-            if (_ft != nint.Zero)
-                EdInterop.MSDF_ShutdownFt(_ft);
-
-            _styles = FrozenDictionary<string, UIFontStyle>.Empty;
-            _idStyles = FrozenDictionary<int, UIFontStyle>.Empty;
-
-            _activeFontStyle = -1;
-
-            _shapedGlyph = null;
-
-            _fontVars = nint.Zero;
-            _fontFace = nint.Zero;
-            _ft = nint.Zero;
+            foreach (UIFontStyleData styleData in _styles)
+            {
+                foreach (UIFontTypeData fontType in styleData.Weights)
+                {
+                    fontType.Dispose();
+                }
+            }
 
             base.Dispose();
         }
 
-        public void UpdateAssetData(UIFontAsset asset, nint ft, nint fontFace, nint fontVars, int glyphSize, Ptr<MSDF_ShapedGlyph> shapedGlyph, FrozenDictionary<string, UIFontStyle> styles)
+        public void UpdateAssetData(UIFontAsset asset, byte[] sourceData, int glyphSize, UIFontStyleData[] styles)
         {
             base.UpdateAssetData(asset);
 
-            _ft = ft;
-            _fontFace = fontFace;
-            _fontVars = fontVars;
+            _sourceData = sourceData;
 
             _glyphSize = glyphSize;
 
-            _shapedGlyph = shapedGlyph;
-
-            _activeFontStyle = 0;
-
             _styles = styles;
-            _idStyles = styles.Select((x) => new KeyValuePair<int, UIFontStyle>(x.Key.GetDjb2HashCode(), x.Value)).ToFrozenDictionary();
         }
 
-        internal unsafe UIShapedGlyph? ShapeNewGlyph(UIFontStyle style, char c)
-        {
-            if (_activeFontStyle != style.Index)
-            {
-                MSDF_VarFontStyle varFontStyle = default;
-                nint fontStyleRaw = EdInterop.MSDF_GetVarFontStyle((MSDF_FontFace*)_fontFace, _fontVars, (uint)style.Index, &varFontStyle);
+        public ImmutableArray<UIFontTypeData> GetFontTypes(FontStyle style) => _styles[(int)style].Weights;
+        public UIFontTypeData GetFontType(FontStyle style, FontWeight weight) => _styles[(int)style].GetFontType(weight);
 
-                EdInterop.MSDF_SetFontStyle((MSDF_FontFace*)_fontFace, (uint)style.Index, fontStyleRaw);
-                _activeFontStyle = style.Index;
-            }
-
-            MSDF_ShapedGlyph* shapedGlyph = _shapedGlyph.Pointer;
-            if (EdInterop.MSDF_ShapeGlyph((MSDF_FontFace*)_fontFace, (uint)c, shapedGlyph))
-            {
-                MSDF_RenderBox box;
-                EdInterop.MSDF_CalculateBox(shapedGlyph, _glyphSize, 2.0, 1.0, 0, 0, &box);
-
-                _shapedGlyph = EdInterop.MSDF_CreateShapedGlyph();
-
-                return new UIShapedGlyph(c, shapedGlyph, box, (float)shapedGlyph->Advance);
-            }
-
-            return null;
-        }
-
-        internal unsafe void SetShapingFontStyle(UIFontStyle style)
-        {
-            if (_activeFontStyle != style.Index)
-            {
-                MSDF_VarFontStyle varFontStyle = default;
-                nint fontStyleRaw = EdInterop.MSDF_GetVarFontStyle((MSDF_FontFace*)_fontFace, _fontVars, (uint)style.Index, &varFontStyle);
-
-                EdInterop.MSDF_SetFontStyle((MSDF_FontFace*)_fontFace, (uint)style.Index, fontStyleRaw);
-                _activeFontStyle = style.Index;
-            }
-        }
-
-        internal nint Ft => _ft;
-        internal nint Face => _fontFace;
-        internal nint Vars => _fontVars;
+        public ReadOnlySpan<byte> SourceData => _sourceData;
 
         public int GlyphSize => _glyphSize;
-
-        public IReadOnlyDictionary<string, UIFontStyle> Styles => _styles;
-        public IReadOnlyDictionary<int, UIFontStyle> IdStyles => _idStyles;
-
-        internal Lock Lock => _lock;
     }
 
-    public sealed class UIFontStyle : IDisposable
+    public sealed class UIFontStyleData
+    {
+        private readonly ImmutableArray<UIFontTypeData> _weights;
+
+        internal UIFontStyleData(ImmutableArray<UIFontTypeData> weights)
+        {
+            _weights = weights;
+        }
+
+        public UIFontTypeData GetFontType(FontWeight weight) => _weights[(int)weight];
+        public UIFontTypeData GetFontType(int weight)
+        {
+            weight = weight / 100 - 1;
+            Guard.IsInRange(weight, (int)FontWeight._100, (int)FontWeight._900);
+            return _weights[weight];
+        }
+
+        public ImmutableArray<UIFontTypeData> Weights => _weights;
+    }
+
+    public sealed class UIFontTypeData : IDisposable
     {
         private readonly UIFontAsset _assetDef;
         private readonly UIFontAssetData _assetData;
 
-        private string _styleName;
-        private int _index;
+        private readonly FontStyle _style;
+        private readonly FontWeight _weight;
 
-        private FontStyleAdvances _advances;
-        private FontStyleMetrics _metrics;
+        private readonly FrozenDictionary<char, int> _codepoints;
+
+        private readonly FontStyleAdvances _advances;
+        private readonly FontStyleMetrics _metrics;
+
+        private readonly Lock _lock;
 
         private List<UIGlyphData> _data;
 
@@ -198,20 +138,26 @@ namespace Editor.UI.Assets
         private Vector2 _atlasSize;
         private RHITexture? _atlasTexture;
 
+        private GlyphCache _glyphCache;
+
         private Queue<UIShapedGlyph> _unrenderedGlyphs;
 
         private bool _disposedValue;
 
-        public UIFontStyle(UIFontAsset asset, UIFontAssetData assetData, string styleName, int index, FontStyleAdvances advances, FontStyleMetrics metrics)
+        public UIFontTypeData(UIFontAsset asset, UIFontAssetData assetData, FontStyle style, FontWeight weight, FrozenDictionary<char, int> codepoints, FontStyleAdvances advances, FontStyleMetrics metrics)
         {
             _assetDef = asset;
             _assetData = assetData;
 
-            _styleName = styleName;
-            _index = index;
+            _style = style;
+            _weight = weight;
+
+            _codepoints = codepoints;
 
             _advances = advances;
             _metrics = metrics;
+
+            _lock = new Lock();
 
             _data = new List<UIGlyphData>();
 
@@ -220,6 +166,8 @@ namespace Editor.UI.Assets
 
             _atlasSize = Vector2.Zero;
             _atlasTexture = null;
+
+            _glyphCache = new GlyphCache(assetData.Id, style, weight);
 
             _unrenderedGlyphs = new Queue<UIShapedGlyph>();
         }
@@ -230,6 +178,8 @@ namespace Editor.UI.Assets
             {
                 if (disposing)
                 {
+                    _glyphCache.Dispose();
+
                     _atlasTexture?.Dispose();
                     _atlasTexture = null;
                 }
@@ -255,7 +205,7 @@ namespace Editor.UI.Assets
             if (_glyphs.TryGetValue(c, out UIGlyph glyph))
                 return glyph;
 
-            lock (_assetData.Lock)
+            lock (_lock)
             {
                 glyph = GenerateNewGlyph(c);
             }
@@ -264,9 +214,27 @@ namespace Editor.UI.Assets
             return glyph;
         }
 
+        private unsafe UIShapedGlyph? ShapeNewGlyph(char c)
+        {
+            if (_codepoints.TryGetValue(c, out int offset))
+            {
+                fixed (byte* ptr = _assetData.SourceData)
+                {
+                    MSDF_ShapedGlyph* shapedGlyph = EdInterop.MSDF_DeserializeShapedGlyph(ptr + offset, _metrics.UnitsPerEM);
+
+                    MSDF_RenderBox box;
+                    EdInterop.MSDF_CalculateBox(shapedGlyph, _assetData.GlyphSize, 2.0, 1.0, 0, 0, &box);
+
+                    return new UIShapedGlyph(c, shapedGlyph, box, (float)shapedGlyph->Advance);
+                }
+            }
+
+            return null;
+        }
+
         private UIGlyph GenerateNewGlyph(char c)
         {
-            UIShapedGlyph? metricsNullable = _assetData.ShapeNewGlyph(this, c);
+            UIShapedGlyph? metricsNullable = ShapeNewGlyph(c);
             if (!metricsNullable.HasValue)
             {
                 if (c == unchecked((char)-1))
@@ -323,8 +291,8 @@ namespace Editor.UI.Assets
         public UIFontAsset Font => _assetDef;
         internal UIFontAssetData FontData => _assetData;
 
-        public string StyleName => _styleName;
-        public int Index => _index;
+        public FontStyle Style => _style;
+        public FontWeight Weight => _weight;
 
         public FontStyleAdvances Advances => _advances;
         public FontStyleMetrics Metrics => _metrics;
@@ -334,13 +302,39 @@ namespace Editor.UI.Assets
         internal Vector2 AtlasSize { get => _atlasSize; set => _atlasSize = value; }
         internal RHITexture? AtlasTexture { get => _atlasTexture; set => _atlasTexture = value; }
 
+        internal GlyphCache GlyphCache => _glyphCache;
+
         internal Queue<UIShapedGlyph> UnrenderedGlyphs => _unrenderedGlyphs;
     }
 
     public readonly record struct FontStyleAdvances(float Space, float Tab);
-    public readonly record struct FontStyleMetrics(float Ascender, float Descender, float LineHeight, float UnderlineY, float Height);
+    public readonly record struct FontStyleMetrics(double UnitsPerEM, float Ascender, float Descender, float LineHeight, float UnderlineY, float Height);
 
     public readonly record struct UIGlyph(Vector4 PlaneBounds, Vector2 Size, Vector4 AtlasUVs, float Advance);
+
+    public enum FontStyle : byte
+    {
+        Normal,
+        Italic
+    }
+
+    public enum FontWeight : byte
+    {
+        _100 = 0,
+        _200,
+        _300,
+        _400,
+        _500,
+        _600,
+        _700,
+        _800,
+        _900,
+
+        Lighter = _300,
+        Normal = _400,
+        Bold = _700,
+        Bolder = _800
+    }
 
     internal struct UIGlyphSpace
     {

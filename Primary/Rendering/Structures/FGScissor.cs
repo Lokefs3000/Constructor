@@ -10,15 +10,17 @@ namespace Primary.Rendering.Structures
 
         public bool Equals(FGRect other)
         {
-            return Vector128.EqualsAll(AsVector128(ref this), AsVector128(ref other));
+            return Vector128.EqualsAll(AsVector128(), other.AsVector128());
         }
 
-        private static Vector128<int> AsVector128(ref FGRect rect)
+        public override int GetHashCode()
         {
-            Vector128<int> vector;
-            Unsafe.SkipInit(out vector);
-            Unsafe.WriteUnaligned(ref Unsafe.As<Vector128<int>, byte>(ref vector), rect);
-            return vector;
+            return HashCode.Combine(Left, Top, Right, Bottom);
+        }
+
+        private Vector128<int> AsVector128()
+        {
+            return Unsafe.ReadUnaligned<Vector128<int>>(ref Unsafe.As<FGRect, byte>(ref this));
         }
 
         public static bool Intersects(FGRect a, FGRect b)

@@ -6,7 +6,7 @@ using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.Rendering.State;
 using Primary.Rendering.Structures;
-using Primary.RHI2;
+using Primary.RHI;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Vortice.Mathematics;
@@ -34,8 +34,8 @@ namespace Primary.Rendering.Commands
 
         public void SetProperties(PropertyBlock block)
         {
-            if (block.IsOutOfDate)
-                block.Reload();
+            //if (block.IsOutOfDate)
+            //    block.Reload();
 
             _state.SetPropertyBlock(block);
         }
@@ -83,7 +83,7 @@ namespace Primary.Rendering.Commands
             }
 
             int totalDataSize = Unsafe.SizeOf<T>() * data.Length;
-            if (totalDataSize + desc.Offset > desc.Buffer.Description.Width)
+            if (totalDataSize + desc.Offset > FGResourceUtility.GetWidth(desc.Buffer))
             {
                 _errorReporter.ReportError(RPErrorSource.UploadBuffer, RPErrorType.ResourceTooSmall, desc.Buffer.ToString());
                 return;
@@ -494,6 +494,54 @@ namespace Primary.Rendering.Commands
 
                 BufferOffset = desc.Offset
             });
+        }
+
+        public CommandEventScope BeginEvent(ReadOnlySpan<byte> name, uint? color = null)
+        {
+            int textLength = Math.Min(name.Length, 127);
+
+            _recorder.AddCommand(RecCommandType.BeginEvent, new CmdBeginEvent
+            {
+                Color = color ?? (uint)(name.GetDjb2HashCode() | 0xff000000),
+                TextLength = (byte)textLength
+            });
+
+            _recorder.AddString(name[..textLength]);
+
+            return new CommandEventScope(this);
+        }
+
+        internal void EndEvent()
+        {
+            _recorder.AddBlankCommand(RecCommandType.EndEvent);
+        }
+
+        public void MarkEvent(ReadOnlySpan<byte> name, uint? color = null)
+        {
+            int textLength = Math.Min(name.Length, 127);
+
+            _recorder.AddCommand(RecCommandType.MarkEvent, new CmdBeginEvent
+            {
+                Color = color ?? (uint)(name.GetDjb2HashCode() | 0xff000000),
+                TextLength = (byte)textLength
+            });
+
+            _recorder.AddString(name[..textLength]);
+        }
+    }
+
+    public readonly record struct CommandEventScope : IDisposable
+    {
+        private readonly CommandBuffer _buffer;
+
+        internal CommandEventScope(CommandBuffer buffer)
+        {
+            _buffer = buffer;
+        }
+
+        public void Dispose()
+        {
+            _buffer.EndEvent();
         }
     }
 

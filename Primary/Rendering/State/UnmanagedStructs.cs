@@ -1,9 +1,10 @@
 ﻿using Primary.Assets;
 using Primary.Common;
+using Primary.Rendering.Assets;
 using Primary.Rendering.Commands;
 using Primary.Rendering.Resources;
 using Primary.Rendering.Structures;
-using Primary.RHI2;
+using Primary.RHI;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -120,6 +121,8 @@ namespace Primary.Rendering.State
 
         public int DataOffset;
         public CmdDataResource Resource;
+
+        public PropertyBindIntent Intent;
     }
 
     internal struct CmdSetRawData
@@ -247,7 +250,23 @@ namespace Primary.Rendering.State
 
     internal struct CmdPresentOnWindow
     {
-        public CmdDataResource Texture;
         public uint WindowId;
+    }
+
+    internal struct CmdBeginEvent
+    {
+        public uint Color;
+        public byte TextLength;
+    }
+
+    internal struct CmdEndEvent
+    {
+
+    }
+
+    internal struct CmdMarkEvent
+    {
+        public uint Color;
+        public byte TextLength;
     }
 }

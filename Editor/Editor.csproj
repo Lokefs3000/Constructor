@@ -8,7 +8,7 @@
 		<StartupObject>Editor.Program</StartupObject>
 		<Configurations>Debug;Release;ReleaseWithDebug</Configurations>
 		<AssemblyVersion>0.1.0</AssemblyVersion>
-		<FileVersion>0.1.0b</FileVersion>
+		<FileVersion>0.1.0</FileVersion>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
 		<DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
@@ -86,23 +86,8 @@
 		<Compile Remove="GeoEdit\IGeoTool.cs" />
 		<Compile Remove="GeoEdit\PlaceTool.cs" />
 		<Compile Remove="GeoEdit\Selectables.cs" />
-		<Compile Remove="Inspector\AsmReflectionCache.cs" />
-		<Compile Remove="Inspector\ComponentEditorCache.cs" />
-		<Compile Remove="Inspector\Components\ComponentEditor.cs" />
-		<Compile Remove="Inspector\Components\DefaultComponentEditor.cs" />
-		<Compile Remove="Inspector\Components\GeoSceneEditor.cs" />
-		<Compile Remove="Inspector\Components\LightEditor.cs" />
-		<Compile Remove="Inspector\Editors\DefaultObjectEditor.cs" />
-		<Compile Remove="Inspector\Editors\ObjectEditor.cs" />
-		<Compile Remove="Inspector\Entities\AssetTypeStorage.cs" />
-		<Compile Remove="Inspector\Entities\RenderTypeStorage.cs" />
-		<Compile Remove="Inspector\Entities\ValueStorageBase.cs" />
-		<Compile Remove="Inspector\Entities\ValueTypeStorages.cs" />
-		<Compile Remove="Inspector\PropReflectionCache.cs" />
-		<Compile Remove="Inspector\ReflectionField.cs" />
-		<Compile Remove="Interaction\Controls\GeoEditControlTool.cs" />
 		<Compile Remove="Interaction\Logic\GeoSelectionLogic.cs" />
-		<Compile Remove="Interaction\Tools\TranslateTool.cs" />
+		<Compile Remove="Interaction\Tools\TranslateTool_Old.cs" />
 		<Compile Remove="Rendering\GeoToolRenderPass.cs" />
 		<Compile Remove="Rendering\GizmoRenderPass.cs" />
 		<Compile Remove="Rendering\RenderPathManager.cs" />
@@ -120,18 +105,24 @@
 		<ProjectReference Include="..\Primary\Primary.csproj" />
 	</ItemGroup>
 	<ItemGroup>
+		<ProjectReference Include="..\Primary.SourceGenerator\Primary.SourceGenerator.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+	</ItemGroup>
+	<ItemGroup>
 		<PackageReference Include="CircularBuffer" Version="1.4.0" />
 		<PackageReference Include="CommandLineParser" Version="2.9.1" />
-		<PackageReference Include="CsToml.Generator" Version="1.8.0">
+		<PackageReference Include="CsToml.Generator" Version="1.8.2">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Hexa.NET.ImGui" Version="2.2.9" />
 		<PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.18" />
 		<PackageReference Include="RectpackSharp" Version="1.2.0" />
+		<PackageReference Include="Sigil" Version="5.0.0" />
 		<PackageReference Include="StbImageSharper" Version="1.0.1" />
 	</ItemGroup>
 	<ItemGroup>
+		<Folder Include="DearImGui\StylesheetEd\" />
+		<Folder Include="Diagnostics\" />
 		<Folder Include="Rendering\Paths\" />
 	</ItemGroup>
 	<ItemGroup>
@@ -187,23 +178,8 @@
 		<None Include="GeoEdit\IGeoTool.cs" />
 		<None Include="GeoEdit\PlaceTool.cs" />
 		<None Include="GeoEdit\Selectables.cs" />
-		<None Include="Inspector\AsmReflectionCache.cs" />
-		<None Include="Inspector\ComponentEditorCache.cs" />
-		<None Include="Inspector\Components\ComponentEditor.cs" />
-		<None Include="Inspector\Components\DefaultComponentEditor.cs" />
-		<None Include="Inspector\Components\GeoSceneEditor.cs" />
-		<None Include="Inspector\Components\LightEditor.cs" />
-		<None Include="Inspector\Editors\DefaultObjectEditor.cs" />
-		<None Include="Inspector\Editors\ObjectEditor.cs" />
-		<None Include="Inspector\Entities\AssetTypeStorage.cs" />
-		<None Include="Inspector\Entities\RenderTypeStorage.cs" />
-		<None Include="Inspector\Entities\ValueStorageBase.cs" />
-		<None Include="Inspector\Entities\ValueTypeStorages.cs" />
-		<None Include="Inspector\PropReflectionCache.cs" />
-		<None Include="Inspector\ReflectionField.cs" />
-		<None Include="Interaction\Controls\GeoEditControlTool.cs" />
 		<None Include="Interaction\Logic\GeoSelectionLogic.cs" />
-		<None Include="Interaction\Tools\TranslateTool.cs" />
+		<None Include="Interaction\Tools\TranslateTool_Old.cs" />
 		<None Include="Rendering\GeoToolRenderPass.cs" />
 		<None Include="Rendering\GizmoRenderPass.cs" />
 		<None Include="Rendering\RenderPathManager.cs" />

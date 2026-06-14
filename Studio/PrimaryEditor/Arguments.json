@@ -1,0 +1,12 @@
+{
+    "arguments": [
+        {
+            "name": "project-path",
+            "shorthand": null,
+            "type": "String"
+        }
+    ],
+    "includes": [
+        "CoreArguments.json"
+    ]
+}

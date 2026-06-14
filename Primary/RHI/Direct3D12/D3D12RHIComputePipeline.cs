@@ -14,9 +14,9 @@ using static TerraFX.Interop.DirectX.D3D12_SAMPLER_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_SHADER_VISIBILITY;
 using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows")]
+    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe sealed class D3D12RHIComputePipeline : RHIComputePipeline
     {
         private readonly D3D12RHIDevice _device;
@@ -189,6 +189,8 @@ namespace Primary.RHI2.Direct3D12
 
                     _pipelineState.Reset();
                     _rootSignature.Reset();
+
+                    _device.ResourceTracker.Untrack(this);
                 });
 
                 _disposedValue = true;
@@ -206,6 +208,11 @@ namespace Primary.RHI2.Direct3D12
             {
                 ResourceHelper.SetResourceName((ID3D12Resource2*)_pipelineState.Get(), debugName);
             }
+        }
+
+        public override string ToString()
+        {
+            return $"RHIComputePipeline{{{_debugName}}}";
         }
 
         public override unsafe RHIComputePipelineNative* GetAsNative() => (RHIComputePipelineNative*)_nativeRep;

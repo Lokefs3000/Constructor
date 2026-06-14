@@ -1,11 +1,12 @@
 ﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets;
 using Primary.Common;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Commands;
 using Primary.Rendering.Pass;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.RHI2;
+using Primary.RHI;
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -21,6 +22,7 @@ namespace Primary.Rendering.Structures
             _commandBuffer = commandBuffer;
         }
 
+        public void SetPipeline(ComputeShaderKernel shader) => _commandBuffer.SetPipeline(shader);
         public void SetPipeline(RHIComputePipeline pipeline) => _commandBuffer.SetPipeline(pipeline);
 
         public void SetProperties(PropertyBlock block) => _commandBuffer.SetProperties(block);

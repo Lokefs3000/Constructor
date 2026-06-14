@@ -1,34 +1,42 @@
-﻿using Editor.Rendering.Debugging;
+﻿using Editor.Gui.View;
+using Editor.Rendering.Debugging;
+using Primary.Components;
+using Primary.Mathematics;
+using Primary.Memory.Native;
+using Primary.Profiling;
+using Primary.Rendering;
+using Primary.RHI;
+using Primary.Windowing;
+using System.Diagnostics;
+using System.Numerics;
 
 namespace Editor.Rendering
 {
-    internal sealed class EditorRenderManager : IDisposable
+    public sealed class EditorRenderManager : IDisposable
     {
-        private Editor _editor;
-
-        //private GizmoRenderPass _gizmoPass;
-        //private ToolsRenderPass _toolsPass;
-        //private SelectionRenderPass _selectionRenderPass;
-        //private GeoToolRenderPass _geoToolRenderPass;
-
-        //private Gizmos _gizmos;
-
         private EntityDebugRenderer _entityDbgRenderer;
+
+        private Gizmos _gizmos;
+        private ScreenGizmos _screenGizmos;
+
+        private RHITexture? _primaryOutputView;
+        private Int2? _pendingViewResize;
+
+        private EditorCamera _editorCamera;
 
         private bool _disposedValue;
 
         internal EditorRenderManager()
         {
-            _editor = Editor.GlobalSingleton;
-
-            //_gizmoPass = new GizmoRenderPass();
-            //_toolsPass = new ToolsRenderPass();
-            //_selectionRenderPass = new SelectionRenderPass();
-            //_geoToolRenderPass = new GeoToolRenderPass();
-
-            //_gizmos = new Gizmos();
-
             _entityDbgRenderer = new EntityDebugRenderer();
+
+            _gizmos = new Gizmos();
+            _screenGizmos = new ScreenGizmos();
+
+            _editorCamera = new EditorCamera();
+
+            RenderingManager renderer = EditorRuntime.GlobalSingleton.RenderingManager;
+            renderer.RenderWorld.TransformOutput.Subscribe(OnTransformOutput);
         }
 
         private void Dispose(bool disposing)
@@ -37,12 +45,14 @@ namespace Editor.Rendering
             {
                 if (disposing)
                 {
-                    //_gizmos.Dispose();
+                    RenderingManager renderer = EditorRuntime.GlobalSingleton.RenderingManager;
+                    renderer.RenderWorld.TransformOutput.Unsubscribe(OnTransformOutput);
 
-                    //_geoToolRenderPass.Dispose();
-                    //_selectionRenderPass.Dispose();
-                    //_toolsPass.Dispose();
-                    //_gizmoPass.Dispose();
+                    _primaryOutputView?.Dispose();
+                    _primaryOutputView = null;
+
+                    _gizmos.Dispose();
+                    _screenGizmos.Dispose();
                 }
 
                 _disposedValue = true;
@@ -57,23 +67,89 @@ namespace Editor.Rendering
 
         internal void PrepareFrame()
         {
-            //_gizmos.ResetForNewFrame();
+            using (new ProfilingScope("RenderPrepareFrame"))
+            {
+                _gizmos.ClearDrawData();
+                _screenGizmos.ClearDrawData();
+
+                if (_pendingViewResize.HasValue)
+                {
+                    Int2 newSize = _pendingViewResize.Value;
+                    _pendingViewResize = null;
+
+                    if (_primaryOutputView == null)
+                    {
+                        if (newSize.X >= 1 && newSize.Y >= 1)
+                            _primaryOutputView = CreateOutputView(newSize);
+                    }
+                    else
+                    {
+                        if (newSize.X < 1 || newSize.Y < 1)
+                        {
+                            _primaryOutputView.Dispose();
+                            _primaryOutputView = null;
+                        }
+                        else if (new Int2(_primaryOutputView.Description.Width, _primaryOutputView.Description.Height) != newSize)
+                        {
+                            _primaryOutputView.Dispose();
+                            _primaryOutputView = CreateOutputView(newSize);
+                        }
+                    }
+
+                    _editorCamera.ClientSize = newSize.AsVector2();
+                }
+
+                _editorCamera.UpdateVectors();
+            }
+
+            _entityDbgRenderer.Render();
         }
 
-        internal void SetupPasses()
+        private void OnTransformOutput(List<RenderOutputData> outputs)
         {
-            //_entityDbgRenderer.Render();
-            //_structureDbgRenderer.Render();
-            //
-            //_gizmos.FinalizeBuffers();
-            //
-            //_gizmoPass.SetupRenderState(renderPass);
-            //_selectionRenderPass.SetupRenderState(renderPass);
-            //_geoToolRenderPass.SetupRenderState(renderPass);
-            //_toolsPass.SetupRenderState(renderPass);
-            //_editor.DearImGuiStateManager.SetupPasses(renderPass);
+            if (_primaryOutputView == null)
+                return;
+
+            Window? primaryWindow = WindowManager.Instance.PrimaryWindow;
+            for (int i = outputs.Count - 1; i >= 0; --i)
+            {
+                RenderOutputData outputData = outputs[i];
+                if (outputData.Window == primaryWindow && outputData.TargetTexture == null)
+                {
+                    Camera cameraData = outputData.Camera;
+                    CameraProjectionData projectionData = new CameraProjectionData
+                    {
+                        ClientSize = _editorCamera.ClientSize,
+                        ProjectionMatrix = _editorCamera.ProjectionMatrix,
+                        ViewMatrix = _editorCamera.ViewMatrix
+                    };
+
+                    outputs[i] = new RenderOutputData(outputData.Entity, new WorldTransform { Transformation = _editorCamera.Transform, UpdateIndex = int.MinValue }, cameraData, projectionData, primaryWindow, _primaryOutputView);
+                    break;
+                }
+            }
         }
 
-        //internal Gizmos Gizmos => _gizmos;
+        internal void UpdateViewSize(Int2 newSize) => _pendingViewResize = newSize;
+
+        public EditorCamera Camera => _editorCamera;
+
+        internal RHITexture? ViewTexture => _primaryOutputView;
+
+        private static RHITexture? CreateOutputView(Int2 size)
+        {
+            return RHIDevice.Instance?.CreateTexture(new RHITextureDescription
+            {
+                Width = size.X,
+                Height = size.Y,
+                MipLevels = 1,
+
+                Dimension = RHIDimension.Texture2D,
+                Format = RHIFormat.RGB10A2_UNorm,
+                Usage = RHIResourceUsage.RenderTarget | RHIResourceUsage.ShaderResource,
+
+                Swizzle = new RHISwizzle(RHISwizzleChannel.Red, RHISwizzleChannel.Green, RHISwizzleChannel.Blue, RHISwizzleChannel.One)
+            }, [], "SceneOutput");
+        }
     }
 }

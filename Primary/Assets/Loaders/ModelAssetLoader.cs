@@ -3,8 +3,9 @@ using K4os.Compression.LZ4.Streams;
 using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
+using Primary.Mathematics;
 using Primary.Memory.Native;
-using Primary.RHI2;
+using Primary.RHI;
 using Primary.Utility;
 using System.Buffers;
 using System.Diagnostics;
@@ -36,6 +37,10 @@ namespace Primary.Assets.Loaders
                 throw new ArgumentException(nameof(asset));
             if (assetData is not ModelAssetData modelData)
                 throw new ArgumentException(nameof(assetData));
+
+            RenderMesh[] previousRenderMeshes = modelData.Meshes.ToArray();
+
+            modelData.Dispose();
 
             RHIBuffer? vertexBuffer = null;
             RHIBuffer? indexBuffer = null;
@@ -84,7 +89,7 @@ namespace Primary.Assets.Loaders
                     if (uvChannelCount > 1)
                         throw new NotImplementedException();
 
-                    Span<float> vertices = MemoryMarshal.Cast<byte, float>(new Span<byte>(vertexData, vertexDataOffset, (int)mesh.VertexCount * (12 + (uvChannelCount * 2)) * sizeof(float)));
+                    Span<float> vertices = MemoryMarshal.Cast<byte, float>(new Span<byte>(vertexData, vertexDataOffset, (int)mesh.VertexCount * mesh.VertexStride));
 
                     if (Flags.HasFlag(header.Flags, PMFHeaderFlags.HalfVertexValues))
                     {
@@ -134,7 +139,13 @@ namespace Primary.Assets.Loaders
                         aabb.Maximum = Vector3.Max(aabb.Maximum, pos);
                     }
 
-                    meshes[i] = new RenderMesh(modelData, i, mesh.Name, aabb, 0, indexOffsetTotal, mesh.IndexCount);
+                    RenderMesh? renderMesh = Array.Find(previousRenderMeshes, (x) => x.Id == mesh.Name);
+                    if (renderMesh == null)
+                        renderMesh = new RenderMesh(modelData, i, mesh.Name, aabb, 0, indexOffsetTotal, mesh.IndexCount, true);
+                    else
+                        renderMesh.UpdateMeshData(i, mesh.Name, aabb, 0, indexOffsetTotal, mesh.IndexCount, true);
+
+                    meshes[i] = renderMesh;
                     indexOffsetTotal += mesh.IndexCount;
                 }
 

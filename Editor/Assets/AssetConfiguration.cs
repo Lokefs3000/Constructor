@@ -51,6 +51,11 @@ namespace Editor.Assets
         /// <summary>Thread-safe</summary>
         public bool DoesFileHaveConfig(string localPath, string keyword, bool allowLocalConfig = true)
         {
+            if (AssetPipeline.TryGetFullPathFromLocal(localPath, out string? fullPath))
+                localPath = fullPath;
+            else
+                EdLog.Assets.Warning("Failed to get full path from local path: {p}", localPath);
+
             AssetId id = _pipeline.Identifier.GetOrRegisterAsset(localPath);
 
             string sourcePath = Path.Combine(EditorFilepaths.LibraryAssetsPath, $"{id}_{keyword}.toml");

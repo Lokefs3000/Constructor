@@ -35,11 +35,17 @@ namespace Editor.UI.Styling
             Type? currentType = type;
             do
             {
-                Guard.IsLessThan(count, 32);
-                if (_uiManager.ReflectionManager.ElementCache.TryGetElementData(currentType, out CachedElementData elementData))
-                    temp[count++] = elementData.PrettyName;
-                else
-                    UIManager.Logger?.Warning("Failed to get element data for: {t}", currentType);
+                if (currentType != typeof(StyleBase) && currentType.IsClass)
+                {
+                    if (currentType.IsGenericTypeDefinition)
+                        currentType = currentType.GetGenericTypeDefinition();
+
+                    Guard.IsLessThan(count, 32);
+                    if (_uiManager.ReflectionManager.ElementCache.TryGetElementData(currentType, out CachedElementData elementData))
+                        temp[count++] = elementData.PrettyName;
+                    else
+                        UIManager.Logger?.Warning("Failed to get element data for: {t}", currentType);
+                }
             } while ((currentType = currentType.BaseType) != typeof(StyleBase) && currentType != null);
 
             temp.Span.Slice(0, count).Reverse();

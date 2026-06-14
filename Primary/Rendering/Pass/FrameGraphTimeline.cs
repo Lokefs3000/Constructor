@@ -11,6 +11,9 @@ namespace Primary.Rendering.Pass
         private List<nint> _events;
         private List<int> _passes;
 
+        private int _totalPassCount;
+        private int _passIndexOffset;
+
         private bool _disposedValue;
 
         internal FrameGraphTimeline()
@@ -19,6 +22,9 @@ namespace Primary.Rendering.Pass
 
             _events = new List<nint>();
             _passes = new List<int>();
+
+            _totalPassCount = 0;
+            _passIndexOffset = 0;
         }
 
         private void Dispose(bool disposing)
@@ -46,6 +52,16 @@ namespace Primary.Rendering.Pass
 
             _events.Clear();
             _passes.Clear();
+
+            _totalPassCount = 0;
+            _passIndexOffset = 0;
+        }
+
+        internal void ClearLocalData()
+        {
+            _passes.Clear();
+
+            _passIndexOffset = _totalPassCount;
         }
 
         internal void AddRasterEvent(int passIndex)
@@ -54,6 +70,8 @@ namespace Primary.Rendering.Pass
 
             _events.Add(ptr);
             _passes.Add(passIndex);
+
+            ++_totalPassCount;
 
             Unsafe.WriteUnaligned(ptr.ToPointer(), new TimelineRasterEvent(TimelineEventType.Raster, passIndex));
         }
@@ -64,6 +82,8 @@ namespace Primary.Rendering.Pass
 
             _events.Add(ptr);
             _passes.Add(passIndex);
+
+            ++_totalPassCount;
 
             Unsafe.WriteUnaligned(ptr.ToPointer(), new TimelineComputeEvent(TimelineEventType.Compute, passIndex));
         }
@@ -78,6 +98,9 @@ namespace Primary.Rendering.Pass
 
         internal ReadOnlySpan<nint> Events => _events.AsSpan();
         internal ReadOnlySpan<int> Passes => _passes.AsSpan();
+
+        internal int TotalPassCount => _totalPassCount;
+        internal int PassIndexOffset => _passIndexOffset;
 
         public bool IsEmpty => _events.Count == 0 && _passes.Count == 0;
     }

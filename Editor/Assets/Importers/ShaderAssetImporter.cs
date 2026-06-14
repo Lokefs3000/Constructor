@@ -103,7 +103,7 @@ namespace Editor.Assets.Importers
 
             pipeline.ReloadAsset(id);
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localInputFile, true));
+            EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localInputFile, true));
             return false;
 
             static SBCPrimitiveTopology DecodeTopologyType(TomlTable root) => Enum.Parse<SBCPrimitiveTopology>((string)root["primitive_topology"]);
@@ -197,18 +197,18 @@ namespace Editor.Assets.Importers
 
             if (stream == null || stream.Length < Unsafe.SizeOf<SBCHeader>())
             {
-                Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localFilePath, false));
+                EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localFilePath, false));
                 return;
             }
 
             SBCHeader header = stream.Read<SBCHeader>();
             if (header.Header != SBCHeader.ConstHeader || header.Version != SBCHeader.ConstVersion)
             {
-                Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localFilePath, false));
+                EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localFilePath, false));
                 return;
             }
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localFilePath, true));
+            EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ShaderAsset>(new AssetDatabaseEntry(id, localFilePath, true));
         }
 
         public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)

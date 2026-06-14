@@ -3,6 +3,7 @@ using System.Runtime.Serialization;
 
 namespace Primary.Components
 {
+    [Component]
     [ComponentRequirements(typeof(Transform))]
     [ComponentConnections(typeof(LightRenderingData))]
     public record struct Light : IComponent
@@ -19,7 +20,7 @@ namespace Primary.Components
 
         private ShadowImportance _shadowImportance;
 
-        private bool _dirty;
+        [IgnoreDataMember] private bool _dirty;
 
         public Light()
         {
@@ -50,7 +51,6 @@ namespace Primary.Components
 
         public ShadowImportance ShadowImportance { get => _shadowImportance; set { _shadowImportance = value; _dirty = true; } }
 
-        [IgnoreDataMember]
         internal bool Dirty { get => _dirty; set => _dirty = value; }
     }
 

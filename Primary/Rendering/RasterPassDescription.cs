@@ -1,10 +1,11 @@
 ﻿using Collections.Pooled;
 using CommunityToolkit.HighPerformance;
+using Primary.Collections;
 using Primary.Common;
 using Primary.Rendering.Pass;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.RHI2;
+using Primary.RHI;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
@@ -16,23 +17,23 @@ namespace Primary.Rendering
         private readonly string _name;
         private readonly IPassData _passData;
 
-        private PooledList<UsedResourceData> _usedResources;
-        private PooledList<UsedRenderTargetData> _usedRenderTargets;
+        private PassArray _array;
 
-        private Action<IPassContext, IPassData>? _function;
+        private Action<object, IPassContext, IPassData>? _function;
+        private object? _realFunction;
 
         private bool _allowCulling;
 
-        internal RasterPassDescription(RenderPass renderPass, string name, IPassData passData)
+        internal RasterPassDescription(RenderPass renderPass, string name, IPassData passData, PassArray array)
         {
             _renderPass = renderPass;
             _name = name;
             _passData = passData;
 
-            _usedResources = new PooledList<UsedResourceData>();
-            _usedRenderTargets = new PooledList<UsedRenderTargetData>();
+            _array = array;
 
             _function = null;
+            _realFunction = null;
 
             _allowCulling = true;
         }
@@ -41,12 +42,17 @@ namespace Primary.Rendering
         {
             if (_function != null)
             {
-                RenderPass.AddGlobalResources(_usedResources, _usedRenderTargets);
-                _renderPass.AddNewRenderPass(new RenderPassDescription(_name, RenderPassType.Graphics, _usedResources, _usedRenderTargets, _passData, _function, _allowCulling));
+                RenderPass.AddGlobalResources(ref _array);
+                _array.Commit();
+                _renderPass.AddNewRenderPass(new RenderPassDescription(_name, _renderPass.CurrentGroupIndex, RenderPassType.Graphics, _array.UsedResources, _array.UsedRenderTargets, _passData, _function, _realFunction, _allowCulling));
+            }
+            else
+            {
+                _array.Commit();
             }
         }
 
-        public FrameGraphTexture CreateTexture(FrameGraphTextureDesc desc, string? debugName = null)
+        public FrameGraphTexture CreateTexture(FrameGraphTextureDesc desc, [CallerMemberName] string? debugName = null)
         {
             //validate
             {
@@ -172,7 +178,7 @@ namespace Primary.Rendering
             return texture;
         }
 
-        public FrameGraphBuffer CreateBuffer(FrameGraphBufferDesc desc, string? debugName = null)
+        public FrameGraphBuffer CreateBuffer(FrameGraphBufferDesc desc, [CallerMemberName] string? debugName = null)
         {
             //validate
             {
@@ -223,30 +229,59 @@ namespace Primary.Rendering
         {
             //validate
             {
-                if (Flags.HasFlag(usage, FGResourceUsage.Read))
+                if (resource.IsExternal)
                 {
-                    if (!Flags.HasEither(resource.Description.Usage, FGTextureUsage.GenericShader | FGTextureUsage.PixelShader))
+                    RHIResourceUsage resUsage = resource.Resource!.Description.Usage;
+
+                    if (Flags.HasFlag(usage, FGResourceUsage.Read))
                     {
-                        if (!Flags.HasFlag(usage, FGResourceUsage.NoShaderAccess))
+                        if (!Flags.HasEither(resUsage, RHIResourceUsage.ShaderResource))
+                        {
+                            if (!Flags.HasFlag(usage, FGResourceUsage.NoShaderAccess))
+                                _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
+                        }
+                    }
+
+                    if (Flags.HasFlag(usage, FGResourceUsage.Write))
+                    {
+                        if (!Flags.HasEither(resUsage, RHIResourceUsage.ShaderResource))
+                        {
                             _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
+                        }
+
+                        if (!Flags.HasEither(resUsage, RHIResourceUsage.RenderTarget | RHIResourceUsage.DepthStencil))
+                        {
+                            _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.InvalidUsage, resource.ToString());
+                        }
                     }
                 }
-
-                if (Flags.HasFlag(usage, FGResourceUsage.Write))
+                else
                 {
-                    if (!Flags.HasEither(resource.Description.Usage, FGTextureUsage.GenericShader | FGTextureUsage.PixelShader))
+                    if (Flags.HasFlag(usage, FGResourceUsage.Read))
                     {
-                        _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
+                        if (!Flags.HasEither(resource.Description.Usage, FGTextureUsage.GenericShader | FGTextureUsage.PixelShader))
+                        {
+                            if (!Flags.HasFlag(usage, FGResourceUsage.NoShaderAccess))
+                                _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
+                        }
                     }
 
-                    if (!Flags.HasEither(resource.Description.Usage, FGTextureUsage.RenderTarget | FGTextureUsage.DepthStencil))
+                    if (Flags.HasFlag(usage, FGResourceUsage.Write))
                     {
-                        _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.InvalidUsage, resource.ToString());
+                        if (!Flags.HasEither(resource.Description.Usage, FGTextureUsage.GenericShader | FGTextureUsage.PixelShader))
+                        {
+                            _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
+                        }
+
+                        if (!Flags.HasEither(resource.Description.Usage, FGTextureUsage.RenderTarget | FGTextureUsage.DepthStencil))
+                        {
+                            _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.InvalidUsage, resource.ToString());
+                        }
                     }
                 }
             }
 
-            _usedResources.Add(new UsedResourceData(usage, resource));
+            _array.AddResource(new UsedResourceData(usage, resource));
         }
 
         public void UseResource(FGResourceUsage usage, FrameGraphBuffer resource)
@@ -257,18 +292,38 @@ namespace Primary.Rendering
                 {
                     case FGResourceUsage.Read:
                         {
-                            if (!Flags.HasEither(resource.Description.Usage, FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.VertexBuffer | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer))
+                            if (resource.IsExternal)
                             {
-                                _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
+                                if (!Flags.HasEither(resource.Resource!.Description.Usage, RHIResourceUsage.VertexInput | RHIResourceUsage.IndexInput | RHIResourceUsage.ConstantBuffer))
+                                {
+                                    _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
+                                }
+                            }
+                            else
+                            {
+                                if (!Flags.HasEither(resource.Description.Usage, FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.VertexBuffer | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer))
+                                {
+                                    _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
+                                }
                             }
 
                             break;
                         }
                     case FGResourceUsage.Write:
                         {
-                            if (!Flags.HasEither(resource.Description.Usage, FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.VertexBuffer | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer))
+                            if (resource.IsExternal)
                             {
-                                _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
+                                if (!Flags.HasEither(resource.Resource!.Description.Usage, RHIResourceUsage.VertexInput | RHIResourceUsage.IndexInput | RHIResourceUsage.ConstantBuffer))
+                                {
+                                    _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
+                                }
+                            }
+                            else
+                            {
+                                if (!Flags.HasEither(resource.Description.Usage, FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.VertexBuffer | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer))
+                                {
+                                    _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
+                                }
                             }
 
                             break;
@@ -276,7 +331,7 @@ namespace Primary.Rendering
                 }
             }
 
-            _usedResources.Add(new UsedResourceData(usage, resource));
+            _array.AddResource(new UsedResourceData(usage, resource));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -329,7 +384,7 @@ namespace Primary.Rendering
                 }
             }
 
-            _usedRenderTargets.Add(new UsedRenderTargetData(FGRenderTargetType.RenderTarget, renderTarget));
+            _array.AddRenderTarget(new UsedRenderTargetData(FGRenderTargetType.RenderTarget, renderTarget));
         }
 
         public void UseDepthStencil(FrameGraphTexture depthStencil)
@@ -349,7 +404,7 @@ namespace Primary.Rendering
                 }
             }
 
-            _usedRenderTargets.Add(new UsedRenderTargetData(FGRenderTargetType.DepthStencil, depthStencil));
+            _array.AddRenderTarget(new UsedRenderTargetData(FGRenderTargetType.DepthStencil, depthStencil));
         }
 
         public void SetRenderFunction<T>(Action<RasterPassContext, T> function) where T : class, IPassData, new()
@@ -360,7 +415,8 @@ namespace Primary.Rendering
                 return;
             }
 
-            _function = (x, y) => function(Unsafe.As<RasterPassContext>(x), Unsafe.As<T>(y));
+            _function = static (f, x, y) => Unsafe.As<Action<RasterPassContext, T>>(f)(Unsafe.As<RasterPassContext>(x), Unsafe.As<T>(y));
+            _realFunction = function;
         }
 
         public void AllowPassCulling(bool allow)
@@ -368,7 +424,7 @@ namespace Primary.Rendering
             _allowCulling = allow;
         }
 
-        private static FGTextureUsage[] s_textureUsageMap = [
+        private static readonly FGTextureUsage[] s_textureUsageMap = [
             FGTextureUsage.PixelShader | FGTextureUsage.RenderTarget | FGTextureUsage.DepthStencil,    //GenericShader
             FGTextureUsage.GenericShader | FGTextureUsage.RenderTarget | FGTextureUsage.DepthStencil,  //PixelShader
             FGTextureUsage.RenderTarget | FGTextureUsage.GenericShader | FGTextureUsage.PixelShader,   //RenderTarget
@@ -376,7 +432,7 @@ namespace Primary.Rendering
             FGTextureUsage.ShaderResource                                                          ,   //ShaderResource
             ];
 
-        private static FGBufferUsage[] s_bufferUsageMap = [
+        private static readonly FGBufferUsage[] s_bufferUsageMap = [
             FGBufferUsage.ConstantBuffer | FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.VertexBuffer,    //ConstantBuffer
             FGBufferUsage.GenericShader | FGBufferUsage.ConstantBuffer | FGBufferUsage.PixelShader | FGBufferUsage.VertexBuffer,    //GenericShader
             FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer | FGBufferUsage.GenericShader | FGBufferUsage.VertexBuffer,    //PixelShader

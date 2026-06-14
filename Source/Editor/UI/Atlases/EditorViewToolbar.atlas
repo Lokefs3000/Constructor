@@ -1,0 +1,11 @@
+texture = "Editor/UI/Icons/EditorViewToolbar.png"
+
+[[sprites]]
+name = "SnappingOff"
+offset = [0, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "SnappingOn"
+offset = [32, 0]
+size = [32, 32]

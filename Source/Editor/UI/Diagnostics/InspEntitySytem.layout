@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Layout>
+	<Stylesheet Path="Editor/UI/Default.style" />
+	<Stylesheet Path="Editor/UI/Styles/InspectorDebug.style" />
+
+	<Window>
+        <Frame Class="content-frame">
+            <Element IsEnabled="False" Id="layout-content" Class="content-tab">
+                <TreeView Id="layout-treeview" Size="1.0 0 1.0 -32">
+
+                </TreeView>
+                <ToggleButton Id="layout-showhide" Class="layout-sh-button">
+                    <Label IsActive="False" Class="ribbon-select-window-label" Text="Show/Hide preview" />
+                </ToggleButton>
+            </Element>
+            <Element Id="interaction-content" Class="content-tab">
+                <Label Text="..." />
+            </Element>
+        </Frame>
+	</Window>
+</Layout>

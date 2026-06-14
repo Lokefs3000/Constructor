@@ -5,6 +5,7 @@ using Editor.UI.Text;
 using Editor.UI.Visual;
 using Primary.Common;
 using Primary.Pooling;
+using Primary.Windowing;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -17,16 +18,16 @@ namespace Editor.UI
     public sealed class UILayoutManager
     {
         private ObjectPool<LayoutHandler> _handlers;
-        private HashSet<IWindowHost> _invalidHosts;
+        private HashSet<ILayoutHost> _invalidHosts;
 
         internal UILayoutManager()
         {
             _handlers = new ObjectPool<LayoutHandler>(new LayoutHandler.Policy(this));
-            _invalidHosts = new HashSet<IWindowHost>();
+            _invalidHosts = new HashSet<ILayoutHost>();
         }
 
-        public void AddInvalidLayout(IWindowHost host) => _invalidHosts.Add(host);
-        public void RemoveInvalidHost(IWindowHost host) => _invalidHosts.Remove(host);
+        public void AddInvalidLayout(ILayoutHost host) => _invalidHosts.Add(host);
+        public void RemoveInvalidHost(ILayoutHost host) => _invalidHosts.Remove(host);
 
         internal void RecalculateAll()
         {
@@ -34,40 +35,27 @@ namespace Editor.UI
             {
                 while (_invalidHosts.Count > 0)
                 {
-                    IWindowHost host = _invalidHosts.First();
+                    ILayoutHost host = _invalidHosts.First();
 
-                    if (host is UIDockHost dockHost)
+                    host.RecalculateLayout();
+                    if (host is IWindowHost windowHost)
                     {
-                        dockHost.RecalculateLayout();
-
-                        foreach (UIWindow window in dockHost.TabbedWindows)
+                        IWindow? currentWindow = windowHost.ActiveWindow;
+                        if (currentWindow != null && Flags.HasFlag(currentWindow.RootElement.StateFlags, UIStateFlags.InvalidLayout))
                         {
-                            if (Flags.HasFlag(window.RootElement.StateFlags, UIStateFlags.InvalidLayout))
-                            {
-                                window.RootElement.RemoveStateFlags(UIStateFlags.InvalidLayout);
-                                RecalculateLayout(window);
-                            }
+                            currentWindow.RootElement.RemoveStateFlags(UIStateFlags.InvalidLayout);
+                            RecalculateLayout(currentWindow);
                         }
 
-                        foreach (UIDockHost dockedHost in dockHost.DockedHosts)
+                        if (windowHost is IWindowDockHost windowDockHost)
                         {
-                            if (Flags.HasFlag(dockedHost.InvalidationFlags, UIStateFlags.InvalidLayout))
+                            foreach (IWindowHost childHost in windowDockHost.Hosts)
                             {
-                                dockedHost.RemoveStateFlags(UIStateFlags.InvalidLayout);
-                                _invalidHosts.Add(dockedHost);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        host.RecalculateLayout();
-
-                        foreach (UIWindow window in host.Windows)
-                        {
-                            if (Flags.HasFlag(window.RootElement.StateFlags, UIStateFlags.InvalidLayout))
-                            {
-                                window.RootElement.RemoveStateFlags(UIStateFlags.InvalidLayout);
-                                RecalculateLayout(window);
+                                if (Flags.HasFlag(childHost.InvalidationFlags, UIStateFlags.InvalidLayout))
+                                {
+                                    childHost.RemoveStateFlags(UIStateFlags.InvalidLayout);
+                                    _invalidHosts.Add(childHost);
+                                }
                             }
                         }
                     }
@@ -77,7 +65,7 @@ namespace Editor.UI
             }
         }
 
-        internal void RecalculateLayout(UIWindow window)
+        internal void RecalculateLayout(IWindow window)
         {
             LayoutHandler handler = _handlers.Get();
             handler.Handle(window.RootElement);

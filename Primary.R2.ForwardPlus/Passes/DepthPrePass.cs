@@ -1,4 +1,5 @@
 ﻿using Primary.Rendering;
+using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
@@ -31,7 +32,8 @@ namespace Primary.R2.ForwardPlus.Passes
         {
             RasterCommandBuffer cmd = context.CommandBuffer;
 
-            cmd.SetDepthStencil(data.OutDepth);
+            cmd.ClearDepthStencil(data.OutDepth, FGClearFlags.DepthStencil, null);
+            //cmd.SetDepthStencil(data.OutDepth);
         }
 
         private class PassData : IPassData

@@ -975,7 +975,7 @@ namespace Editor.Shaders.Processors
                     _start = _index;
                     ReadOnlySpan<char> enabledValue = ReadIdentifier();
 
-                    _data.GeneratePropertiesInHeader = (enabledValue.Equals("false", StringComparison.Ordinal) || enabledValue.Equals("0", StringComparison.Ordinal));
+                    _data.GeneratePropertiesInHeader = (enabledValue.Equals("true", StringComparison.Ordinal) || enabledValue.Equals("1", StringComparison.Ordinal));
                 }
             }
         }

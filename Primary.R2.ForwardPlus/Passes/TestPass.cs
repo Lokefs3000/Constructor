@@ -40,7 +40,7 @@ namespace Primary.R2.ForwardPlus.Passes
 
 
             cmd.SetRenderTarget(0, data.OutColor);
-            cmd.SetPipeline(_shader.GraphicsPipeline!);
+            cmd.SetPipeline(_shader);
             cmd.SetProperties(_block);
 
             cmd.DrawInstanced(new FGDrawInstancedDesc(3));

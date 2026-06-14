@@ -41,6 +41,14 @@
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
   </Folder>
+  <Folder Name="/Editor/New/">
+    <Project Path="Studio/EditorUI/EditorUI.csproj" Id="6580e9d1-a4a9-47c0-990b-8f5c1bfcaa16">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Studio/PrimaryEditor/PrimaryEditor.csproj" Id="c10a5eaf-b7c4-45a8-af03-c89686a1031b">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
   <Folder Name="/Engine/">
     <Project Path="D:/source/repos/Constructor/Primary.Common/Primary.Common.csproj" />
     <Project Path="D:/source/repos/Constructor/Primary.Interop/Primary.Interop.csproj" />

@@ -5,7 +5,8 @@ using Editor.UI.Visual;
 using Primary.Common;
 using Primary.Mathematics;
 using Primary.Memory.Native;
-using Primary.RHI2;
+using Primary.RHI;
+using Primary.Windowing;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -48,9 +49,9 @@ namespace Editor.UI.Elements
 
             if (_host.HostedWindow != null && _host.HostTexture != null)
             {
-                Vector2 baseOffset = _clientOffset + PixelCoordinates.Minimum;
+                Vector2 baseOffset = _clientOffset + _viewCoordinates.Minimum;
                 Boundaries boundaries = new Boundaries(baseOffset, baseOffset + _clientSize.AsVector2() / _host.HostedWindow.ClientSize.AsVector2() * _clientSize.AsVector2());
-                
+
                 painter.DrawImage(boundaries, UIPaint.FromColor(Color.White), _host.HostTexture);
             }
 
@@ -109,8 +110,7 @@ namespace Editor.UI.Elements
             {
                 Guard.IsNull(_hostedWindow);
 
-                window.ParentHost?.UndockWindow(window);
-                window.ParentHost = this;
+                
 
                 _hostedWindow = window;
                 AddStateFlags(UIStateFlags.InvalidAll);
@@ -121,16 +121,24 @@ namespace Editor.UI.Elements
                 Guard.IsNotNull(_hostedWindow);
                 Guard.Equals(_hostedWindow, window);
 
-                if (_hostedWindow.ParentHost == this)
-                    _hostedWindow.ParentHost = null;
+                
                 _hostedWindow = null;
 
                 AddStateFlags(UIStateFlags.InvalidAll);
             }
 
+            public void FocusWindow(UIWindow window)
+            {
+            }
+
             public void RecalculateLayout()
             {
                 UIManager.Instance.Renderer.AddHostToRedrawQueue(this);
+            }
+
+            public void DrawVisual(UIPainterContext context)
+            {
+
             }
 
             public void TryChangeWindowSize(UIWindow window, Int2 newClientSize)
@@ -164,10 +172,39 @@ namespace Editor.UI.Elements
                 }, Span<ArrayPtr<byte>>.Empty, "CanvasHostTexture");
             }
 
+            public void TryChangeWindowSize(IWindow window, Int2 newClientSize)
+            {
+                throw new NotImplementedException();
+            }
+
+            public IInteractable GetInteractable(Vector2 point)
+            {
+                throw new NotImplementedException();
+            }
+
+            public void HandleEvent(ref readonly UIEvent @event)
+            {
+                throw new NotImplementedException();
+            }
+
+            public void Update()
+            {
+                throw new NotImplementedException();
+            }
+
+            public void RemoveStateFlags(UIStateFlags flags)
+            {
+                throw new NotImplementedException();
+            }
+
             internal UIWindow? HostedWindow => _hostedWindow;
+
+            public IWindowHost? ParentHost => null;
 
             public Int2 ClientOffset => _canvas._clientOffset.AsInt2();
             public Int2 ClientSize => _canvas._currentSize.AsInt2();
+
+            public Boundaries WindowClientSize => new Boundaries(Vector2.Zero, _canvas._currentSize);
 
             public HostInteractionManager InteractionManager => throw new NotImplementedException();
 
@@ -214,6 +251,22 @@ namespace Editor.UI.Elements
                     }
                 }
             }
+
+            public Window? HostWindow => null;
+
+            IWindow? IWindowHost.ActiveWindow => ActiveWindow;
+
+            public UIStateFlags InvalidationFlags => throw new NotImplementedException();
+
+            public IInteractionShape? Shape => throw new NotImplementedException();
+
+            public Rect HostMetrics => throw new NotImplementedException();
+
+            public Rect ContentMetrics => throw new NotImplementedException();
+
+            public Boundaries InvalidVisualRegion => throw new NotImplementedException();
+
+            public IWindowHost? Host => throw new NotImplementedException();
         }
     }
 }

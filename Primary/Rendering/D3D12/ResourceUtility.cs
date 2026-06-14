@@ -2,8 +2,8 @@
 using Primary.Rendering.Resources;
 using Primary.Rendering.State;
 using Primary.Rendering.Structures;
-using Primary.RHI2;
-using Primary.RHI2.Direct3D12;
+using Primary.RHI;
+using Primary.RHI.Direct3D12;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Versioning;
@@ -63,6 +63,77 @@ namespace Primary.Rendering.D3D12
             }
         }
 
+        internal static bool DoesTextureNeedInit(NRDResource texture, ResourceManager resources)
+        {
+            if (texture.Id != NRDResourceId.Texture)
+                return false;
+
+            return (texture.IsExternal ? ((D3D12RHITextureNative*)texture.Native)->Base.Description.Format : resources.FindFGTexture(texture).Description.Format) switch
+            {
+                RHIFormat.RGBA32_Float => true,
+                RHIFormat.RGBA32_UInt => true,
+                RHIFormat.RGBA32_SInt => true,
+                RHIFormat.RGB32_Float => true,
+                RHIFormat.RGB32_UInt => true,
+                RHIFormat.RGB32_SInt => true,
+                RHIFormat.RG32_Float => true,
+                RHIFormat.RG32_UInt => true,
+                RHIFormat.RG32_SInt => true,
+                RHIFormat.R32_Float => true,
+                RHIFormat.R32_UInt => true,
+                RHIFormat.R32_SInt => true,
+                RHIFormat.RGBA16_Typeless => true,
+                RHIFormat.RGBA16_Float => true,
+                RHIFormat.RGBA16_UNorm => true,
+                RHIFormat.RGBA16_UInt => true,
+                RHIFormat.RGBA16_SNorm => true,
+                RHIFormat.RGBA16_SInt => true,
+                RHIFormat.RG16_Typeless => true,
+                RHIFormat.RG16_Float => true,
+                RHIFormat.RG16_UNorm => true,
+                RHIFormat.RG16_UInt => true,
+                RHIFormat.RG16_SNorm => true,
+                RHIFormat.RG16_SInt => true,
+                RHIFormat.R16_Typeless => true,
+                RHIFormat.R16_Float => true,
+                RHIFormat.R16_UInt => true,
+                RHIFormat.R16_SNorm => true,
+                RHIFormat.R16_SInt => true,
+                RHIFormat.RGBA8_Typeless => true,
+                RHIFormat.RGBA8_UNorm => true,
+                RHIFormat.RGBA8_UNorm_sRGB => true,
+                RHIFormat.RGBA8_UInt => true,
+                RHIFormat.RGBA8_SNorm => true,
+                RHIFormat.RGBA8_SInt => true,
+                RHIFormat.RG8_Typeless => true,
+                RHIFormat.RG8_UNorm => true,
+                RHIFormat.RG8_UInt => true,
+                RHIFormat.RG8_SNorm => true,
+                RHIFormat.RG8_SInt => true,
+                RHIFormat.R8_Typeless => true,
+                RHIFormat.R8_UNorm => true,
+                RHIFormat.R8_UInt => true,
+                RHIFormat.R8_SNorm => true,
+                RHIFormat.R8_SInt => true,
+                RHIFormat.RGB10A2_Typeless => true,
+                RHIFormat.RGB10A2_UNorm => true,
+                RHIFormat.RGB10A2_UInt => true,
+                RHIFormat.RG11B10_Float => true,
+                RHIFormat.R32_Typeless => true,
+                RHIFormat.D32_Float => true,
+                RHIFormat.D16_UNorm => true,
+                RHIFormat.R32G8X24_Typeless => true,
+                RHIFormat.D32_Float_S8X24_UInt => true,
+                RHIFormat.R32_Float_X8X24_Typeless => true,
+                RHIFormat.X32_Typeless_G8X24_UInt => true,
+                RHIFormat.R24G8_Typeless => true,
+                RHIFormat.D24_UNorm_S8_UInt => true,
+                RHIFormat.R24_UNorm_X8_Typeless => true,
+                RHIFormat.X24_Typeless_G8_UInt => true,
+                _ => false
+            };
+        }
+
         internal static NRDResource GetNRDBufferResource(nint ptr, bool isExternal) => isExternal ?
             new NRDResource(((D3D12RHIBufferNative*)ptr.ToPointer())) :
             new NRDResource((int)ptr, NRDResourceId.Buffer);
@@ -89,12 +160,15 @@ namespace Primary.Rendering.D3D12
         internal static HRESULT SetResourceNameStack(ID3D12Resource* resource, string name)
         {
             Debug.Assert(name.Length + 1 < 1024);
-            char* stack = stackalloc char[name.Length + 1];
+            Span<char> stack = stackalloc char[name.Length + 1];
 
-            Unsafe.CopyBlockUnaligned(ref Unsafe.AsRef<byte>(stack), ref Unsafe.As<char, byte>(ref name.DangerousGetReference()), (uint)(name.Length + name.Length));
-            stack[name.Length] = '\0';
+            name.CopyTo(stack);
+            stack[^1] = '\0';
 
-            return resource->SetName(stack);
+            fixed (char* ptr = stack)
+            {
+                return resource->SetName(ptr);
+            }
         }
     }
 }

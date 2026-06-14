@@ -526,7 +526,7 @@ namespace Editor.Assets
 
         private void FlushFilesystemData()
         {
-            int length = Editor.GlobalSingleton.ProjectPath.Length;
+            int length = EditorRuntime.GlobalSingleton.ProjectPath.Length;
 
             StringBuilder sb = new StringBuilder();
             foreach (var kvp in _activeFiles)
@@ -560,7 +560,7 @@ namespace Editor.Assets
             Queue<string> activeQueue = new Queue<string>();
             HashSet<string> newExistingFiles = new HashSet<string>();
 
-            string projectPath = Editor.GlobalSingleton.ProjectPath;
+            string projectPath = EditorRuntime.GlobalSingleton.ProjectPath;
 
             while (true)
             {

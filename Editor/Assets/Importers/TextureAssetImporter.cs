@@ -93,7 +93,7 @@ namespace Editor.Assets.Importers
 
                         if (!pipeline.Identifier.IsIdValid(channel.Asset))
                         {
-                            EdLog.Assets.Error("[{p}]: Composite channel id is not valid: {id} ({ch})", channel.Asset, (TextureCompositeChannel)(1 << i));
+                            EdLog.Assets.Error("[{p}]: Composite channel id is not valid: {id} ({ch})", localInputFile, channel.Asset, (TextureCompositeChannel)(1 << i));
                             throw new HiddenException();
                         }
 
@@ -300,7 +300,7 @@ namespace Editor.Assets.Importers
             filesystem.RemapFile(localInputFile, localOutputFile);
             pipeline.ReloadAsset(id);
 
-            AssetDatabase database = Editor.GlobalSingleton.AssetDatabase;
+            AssetDatabase database = EditorRuntime.GlobalSingleton.AssetDatabase;
             database.AddEntry<TextureAsset>(new AssetDatabaseEntry(id, localInputFile, true));
             
             return true;
@@ -308,7 +308,7 @@ namespace Editor.Assets.Importers
 
         public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
         {
-            AssetDatabase database = Editor.GlobalSingleton.AssetDatabase;
+            AssetDatabase database = EditorRuntime.GlobalSingleton.AssetDatabase;
             AssetId id = pipeline.Identifier.GetOrRegisterAsset(localFilePath);
 
             database.AddEntry<TextureAsset>(new AssetDatabaseEntry(id, localFilePath, ValidateFile(localFilePath, filesystem, pipeline)));
@@ -335,6 +335,12 @@ namespace Editor.Assets.Importers
             }
             else
             {
+                if (!pipeline.Configuration.DoesFileHaveConfig(localFilePath, "Texture"))
+                {
+                    pipeline.DeleteImportedAsset(localFilePath);
+                    return false;
+                }
+
                 using Stream? stream = filesystem.OpenStream(localFilePath);
 
                 if (stream == null || stream.Length < Unsafe.SizeOf<TextureHeader>())

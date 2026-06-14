@@ -1,4 +1,5 @@
 ﻿using Primary.Common;
+using Primary.Mathematics;
 using SDL;
 using System.Numerics;
 
@@ -11,6 +12,8 @@ namespace Primary.Input.Devices
         private Vector2 _mousePosition;
         private Vector2 _wheelDelta;
         private Vector2 _mouseDelta;
+
+        private Int2 _globalMousePosition;
 
         internal PointerDevice()
         {
@@ -69,6 +72,14 @@ namespace Primary.Input.Devices
 
             _mouseDelta = Vector2.Zero;
             _wheelDelta = Vector2.Zero;
+
+            unsafe
+            {
+                float x, y;
+                SDL3.SDL_GetGlobalMouseState(&x, &y);
+
+                _globalMousePosition = new Int2((int)x, (int)y);
+            }
         }
 
         public int ResolveBindingPath(ReadOnlySpan<char> bindingPath)
@@ -104,11 +115,13 @@ namespace Primary.Input.Devices
 
         public bool IsButtonHeld(MouseButton button) => Flags.HasFlag(_states[(int)button], ButtonState.Held);
         public bool IsButtonPressed(MouseButton button) => Flags.HasFlag(_states[(int)button], ButtonState.Held | ButtonState.Updated);
-        public bool IsButtonReleased(MouseButton button) => Flags.HasFlag(_states[(int)button], ButtonState.Updated);
+        public bool IsButtonReleased(MouseButton button) => _states[(int)button] == ButtonState.Updated;
 
         public Vector2 MousePosition => _mousePosition;
         public Vector2 MouseDelta => _mouseDelta;
         public Vector2 WheelDelta => _wheelDelta;
+
+        public Int2 GlobalMousePosition => _globalMousePosition;
 
         public static MouseButton TranslateButton(SDLButton button) => button switch
         {

@@ -1,17 +1,15 @@
-﻿using Primary.Rendering;
+﻿using Primary.Mathematics;
+using Primary.Rendering;
 using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.Rendering.Structures;
-using Primary.RHI2;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+using Primary.RHI;
 
 namespace Editor.UI.Visual.Passes
 {
+    [RenderPassSetup(RunContext = RenderPassRunContext.PerWindow)]
     internal class UIOverlayRenderPass : IRenderPass
     {
         public UIOverlayRenderPass()
@@ -23,14 +21,14 @@ namespace Editor.UI.Visual.Passes
         {
             if (UIManager.Instance.ActiveHosts.Count > 0)
             {
-                RenderCameraData cameraData = context.Get<RenderCameraData>()!;
+                RenderWindowData windowData = context.Get<RenderWindowData>()!;
                 using (RasterPassDescription desc = renderPass.SetupRasterPass("UI-Overlay", out GenericPassData _))
                 {
-                    foreach (UIDockHost host in UIManager.Instance.ActiveHosts)
+                    foreach (IInterfaceHost host in UIManager.Instance.ActiveHosts)
                     {
-                        if (host.IsExternallyHosted)
+                        if (host is IRenderableHost renderableHost && renderableHost.HostWindow != null)
                         {
-                            desc.UseResource(FGResourceUsage.Write, cameraData.ColorTexture);
+                            desc.UseResource(FGResourceUsage.Write, windowData.ColorTexture);
                         }
                     }
 
@@ -43,28 +41,58 @@ namespace Editor.UI.Visual.Passes
         private static void PassFunction(RasterPassContext context, GenericPassData data)
         {
             RasterCommandBuffer cmd = context.CommandBuffer;
-            RenderCameraData cameraData = context.Container.Get<RenderCameraData>()!;
+            RenderWindowData windowData = context.Container.Get<RenderWindowData>()!;
 
-            foreach (UIDockHost host in UIManager.Instance.ActiveHosts)
+            foreach (IInterfaceHost host in UIManager.Instance.ActiveHosts)
             {
-                if (host.IsExternallyHosted)
+                if (host is IRenderableHost renderableHost && renderableHost.HostWindow == windowData.Window && renderableHost.HostTexture != null)
                 {
-                    cmd.Copy(new FGTextureCopyDesc((FrameGraphTexture)host.HostTexture!, null, cameraData.ColorTexture, 0, 0, 0));
+                    ReadOnlySpan<IWindowHost> hosts = ReadOnlySpan<IWindowHost>.Empty;
 
-                    foreach (UIDockHost child in host.DockedHosts)
+                    Int2 baseOffset = renderableHost.ContentMetrics.Position;
+                    if (host is IWindowDockHost dockHost)
                     {
-                        RecursiveHostCopy(cmd, cameraData.ColorTexture, child);
+                        hosts = dockHost.Hosts;
+                    }
+
+                    RHITexture src = renderableHost.HostTexture;
+
+                    if (src.Description.Width > windowData.ColorTexture.Description.Width - baseOffset.X || src.Description.Height > windowData.ColorTexture.Description.Height - baseOffset.Y)
+                    {
+                        UIManager.Logger?.Warning("Incompatible size between source and destination: {src} >? {dst} (offset: {off})", new Int2(src.Description.Width, src.Description.Height), new Int2(windowData.ColorTexture.Description.Width, windowData.ColorTexture.Description.Height), baseOffset);
+                    }
+                    else
+                        cmd.Copy(new FGTextureCopyDesc((FrameGraphTexture)renderableHost.HostTexture, null, windowData.ColorTexture, (uint)baseOffset.X, (uint)baseOffset.Y, 0));
+
+                    foreach (IWindowHost child in hosts)
+                    {
+                        RecursiveHostCopy(cmd, windowData.ColorTexture, child);
                     }
                 }
             }
 
-            void RecursiveHostCopy(RasterCommandBuffer cmd, FrameGraphTexture dest, UIDockHost host)
+            void RecursiveHostCopy(RasterCommandBuffer cmd, FrameGraphTexture dest, IWindowHost host)
             {
                 if (host.HostTexture != null)
                 {
-                    cmd.Copy(new FGTextureCopyDesc((FrameGraphTexture)host.HostTexture!, null, dest, (uint)host.ClientOffset.X, (uint)host.ClientOffset.Y, 0));
+                    ReadOnlySpan<IWindowHost> hosts = ReadOnlySpan<IWindowHost>.Empty;
 
-                    foreach (UIDockHost child in host.DockedHosts)
+                    Int2 baseOffset = host.ContentMetrics.Position;
+                    if (host is IWindowDockHost dockHost)
+                    {
+                        hosts = dockHost.Hosts;
+                    }
+
+                    RHITexture src = host.HostTexture;
+
+                    if (src.Description.Width > windowData.ColorTexture.Description.Width - baseOffset.X || src.Description.Height > windowData.ColorTexture.Description.Height - baseOffset.Y)
+                    {
+                        UIManager.Logger?.Warning("Incompatible size between source and destination: {src} >? {dst} (offset: {off})", new Int2(src.Description.Width, src.Description.Height), new Int2(windowData.ColorTexture.Description.Width, windowData.ColorTexture.Description.Height), baseOffset);
+                    }
+                    else
+                        cmd.Copy(new FGTextureCopyDesc((FrameGraphTexture)src, null, dest, (uint)baseOffset.X, (uint)baseOffset.Y, 0));
+
+                    foreach (UIDockHost child in hosts)
                     {
                         RecursiveHostCopy(cmd, dest, child);
                     }

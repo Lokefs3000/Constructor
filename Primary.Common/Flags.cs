@@ -32,6 +32,19 @@ namespace Primary.Common
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe bool HasExclusive<TEnum>(TEnum a, TEnum b, TEnum flags) where TEnum : unmanaged
+        {
+            switch (sizeof(TEnum))
+            {
+                case 1: return ((Unsafe.BitCast<TEnum, byte>(a) ^ Unsafe.BitCast<TEnum, byte>(b)) & Unsafe.BitCast<TEnum, byte>(flags)) == Unsafe.BitCast<TEnum, byte>(flags);
+                case 2: return ((Unsafe.BitCast<TEnum, ushort>(a) ^ Unsafe.BitCast<TEnum, ushort>(b)) & Unsafe.BitCast<TEnum, ushort>(flags)) == Unsafe.BitCast<TEnum, ushort>(flags);
+                case 4: return ((Unsafe.BitCast<TEnum, uint>(a) ^ Unsafe.BitCast<TEnum, uint>(b)) & Unsafe.BitCast<TEnum, uint>(flags)) == Unsafe.BitCast<TEnum, uint>(flags);
+                case 8: return ((Unsafe.BitCast<TEnum, ulong>(a) ^ Unsafe.BitCast<TEnum, ulong>(b)) & Unsafe.BitCast<TEnum, ulong>(flags)) == Unsafe.BitCast<TEnum, ulong>(flags);
+                default: return false;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe TEnum AddFlags<TEnum>(TEnum value, TEnum flags) where TEnum : unmanaged
         {
             switch (sizeof(TEnum))
@@ -68,6 +81,19 @@ namespace Primary.Common
                 case 8: return Unsafe.BitCast<ulong, TEnum>((ulong)(*(ulong*)&value ^ *(ulong*)&flags));
                 default: return value;
             }
+        }
+    }
+
+    public static class FlagsExtensions
+    {
+        extension<TEnum>(TEnum value) where TEnum : unmanaged, Enum
+        {
+            public bool HasFlags(TEnum flags) => Flags.HasFlag(value, flags);
+            public bool HasAny(TEnum flags) => Flags.HasEither(value, flags);
+
+            public TEnum AddFlags(TEnum flags) => Flags.AddFlags(value, flags);
+            public TEnum RemoveFlags(TEnum flags) => Flags.RemoveFlags(value, flags);
+            public TEnum ChangeFlags(TEnum flags) => Flags.ChangeFlags(value, flags);
         }
     }
 }

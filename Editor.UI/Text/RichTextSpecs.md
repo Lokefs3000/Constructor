@@ -9,7 +9,8 @@
 - **I** - Quickhand for italic text
 - **BI** - Quickhand for bold-italic text
 - **Style** - Set the font style
-	- "Name": Set a specific *style* from the *current font*
+	- "Weight": Set a specific *style* from the *current font*
+	- "Weight style": Set a specific *style* from the *current font*
 - **Size** - Specify text size
 	- "0-Inf px/em" - Specify current *size* of text in pixels or ems
 - **Stroke**: Set stroke state

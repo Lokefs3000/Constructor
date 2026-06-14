@@ -67,7 +67,7 @@ namespace Primary.Rendering.Batching
                 //ref readonly RenderKey lastKey = ref keys[keys.Length - 1];
 
                 {
-                    ref readonly RenderKey firstKey = ref keys[keys.Length - 1];
+                    ref readonly RenderKey firstKey = ref keys[0];
                     Debug.Assert(firstKey.ShaderId == shaderKey);
 
                     previous = firstKey;

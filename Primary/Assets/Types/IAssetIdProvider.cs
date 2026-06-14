@@ -11,7 +11,9 @@ namespace Primary.Assets.Types
 {
     public interface IAssetIdProvider
     {
+        /// <summary>Thread-safe</summary>
         public string? RetrievePathForId(AssetId assetId);
+        /// <summary>Thread-safe</summary>
         public AssetId RetriveIdForPath(ReadOnlySpan<char> path);
 
         public static readonly AssetId Invalid = new AssetId(Guid.Empty);

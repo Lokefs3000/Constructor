@@ -14,11 +14,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Elements\Menu\" />
     <Folder Include="IO\" />
+    <Folder Include="Snippets\" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Diagnostics" Version="8.4.0" />
+    <PackageReference Include="CommunityToolkit.Diagnostics" Version="8.4.2" />
     <PackageReference Include="Sigil" Version="5.0.0" />
   </ItemGroup>
 

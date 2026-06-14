@@ -46,7 +46,7 @@ namespace Editor
                 return;
             }
 
-            using (Editor editor = new Editor(Path.GetFullPath(args[0]), args))
+            using (EditorRuntime editor = new EditorRuntime(Path.GetFullPath(args[0]), args))
             {
                 editor.Run();
             }

@@ -97,7 +97,7 @@ namespace Editor.Assets.Importers
 
             pipeline.ReloadAsset(id);
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ComputeShaderAsset>(new AssetDatabaseEntry(id, localInputFile, true));
+            EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ComputeShaderAsset>(new AssetDatabaseEntry(id, localInputFile, true));
             return false;
         }
 
@@ -108,18 +108,18 @@ namespace Editor.Assets.Importers
 
             if (stream == null || stream.Length < Unsafe.SizeOf<CBCHeader>())
             {
-                Editor.GlobalSingleton.AssetDatabase.AddEntry<ComputeShaderAsset>(new AssetDatabaseEntry(id, localFilePath, false));
+                EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ComputeShaderAsset>(new AssetDatabaseEntry(id, localFilePath, false));
                 return;
             }
 
             CBCHeader header = stream.Read<CBCHeader>();
             if (header.Header != CBCHeader.ConstHeader || header.Version != CBCHeader.ConstVersion)
             {
-                Editor.GlobalSingleton.AssetDatabase.AddEntry<ComputeShaderAsset>(new AssetDatabaseEntry(id, localFilePath, false));
+                EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ComputeShaderAsset>(new AssetDatabaseEntry(id, localFilePath, false));
                 return;
             }
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ComputeShaderAsset>(new AssetDatabaseEntry(id, localFilePath, true));
+            EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ComputeShaderAsset>(new AssetDatabaseEntry(id, localFilePath, true));
         }
 
         public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)

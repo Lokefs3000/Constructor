@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Editor.UI.Elements;
+using Editor.UI.Modifiers;
 using Editor.UI.Reflection;
 using Primary.Collections;
 using Primary.Utility;
@@ -11,14 +12,14 @@ using System.Text;
 
 namespace Editor.UI.Styling
 {
-    public class StyleBase
+    public abstract class StyleBase
     {
         private CachedElementData _data;
         private StyleCache _cache;
 
         private HashSet<StateOverrideKey> _overriden;
         private HashSet<string> _invalid;
-
+ 
         private List<string>? _classes;
 
         private int _enabledStates;
@@ -44,12 +45,15 @@ namespace Editor.UI.Styling
 
         internal void UpdateAllProperties()
         {
+            throw new InvalidOperationException("OUT OF DATE");
+
             if (_cache.Properties.Length == 0)
                 return;
 
-            UIElement? thisAsElement = this as UIElement;
-            if (thisAsElement != null)
-                thisAsElement.WindowOwner?.StyleUpdater.RemoveInvalidStyleBase(this);
+            if (!_cache.IsInitialized)
+                UIManager.Instance.ReflectionManager.PropertyCache.InitializeDefaults(this);
+
+            StyleUpdater?.RemoveInvalidStyleBase(this);
 
             UIStateFlags flags = UIStateFlags.None;
 
@@ -57,13 +61,15 @@ namespace Editor.UI.Styling
 
             HashSet<(string, int)> properties = _cache.Properties
                 .Where((x) => x.Type == StylePropertyType.Styleable && !_overriden.Contains(new StateOverrideKey(x.Name)))
-                .Select((x, i) => (x.Name, Array.FindIndex(_cache.Properties, (x2) => x2.Name == x.Name)))
+                .Select((x, i) => (x.Name, _cache.FindIndex(x.Name)))
                 .ToHashSet();
 
             if (properties.Count == 0)
                 return;
 
-            StyleProvider provider = Unsafe.As<UIElement>(this).WindowOwner!.StyleProvider;
+            StyleProvider? provider = StyleProvider;
+            if (provider == null)
+                return;
 
             List<(string, int)> updates = new List<(string, int)>();
 
@@ -76,10 +82,10 @@ namespace Editor.UI.Styling
                     {
                         if (@class.TryGetProperty(property.Item1, out object? value))
                         {
-                            _cache.Properties[property.Item2].Field.SetValue(this, value);
+                            _cache.Properties[property.Item2].Field!.SetValue(this, value);
 
                             updates.Add(property);
-                            flags |= _cache.Properties[property.Item2].Effect;
+                            flags |= _cache.Properties[property.Item2].Effects;
                         }
                     }
 
@@ -98,16 +104,25 @@ namespace Editor.UI.Styling
                 }
             }
 
-            if (thisAsElement != null)
-                thisAsElement.AddStateFlags(flags);
+            if (flags != UIStateFlags.None)
+            {
+                if (this is UIElement element)
+                    element.AddStateFlags(flags);
+                else if (this is IUILayoutModifier modifier)
+                    modifier.Owner.AddStateFlags(flags);
+            }
         }
 
         internal void UpdateProperty(string propertyName, bool ignoreOverride = false)
         {
+            throw new InvalidOperationException("OUT OF DATE");
+
             if (!ignoreOverride && _overriden.Contains(new StateOverrideKey(propertyName)))
                 return;
 
-            StyleProvider provider = Unsafe.As<UIElement>(this).WindowOwner!.StyleProvider;
+            StyleProvider? provider = StyleProvider;
+            if (provider == null)
+                return;
 
             StyleProperty property = _cache.FindProperty(propertyName);
             if (property.Field != null && property.Type == StylePropertyType.Styleable)
@@ -121,16 +136,17 @@ namespace Editor.UI.Styling
                     return;
 
                 bool wasRemoved = _invalid.Remove(propertyName);
-                if (this is UIElement element && property.Effect != UIStateFlags.None)
+                if (property.Effects != UIStateFlags.None)
                 {
-                    element.AddStateFlags(property.Effect);
+                    if (this is UIElement element)
+                        element.AddStateFlags(property.Effects);
+                    else if (this is IUILayoutModifier modifier)
+                        modifier.Owner.AddStateFlags(property.Effects);
 
                     if (wasRemoved)
-                        element.WindowOwner?.StyleUpdater.RemoveInvalidStyleBase(this);
+                        StyleUpdater?.RemoveInvalidStyleBase(this);
                 }
             }
-
-
         }
 
         internal UIStateFlags UpdateInvalidProperties()
@@ -138,9 +154,18 @@ namespace Editor.UI.Styling
             UIStateFlags flags = UIStateFlags.None;
 
             PropertyCache propertyCache = UIManager.Instance.ReflectionManager.PropertyCache;
-            StyleProvider provider = Unsafe.As<UIElement>(this).WindowOwner!.StyleProvider;
+            StyleProvider? provider = StyleProvider;
+
+            if (provider == null)
+                return UIStateFlags.None;
+
+            if (!_cache.IsInitialized)
+                UIManager.Instance.ReflectionManager.PropertyCache.InitializeDefaults(this);
 
             using RentedList<string> updated = new RentedList<string>(16);
+
+            s_usedFieldNames ??= [];
+            s_usedFieldNames.Clear();
 
             int stateMaxIndex = _currentStateShift + 1;
 
@@ -159,8 +184,11 @@ namespace Editor.UI.Styling
                             {
                                 if (propertyCache.TryFindProperty(GetType(), property, out StyleProperty styleProperty))
                                 {
-                                    styleProperty.Field.SetValue(this, value);
-                                    flags |= styleProperty.Effect;
+                                    if (s_usedFieldNames.Add(styleProperty.LocalName ?? styleProperty.Name))
+                                    {
+                                        styleProperty.Field!.SetValue(this, value);
+                                        flags |= styleProperty.Effects;
+                                    }
 
                                     updated.Add(property);
                                 }
@@ -170,7 +198,7 @@ namespace Editor.UI.Styling
                                 break;
                             }
                         }
-                       
+
                     }
 
                     if (updated.Count > 0)
@@ -197,8 +225,11 @@ namespace Editor.UI.Styling
                     {
                         if (styleProperty.HasDefaultValue)
                         {
-                            styleProperty.Field.SetValue(this, styleProperty.DefaultValue);
-                            flags |= styleProperty.Effect;
+                            if (s_usedFieldNames.Add(styleProperty.LocalName ?? styleProperty.Name))
+                            {
+                                styleProperty.Field!.SetValue(this, styleProperty.DefaultValue);
+                                flags |= styleProperty.Effects;
+                            }
 
                             updated.Add(property);
                         }
@@ -237,6 +268,7 @@ namespace Editor.UI.Styling
         internal void SetAsOverriden(string propertyName, string stateName = "Normal")
         {
             _overriden.Add(new StateOverrideKey(propertyName, stateName));
+            _invalid.Remove(propertyName);
         }
 
         public void AddClass(string className)
@@ -265,8 +297,7 @@ namespace Editor.UI.Styling
                 }
             }
 
-            if (this is UIElement element)
-                element.WindowOwner?.StyleUpdater.AddInvalidStyleBase(this);
+            StyleUpdater?.AddInvalidStyleBase(this);
         }
 
         public void ResetProperty(string propertyName, string stateName = "Normal")
@@ -286,8 +317,13 @@ namespace Editor.UI.Styling
 
                 UIManager.Instance.ReflectionManager.MethodGenerator.GetSetterDelegate<T>(property.Field)(this, value);
 
-                if (this is UIElement element && property.Effect != UIStateFlags.None)
-                    element.AddStateFlags(property.Effect);
+                if (property.Effects != UIStateFlags.None)
+                {
+                    if (this is UIElement element)
+                        element.AddStateFlags(property.Effects);
+                    else if (this is IUILayoutModifier modifier)
+                        modifier.Owner.AddStateFlags(property.Effects);
+                }
             }
         }
 
@@ -302,8 +338,13 @@ namespace Editor.UI.Styling
 
                 UIManager.Instance.ReflectionManager.MethodGenerator.GetSetterDelegate<T>(property.Field)(this, value);
 
-                if (this is UIElement element && property.Effect != UIStateFlags.None)
-                    element.AddStateFlags(property.Effect);
+                if (property.Effects != UIStateFlags.None)
+                {
+                    if (this is UIElement element)
+                        element.AddStateFlags(property.Effects);
+                    else if (this is IUILayoutModifier modifier)
+                        modifier.Owner.AddStateFlags(property.Effects);
+                }
             }
         }
 
@@ -345,7 +386,15 @@ namespace Editor.UI.Styling
             }
         }
 
+        protected abstract StyleUpdater? StyleUpdater { get; }
+        protected abstract StyleProvider? StyleProvider { get; }
+
         public bool HasInvalidProperties => _invalid.Count > 0;
+
+        public string CurrentStateName => _currentStateName;
+
+        [ThreadStatic]
+        private static HashSet<string>? s_usedFieldNames;
 
         private readonly record struct StateOverrideKey(string Property, string State = "Normal")
         {

@@ -25,20 +25,24 @@ namespace Editor.Interop.Ed
 
         [LibraryImport(ModuleName)]
         [return: MarshalAs(UnmanagedType.I1)]
-        public static partial bool LoadPNG(ref ImageLoadData imageData, ref ImageBitmap bitmap);
+        public static partial bool LoadPNG(ref ImageLoadData imageData, ref ImageBitmap bitmap, sbyte** errorOutput);
         [LibraryImport(ModuleName)]
         public static partial void FreePNG(ref ImageBitmap bitmap);
         [LibraryImport(ModuleName)]
-        [return: MarshalAs(UnmanagedType.I1)]
-        public static partial bool QueryPNG(ref ImageLoadData imageData, ref ImageMetrics metrics);
+        public static partial void FreePNGError(sbyte* errorOutput);
         [LibraryImport(ModuleName)]
         [return: MarshalAs(UnmanagedType.I1)]
-        public static partial bool LoadJPEG(ref ImageLoadData imageData, ref ImageBitmap bitmap);
+        public static partial bool QueryPNG(ref ImageLoadData imageData, ref ImageMetrics metrics, sbyte** errorOutput);
+        [LibraryImport(ModuleName)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static partial bool LoadJPEG(ref ImageLoadData imageData, ref ImageBitmap bitmap, sbyte** errorOutput);
         [LibraryImport(ModuleName)]
         public static partial void FreeJPEG(ref ImageBitmap bitmap);
         [LibraryImport(ModuleName)]
+        public static partial void FreeJPEGError(sbyte* errorOutput);
+        [LibraryImport(ModuleName)]
         [return: MarshalAs(UnmanagedType.I1)]
-        public static partial bool QueryJPEG(ref ImageLoadData imageData, ref ImageMetrics metrics);
+        public static partial bool QueryJPEG(ref ImageLoadData imageData, ref ImageMetrics metrics, sbyte** errorOutput);
 
         public const string ModuleName = "texinterop";
 

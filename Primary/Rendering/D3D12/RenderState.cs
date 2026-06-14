@@ -1,6 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
-using Primary.RHI2.Direct3D12;
+using Primary.RHI.Direct3D12;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

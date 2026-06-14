@@ -43,7 +43,7 @@ namespace Primary.Utility
         public T Calculate()
         {
             T def = default;
-            for (int i = _head - 1; i == _head; i = i < 0 ? _values.Length - 1 : i - 1)
+            for (int i = 0; i < _values.Length; i++)
             {
                 def += _values[i];
             }

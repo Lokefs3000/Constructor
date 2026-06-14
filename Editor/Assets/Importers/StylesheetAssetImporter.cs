@@ -32,7 +32,7 @@ namespace Editor.UI.Assets.Importers
 
             pipeline.ReloadAsset(id);
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<StylesheetAsset>(new AssetDatabaseEntry(id, localInputFile, true));
+            EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<StylesheetAsset>(new AssetDatabaseEntry(id, localInputFile, true));
             return true;
         }
 
@@ -40,10 +40,10 @@ namespace Editor.UI.Assets.Importers
         {
             if (!ValidateFile(localFilePath, filesystem, pipeline))
             {
-                Editor.GlobalSingleton.AssetDatabase.AddEntry<StylesheetAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, false));
+                EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<StylesheetAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, false));
             }
             else
-                Editor.GlobalSingleton.AssetDatabase.AddEntry<StylesheetAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, true));
+                EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<StylesheetAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, true));
         }
 
         public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)

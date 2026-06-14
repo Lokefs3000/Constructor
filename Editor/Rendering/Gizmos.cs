@@ -1,6 +1,7 @@
 ﻿using Arch.LowLevel;
 using CommunityToolkit.HighPerformance;
 using Primary.Common;
+using Primary.Mathematics;
 using Primary.Rendering.Debuggable;
 using System;
 using System.Collections.Generic;
@@ -8,133 +9,136 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using TerraFX.Interop.Windows;
 
 namespace Editor.Rendering
 {
-    public sealed class Gizmos : IDisposable, IDebugRenderer
+    public sealed class Gizmos : IDisposable
     {
         private static readonly WeakReference s_instance = new WeakReference(null);
 
-        private List<GZDrawSection> _drawSections;
-        private UnsafeList<GZVertex> _vertices;
+        private List<GizmoSection> _sections;
 
-        private int _currentVertexOffset;
-        private GZVertexType _currentVertexType;
+        private List<GizmoVertex> _vertices;
+        private List<uint> _indices;
 
-        private Stack<StackMatrix> _matrixStack;
-        private bool _matriciesHaveChanged;
+        private Color _primaryColor;
 
-        private bool _disposedValue;
+        private GizmosMode _currentMode;
 
         internal Gizmos()
         {
-            Debug.Assert(s_instance.Target == null);
             s_instance.Target = this;
 
-            _drawSections = new List<GZDrawSection>();
-            _vertices = new UnsafeList<GZVertex>(32);
+            _sections = new List<GizmoSection>();
 
-            _currentVertexOffset = 0;
-            _currentVertexType = unchecked((GZVertexType)(-1));
+            _vertices = new List<GizmoVertex>();
+            _indices = new List<uint>();
 
-            _matrixStack = new Stack<StackMatrix>();
-            _matriciesHaveChanged = false;
-        }
+            _primaryColor = Color.White;
 
-        private void Dispose(bool disposing)
-        {
-            if (!_disposedValue)
-            {
-                _vertices.Dispose();
-                _vertices = new UnsafeList<GZVertex>();
-
-                s_instance.Target = null;
-                _disposedValue = true;
-            }
-        }
-
-        ~Gizmos()
-        {
-            Dispose(disposing: false);
+            _currentMode = GizmosMode.Undefined;
         }
 
         public void Dispose()
         {
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
+            if (s_instance.Target == this)
+                s_instance.Target = null;
         }
 
         internal void ClearDrawData()
         {
-            _drawSections.Clear(); 
+            _sections.Clear();
+
             _vertices.Clear();
+            _indices.Clear();
 
-            _currentVertexOffset = 0;
-            _currentVertexType = unchecked((GZVertexType)(-1));
+            _primaryColor = Color.White;
 
-            _matrixStack.Clear();
-            _matriciesHaveChanged = true;
+            _currentMode = GizmosMode.Undefined;
         }
 
-        internal void FinishDrawData()
+        private void CheckCurrentSection(GizmosMode mode)
         {
-            if (_vertices.Count > _currentVertexOffset)
+            if (_currentMode != mode)
             {
-                AddNewSection(GZVertexType.Triangle);
+                _sections.Add(new GizmoSection(_indices.Count, mode));
+                _currentMode = mode;
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ChangeActiveSectionIfNeeded(GZVertexType vt)
-        {
-            if (_vertices.Count > _currentVertexOffset && _currentVertexType != vt)
-                AddNewSection(vt);
-        }
-
-        private void AddNewSection(GZVertexType vt)
-        {
-            if (_vertices.Count <= _currentVertexOffset)
-                return;
-            if (!_matrixStack.TryPeek(out StackMatrix matrix))
-                matrix = new StackMatrix(Matrix4x4.Identity, true);
-
-            _drawSections.Add(new GZDrawSection(_matriciesHaveChanged ? matrix.Matrix : null, matrix.Multiplied, _currentVertexType, _vertices.Count - _currentVertexOffset));
-            
-            _currentVertexOffset = _vertices.Count;
-            _currentVertexType = vt;
-            _matriciesHaveChanged = false;
-        }
-
         #region Interface
-        public void DrawLine(Vector3 from, Vector3 to, Color color)
+        public static void DrawLine(Vector3 from, Vector3 to, Color? color = null)
         {
-            ChangeActiveSectionIfNeeded(GZVertexType.Line);
+            Gizmos self = Instance;
+            self.CheckCurrentSection(GizmosMode.Wire);
 
-            _vertices.Add(new GZVertex(from, color));
-            _vertices.Add(new GZVertex(to, color));
+            Color c = color.GetValueOrDefault(self._primaryColor);
+
+            self._indices.Add((uint)self._vertices.Count);
+            self._indices.Add((uint)(self._vertices.Count + 1));
+
+            self._vertices.Add(new GizmoVertex(from, c));
+            self._vertices.Add(new GizmoVertex(to, c));
         }
 
-        public void DrawVector(Vector3 position)
+        public static void DrawVector(Vector3 position)
         {
-            ChangeActiveSectionIfNeeded(GZVertexType.Line);
+            Gizmos self = Instance;
+            self.CheckCurrentSection(GizmosMode.Wire);
 
-            _vertices.Add(new GZVertex(position + Vector3.UnitX, Color.Red));
-            _vertices.Add(new GZVertex(position + Vector3.UnitY, Color.Green));
-            _vertices.Add(new GZVertex(position + Vector3.UnitZ, Color.Blue));
+            self._indices.Add((uint)self._vertices.Count);
+            self._indices.Add((uint)(self._vertices.Count + 3));
+            self._indices.Add((uint)(self._vertices.Count + 1));
+            self._indices.Add((uint)(self._vertices.Count + 4));
+            self._indices.Add((uint)(self._vertices.Count + 2));
+            self._indices.Add((uint)(self._vertices.Count + 5));
+
+            self._vertices.Add(new GizmoVertex(position, Color.Red));
+            self._vertices.Add(new GizmoVertex(position, Color.Green));
+            self._vertices.Add(new GizmoVertex(position, Color.Blue));
+
+            self._vertices.Add(new GizmoVertex(position + Vector3.UnitX, Color.Red));
+            self._vertices.Add(new GizmoVertex(position + Vector3.UnitY, Color.Green));
+            self._vertices.Add(new GizmoVertex(position + Vector3.UnitZ, Color.Blue));
         }
 
-        public void DrawWireSphere(Vector3 center, float radius, Color color)
+        public static void DrawWireTriangle(Vector3 pointA, Vector3 pointB, Vector3 pointC, Color? color = null)
         {
-            ChangeActiveSectionIfNeeded(GZVertexType.Line);
+            Gizmos self = Instance;
+            self.CheckCurrentSection(GizmosMode.Wire);
 
-            const int Steps = 16;
+            Color c = color.GetValueOrDefault(self._primaryColor);
+
+            uint i0 = (uint)self._vertices.Count;
+            uint i1 = (uint)(self._vertices.Count + 1);
+            uint i2 = (uint)(self._vertices.Count + 2);
+
+            self._indices.Add(i0);
+            self._indices.Add(i1);
+
+            self._indices.Add(i1);
+            self._indices.Add(i2);
+
+            self._indices.Add(i2);
+            self._indices.Add(i0);
+
+            self._vertices.Add(new GizmoVertex(pointA, c));
+            self._vertices.Add(new GizmoVertex(pointB, c));
+            self._vertices.Add(new GizmoVertex(pointC, c));
+        }
+
+        public static void DrawWireSphere(Vector3 center, float radius, Color? color = null)
+        {
+            Gizmos self = Instance;
+            self.CheckCurrentSection(GizmosMode.Wire);
+
+            Color c = color.GetValueOrDefault(self._primaryColor);
+
+            const int Steps = 12;
             const float StepMult = float.Pi * 2.0f / Steps;
 
-            Vector3 lastPositionX = Vector3.Zero;
-            Vector3 lastPositionY = Vector3.Zero;
-            Vector3 lastPositionZ = Vector3.Zero;
-
-            for (int i = 0; i < Steps; i++)
+            for (int i = 0; i <= Steps; ++i)
             {
                 (float sin, float cos) = MathF.SinCos(i * StepMult);
 
@@ -146,59 +150,183 @@ namespace Editor.Rendering
 
                 if (i > 0)
                 {
-                    _vertices.Add(new GZVertex(lastPositionX, color));
-                    _vertices.Add(new GZVertex(positionX, color));
+                    self._indices.Add((uint)(self._vertices.Count - 3));
+                    self._indices.Add((uint)self._vertices.Count);
 
-                    _vertices.Add(new GZVertex(lastPositionY, color));
-                    _vertices.Add(new GZVertex(positionY, color));
+                    self._indices.Add((uint)(self._vertices.Count - 2));
+                    self._indices.Add((uint)(self._vertices.Count + 1));
 
-                    _vertices.Add(new GZVertex(lastPositionZ, color));
-                    _vertices.Add(new GZVertex(positionZ, color));
+                    self._indices.Add((uint)(self._vertices.Count - 1));
+                    self._indices.Add((uint)(self._vertices.Count + 2));
                 }
 
-                lastPositionX = positionX;
-                lastPositionY = positionY;
-                lastPositionZ = positionZ;
+                self._vertices.Add(new GizmoVertex(positionX, c));
+                self._vertices.Add(new GizmoVertex(positionY, c));
+                self._vertices.Add(new GizmoVertex(positionZ, c));
             }
         }
 
-        public void DrawWireAABB(AABB aabb, Color color)
+        public static void DrawWireAABB(AABB aabb, Color? color = null)
         {
-            ChangeActiveSectionIfNeeded(GZVertexType.Line);
+            Gizmos self = Instance;
+            self.CheckCurrentSection(GizmosMode.Wire);
 
-            _vertices.Add(new GZVertex(aabb.Minimum, color));
-            _vertices.Add(new GZVertex(new Vector3(aabb.Maximum.X, aabb.Minimum.Y, aabb.Minimum.Z), color));
+            Color c = color.GetValueOrDefault(self._primaryColor);
 
-            _vertices.Add(new GZVertex(new Vector3(aabb.Minimum.X, aabb.Maximum.Y, aabb.Minimum.Z), color));
-            _vertices.Add(new GZVertex(new Vector3(aabb.Maximum.X, aabb.Maximum.Y, aabb.Minimum.Z), color));
+            uint i0 = (uint)self._vertices.Count;
+            uint i1 = (uint)(self._vertices.Count + 1);
+            uint i2 = (uint)(self._vertices.Count + 2);
+            uint i3 = (uint)(self._vertices.Count + 3);
+            uint i4 = (uint)(self._vertices.Count + 4);
+            uint i5 = (uint)(self._vertices.Count + 5);
+            uint i6 = (uint)(self._vertices.Count + 6);
+            uint i7 = (uint)(self._vertices.Count + 7);
 
-            _vertices.Add(new GZVertex(new Vector3(aabb.Minimum.X, aabb.Minimum.Y, aabb.Maximum.Z), color));
-            _vertices.Add(new GZVertex(new Vector3(aabb.Maximum.X, aabb.Minimum.Y, aabb.Maximum.Z), color));
+            self._indices.Add(i0);
+            self._indices.Add(i5);
+            self._indices.Add(i1);
+            self._indices.Add(i4);
 
-            _vertices.Add(new GZVertex(new Vector3(aabb.Minimum.X, aabb.Maximum.Y, aabb.Minimum.Z), color));
-            _vertices.Add(new GZVertex(new Vector3(aabb.Maximum.X, aabb.Maximum.Y, aabb.Minimum.Z), color));
+            self._indices.Add(i0);
+            self._indices.Add(i1);
+            self._indices.Add(i5);
+            self._indices.Add(i4);
 
-            _vertices.Add(new GZVertex(new Vector3(aabb.Minimum.X, aabb.Minimum.Y, aabb.Minimum.Z), color));
-            _vertices.Add(new GZVertex(new Vector3(aabb.Minimum.X, aabb.Maximum.Y, aabb.Minimum.Z), color));
+            self._indices.Add(i3);
+            self._indices.Add(i6);
+            self._indices.Add(i2);
+            self._indices.Add(i7);
 
-            _vertices.Add(new GZVertex(new Vector3(aabb.Maximum.X, aabb.Minimum.Y, aabb.Minimum.Z), color));
-            _vertices.Add(new GZVertex(new Vector3(aabb.Maximum.X, aabb.Maximum.Y, aabb.Minimum.Z), color));
+            self._indices.Add(i3);
+            self._indices.Add(i2);
+            self._indices.Add(i6);
+            self._indices.Add(i7);
 
-            _vertices.Add(new GZVertex(new Vector3(aabb.Minimum.X, aabb.Minimum.Y, aabb.Maximum.Z), color));
-            _vertices.Add(new GZVertex(new Vector3(aabb.Minimum.X, aabb.Maximum.Y, aabb.Maximum.Z), color));
+            self._indices.Add(i0);
+            self._indices.Add(i3);
+            self._indices.Add(i1);
+            self._indices.Add(i2);
 
-            _vertices.Add(new GZVertex(new Vector3(aabb.Maximum.X, aabb.Minimum.Y, aabb.Maximum.Z), color));
-            _vertices.Add(new GZVertex(new Vector3(aabb.Maximum.X, aabb.Maximum.Y, aabb.Maximum.Z), color));
+            self._indices.Add(i5);
+            self._indices.Add(i6);
+            self._indices.Add(i4);
+            self._indices.Add(i7);
+
+            self._vertices.Add(new GizmoVertex(aabb.Minimum, c));                                                   // ---      0
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Maximum.X, aabb.Minimum.Y, aabb.Minimum.Z), c));    // +--      1
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Maximum.X, aabb.Maximum.Y, aabb.Minimum.Z), c));    // ++-      2
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Minimum.X, aabb.Maximum.Y, aabb.Minimum.Z), c));    // -+-      3
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Maximum.X, aabb.Minimum.Y, aabb.Maximum.Z), c));    // +-+      4
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Minimum.X, aabb.Minimum.Y, aabb.Maximum.Z), c));    // --+      5
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Minimum.X, aabb.Maximum.Y, aabb.Maximum.Z), c));    // -++      6
+            self._vertices.Add(new GizmoVertex(aabb.Maximum, c));                                                   // +++      7
         }
 
-        public void DrawWireCircle(Vector3 center, float radius, Color color)
+        public static void DrawWireBox(Vector3 min, Vector3 max, Color? color = null) => DrawWireAABB(new AABB(min, max), color);
+
+        public static void DrawSolidAABB(AABB aabb, Color? color = null)
         {
-            ChangeActiveSectionIfNeeded(GZVertexType.Line);
+            Gizmos self = Instance;
+            self.CheckCurrentSection(GizmosMode.Solid);
+
+            Color c = color.GetValueOrDefault(self._primaryColor);
+
+            uint i0 = (uint)self._vertices.Count;
+            uint i1 = (uint)(self._vertices.Count + 1);
+            uint i2 = (uint)(self._vertices.Count + 2);
+            uint i3 = (uint)(self._vertices.Count + 3);
+            uint i4 = (uint)(self._vertices.Count + 4);
+            uint i5 = (uint)(self._vertices.Count + 5);
+            uint i6 = (uint)(self._vertices.Count + 6);
+            uint i7 = (uint)(self._vertices.Count + 7);
+
+            self._indices.Add(i1);
+            self._indices.Add(i2);
+            self._indices.Add(i0);
+
+            self._indices.Add(i0);
+            self._indices.Add(i2);
+            self._indices.Add(i3);
+
+            self._indices.Add(i6);
+            self._indices.Add(i7);
+            self._indices.Add(i5);
+
+            self._indices.Add(i4);
+            self._indices.Add(i5);
+            self._indices.Add(i7);
+
+            self._indices.Add(i6);
+            self._indices.Add(i5);
+            self._indices.Add(i0);
+
+            self._indices.Add(i6);
+            self._indices.Add(i0);
+            self._indices.Add(i3);
+
+            self._indices.Add(i1);
+            self._indices.Add(i4);
+            self._indices.Add(i7);
+
+            self._indices.Add(i2);
+            self._indices.Add(i1);
+            self._indices.Add(i7);
+
+            self._indices.Add(i7);
+            self._indices.Add(i6);
+            self._indices.Add(i3);
+
+            self._indices.Add(i2);
+            self._indices.Add(i7);
+            self._indices.Add(i3);
+
+            self._indices.Add(i0);
+            self._indices.Add(i5);
+            self._indices.Add(i4);
+
+            self._indices.Add(i4);
+            self._indices.Add(i1);
+            self._indices.Add(i0);
+
+            self._vertices.Add(new GizmoVertex(aabb.Minimum, c));                                                   // ---      0
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Maximum.X, aabb.Minimum.Y, aabb.Minimum.Z), c));    // +--      1
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Maximum.X, aabb.Maximum.Y, aabb.Minimum.Z), c));    // ++-      2
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Minimum.X, aabb.Maximum.Y, aabb.Minimum.Z), c));    // -+-      3
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Maximum.X, aabb.Minimum.Y, aabb.Maximum.Z), c));    // +-+      4
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Minimum.X, aabb.Minimum.Y, aabb.Maximum.Z), c));    // --+      5
+            self._vertices.Add(new GizmoVertex(new Vector3(aabb.Minimum.X, aabb.Maximum.Y, aabb.Maximum.Z), c));    // -++      6
+            self._vertices.Add(new GizmoVertex(aabb.Maximum, c));                                                   // +++      7
+        }
+
+        public static void DrawSolidTriangle(Vector3 pointA, Vector3 pointB, Vector3 pointC, Color? color = null)
+        {
+            Gizmos self = Instance;
+            self.CheckCurrentSection(GizmosMode.Solid);
+
+            Color c = color.GetValueOrDefault(self._primaryColor);
+
+            uint i0 = (uint)self._vertices.Count;
+            uint i1 = (uint)(self._vertices.Count + 1);
+            uint i2 = (uint)(self._vertices.Count + 2);
+
+            self._indices.Add(i0);
+            self._indices.Add(i2);
+            self._indices.Add(i1);
+
+            self._vertices.Add(new GizmoVertex(pointA, c));
+            self._vertices.Add(new GizmoVertex(pointB, c));
+            self._vertices.Add(new GizmoVertex(pointC, c));
+        }
+
+        public static void DrawWireCircle(Vector3 center, float radius, Color? color = null)
+        {
+            Gizmos self = Instance;
+            self.CheckCurrentSection(GizmosMode.Wire);
+
+            Color c = color.GetValueOrDefault(self._primaryColor);
 
             const int Steps = 32;
             const float StepMult = float.Pi * 2.0f / Steps;
-
-            Vector3 lastPosition = Vector3.Zero;
 
             for (int i = 0; i < Steps; i++)
             {
@@ -209,75 +337,89 @@ namespace Editor.Rendering
 
                 if (i > 0)
                 {
-                    _vertices.Add(new GZVertex(lastPosition, color));
-                    _vertices.Add(new GZVertex(position, color));
+                    self._indices.Add((uint)(self._vertices.Count - 1));
+                    self._indices.Add((uint)self._vertices.Count);
                 }
 
-                lastPosition = position;
+                self._vertices.Add(new GizmoVertex(position, c));
             }
         }
 
-        public void DrawWireRect(Vector2 min, Vector2 max, Color color)
+        public static void DrawWireRect(Vector2 min, Vector2 max, Color? color = null)
         {
-            ChangeActiveSectionIfNeeded(GZVertexType.Line);
+            Gizmos self = Instance;
+            self.CheckCurrentSection(GizmosMode.Wire);
 
-            _vertices.Add(new GZVertex(new Vector3(min.X, min.Y, 0.0f), color));
-            _vertices.Add(new GZVertex(new Vector3(max.X, min.Y, 0.0f), color));
+            Color c = color.GetValueOrDefault(self._primaryColor);
 
-            _vertices.Add(new GZVertex(new Vector3(min.X, max.Y, 0.0f), color));
-            _vertices.Add(new GZVertex(new Vector3(max.X, max.Y, 0.0f), color));
+            uint i0 = (uint)self._vertices.Count;
+            uint i1 = (uint)(self._vertices.Count + 1);
+            uint i2 = (uint)(self._vertices.Count + 2);
+            uint i3 = (uint)(self._vertices.Count + 3);
 
-            _vertices.Add(new GZVertex(new Vector3(min.X, min.Y, 0.0f), color));
-            _vertices.Add(new GZVertex(new Vector3(min.X, max.Y, 0.0f), color));
+            self._indices.Add(i0);
+            self._indices.Add(i1);
 
-            _vertices.Add(new GZVertex(new Vector3(max.X, min.Y, 0.0f), color));
-            _vertices.Add(new GZVertex(new Vector3(max.X, max.Y, 0.0f), color));
+            self._indices.Add(i1);
+            self._indices.Add(i2);
+
+            self._indices.Add(i2);
+            self._indices.Add(i3);
+
+            self._indices.Add(i3);
+            self._indices.Add(i0);
+
+            self._vertices.Add(new GizmoVertex(new Vector3(min.X, min.Y, 0.0f), c));
+            self._vertices.Add(new GizmoVertex(new Vector3(max.X, min.Y, 0.0f), c));
+            self._vertices.Add(new GizmoVertex(new Vector3(max.X, max.Y, 0.0f), c));
+            self._vertices.Add(new GizmoVertex(new Vector3(min.X, max.Y, 0.0f), c));
         }
 
-        public void DrawSolidRect(Vector2 min, Vector2 max, Color color)
+        public static void DrawSolidRect(Vector2 min, Vector2 max, Color? color = null)
         {
-            ChangeActiveSectionIfNeeded(GZVertexType.Triangle);
+            Gizmos self = Instance;
+            self.CheckCurrentSection(GizmosMode.Solid);
 
-            _vertices.Add(new GZVertex(new Vector3(min.X, min.Y, 0.0f), color));
-            _vertices.Add(new GZVertex(new Vector3(min.X, max.Y, 0.0f), color));
-            _vertices.Add(new GZVertex(new Vector3(max.X, min.Y, 0.0f), color));
+            Color c = color.GetValueOrDefault(self._primaryColor);
 
-            _vertices.Add(new GZVertex(new Vector3(max.X, min.Y, 0.0f), color));
-            _vertices.Add(new GZVertex(new Vector3(min.X, max.Y, 0.0f), color));
-            _vertices.Add(new GZVertex(new Vector3(max.X, max.Y, 0.0f), color));
-        }
+            uint i0 = (uint)self._vertices.Count;
+            uint i1 = (uint)(self._vertices.Count + 1);
+            uint i2 = (uint)(self._vertices.Count + 2);
+            uint i3 = (uint)(self._vertices.Count + 3);
 
-        public void PushMatrix(Matrix4x4 matrix, bool multiplyWithPrevious)
-        {
-            _matrixStack.Push(new StackMatrix(matrix, multiplyWithPrevious));
-            _matriciesHaveChanged = true;
-        }
+            self._indices.Add(i0);
+            self._indices.Add(i2);
+            self._indices.Add(i1);
 
-        public void PopMatrix()
-        {
-            _matriciesHaveChanged = true;
-            AddNewSection(GZVertexType.Triangle);
+            self._indices.Add(i1);
+            self._indices.Add(i3);
+            self._indices.Add(i2);
 
-            _matrixStack.TryPop(out _);
+            self._vertices.Add(new GizmoVertex(new Vector3(min.X, min.Y, 0.0f), c));
+            self._vertices.Add(new GizmoVertex(new Vector3(max.X, min.Y, 0.0f), c));
+            self._vertices.Add(new GizmoVertex(new Vector3(max.X, max.Y, 0.0f), c));
+            self._vertices.Add(new GizmoVertex(new Vector3(min.X, max.Y, 0.0f), c));
         }
         #endregion
 
-        internal Span<GZDrawSection> Sections => _drawSections.AsSpan();
-        internal Span<GZVertex> Vertices => _vertices.AsSpan();
+        internal Span<GizmoSection> Sections => _sections.AsSpan();
 
-        internal bool HasDrawData => _drawSections.Count > 0 && _vertices.Count > 0;
+        internal Span<GizmoVertex> Vertices => _vertices.AsSpan();
+        internal Span<uint> Indices => _indices.AsSpan();
+
+        internal bool HasAnyDrawData => _sections.Count > 0;
 
         internal static Gizmos Instance => Unsafe.As<Gizmos>(s_instance.Target!);
-
-        private readonly record struct StackMatrix(Matrix4x4 Matrix, bool Multiplied);
     }
 
-    internal readonly record struct GZDrawSection(Matrix4x4? Matrix, bool NeedsProjection, GZVertexType VertexType, int VertexCount);
-    internal readonly record struct GZVertex(Vector3 Position, Color Color);
+    internal readonly record struct GizmoVertex(Vector3 Position, Color Color);
+    internal readonly record struct GizmoSection(int IndexStart, GizmosMode Mode);
 
-    internal enum GZVertexType : byte
+    internal enum GizmosMode : byte
     {
-        Triangle = 0,
-        Line
+        Solid = 0,
+        Wire,
+
+        Undefined
     }
 }

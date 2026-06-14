@@ -10,7 +10,7 @@ using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.Rendering.Structures;
-using Primary.RHI2;
+using Primary.RHI;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -18,7 +18,8 @@ using System.Runtime.InteropServices;
 
 namespace Editor.Rendering.Passes
 {
-    internal sealed class DearImGuiRenderPass : IRenderPass
+    [RenderPassSetup(RunContext = RenderPassRunContext.PerWindow)]
+    internal sealed class DearImGuiRenderPass : IRenderPass, IDisposable
     {
         private ShaderAsset _dearImGuiShader;
         private PropertyBlock _propertyBlock;
@@ -41,17 +42,28 @@ namespace Editor.Rendering.Passes
             }
         }
 
+        public void Dispose()
+        {
+            foreach (var (_, texture) in _activeTextures)
+            {
+                texture.Dispose();
+            }
+
+            _primaryTexture?.Dispose();
+            _primaryTexture = null;
+        }
+
         public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
         {
-            RenderCameraData cameraData = context.Get<RenderCameraData>()!;
+            RenderWindowData windowData = context.Get<RenderWindowData>()!;
             ImDrawDataPtr drawData = ImGui.GetDrawData();
 
-            if (!drawData.Valid || drawData.TotalVtxCount <= 0 || drawData.TotalIdxCount <= 0)
+            if (!drawData.Valid || drawData.TotalVtxCount <= 0 || drawData.TotalIdxCount <= 0 || !windowData.Window.IsPrimary)
                 return;
 
             using (RasterPassDescription desc = renderPass.SetupRasterPass("DearImGui", out PassData passData))
             {
-                passData.OutColor = cameraData.ColorTexture;
+                passData.OutColor = windowData.ColorTexture;
 
                 passData.VertexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
                 {
@@ -138,7 +150,7 @@ namespace Editor.Rendering.Passes
             cmd.SetVertexBuffer(passData.VertexBuffer);
             cmd.SetIndexBuffer(passData.IndexBuffer);
 
-            cmd.SetPipeline(passData.Shader!.GraphicsPipeline!);
+            cmd.SetPipeline(passData.Shader!);
 
             passData.Block!.SetResource("cbVertex", passData.VertexData);
 

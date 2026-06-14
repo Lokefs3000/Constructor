@@ -1,5 +1,9 @@
-﻿using Primary.RHI2.Validation;
+﻿using Primary.Common;
+using Primary.Memory.Native;
+using Primary.RHI.Validation;
 using Serilog;
+using System.Collections.Concurrent;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -11,22 +15,20 @@ using static TerraFX.Interop.DirectX.D3D_SHADER_MODEL;
 using static TerraFX.Interop.DirectX.D3D12_COMMAND_LIST_TYPE;
 using static TerraFX.Interop.DirectX.D3D12_COMMAND_QUEUE_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_COMMAND_QUEUE_PRIORITY;
+using static TerraFX.Interop.DirectX.D3D12_DRED_ENABLEMENT;
 using static TerraFX.Interop.DirectX.D3D12_FEATURE;
+using static TerraFX.Interop.DirectX.D3D12_MESSAGE_ID;
 using static TerraFX.Interop.DirectX.D3D12_MESSAGE_SEVERITY;
 using static TerraFX.Interop.DirectX.D3D12_RESOURCE_BINDING_TIER;
 using static TerraFX.Interop.DirectX.D3D12_RESOURCE_HEAP_TIER;
 using static TerraFX.Interop.DirectX.DXGI;
 using static TerraFX.Interop.DirectX.DXGI_GPU_PREFERENCE;
-using static TerraFX.Interop.DirectX.D3D12_MESSAGE_ID;
 using static TerraFX.Interop.DirectX.DXGI_MEMORY_SEGMENT_GROUP;
 using D3D12MA = Interop.D3D12MemAlloc;
-using Primary.Common;
-using System.Globalization;
-using Primary.Memory.Native;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows")]
+    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe sealed class D3D12RHIDevice : RHIDevice
     {
         private ILogger? _logger;
@@ -44,6 +46,7 @@ namespace Primary.RHI2.Direct3D12
 
         private ComPtr<ID3D12InfoQueue> _infoQueue;
         private ComPtr<ID3D12InfoQueue1> _infoQueue1;
+        private ComPtr<ID3D12DeviceRemovedExtendedDataSettings1> _dredSettings;
 
         private ComPtr<ID3D12CommandQueue> _directCmdQueue;
         private ComPtr<ID3D12CommandQueue> _computeCmdQueue;
@@ -54,12 +57,18 @@ namespace Primary.RHI2.Direct3D12
         private D3D12RHIDeviceNative* _nativeRep;
 
         private UploadManager _uploadManager;
+        private ResourceTracker _resourceTracker;
 
-        private Queue<(Action, ulong)> _pendingFreeCallbacks;
+        private ConcurrentQueue<(Action, ulong)> _pendingFreeCallbacks;
+
+        private CancellationTokenSource _resoureFreeCts;
+        private AutoResetEvent _resourceFreeEvent;
+        private Thread _resourceFreeThread;
 
         private int _debugMessageWidth;
         private void* _debugMessageData;
 
+        private ulong _renderFrameIndex;
         private ulong _frameIndex;
 
         internal D3D12RHIDevice(RHIDeviceDescription description, ILogger? logger)
@@ -189,6 +198,18 @@ namespace Primary.RHI2.Direct3D12
                             _infoQueue.Get()->PushStorageFilter(&filter);
                         }
                     }
+
+                    //_infoQueue.Get()->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+                    //_infoQueue.Get()->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+                }
+
+                if (_device.Get()->QueryInterface(UuidOf.Get<ID3D12DeviceRemovedExtendedDataSettings1>(), (void**)_dredSettings.GetAddressOf()).SUCCEEDED)
+                {
+                    ID3D12DeviceRemovedExtendedDataSettings1* settings = _dredSettings.Get();
+
+                    settings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+                    settings->SetBreadcrumbContextEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+                    settings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
                 }
             }
 
@@ -227,7 +248,7 @@ namespace Primary.RHI2.Direct3D12
                 {
                     pDevice = (ID3D12Device*)_device.Get(),
                     pAdapter = (IDXGIAdapter*)_adapter.Get(),
-                    Flags = ALLOCATOR_FLAG_NONE,
+                    Flags = ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED | ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED,
                     pAllocationCallbacks = null,
                     PreferredBlockSize = 0
                 };
@@ -262,13 +283,21 @@ namespace Primary.RHI2.Direct3D12
             }
 
             _uploadManager = new UploadManager(this);
+            _resourceTracker = new ResourceTracker();
 
-            _pendingFreeCallbacks = new Queue<(Action, ulong)>();
+            _pendingFreeCallbacks = new ConcurrentQueue<(Action, ulong)>();
+
+            _resoureFreeCts = new CancellationTokenSource();
+            _resourceFreeEvent = new AutoResetEvent(false);
+            _resourceFreeThread = new Thread(ResourceFreeProc);
 
             _debugMessageWidth = 0;
             _debugMessageData = null;
 
             _frameIndex = 0;
+            _renderFrameIndex = 0;
+
+            //_resourceFreeThread.Start();
         }
 
         protected override void Dispose(bool disposing)
@@ -288,6 +317,16 @@ namespace Primary.RHI2.Direct3D12
                 _frameIndex = ulong.MaxValue;
                 HandlePendingUpdates();
 
+                if (_resourceFreeThread.ThreadState == ThreadState.Running)
+                {
+                    _resoureFreeCts.Cancel();
+                    _resourceFreeEvent.Set();
+                    _resourceFreeThread.Join();
+                }
+
+                _resoureFreeCts.Dispose();
+                _resourceFreeEvent.Dispose();
+
                 if (_nativeRep != null)
                 {
                     NativeMemory.Free(_nativeRep);
@@ -295,6 +334,8 @@ namespace Primary.RHI2.Direct3D12
                 }
 
                 _uploadManager.Dispose();
+
+                _resourceTracker.PrintUnreleased();
 
                 _d3d12Allocator->Base.Release();
 
@@ -304,6 +345,7 @@ namespace Primary.RHI2.Direct3D12
 
                 _infoQueue1.Reset();
                 _infoQueue.Reset();
+                _dredSettings.Reset();
 
                 _device.Reset();
                 _debug.Reset();
@@ -320,19 +362,38 @@ namespace Primary.RHI2.Direct3D12
 
         public override void HandlePendingUpdates()
         {
-            while (_pendingFreeCallbacks.TryPeek(out (Action, ulong) action))
+            if (!_pendingFreeCallbacks.IsEmpty)
             {
-                if (action.Item2 >= _frameIndex)
+                if (_resourceFreeThread.ThreadState == ThreadState.Running)
                 {
-                    action.Item1();
-                    _pendingFreeCallbacks.Dequeue();
+                    _resourceFreeEvent.Set();
                 }
                 else
-                    break;
+                {
+                    while (_pendingFreeCallbacks.TryPeek(out (Action, ulong) tuple))
+                    {
+                        if (tuple.Item2 <= _frameIndex)
+                        {
+                            Logger?.Debug("Freeing: {ac}{{ {targ} }} ({fr})", tuple.Item1.Method.Name, tuple.Item1.Target, tuple.Item2);
+
+                            tuple.Item1();
+                            _pendingFreeCallbacks.TryDequeue(out _);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
             }
 
             FlushPendingMessages();
             ++_frameIndex;
+        }
+
+        public override void IncrementFrame()
+        {
+            ++_renderFrameIndex;
         }
 
         public void UploadPendingData(ID3D12GraphicsCommandList10* cmds) => _uploadManager.UploadPending(cmds);
@@ -349,6 +410,7 @@ namespace Primary.RHI2.Direct3D12
             if (!rawData.IsNullOrEmpty)
                 _uploadManager.AddBufferUpload(buffer, rawData);
 
+            _resourceTracker.Track(buffer);
             return buffer;
         }
 
@@ -371,6 +433,7 @@ namespace Primary.RHI2.Direct3D12
                 }
             }
 
+            _resourceTracker.Track(texture);
             return texture;
         }
 
@@ -383,6 +446,7 @@ namespace Primary.RHI2.Direct3D12
             if (debugName != null)
                 sampler.DebugName = debugName;
 
+            _resourceTracker.Track(sampler);
             return sampler;
         }
 
@@ -395,6 +459,7 @@ namespace Primary.RHI2.Direct3D12
             if (debugName != null)
                 swapChain.DebugName = debugName;
 
+            _resourceTracker.Track(swapChain);
             return swapChain;
         }
 
@@ -407,6 +472,7 @@ namespace Primary.RHI2.Direct3D12
             if (debugName != null)
                 graphicsPipeline.DebugName = debugName;
 
+            _resourceTracker.Track(graphicsPipeline);
             return graphicsPipeline;
         }
 
@@ -419,6 +485,7 @@ namespace Primary.RHI2.Direct3D12
             if (debugName != null)
                 computePipeline.DebugName = debugName;
 
+            _resourceTracker.Track(computePipeline);
             return computePipeline;
         }
 
@@ -462,15 +529,141 @@ namespace Primary.RHI2.Direct3D12
                         case D3D12_MESSAGE_SEVERITY_INFO: _logger?.Information("[{cat}/{id}]: {desc}", cat, id, desc); break;
                         case D3D12_MESSAGE_SEVERITY_MESSAGE: _logger?.Debug("[{cat}/{id}]: {desc}", cat, id, desc); break;
                     }
+
+                    switch (message->ID)
+                    {
+                        case D3D12_MESSAGE_ID_DEVICE_REMOVAL_PROCESS_AT_FAULT:
+                            {
+                                ReportDREDErrors();
+                                break;
+                            }
+                    }
                 }
 
                 infoQueue->ClearStoredMessages();
             }
         }
 
+        public override RHIUsedMemoryInfo QueryUsedMemory()
+        {
+            D3D12MA.Budget local;
+            D3D12MA.Budget nonLocal;
+
+            D3D12MA.Allocator.GetBudget(_d3d12Allocator, &local, &nonLocal);
+
+            return new RHIUsedMemoryInfo
+            (
+                 new RHIUsedMemoryBudget
+                 (
+                    (int)local.Stats.BlockCount,
+                    (int)local.Stats.AllocationCount,
+                    (long)local.Stats.BlockBytes,
+                    (long)local.Stats.AllocationBytes,
+                    (long)local.BudgetBytes,
+                    (long)local.UsageBytes
+                ),
+                new RHIUsedMemoryBudget
+                (
+                    (int)nonLocal.Stats.BlockCount,
+                    (int)nonLocal.Stats.AllocationCount,
+                    (long)nonLocal.Stats.BlockBytes,
+                    (long)nonLocal.Stats.AllocationBytes,
+                    (long)nonLocal.BudgetBytes,
+                    (long)nonLocal.UsageBytes
+                )
+            );
+        }
+
         internal void AddResourceFreeNextFrame(Action callback)
         {
-            _pendingFreeCallbacks.Enqueue((callback, _frameIndex + 1));
+            _pendingFreeCallbacks.Enqueue((callback, _renderFrameIndex + 1));
+        }
+
+        internal void ReportDREDErrors()
+        {
+            ComPtr<ID3D12DeviceRemovedExtendedData1> dataComPtr = new ComPtr<ID3D12DeviceRemovedExtendedData1>();
+            if (_device.Get()->QueryInterface(UuidOf.Get<ID3D12DeviceRemovedExtendedData1>(), (void**)dataComPtr.GetAddressOf()).SUCCEEDED)
+            {
+                ID3D12DeviceRemovedExtendedData1* data = dataComPtr.Get();
+
+                Logger?.Fatal("Uh-oh a GPU crash/hung has occured!");
+                Logger?.Fatal("Dumping available DRED data:");
+
+                {
+                    D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 breadcrumps;
+                    if (data->GetAutoBreadcrumbsOutput1(&breadcrumps).SUCCEEDED)
+                    {
+                        Logger?.Fatal("    Breadcrumb data:");
+
+                        D3D12_AUTO_BREADCRUMB_NODE1* node = breadcrumps.pHeadAutoBreadcrumbNode;
+                        while (node != null)
+                        {
+                            Logger?.Fatal("        Command list debug name: {val} ({ptr:x8})", new string(node->pCommandListDebugNameW), (nint)node->pCommandList);
+                            Logger?.Fatal("        Command queue debug name: {val} ({ptr:x8})", new string(node->pCommandQueueDebugNameW), (nint)node->pCommandQueue);
+                            Logger?.Fatal("        Breadcrumbs:");
+
+                            for (int i = 0; i < node->BreadcrumbCount; i++)
+                            {
+                                D3D12_AUTO_BREADCRUMB_OP op = node->pCommandHistory[i];
+                                Logger?.Error("            Executed: {ex}, Operation: {op}", *node->pLastBreadcrumbValue >= i, op);
+                            }
+
+                            if (node->BreadcrumbContextsCount > 0)
+                            {
+                                Logger?.Fatal("        Contexts:");
+
+                                for (int i = 0; i < node->BreadcrumbContextsCount; i++)
+                                {
+                                    D3D12_DRED_BREADCRUMB_CONTEXT context = node->pBreadcrumbContexts[i];
+                                    Logger?.Fatal("            Index: {idx}, Context: {str}", context.BreadcrumbIndex, new string(context.pContextString));
+                                }
+                            }
+
+                            node = node->pNext;
+                        }
+                    }
+                    else
+                        Logger?.Fatal("    No breadcrumbs");
+                }
+
+                {
+                    D3D12_DRED_PAGE_FAULT_OUTPUT1 pagefault;
+                    if (data->GetPageFaultAllocationOutput1(&pagefault).SUCCEEDED)
+                    {
+                        Logger?.Fatal("    Pagefault data:");
+
+                        Logger?.Fatal("        Pagefault virtual address: {val:x8}", pagefault.PageFaultVA);
+
+                        Logger?.Fatal("        Existing allocations:");
+
+                        D3D12_DRED_ALLOCATION_NODE1* node = pagefault.pHeadExistingAllocationNode;
+                        while (node != null)
+                        {
+                            Logger?.Fatal("            Object name: {val}", new string(node->ObjectNameW));
+                            Logger?.Fatal("            Allocation type: {val}", node->AllocationType);
+                            Logger?.Fatal("            Object: {val:x8}", (nint)node->pObject);
+
+                            node = node->pNext;
+                        }
+
+                        Logger?.Fatal("        Recent freed allocations:");
+
+                        node = pagefault.pHeadRecentFreedAllocationNode;
+                        while (node != null)
+                        {
+                            Logger?.Fatal("            Object name: {val}", new string(node->ObjectNameW));
+                            Logger?.Fatal("            Allocation type: {val}", node->AllocationType);
+                            Logger?.Fatal("            Object: {val:x8}", (nint)node->pObject);
+
+                            node = node->pNext;
+                        }
+                    }
+                    else
+                        Logger?.Fatal("    No pagefaults");
+                }
+            }
+            else
+                Logger?.Fatal("No DRED data available!");
         }
 
         private void VideoBudgetThreadProc()
@@ -499,6 +692,36 @@ namespace Primary.RHI2.Direct3D12
             }
         }
 
+        private void ResourceFreeProc()
+        {
+            Thread.CurrentThread.Name = "FreeResourcesThread";
+
+            ulong requiredNextFrame = 0;
+            while (!_resoureFreeCts.IsCancellationRequested)
+            {
+                _resourceFreeEvent.WaitOne();
+
+                if (requiredNextFrame <= _frameIndex)
+                {
+                    while (_pendingFreeCallbacks.TryPeek(out (Action, ulong) tuple))
+                    {
+                        if (tuple.Item2 <= _frameIndex)
+                        {
+                            Logger?.Debug("Freeing: {ac}{{ {targ} }} ({fr})", tuple.Item1.Method.Name, tuple.Item1.Target, tuple.Item2);
+
+                            tuple.Item1();
+                            _pendingFreeCallbacks.TryDequeue(out _);
+                        }
+                        else
+                        {
+                            requiredNextFrame = tuple.Item2;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         public override unsafe RHIDeviceNative* GetAsNative() => (RHIDeviceNative*)_nativeRep;
 
         public ILogger? Logger => _logger;
@@ -515,6 +738,7 @@ namespace Primary.RHI2.Direct3D12
         public bool HasPendingUploads => _uploadManager.HasPendingUploads;
 
         internal UploadManager UploadManager => _uploadManager;
+        internal ResourceTracker ResourceTracker => _resourceTracker;
 
         public override RHIDeviceAPI DeviceAPI => RHIDeviceAPI.Direct3D12;
 
@@ -522,6 +746,8 @@ namespace Primary.RHI2.Direct3D12
             D3D12_MESSAGE_SEVERITY_CORRUPTION,
             D3D12_MESSAGE_SEVERITY_ERROR,
             D3D12_MESSAGE_SEVERITY_WARNING,
+            //D3D12_MESSAGE_SEVERITY_INFO,
+            D3D12_MESSAGE_SEVERITY_MESSAGE,
             ];
 
         private static D3D12_MESSAGE_ID[] s_deniedIds = [

@@ -7,7 +7,7 @@ using Primary.Rendering.Assets;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.Rendering.Structures;
-using Primary.RHI2;
+using Primary.RHI;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -16,6 +16,7 @@ using System.Text;
 
 namespace Editor.UI.Visual.Passes
 {
+    [RenderPassSetupAttribute(RunContext = RenderPassRunContext.PerWindow)]
     internal sealed class UIGenGradientsRenderPass : IRenderPass
     {
         private ComputeShaderAsset _shader;
@@ -114,7 +115,7 @@ namespace Editor.UI.Visual.Passes
                 data.DataBlock.SetResource("baGradientKeyBuffer", data.GradientKeys);
                 data.DataBlock.SetResource("txGradientOutput", data.Texture);
 
-                cmd.SetPipeline(kernel.Pipeline);
+                cmd.SetPipeline(kernel);
                 cmd.SetProperties(data.DataBlock);
 
                 cmd.Dispatch(

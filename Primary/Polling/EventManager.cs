@@ -1,4 +1,5 @@
-﻿using SDL;
+﻿using Primary.Profiling;
+using SDL;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using static SDL.SDL3;
@@ -10,6 +11,7 @@ namespace Primary.Polling
         private static EventManager? s_instance = null;
 
         private List<IEventHandler> _handlers;
+        private HashSet<IEventHandler> _removing;
 
         private bool _disposedValue;
 
@@ -18,6 +20,7 @@ namespace Primary.Polling
             s_instance = this;
 
             _handlers = new List<IEventHandler>();
+            _removing = new HashSet<IEventHandler>();
 
             //ExceptionUtility.Assert(SDL_AddEventWatch(&EventWatchCallback, nint.Zero));
         }
@@ -39,14 +42,32 @@ namespace Primary.Polling
 
         public void PollEvents()
         {
-            unsafe
+            using (new ProfilingScope("PollSysEvents"))
             {
-                SDL_Event @event = new SDL_Event();
-                while (SDL_PollEvent(&@event))
+                unsafe
                 {
-                    PumpOnRecieve(ref @event);
+                    SDL_Event @event = new SDL_Event();
+                    while (SDL_PollEvent(&@event))
+                    {
+                        if (_removing.Count > 0)
+                        {
+                            foreach (IEventHandler handler in _removing)
+                            {
+                                _handlers.Remove(handler);
+                            }
+
+                            _removing.Clear();
+                        }
+
+                        PumpOnRecieve(ref @event);
+                    }
                 }
             }
+        }
+
+        public void PumpEvents()
+        {
+            SDL_PumpEvents();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -68,7 +89,7 @@ namespace Primary.Polling
 
         public void RemoveHandler<T>(T handler) where T : IEventHandler
         {
-            _handlers.Remove(handler);
+            _removing.Add(handler);
         }
 
         protected virtual void Dispose(bool disposing)

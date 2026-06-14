@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets;
 using Primary.Common;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Commands;
@@ -6,7 +7,8 @@ using Primary.Rendering.Pass;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.Rendering.State;
-using Primary.RHI2;
+using Primary.RHI;
+using Primary.Windowing;
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -39,6 +41,7 @@ namespace Primary.Rendering.Structures
         public void SetVertexBuffer(FGSetBufferDesc desc) => _commandBuffer.SetVertexBuffer(desc);
         public void SetIndexBuffer(FGSetBufferDesc desc) => _commandBuffer.SetIndexBuffer(desc);
 
+        public void SetPipeline(ShaderAsset shader) => _commandBuffer.SetPipeline(shader);
         public void SetPipeline(RHIGraphicsPipeline pipeline) => _commandBuffer.SetPipeline(pipeline);
 
         public void SetProperties(PropertyBlock block) => _commandBuffer.SetProperties(block);
@@ -61,6 +64,9 @@ namespace Primary.Rendering.Structures
         public FGMappedSubresource<T> Map<T>(FGMapBufferDesc desc) where T : unmanaged => _commandBuffer.Map<T>(desc);
         public FGMappedSubresource<T> Map<T>(FrameGraphTexture texture) where T : unmanaged => _commandBuffer.Map<T>(texture);
 
-        internal void PresentOnWindow(Window window, FrameGraphTexture texture) => _commandBuffer.PresentOnWindow(window, texture);
+        internal void PresentOnWindow(Window window) => _commandBuffer.PresentOnWindow(window);
+
+        public CommandEventScope BeginEvent(ReadOnlySpan<byte> name, uint? color = null) => _commandBuffer.BeginEvent(name, color);
+        public void MarkEvent(ReadOnlySpan<byte> name, uint? color = null) => _commandBuffer.MarkEvent(name, color);
     }
 }

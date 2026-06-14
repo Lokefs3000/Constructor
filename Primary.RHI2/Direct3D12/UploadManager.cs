@@ -21,7 +21,7 @@ using static TerraFX.Interop.DirectX.D3D12_TEXTURE_LAYOUT;
 
 using D3D12MemAlloc = Interop.D3D12MemAlloc;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
     [SupportedOSPlatform("windows")]
     internal sealed unsafe class UploadManager : IDisposable

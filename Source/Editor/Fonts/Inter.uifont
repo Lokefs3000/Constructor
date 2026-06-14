@@ -1,3 +1,34 @@
-font_file="Editor/Fonts/Inter.ttf"
-default_style="Regular"
-glyph_size=32
+default_style = "Normal Normal"
+glyph_size = 48
+distance_range = 2.0
+miter_limit = 1.0
+
+[[fonts]]
+source = "Editor/Fonts/Inter.ttf"
+style = "Normal"
+weights = [
+    { source_name = "Thin", weight = 100 },
+    { source_name = "ExtraLight", weight = 200 },
+    { source_name = "Light", weight = 300 },
+    { source_name = "Regular", weight = 400 },
+    { source_name = "Medium", weight = 500 },
+    { source_name = "SemiBold", weight = 600 },
+    { source_name = "Bold", weight = 700 },
+    { source_name = "ExtraBold", weight = 800 },
+    { source_name = "Black", weight = 900 },
+]
+
+[[fonts]]
+source = "Editor/Fonts/InterItalic.ttf"
+style = "Italic"
+weights = [
+    { source_name = "Thin Italic", weight = 100 },
+    { source_name = "ExtraLight Italic", weight = 200 },
+    { source_name = "Light Italic", weight = 300 },
+    { source_name = "Italic", weight = 400 },
+    { source_name = "Medium Italic", weight = 500 },
+    { source_name = "SemiBold Italic", weight = 600 },
+    { source_name = "Bold Italic", weight = 700 },
+    { source_name = "ExtraBold Italic", weight = 800 },
+    { source_name = "Black Italic", weight = 900 },
+]

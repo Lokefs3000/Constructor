@@ -77,6 +77,19 @@
             return null;
         }
 
+        public static bool TryDelete(string path)
+        {
+            try
+            {
+                File.Delete(path);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         public static string FormatSize(long size, string? format = "G", IFormatProvider? provider = null)
         {
             if (size < 1025)

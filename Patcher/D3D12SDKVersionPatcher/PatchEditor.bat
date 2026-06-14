@@ -3,7 +3,7 @@
 set "AgilitySDKVer=618"
 
 @echo Patching executable.. (ver:%AgilitySDKVer%)
-@call "..\..\..\..\Patcher\D3D12SDKVersionPatcher\D3D12SDKVersionPatcher.exe" "%1.exe" "%AgilitySDKVer%" ".\\D3D12\\"
+@call "..\..\..\..\..\Patcher\D3D12SDKVersionPatcher\D3D12SDKVersionPatcher.exe" "%1.exe" "%AgilitySDKVer%" ".\\D3D12\\"
 
 @if %ERRORLEVEL% GEQ 1 goto alreadyPatched
 

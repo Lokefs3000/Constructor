@@ -1,5 +1,6 @@
 ﻿using Editor.UI.Assets;
 using Editor.UI.Datatypes;
+using Editor.UI.Text;
 using Editor.UI.Visual;
 using Primary.Common;
 using System;
@@ -11,14 +12,20 @@ namespace Editor.UI.Elements.Tree
 {
     public class TreeNode : BaseTreeNode
     {
-        private UIFontStyle? _fontStyle;
+        private UIFontAsset? _font;
+        private FontStyle _style;
+        private FontWeight _weight;
+
         private string _text;
 
         private UIColor _textColor;
 
         public TreeNode()
         {
-            _fontStyle = null;
+            _font = null;
+            _style = FontStyle.Normal;
+            _weight = FontWeight.Normal;
+
             _text = "TreeNode";
 
             _textColor = Color.Black;
@@ -26,11 +33,16 @@ namespace Editor.UI.Elements.Tree
 
         public override void DrawVisual(Vector2 position, UIPainterContext painter)
         {
-            if (_fontStyle != null)
-                painter.DrawText(position, UIPaint.FromColor(_textColor), TextBuilder.Default, _fontStyle, 1.0f, _text);
+            if (_font != null)
+            {
+                painter.DrawText(new Vector2(position.X, position.Y + (18.0f - (18.0f - 14.0f))), UIPaint.FromColor(_textColor), new TextBuilder().SetOrigin(TextOrigin.Bottom), _font.FindStyle(_style, _weight), 14.0f / TextManager.PixelsPerEM, _text);
+            }
         }
 
-        public UIFontStyle? FontStyle { get => _fontStyle; set => _fontStyle = value; }
+        public UIFontAsset? Font { get => _font; set => _font = value; }
+        public FontStyle FontStyle { get => _style; set => _style = value; }
+        public FontWeight FontWeight { get => _weight; set => _weight = value; }
+
         public string Text { get => _text; set => _text = value; }
 
         public UIColor TextColor { get => _textColor; set => _textColor = value;}

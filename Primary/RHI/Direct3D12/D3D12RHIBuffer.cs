@@ -16,9 +16,9 @@ using static TerraFX.Interop.DirectX.D3D12_TEXTURE_LAYOUT;
 using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 using D3D12MA = Interop.D3D12MemAlloc;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows")]
+    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe sealed class D3D12RHIBuffer : RHIBuffer
     {
         private readonly D3D12RHIDevice _device;
@@ -105,12 +105,13 @@ namespace Primary.RHI2.Direct3D12
                         NativeMemory.Free(_nativeRep);
                     _nativeRep = null;
 
-                    if (_allocation != null)
-                        _allocation->Base.Dispose();
-                    _allocation = null;
                     _resource.Reset();
+                    if (_allocation != null)
+                        _allocation->Base.Release();
+                    _allocation = null;
 
                     _device.UploadManager.RemoveWithResource(this);
+                    _device.ResourceTracker.Untrack(this);
                 });
 
                 _disposedValue = true;
@@ -123,6 +124,11 @@ namespace Primary.RHI2.Direct3D12
             {
                 ResourceHelper.SetResourceName(_resource, debugName);
             }
+        }
+
+        public override string ToString()
+        {
+            return $"RHIBuffer{{{_debugName}}}";
         }
 
         public override unsafe RHIBufferNative* GetAsNative() => (RHIBufferNative*)_nativeRep;

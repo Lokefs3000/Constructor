@@ -1,7 +1,7 @@
 ﻿using Primary.Common;
 using Serilog;
 
-namespace Primary.RHI2.Validation
+namespace Primary.RHI.Validation
 {
     public static class BufferValidator
     {

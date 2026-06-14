@@ -3,17 +3,17 @@ using Primary.Editor;
 
 namespace Primary.Components
 {
+    [Component, DontSerializeComponent]
     [InspectorHidden]
-    internal record class EntityRelationships : IComponent
+    internal record struct EntityRelationships : IComponent
     {
         internal Entity Parent;
-        internal List<Entity> Children;
+        internal readonly List<Entity> Children;
 
         public EntityRelationships()
         {
             Parent = Entity.Null;
-            //TODO: use a pool for SortedList to allow for less GC when creating and destroying alot of entities
-            Children = new List<Entity>();
+            Children = [];
         }
     }
 

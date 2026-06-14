@@ -20,7 +20,7 @@ DefaultPsInput VertexMain(VsInput input)
     RoundedRectMetadata metadata = baMetadata.Load<RoundedRectMetadata>(input.MetadataOffset);
     DefaultPsInput output =
     {
-        float4(mul(transpose(cbGlobals.Model), float3(input.Position, 1.0)), metadata.ZIndex * 0.01, 1.0),
+        float4(mul(transpose(cbGlobals.Model), float3(input.Position, 1.0)), metadata.ZIndex * 0.00001, 1.0),
         input.UV * 2.0 - metadata.BoxSize,
         metadata.Color,
 
@@ -36,12 +36,16 @@ float4 PixelMain(DefaultPsInput input) : SV_Target
     RoundedRectMetadata metadata = baMetadata.Load<RoundedRectMetadata>(input.GetMetadataOffset());
 
     float dist = sdRoundedBox(input.UV, metadata.BoxSize, metadata.Radius);
+
     if (input.HasStroke())
     {
         StrokeMetadata stroke = baMetadata.Load<StrokeMetadata>(input.GetMetadataOffset() + sizeof(RoundedRectMetadata));
+        
+        float innerDist = sdRoundedBox(input.UV, metadata.BoxSize - (stroke.Width * 2 + 0.5), metadata.Radius);
+        float strokeDist = opSubtraction(innerDist, dist);
 
-        if (dist + (stroke.Width + stroke.Width) >= 0.0)
-            return float4(stroke.Color.rgb, float(stroke.Color.a) * SmoothSDF(dist));
+        float4 color = lerp(metadata.Color, stroke.Color, SmoothSDF(strokeDist));
+        return float4(color.rgb, color.a * SmoothSDF(dist));
     }
 
     return float4(input.Color.rgb, float(input.Color.a) * SmoothSDF(dist));

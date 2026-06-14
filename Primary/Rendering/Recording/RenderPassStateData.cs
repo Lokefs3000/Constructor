@@ -28,7 +28,7 @@ namespace Primary.Rendering.Recording
 
         internal void SetupState(ref readonly RenderPassDescription desc)
         {
-            foreach (ref readonly UsedResourceData data in desc.Resources.Span)
+            foreach (ref readonly UsedResourceData data in desc.Resources.AsSpan())
             {
                 if (data.Resource.ResourceId != FGResourceId.Global)
                 {
@@ -36,7 +36,7 @@ namespace Primary.Rendering.Recording
                 }
             }
 
-            foreach (ref readonly UsedRenderTargetData data in desc.RenderTargets.Span)
+            foreach (ref readonly UsedRenderTargetData data in desc.RenderTargets.AsSpan())
             {
                 if (((FrameGraphResource)data.Target).ResourceId != FGResourceId.Global)
                 {

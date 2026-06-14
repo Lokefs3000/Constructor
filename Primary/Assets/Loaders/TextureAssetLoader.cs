@@ -4,7 +4,7 @@ using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
 using Primary.Memory.Native;
-using Primary.RHI2;
+using Primary.RHI;
 using Primary.Utility;
 using Serilog;
 using System.Collections.Frozen;
@@ -38,6 +38,8 @@ namespace Primary.Assets.Loaders
                 throw new ArgumentException(nameof(asset));
             if (assetData is not TextureAssetData textureData)
                 throw new ArgumentException(nameof(assetData));
+
+            textureData.Dispose();
 
             try
             {
@@ -109,7 +111,7 @@ namespace Primary.Assets.Loaders
 
                         if (header.Format == TextureFormat.RGB8)
                         {
-                            ExceptionUtility.Assert(depth > 1, "can depth actually have a 24bit format?");
+                            ExceptionUtility.Assert(depth == 1, "can depth actually have a 24bit format?");
 
                             mipData = AddAlphaChannelToPixelData(mipData, width, height);
                             fi = RHIFormatInfo.Query(RHIFormat.RGBA8_UNorm);
@@ -166,8 +168,8 @@ namespace Primary.Assets.Loaders
                 rhiSampler = device.CreateSampler(new RHISamplerDescription
                 {
                     Min = Extensions.ToRHIEnum(samplerInfo.MinFilter),
-                    Mag = Extensions.ToRHIEnum(samplerInfo.MinFilter),
-                    Mip = Extensions.ToRHIEnum(samplerInfo.MinFilter),
+                    Mag = Extensions.ToRHIEnum(samplerInfo.MagFilter),
+                    Mip = Extensions.ToRHIEnum(samplerInfo.MipFilter),
                     Reduction = Extensions.ToRHIEnum(samplerInfo.ReductionType),
 
                     AddressModeU = Extensions.ToRHIEnum(samplerInfo.AddressModeU),
@@ -182,7 +184,7 @@ namespace Primary.Assets.Loaders
                     MinLOD = samplerInfo.MinLOD,
                     MaxLOD = samplerInfo.MaxLOD,
                     MaxAnisotropy = samplerInfo.MaxAnisotropy == 0 ? 1 : (uint)samplerInfo.MaxAnisotropy,
-                });
+                }, sourcePath);
 
                 Debug.Assert(rhiTexture != null && rhiSampler != null);
                 textureData.UpdateAssetData(texture, rhiTexture!, rhiSampler!);

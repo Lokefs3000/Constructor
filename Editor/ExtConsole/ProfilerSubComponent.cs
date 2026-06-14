@@ -14,7 +14,7 @@ namespace Editor.ExtConsole
     {
         public void UpdatePackets(ExtConsoleClient client)
         {
-            ProfilingManager profiler = Editor.GlobalSingleton.ProfilingManager;
+            ProfilingManager profiler = EditorRuntime.GlobalSingleton.ProfilingManager;
             if (profiler.Timestamps.Count > 0)
             {
                 ushort count = 0;
@@ -53,7 +53,7 @@ namespace Editor.ExtConsole
             {
                 case MessageId.SetProfilerFeatures:
                     {
-                        Editor editor = Editor.GlobalSingleton;
+                        EditorRuntime editor = EditorRuntime.GlobalSingleton;
                         ProfilingManager profiler = editor.ProfilingManager;
 
                         MsgSetProfilerFeatures msg = queued.Deserialize<MsgSetProfilerFeatures>();

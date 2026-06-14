@@ -4,6 +4,7 @@ using Editor.UI.Elements;
 using Editor.UI.Text;
 using Editor.UI.Utility;
 using Primary.Common;
+using Primary.Mathematics;
 using System.Numerics;
 using System.Runtime.Intrinsics;
 
@@ -70,7 +71,46 @@ namespace Editor.UI.Visual
 
         internal void AddLinesStrip(ReadOnlySpan<Vector2> points, float width, uint metadataOffset)
         {
+            float halfWidth = width;
 
+            _vertices.EnsureSizeFor(points.Length * 4);
+            _indices.EnsureSizeFor(points.Length * 6);
+
+            Vector2 p0 = points[0];
+            for (int i = 1; i < points.Length;)
+            {
+                Vector2 p1 = points[i++];
+
+                Vector2 m = p1 - p0;
+                Vector2 p = Vector2.Normalize(new Vector2(-m.Y, m.X)) * halfWidth;
+
+                Vector128<float> pVector = Vector128.Create(p.X, p.Y, -p.X, -p.Y);
+
+                Vector128<float> c01 = Vector128.Create(p0.X, p0.Y, p0.X, p0.Y) + pVector;
+                Vector128<float> c23 = Vector128.Create(p1.X, p1.Y, p1.X, p1.Y) + pVector;
+
+                Vector128<int> vertexIndices = Vector128.Create(_vertices.Count) + _1234Vector;
+                Vector128<int> indexIndices = Vector128.Create(_indices.Count) + _1234Vector;
+
+                Vector128<ushort> indexValues = Vector128.Create((ushort)_vertices.Count) + _12345678Vector16;
+
+                _vertices.SetUnchecked(_vertices.Count, new UIVertex(*(Vector2*)&c01, new Vector2(width, 0.0f), metadataOffset));
+                _vertices.SetUnchecked(vertexIndices[0], new UIVertex(*((Vector2*)&c01 + 1), Vector2.Zero, metadataOffset));
+                _vertices.SetUnchecked(vertexIndices[1], new UIVertex(*(Vector2*)&c23, new Vector2(width, 0.0f), metadataOffset));
+                _vertices.SetUnchecked(vertexIndices[2], new UIVertex(*((Vector2*)&c23 + 1), Vector2.Zero, metadataOffset));
+
+                _indices.SetUnchecked(_indices.Count, (ushort)_vertices.Count);
+                _indices.SetUnchecked(indexIndices[0], indexValues[2]);
+                _indices.SetUnchecked(indexIndices[1], indexValues[0]);
+                _indices.SetUnchecked(indexIndices[2], (ushort)_vertices.Count);
+                _indices.SetUnchecked(indexIndices[3], indexValues[1]);
+                _indices.SetUnchecked(_indices.Count + 5, indexValues[2]);
+
+                _vertices.Count += 4;
+                _indices.Count += 6;
+
+                p0 = p1;
+            }
         }
 
         internal void AddRect(Boundaries boundaries, Vector2 uvMin, Vector2 uvMax, uint metadataOffset)
@@ -147,7 +187,7 @@ namespace Editor.UI.Visual
             _indices.Count += 3;
         }
 
-        internal void AddGlyphs(Vector2 position, UIFontStyle fontStyle, in TextVisualInfo visualInfo, ReadOnlySpan<char> letters, uint metadataOffset)
+        internal void AddGlyphs(Vector2 position, UIFontTypeData typeData, in TextVisualInfo visualInfo, ReadOnlySpan<char> letters, uint metadataOffset)
         {
             Vector128<int> vertexIndices;
             Vector128<int> indexIndices;
@@ -159,7 +199,10 @@ namespace Editor.UI.Visual
             for (int i = 0; i < letters.Length; i++)
             {
                 char c = letters.DangerousGetReferenceAt(i);
-                UIGlyph glyph = fontStyle.RequestGlyph(c);
+                if (char.IsControl(c))
+                    continue;
+
+                UIGlyph glyph = typeData.RequestGlyph(c);
 
                 Vector4 planeBounds = glyph.PlaneBounds * visualInfo.FontSize + new Vector4(position.X, position.Y, position.X, position.Y);
                 position.X += glyph.Advance * visualInfo.FontSize;

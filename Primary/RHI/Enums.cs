@@ -1,4 +1,4 @@
-﻿namespace Primary.RHI2
+﻿namespace Primary.RHI
 {
     public enum RHIResourceUsage : byte
     {
@@ -144,8 +144,8 @@
         Green,
         Blue,
         Alpha,
-        One,
-        Zero
+        Zero,
+        One
     }
 
     public enum RHIDeviceAPI : byte

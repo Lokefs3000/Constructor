@@ -1,6 +1,6 @@
 ﻿using System.Runtime.Serialization;
 
-namespace Primary.RHI2
+namespace Primary.RHI
 {
     public class RHIException : Exception
     {

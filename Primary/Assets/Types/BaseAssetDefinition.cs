@@ -1,7 +1,10 @@
-﻿using System.Runtime.CompilerServices;
+﻿using Primary.Serialization.Json;
+using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace Primary.Assets.Types
 {
+    [JsonConverter(typeof(AssetJsonConverter))]
     public abstract class BaseAssetDefinition<TSelf, T> : IAssetDefinition where TSelf : class, IAssetDefinition where T : class, IInternalAssetData
     {
         private readonly T _assetData;

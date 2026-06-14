@@ -19,7 +19,7 @@ namespace ExtConsole
 
         internal BackendManager()
         {
-            _window = SDL.CreateWindow("ExtConsole", 800, 500, SDLWindowFlags.Resizable | SDLWindowFlags.Opengl);
+            _window = SDL.CreateWindow("ExtConsole", 800, 500, (ulong)(SDLWindowFlags.Resizable | SDLWindowFlags.Opengl));
             _context = SDL.GLCreateContext(_window);
 
             _gl = new GL(new GLContext((nint)_window, _context));

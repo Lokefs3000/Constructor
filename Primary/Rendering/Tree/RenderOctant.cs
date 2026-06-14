@@ -1,5 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
+using Primary.Collections.ReadOnly;
 using Primary.Common;
+using Primary.Mathematics;
 using Primary.Scenes;
 using System.Diagnostics;
 using System.Numerics;
@@ -63,7 +65,7 @@ namespace Primary.Rendering.Tree
         public int OctantId => _octantId;
 
         public ReadOnlySpan<RenderOctant> Octants => _octants;
-        public IReadOnlyList<SceneEntity> Children => _children;
+        public ROList<SceneEntity> Children => _children;
 
         public static OctreePoint GetOctreePointForOctant(Vector3 position)
         {

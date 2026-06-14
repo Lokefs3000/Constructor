@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Layout>
+	<Stylesheet Path="Editor/UI/Default.style" />
+	<Stylesheet Path="Editor/UI/Styles/DiagnosticsWindow.style" />
+
+	<Window>
+		<Frame Class="side-tab-bar">
+            <ListLayout Direction="Vertical" />
+
+            <Button Id="tab-layout-button" Class="tab-button">
+                <Sprite IsActive="False" Class="tab-layout-icon" />
+            </Button>
+            <Button Id="tab-layout-button" Class="tab-button">
+                <Sprite IsActive="False" Class="tab-interaction-icon" />
+            </Button>
+        </Frame>
+        <Frame Class="content-frame">
+            <Element IsEnabled="False" Id="layout-content" Class="content-tab">
+                <TreeView Id="layout-treeview" Size="1.0 0 1.0 -32">
+
+                </TreeView>
+                <ToggleButton Id="layout-showhide" Class="layout-sh-button">
+                    <Label IsActive="False" Class="ribbon-select-window-label" Text="Show/Hide preview" />
+                </ToggleButton>
+            </Element>
+            <Element Id="interaction-content" Class="content-tab">
+                <Label Text="..." />
+            </Element>
+        </Frame>
+        <Frame Class="bottom-ribbon">
+            <Label Id="active-window-label" Class="active-window-label no-active-window" AutoSize="FitBoundsToText" Text="No active window" />
+            
+            <Button Id="select-window-button" Class="ribbon-select-window">
+                <Label IsActive="False" Class="ribbon-select-window-label" Text="Select window" />
+            </Button>
+        </Frame>
+        <Frame IsEnabled="False" Id="select-window-popup" Class="select-window-bg">
+            <ScrollView Id="select-window-view" Class="select-window-view">
+                <ListLayout Direction="Vertical" Padding="0.0 4" />
+            </ScrollView>
+            <Button Id="select-window-goback" Class="goback-button">
+                <Label IsActive="False" Class="ribbon-select-window-label" Text="X" />
+            </Button>
+        </Frame>
+	</Window>
+</Layout>

@@ -1,0 +1,66 @@
+{
+    "Font": "Editor/Fonts/Inter.uifont",
+    "Stylesheets": [
+        "Editor/UI/Default.style"
+    ],
+    "Items": [
+        {
+            "Type": "Item",
+            "Text": "Add brush",
+            "Items": [
+                {
+                    "Type": "Item",
+                    "Id": "AddBrushCamera",
+                    "Text": "At camera",
+                    "Image": [ "Editor/UI/Atlases/GeoContextMenuIcons.atlas", "AtCamera" ]
+                },
+                {
+                    "Type": "Item",
+                    "Id": "AddBrushCenter",
+                    "Text": "At center",
+                    "Image": [ "Editor/UI/Atlases/GeoContextMenuIcons.atlas", "AtCenter" ]
+                }
+            ],
+            "Image": [ "Editor/UI/Atlases/GeoContextMenuIcons.atlas", "NewBrush" ]
+        },
+        {
+            "Type": "Item",
+            "Id": "NewGroup",
+            "Text": "New group",
+            "Image": [ "Editor/UI/Atlases/GeoContextMenuIcons.atlas", "NewGroup" ]
+        },
+        {
+            "Type": "Separator"
+        },
+        {
+            "Type": "Item",
+            "Id": "Rename",
+            "Text": "Rename",
+            "Image": [ "Editor/UI/Atlases/ContextMenuIcons.atlas", "Rename" ]
+        },
+        {
+            "Type": "Item",
+            "Id": "Rename",
+            "Text": "Cut",
+            "Image": [ "Editor/UI/Atlases/ContextMenuIcons.atlas", "Cut" ]
+        },
+        {
+            "Type": "Item",
+            "Id": "Rename",
+            "Text": "Copy",
+            "Image": [ "Editor/UI/Atlases/ContextMenuIcons.atlas", "Copy" ]
+        },
+        {
+            "Type": "Item",
+            "Id": "Rename",
+            "Text": "Paste",
+            "Image": [ "Editor/UI/Atlases/ContextMenuIcons.atlas", "Paste" ]
+        },
+        {
+            "Type": "Item",
+            "Id": "Rename",
+            "Text": "Delete",
+            "Image": [ "Editor/UI/Atlases/ContextMenuIcons.atlas", "Delete" ]
+        }
+    ]
+}

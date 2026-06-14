@@ -16,13 +16,13 @@ namespace Editor.UI.Text
     internal abstract class TextWrapper
     {
         private Stack<Color> _colorStack;
-        private Stack<UIFontStyle> _styleStack;
+        private Stack<UIFontTypeData> _styleStack;
         private Stack<float> _sizeStack;
 
         public TextWrapper()
         {
             _colorStack = new Stack<Color>();
-            _styleStack = new Stack<UIFontStyle>();
+            _styleStack = new Stack<UIFontTypeData>();
             _sizeStack = new Stack<float>();
         }
 
@@ -74,9 +74,9 @@ namespace Editor.UI.Text
                         case RichTextSymbol.BoldItalic:
                         case RichTextSymbol.Style:
                             {
-                                if (_styleStack.TryPop(out UIFontStyle? _))
+                                if (_styleStack.TryPop(out UIFontTypeData? _))
                                 {
-                                    newVisualInfo.Style = _styleStack.TryPeek(out UIFontStyle? result) ? result : info.DefaultVisualInfo.Style;
+                                    newVisualInfo.TypeData = _styleStack.TryPeek(out UIFontTypeData? result) ? result : info.DefaultVisualInfo.TypeData;
                                     removed |= RichTextEffect.Style;
                                 }
                                 else
@@ -96,8 +96,7 @@ namespace Editor.UI.Text
 
                                 break;
                             }
-                        case RichTextSymbol.Disable:
-                            break;
+                        case RichTextSymbol.Disable: return false;
                         case RichTextSymbol.Break: return false;
                         default: return false;
                     }
@@ -225,19 +224,19 @@ namespace Editor.UI.Text
                             }
                         case RichTextSymbol.Bold:
                             {
-                                newVisualInfo.Style = currentVisualInfo.Style.Font.FindStyle("Bold") ?? currentVisualInfo.Style;
+                                newVisualInfo.TypeData = currentVisualInfo.TypeData.Font.FindStyle(FontWeight.Bold) ?? currentVisualInfo.TypeData;
                                 effect |= RichTextEffect.Style;
                                 break;
                             }
                         case RichTextSymbol.Italic:
                             {
-                                newVisualInfo.Style = currentVisualInfo.Style.Font.FindStyle("Italic") ?? currentVisualInfo.Style;
+                                newVisualInfo.TypeData = currentVisualInfo.TypeData.Font.FindStyle(FontStyle.Italic) ?? currentVisualInfo.TypeData;
                                 effect |= RichTextEffect.Style;
                                 break;
                             }
                         case RichTextSymbol.BoldItalic:
                             {
-                                newVisualInfo.Style = currentVisualInfo.Style.Font.FindStyle("BoldItalic") ?? currentVisualInfo.Style;
+                                newVisualInfo.TypeData = currentVisualInfo.TypeData.Font.FindStyle(FontStyle.Italic, FontWeight.Bold) ?? currentVisualInfo.TypeData;
                                 effect |= RichTextEffect.Style;
                                 break;
                             }
@@ -246,7 +245,34 @@ namespace Editor.UI.Text
                                 if (!parser.MoveNext())
                                     return false;
 
-                                newVisualInfo.Style = currentVisualInfo.Style.Font.FindStyle(parser.Current.GetDjb2HashCode()) ?? currentVisualInfo.Style;
+                                var tokenizer = parser.Current.Tokenize(' ');
+                                if (!tokenizer.MoveNext())
+                                    return false;
+
+                                FontStyle style = FontStyle.Normal;
+                                FontWeight weight = FontWeight.Normal;
+
+                                if (tokenizer.Current.Length == 3)
+                                {
+                                    int target = tokenizer.Current[0] - '1';
+                                    if (target < (int)FontWeight._100 || target > (int)FontWeight._900)
+                                        return false;
+                                }
+
+                                if (tokenizer.MoveNext())
+                                {
+                                    if (tokenizer.Current.SequenceEqual("Normal"))
+                                        style = FontStyle.Normal;
+                                    else if (tokenizer.Current.SequenceEqual("Italic"))
+                                        style = FontStyle.Italic;
+                                    else
+                                        return false;
+
+                                    if (tokenizer.MoveNext())
+                                        return false;
+                                }
+
+                                newVisualInfo.TypeData = currentVisualInfo.TypeData.Font.FindStyle(style, weight) ?? currentVisualInfo.TypeData;
                                 effect |= RichTextEffect.Style;
                                 break;
                             }
@@ -260,8 +286,7 @@ namespace Editor.UI.Text
 
                                 break;
                             }
-                        case RichTextSymbol.Disable:
-                            break;
+                        case RichTextSymbol.Disable: effect |= RichTextEffect.Disabled; break;
                         case RichTextSymbol.Break: break;
                         default: return false;
                     }
@@ -280,7 +305,7 @@ namespace Editor.UI.Text
             if (Flags.HasFlag(effect, RichTextEffect.Color))
                 _colorStack.Push(newVisualInfo.DrawColor.Solid);
             if (Flags.HasFlag(effect, RichTextEffect.Style))
-                _styleStack.Push(newVisualInfo.Style);
+                _styleStack.Push(newVisualInfo.TypeData);
             if (Flags.HasFlag(effect, RichTextEffect.Size))
                 _sizeStack.Push(newVisualInfo.FontSize);
 
@@ -302,6 +327,7 @@ namespace Editor.UI.Text
         Color = 1 << 0,
         Style = 1 << 1,
         Size = 1 << 2,
+        Disabled = 1 << 3,
 
         Removed = 1 << 7
     }
@@ -313,15 +339,15 @@ namespace Editor.UI.Text
         public readonly float Ascender;
         public readonly float Descender;
 
-        public FontMetrics(UIFontStyle fontStyle, float emSize)
+        public FontMetrics(UIFontTypeData typeData, float emSize)
         {
             RelativeScale = emSize;
             Unsafe.As<FontMetrics, Vector3>(ref Unsafe.AddByteOffset(ref this, Unsafe.SizeOf<float>())) = new Vector3(
-                fontStyle.Metrics.LineHeight,
-                fontStyle.Metrics.Ascender,
-                fontStyle.Metrics.Descender) * RelativeScale;
+                typeData.Metrics.LineHeight,
+                typeData.Metrics.Ascender,
+                typeData.Metrics.Descender) * RelativeScale;
         }
     }
 
-    public readonly record struct TextWrapInfo(Vector2 MaxExtents, TextVisualInfo DefaultVisualInfo);
+    public readonly record struct TextWrapInfo(TextOrigin Origin, Vector2 MaxExtents, bool AllowRichText, TextVisualInfo DefaultVisualInfo);
 }

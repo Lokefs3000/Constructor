@@ -17,7 +17,7 @@ DefaultPsInput VertexMain(VsInput input)
     RectMetadata metadata = baMetadata.Load<RectMetadata>(input.MetadataOffset);
     DefaultPsInput output =
     {
-        float4(mul(transpose(cbGlobals.Model), float3(input.Position, 1.0)), metadata.ZIndex * 0.01, 1.0),
+        float4(mul(transpose(cbGlobals.Model), float3(input.Position, 1.0)), 0.0, 1.0),
         input.UV * 2.0 - metadata.BoxSize,
         metadata.Color,
 

@@ -1,24 +1,33 @@
-﻿using CommunityToolkit.HighPerformance;
+﻿using CommunityToolkit.Diagnostics;
+using CommunityToolkit.HighPerformance;
+using Editor.UI.Interaction;
 using Editor.UI.Visual;
 using Primary.Common;
+using Primary.Input.Devices;
+using Primary.Utility;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Text;
 
 namespace Editor.UI.Elements.Tree
 {
-    public class BaseTreeNode
+    public class BaseTreeNode : IInteractable
     {
         private UITreeView? _parentTree;
 
         private BaseTreeNode? _parent;
         private List<BaseTreeNode> _children;
 
+        private int _treePosition;
+
         private int _shownNodeCount;
         private int _depth;
+        private int _maxDepth;
 
         private bool _isOpened;
+        private bool _isSelected;
 
         public BaseTreeNode()
         {
@@ -27,50 +36,74 @@ namespace Editor.UI.Elements.Tree
             _parent = null;
             _children = new List<BaseTreeNode>();
 
+            _treePosition = -1;
+
             _shownNodeCount = 1;
             _depth = 0;
+            _maxDepth = 0;
 
             _isOpened = false;
+            _isSelected = false;
         }
 
-        private void SetParent(BaseTreeNode? newParent)
+        internal void SetNewOwner(UITreeView? treeView, BaseTreeNode? parent)
         {
-            if (_parent == newParent)
+            if (_parentTree == treeView && _parent == parent)
                 return;
 
-            if (_parent != null)
+            if (parent == this)
             {
-                _parentTree?.RemoveNodeFromTree(this);
-                _parent._children.Remove(this);
-
-                if (_parent._isOpened)
-                    _parent._shownNodeCount -= _shownNodeCount;
+                UIManager.Logger?.Warning("Cannot set tree node parent to self!");
+                parent = null;
             }
 
-            if (newParent == null)
+            if (_parent != parent || _parentTree != treeView)
             {
-                _parentTree = null;
-                _parent = null;
-
-                _depth = 0;
-            }
-            else
-            {
-                _parentTree = newParent._parentTree;
-                _parent = newParent;
-
-                _depth = newParent._depth + 1;
-
-                newParent._children.Add(this);
-
-                if (newParent._isOpened)
+                if (_parentTree != treeView)
                 {
-                    newParent._parentTree?.AddNodeToTree(this);
-                    newParent._shownNodeCount += _shownNodeCount;
-                }
-            }
+                    if (_isSelected)
+                        Deselect();
 
-            SetChildrenDepth(_depth + 1);
+                    _parentTree?.RemoveNodeFromInternal(this);
+                }
+
+                if (_parent != null)
+                {
+                    _maxDepth -= _depth;
+
+                    _parent._children.Remove(this);
+                    (_parent._shownNodeCount, _parent._maxDepth) = GetNodeMetrics(_parent);
+                }
+                else
+                {
+                    if (_parentTree != null && _parentTree.TempNode == null)
+                        _parentTree.TempNode = null;
+                    _parentTree?.RemoveNodeFromList(this);
+                }
+
+                if (parent != null)
+                {
+                    _maxDepth += parent._depth + 1;
+
+                    parent._children.Add(this);
+                    (parent._shownNodeCount, parent._maxDepth) = GetNodeMetrics(parent);
+                }
+                else
+                {
+                    treeView?.AddNodeToList(this);
+                }
+
+                _parent = parent;
+                _depth = (parent?._depth ?? -1) + 1;
+
+                Debug.Assert(_parent != this);
+
+                _parentTree = treeView;
+                treeView?.AddStateFlags(UIStateFlags.InvalidVisual);
+
+                SetChildrenDepth(_depth);
+                SetChildrenTreeView(treeView);
+            }
         }
 
         private void SetChildrenDepth(int newDepth)
@@ -78,21 +111,40 @@ namespace Editor.UI.Elements.Tree
             int nextDepth = newDepth + 1;
             foreach (BaseTreeNode child in _children)
             {
-                child._depth = newDepth;
+                child._depth = nextDepth;
                 child.SetChildrenDepth(nextDepth);
             }
         }
 
-        internal void SetRootData(UITreeView treeView)
+        private void SetChildrenTreeView(UITreeView? treeView)
         {
-            _parentTree = treeView;
-            _depth = -1;
+            foreach (BaseTreeNode child in _children)
+            {
+                if (child._parentTree != treeView)
+                {
+                    if (_isSelected)
+                    {
+                        child._parentTree?.DeselectNode(child);
+                        treeView?.SelectNode(child);
+                    }
+
+                    if (child._parentTree != null && child._parentTree.TempNode == child)
+                    {
+                        child._parentTree.TempNode = null;
+                    }
+
+                    child._parentTree?.RemoveNodeFromInternal(child);
+
+                    child._parentTree = treeView;
+                    child.SetChildrenTreeView(treeView);
+                }
+            }
         }
 
         public void ClearChildren()
         {
             foreach (BaseTreeNode treeNode in _children)
-                treeNode.SetParent(null);
+                treeNode.SetNewOwner(null, null);
 
             _children.Clear();
         }
@@ -102,10 +154,14 @@ namespace Editor.UI.Elements.Tree
             if (_isOpened)
                 return;
 
-            _shownNodeCount = _children.Sum((x) => x._shownNodeCount /*Correct for *this* node*/) + 1;
             _isOpened = true;
+            (_shownNodeCount, _maxDepth) = GetNodeMetrics(this);
 
-            _parentTree?.ExpandNode(this);
+            if (_parent != null)
+                (_parent._shownNodeCount, _parent._maxDepth) = GetNodeMetrics(_parent);
+
+            //_parentTree?.ExpandNode(this);
+            _parentTree?.AddStateFlags(UIStateFlags.InvalidAll);
         }
 
         public void Collapse()
@@ -113,37 +169,84 @@ namespace Editor.UI.Elements.Tree
             if (!_isOpened)
                 return;
 
-            _shownNodeCount = 1;
             _isOpened = false;
+            _shownNodeCount = 1;
+            _maxDepth = _depth;
 
-            _parentTree?.CollapseNode(this);
+            if (_parent != null)
+                (_parent._shownNodeCount, _parent._maxDepth) = GetNodeMetrics(_parent);
+
+            //_parentTree?.CollapseNode(this);
+            _parentTree?.AddStateFlags(UIStateFlags.InvalidAll);
         }
 
-        public void MoveChild(BaseTreeNode child, int newIndex)
+        public void Select()
         {
-            if (newIndex >= 0 && newIndex < _children.Count)
-                throw new IndexOutOfRangeException($"newIndex ({newIndex}) >= 0 && newIndex ({newIndex}) < _children.Count ({_children.Count})");
+            if (_isSelected)
+                return;
+
+            if (_parentTree != null)
+            {
+                _isSelected = true;
+
+                _parentTree.SelectNode(this);
+                _parentTree.AddStateFlags(UIStateFlags.InvalidVisual);
+            }
+        }
+
+        public void Deselect()
+        {
+            if (!_isSelected)
+                return;
+
+            if (_parentTree != null)
+            {
+                _isSelected = false;
+
+                _parentTree.DeselectNode(this);
+                _parentTree.AddStateFlags(UIStateFlags.InvalidVisual);
+            }
+        }
+
+        /// <summary>NOTE: Removes the <paramref name="treeNode"/> from its previous parent aswell</summary>
+        public void AddNode(BaseTreeNode treeNode) => treeNode.SetNewOwner(_parentTree, this);
+        public void RemoveNode(BaseTreeNode treeNode)
+        {
+            if (treeNode._parent == this)
+                treeNode.SetNewOwner(null, null);
+        }
+
+        public void MoveNode(BaseTreeNode child, int newIndex)
+        {
+            Guard.IsInRange(newIndex, 0, _children.Count);
 
             int oldIndex = _children.IndexOf(child);
             if (oldIndex != newIndex)
             {
-                _children[oldIndex] = _children[newIndex];
-                _children[newIndex] = child;
-
-                _parentTree?.MoveNodeWithinTree(child, newIndex);
+                (_children[oldIndex], _children[newIndex]) = (_children[newIndex], child);
+                _parentTree?.AddStateFlags(UIStateFlags.InvalidVisual);
             }
         }
 
         public virtual void DrawVisual(Vector2 position, UIPainterContext context) { }
+        public virtual void Activate(MouseButton button)
+        {
+            OnPress?.Invoke(button);
+        }
 
-        internal UITreeView? ParentTree => _parentTree;
+        public virtual IInteractable GetInteractable(Vector2 point) => this;
+        public virtual void HandleEvent(ref readonly UIEvent @event) { }
+
+        public UITreeView? ParentTree => _parentTree;
 
         internal ReadOnlySpan<BaseTreeNode> ChildrenSpan => _children.AsSpan();
 
-        public BaseTreeNode? Parent { get => _parent; set => SetParent(value); }
+        public BaseTreeNode? Parent => _parent;
         public IReadOnlyList<BaseTreeNode> Children => _children;
 
-        public bool IsOpened
+        public int TreePosition { get => _treePosition; internal set => _treePosition = value; }
+
+        public bool IsExpanded
         {
             get => _isOpened;
             set
@@ -155,8 +258,41 @@ namespace Editor.UI.Elements.Tree
             }
         }
 
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (value)
+                    Select();
+                else
+                    Deselect();
+            }
+        }
+
         /// <summary>NOTE: Includes current node state in the count though it will always count</summary>
         public int ShownNodeCount => _shownNodeCount;
         public int Depth => _depth;
+        public int MaxDepth => _maxDepth;
+
+        public IWindowHost? Host => _parentTree?.Host;
+        public virtual IInteractionShape? Shape => null;
+
+        public event Action<MouseButton>? OnPress;
+
+        private static (int shownNodes, int maxDepth) GetNodeMetrics(BaseTreeNode treeNode)
+        {
+            if (treeNode._isOpened)
+            {
+                if (treeNode._children.Count == 0)
+                    return (1, treeNode._depth);
+                else
+                    return (treeNode._children.Sum(static (x) => x._shownNodeCount) + 1, treeNode._children.Max(static (x) => x._maxDepth));
+            }
+            else
+            {
+                return (1, treeNode._depth);
+            }
+        }
     }
 }

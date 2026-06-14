@@ -1,5 +1,4 @@
 ﻿using Editor.UI.Assets;
-using Editor.UI.Visual;
 using Primary;
 using Primary.Assets;
 using Primary.Common;
@@ -10,19 +9,15 @@ using Primary.Rendering.Commands;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.Rendering.Structures;
-using Primary.RHI2;
-using System;
+using Primary.RHI;
 using System.Buffers;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using TerraFX.Interop.Gdiplus;
 
 namespace Editor.UI.Visual.Passes
 {
+    [RenderPassSetup(RunContext = RenderPassRunContext.PerWindow)]
     internal sealed class UIWindowRenderPass : IRenderPass
     {
         private ShaderAsset[] _shaders;
@@ -50,23 +45,29 @@ namespace Editor.UI.Visual.Passes
         public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
         {
             UIRenderer renderer = UIManager.Instance.Renderer;
-            if (renderer.AreAnyWindowsQueued)
+            if (renderer.AreAnyHostsQueued)
             {
                 BlackboardData blackboard = renderPass.Blackboard.Add<BlackboardData>()!;
 
                 UIGenGradientsRenderPass.BlackboardData? gradientsBlackboard = renderPass.Blackboard.Get<UIGenGradientsRenderPass.BlackboardData>();
 
-                blackboard.Regions = ArrayPool<UICompositeRegion>.Shared.Rent(renderer.WindowQueueSize);
-                blackboard.RegionCount = 0;
-
-                while (renderer.TryDequeueQueuedWindow(out UIWindowRedraw redraw))
+                while (renderer.TryDequeueQueuedWindow(out HostRedrawData redraw))
                 {
-                    using (RasterPassDescription desc = renderPass.SetupRasterPass(Engine.IsDebugBuild ? $"UI-DrawWnd({redraw.Window.WindowTitle})" : "UI-DrawWnd", out PassData data))
+                    string name = "UI-DrawHost";
+                    string rtName = "UI-RT";
+
+                    IRenderableWindow? window = (redraw.Host as IWindowHost)?.ActiveWindow as IRenderableWindow;
+                    if (Engine.IsDebugBuild)
+                    {
+                        string str = window?.ToString() ?? redraw.Host.ToString() ?? redraw.Host.GetType().Name;
+                        
+                        name = $"UI-DrawWnd({str})";
+                        rtName = $"UI-RT({str})";
+                    }
+
+                    using (RasterPassDescription desc = renderPass.SetupRasterPass(name, out PassData data))
                     {
                         DrawContext drawCtx = redraw.Context;
-                        IWindowHost host = redraw.Window.ParentHost!;
-
-                        UIDockHost? dockHost = host as UIDockHost;
 
                         data.Renderer = renderer;
 
@@ -75,28 +76,12 @@ namespace Editor.UI.Visual.Passes
 
                         data.Redraw = redraw;
 
-                        if (dockHost != null)
+                        data.OutColor = redraw.Host.HostTexture ?? FrameGraphTexture.Invalid;
+
+                        if (data.OutColor.IsNull)
                         {
-                            Vector2 drawSize = redraw.Region.Size;
-                            data.OutColor = desc.CreateTexture(new FrameGraphTextureDesc
-                            {
-                                Width = (int)drawSize.X,
-                                Height = (int)drawSize.Y,
-                                Depth = 1,
-
-                                Dimension = FGTextureDimension._2D,
-                                Format = RHIFormat.RGB10A2_UNorm,
-                                Usage = FGTextureUsage.ShaderResource | FGTextureUsage.RenderTarget | FGTextureUsage.PixelShader,
-
-                                Swizzle = new FGTextureSwizzle(FGSwizzleChannel.Red, FGSwizzleChannel.Green, FGSwizzleChannel.Blue, FGSwizzleChannel.One)
-                            }, "UI-RedrawRT");
-                        }
-                        else
-                        {
-                            if (host.HostTexture == null)
-                                return;
-
-                            data.OutColor = host.HostTexture;
+                            UIManager.Logger?.Warning("Unexpected null host texture when rendering: {h}", name);
+                            continue;
                         }
 
                         data.VertexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
@@ -138,9 +123,6 @@ namespace Editor.UI.Visual.Passes
                         if (!data.OutColor.IsExternal)
                             desc.UseRenderTarget(data.OutColor);
 
-                        if (dockHost != null)
-                            blackboard.Regions[blackboard.RegionCount++] = new UICompositeRegion(dockHost, data.OutColor, redraw.Region);
-
                         desc.SetRenderFunction<PassData>(PassFunction);
                     }
                 }
@@ -169,11 +151,15 @@ namespace Editor.UI.Visual.Passes
             cmd.SetVertexBuffer(data.VertexBuffer);
             cmd.SetIndexBuffer(data.IndexBuffer);
 
+            cmd.ClearRenderTarget(data.OutColor, null);
+
             cmd.SetRenderTarget(0, data.OutColor);
 
+            Rect contentMetrics = data.Redraw.Host.ContentMetrics;
+
             Matrix3x2 globalModel =
-                    Matrix3x2.CreateTranslation(Vector2.Truncate(data.Redraw.Window.ClientSize.AsVector2() * -0.5f)) *
-                    Matrix3x2.CreateScale(Vector2.One / data.Redraw.Window.ClientSize.AsVector2() * 2.0f) *
+                    Matrix3x2.CreateTranslation(Vector2.Truncate(contentMetrics.Size.AsVector2() * -0.5f)) *
+                    Matrix3x2.CreateScale(Vector2.One / contentMetrics.Size.AsVector2() * 2.0f) *
                     Matrix3x2.CreateScale(1.0f, -1.0f);
 
             DrawContext drawCtx = data.Redraw.Context;
@@ -181,8 +167,8 @@ namespace Editor.UI.Visual.Passes
             ReadOnlySpan<BuiltDrawGroup> groups = drawCtx.Builder.Groups;
             ReadOnlySpan<BuiltDrawSegment> segments = drawCtx.Builder.Segments;
 
-            int prevMatrixId = int.MinValue + 1;
-            int prevClipId = int.MinValue + 1;
+            int prevMatrixId = -2;
+            int prevClipId = -2;
 
             int currentStartIndex = 0;
             for (int i = 0; i < groups.Length; ++i)
@@ -191,7 +177,7 @@ namespace Editor.UI.Visual.Passes
 
                 if (group.MatrixId != prevMatrixId)
                 {
-                    GlobalBufferData bufferData = new GlobalBufferData(group.MatrixId != int.MinValue ? drawCtx.Painter.Matricies.Get(group.MatrixId) : globalModel);
+                    GlobalBufferData bufferData = new GlobalBufferData(group.MatrixId != -1 ? (drawCtx.Painter.Matricies.Get(group.MatrixId) * globalModel) : globalModel);
                     cmd.Upload(data.GlobalBuffer, bufferData);
 
                     prevMatrixId = group.MatrixId;
@@ -199,7 +185,7 @@ namespace Editor.UI.Visual.Passes
 
                 if (group.ClipId != prevClipId)
                 {
-                    if (group.ClipId == int.MinValue)
+                    if (group.ClipId == -1)
                         cmd.SetScissor(0, null);
                     else
                     {
@@ -230,10 +216,10 @@ namespace Editor.UI.Visual.Passes
                                     dataBlock.SetResource("txImage", (RHITexture)segment.Value!);
                                 break;
                             }
-                        case BuiltSegmentType.Text: dataBlock.SetResource("txFontAtlas", ((UIFontStyle)segment.Value!).AtlasTexture!); break;
+                        case BuiltSegmentType.Text: dataBlock.SetResource("txFontAtlas", ((UIFontTypeData)segment.Value!).AtlasTexture!); break;
                     }
 
-                    cmd.SetPipeline(data.Shaders![(int)segment.Type].GraphicsPipeline!);
+                    cmd.SetPipeline(data.Shaders![(int)segment.Type]);
                     cmd.SetProperties(dataBlock);
 
                     cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc((uint)(nextOffset - segment.IndexOffset), StartIndexLocation: (uint)segment.IndexOffset));
@@ -263,7 +249,7 @@ namespace Editor.UI.Visual.Passes
             public ShaderAsset[]? Shaders;
             public PropertyBlock[]? DataBlocks;
 
-            public UIWindowRedraw Redraw;
+            public HostRedrawData Redraw;
             public FrameGraphTexture OutColor;
 
             public FrameGraphBuffer VertexBuffer;
@@ -332,5 +318,5 @@ namespace Editor.UI.Visual.Passes
         }
     }
 
-    internal readonly record struct UICompositeRegion(UIDockHost Host, FrameGraphTexture Texture, Boundaries Region);
+    internal readonly record struct UICompositeRegion(IWindowHost Host, FrameGraphTexture Texture, Boundaries Region);
 }

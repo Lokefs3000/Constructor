@@ -7,6 +7,7 @@ using System.Runtime.Serialization;
 
 namespace Primary.Components
 {
+    [Component]
     [ComponentConnections(typeof(RenderableAdditionalData), typeof(RenderBounds))]
     [ComponentUsage(HasSelfReference: true)]
     public struct MeshRenderer : IComponent

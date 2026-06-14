@@ -2,7 +2,7 @@
 using TerraFX.Interop;
 using TerraFX.Interop.Windows;
 
-namespace Primary.RHI2.Direct3D12
+namespace Primary.RHI.Direct3D12
 {
     [SupportedOSPlatform("windows")]
     internal static unsafe class UuidOf

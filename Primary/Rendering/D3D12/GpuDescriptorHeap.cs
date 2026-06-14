@@ -1,7 +1,7 @@
 ﻿using Primary.Common;
 using Primary.Rendering.Resources;
-using Primary.RHI2;
-using Primary.RHI2.Direct3D12;
+using Primary.RHI;
+using Primary.RHI.Direct3D12;
 using Primary.Utility;
 using System.Runtime.Versioning;
 using TerraFX.Interop.DirectX;
@@ -14,6 +14,7 @@ using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 using static TerraFX.Interop.DirectX.D3D12_UAV_DIMENSION;
 using static TerraFX.Interop.DirectX.D3D12_BUFFER_UAV_FLAGS;
 using System.Diagnostics;
+using Primary.Rendering.Assets;
 
 namespace Primary.Rendering.D3D12
 {
@@ -96,14 +97,14 @@ namespace Primary.Rendering.D3D12
             _activeDescriptors.Clear();
         }
 
-        internal uint GetDescriptorIndex(NRDResource resource, bool bindAsUnorderedAccess, out bool changedActiveHeap)
+        internal uint GetDescriptorIndex(NRDResource resource, bool bindAsUnorderedAccess, PropertyBindIntent intent, out bool changedActiveHeap)
         {
             changedActiveHeap = false;
 
             if (resource.IsNull)
                 return ushort.MaxValue;
 
-            ResourceData resData = new ResourceData(resource, bindAsUnorderedAccess);
+            ResourceData resData = new ResourceData(resource, bindAsUnorderedAccess, intent);
             if (_activeDescriptors.TryGetValue(resData, out uint index))
                 return index;
 
@@ -212,6 +213,18 @@ namespace Primary.Rendering.D3D12
                             {
                                 RHITextureDescription texDesc = ((D3D12RHITextureNative*)resource.Native)->Base.Description;
 
+                                RHIFormat format = texDesc.Format;
+                                if (Flags.HasFlag(texDesc.Usage, RHIResourceUsage.DepthStencil))
+                                {
+                                    if (intent == PropertyBindIntent.AsStencil)
+                                        format = format.ToStencilFormat();
+                                    else
+                                        format = format.ToDepthFormat();
+
+                                    if (format == RHIFormat.Unknown)
+                                        format = texDesc.Format;
+                                }
+
                                 desc = new D3D12_SHADER_RESOURCE_VIEW_DESC
                                 {
                                     ViewDimension = texDesc.Dimension switch
@@ -222,7 +235,7 @@ namespace Primary.Rendering.D3D12
                                         RHIDimension.TextureCube => D3D12_SRV_DIMENSION_TEXTURECUBE,
                                         _ => throw new NotImplementedException(),
                                     },
-                                    Format = texDesc.Format.ToResourceViewFormat(),
+                                    Format = format.ToTextureFormat(),
                                     Shader4ComponentMapping = ResourceHelper.EncodeShader4ComponentMapping((uint)texDesc.Swizzle.R, (uint)texDesc.Swizzle.G, (uint)texDesc.Swizzle.B, (uint)texDesc.Swizzle.A),
                                 };
                             }
@@ -230,6 +243,18 @@ namespace Primary.Rendering.D3D12
                             {
                                 FrameGraphTexture fg = _device.ResourceManager.FindFGTexture(resource);
                                 ref readonly FrameGraphTextureDesc texDesc = ref fg.Description;
+
+                                RHIFormat format = texDesc.Format;
+                                if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.DepthStencil))
+                                {
+                                    if (intent == PropertyBindIntent.AsStencil)
+                                        format = format.ToStencilFormat();
+                                    else
+                                        format = format.ToDepthFormat();
+
+                                    if (format == RHIFormat.Unknown)
+                                        format = texDesc.Format;
+                                }
 
                                 desc = new D3D12_SHADER_RESOURCE_VIEW_DESC
                                 {
@@ -241,7 +266,7 @@ namespace Primary.Rendering.D3D12
                                         FGTextureDimension.Cube => D3D12_SRV_DIMENSION_TEXTURECUBE,
                                         _ => throw new NotImplementedException(),
                                     },
-                                    Format = texDesc.Format.ToResourceViewFormat(),
+                                    Format = format.ToTextureFormat(),
                                     Shader4ComponentMapping = DefaultShader4ComponentMapping,
                                 };
                             }
@@ -263,7 +288,7 @@ namespace Primary.Rendering.D3D12
                                         desc.Texture2D = new D3D12_TEX2D_SRV
                                         {
                                             MostDetailedMip = 0,
-                                            PlaneSlice = 0,
+                                            PlaneSlice = intent == PropertyBindIntent.AsStencil ? 1u : 0,
                                             MipLevels = 0xffffffff,
                                             ResourceMinLODClamp = 0.0f,
                                         };
@@ -541,7 +566,7 @@ namespace Primary.Rendering.D3D12
         }
 
         internal readonly record struct HeapData(Ptr<ID3D12DescriptorHeap> Heap, D3D12_CPU_DESCRIPTOR_HANDLE StartHandle);
-        private readonly record struct ResourceData(NRDResource Resource, bool IsUnorderedAccess)
+        private readonly record struct ResourceData(NRDResource Resource, bool IsUnorderedAccess, PropertyBindIntent Intent)
         {
             public override int GetHashCode() => HashCode.Combine(Resource, IsUnorderedAccess);
         }

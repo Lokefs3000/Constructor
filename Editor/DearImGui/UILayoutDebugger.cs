@@ -1,28 +1,32 @@
-﻿using CircularBuffer;
+﻿using System;
+using System.Collections.Frozen;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Numerics;
+using System.Text;
+using CircularBuffer;
 using CommunityToolkit.HighPerformance;
 using Editor.DearImGui.LayoutDbg;
 using Editor.UI;
-using Editor.UI.Debugging;
+using Editor.UI.Assets;
+using Editor.UI.Diagnostics;
 using Editor.UI.Elements;
+using Editor.UI.Helpers;
 using Editor.UI.Interaction;
+using Editor.UI.Text;
 using Editor.UI.Visual;
 using Hexa.NET.ImGui;
 using Primary.Common;
 using Primary.Mathematics;
 using Primary.Rendering;
 using Primary.Threading;
-using System;
-using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Numerics;
-using System.Text;
+using TerraFX.Interop.Windows;
 
 namespace Editor.DearImGui
 {
     internal sealed class UILayoutDebugger : IDearImGuiWindow
     {
-        private UIWindow? _targetWindow;
+        private IWindow? _targetWindow;
         private UIElement? _selectedElement;
 
         private UIElement? _dragDropElement;
@@ -38,7 +42,7 @@ namespace Editor.DearImGui
 
             if (ImGui.Begin("UI layout debugger"u8, ImGuiWindowFlags.MenuBar))
             {
-                Editor editor = Editor.GlobalSingleton;
+                EditorRuntime editor = EditorRuntime.GlobalSingleton;
                 UIManager manager = editor.UIManager;
 
                 if (ImGui.BeginMenuBar())
@@ -51,7 +55,23 @@ namespace Editor.DearImGui
                         ImGui.EndMenu();
                     }
 
-                    if (ImGui.MenuItem($"\"{_targetWindow?.WindowTitle ?? "No window"}\""))
+                    if (_targetWindow != null)
+                    {
+                        if (ImGui.BeginMenu("Stylesheets"u8))
+                        {
+                            foreach (StylesheetAsset stylesheet in _targetWindow.StyleProvider.Stylesheets)
+                            {
+                                if (ImGui.MenuItem(stylesheet.Name) && !editor.DearImGuiWindowManager.IsPopupOpen((x) => x is UIStylesheetEditor popup && popup.Stylesheet == stylesheet))
+                                {
+                                    editor.DearImGuiWindowManager.OpenPopup(new UIStylesheetEditor(stylesheet));
+                                }
+                            }
+
+                            ImGui.EndMenu();
+                        }
+                    }
+
+                    if (ImGui.MenuItem($"\"{_targetWindow?.ToString() ?? "No window"}\""))
                     {
                         editor.DearImGuiWindowManager.OpenPopup<SelectWindowPopup>((x) =>
                         {
@@ -67,7 +87,7 @@ namespace Editor.DearImGui
                     {
                         if (ImGui.MenuItem("Recorder"u8))
                         {
-                            editor.DearImGuiWindowManager.OpenPopup(new RecorderViewPopup(_targetWindow));
+                            //editor.DearImGuiWindowManager.OpenPopup(new RecorderViewPopup(_targetWindow));
                         }
 
                         if (ImGui.MenuItem("Interaction"u8))
@@ -77,7 +97,7 @@ namespace Editor.DearImGui
 
                         if (ImGui.MenuItem("Rendering"u8))
                         {
-                            editor.DearImGuiWindowManager.OpenPopup(new RenderingViewPopup(_targetWindow));
+                            //editor.DearImGuiWindowManager.OpenPopup(new RenderingViewPopup(_targetWindow));
                         }
                     }
 
@@ -116,9 +136,9 @@ namespace Editor.DearImGui
 
             if (_targetWindow != null)
             {
-                Vector2 baseOffset = _targetWindow.ParentHost!.ClientOffset.AsVector2();
+                Vector2 baseOffset = (_targetWindow.ParentHost! is IWindowDockHost dock ? dock.HostMetrics.Position : Int2.Zero).AsVector2();
                 if (_targetWindow.ParentHost is UIDockHost dockHost)
-                    baseOffset += dockHost.TabbedClientBounds.Minimum;
+                    baseOffset += dockHost.ContentMetrics.Position.AsVector2();
 
                 if (_drawElementBounds && _targetWindow != null)
                 {
@@ -129,6 +149,34 @@ namespace Editor.DearImGui
                     {
                         Boundaries bounds = Boundaries.Offset(element.PixelCoordinates, baseOffset);
                         drawList.AddRect(bounds.Minimum, bounds.Maximum, 0x8000ffff);
+
+                        if (element is UILabel label)
+                        {
+                            UIFontTypeData? typeData = label.Font?.FindStyle(label.FontStyle, label.FontWeight);
+                            if (typeData != null)
+                            {
+                                TextVisualInfo visualInfo = new TextVisualInfo(new PaintColor(label.TextColor.Solid), label.FontSize, typeData);
+                                TextWrapInfo wrapInfo = new TextWrapInfo(TextOrigin.Top, element.PixelCoordinates.Maximum, true, visualInfo);
+
+                                string text = label.Text;
+                                using RentedArray<char> tempText = RentedArray<char>.Rent(text.Length + 1);
+
+                                text.CopyTo(tempText.Span);
+                                tempText.Span[text.Length] = '\0';
+
+                                UIManager manager = UIManager.Instance;
+                                ShapedTextData textData = manager.TextManager.ShapeText(wrapInfo, label.Overflow, tempText.Span, text.Length < 200 ? text.GetDjb2HashCode() : StringHandle.InvalidHashCode);
+
+                                foreach (TextRenderSegment segment in textData.Iterate())
+                                {
+                                    Vector2 basePosition = new Vector2(segment.LeftOffset, segment.LineOffset) + bounds.Minimum;
+                                    drawList.AddLine(basePosition, basePosition + new Vector2(segment.TextSize.X, 0.0f), 0xffff0000);
+
+                                    Vector2 localPosition = basePosition - new Vector2(0.0f, typeData.Metrics.Height * (TextManager.PixelsPerEM * visualInfo.FontSize));
+                                    drawList.AddLine(localPosition, localPosition + new Vector2(segment.TextSize.X, 0.0f), 0xffff0000);
+                                }
+                            }
+                        }
 
                         foreach (UIElement child in element.Children)
                         {
@@ -383,14 +431,14 @@ namespace Editor.DearImGui
 
         private sealed class SelectWindowPopup : IDearImGuiPopup
         {
-            private UIWindow? _targetWindow;
+            private IWindow? _targetWindow;
             private bool _hasSelected;
 
-            private HashSet<UIWindow> _alreadyShown;
+            private HashSet<IWindow> _alreadyShown;
 
             public SelectWindowPopup()
             {
-                _alreadyShown = new HashSet<UIWindow>();
+                _alreadyShown = new HashSet<IWindow>();
             }
 
             public void OpenPopup() => ImGui.OpenPopup("Select window"u8);
@@ -401,22 +449,39 @@ namespace Editor.DearImGui
                 {
                     if (ImGui.BeginChild("VIEW"u8, ImGuiChildFlags.AutoResizeY | ImGuiChildFlags.AlwaysAutoResize))
                     {
-                        Editor editor = Editor.GlobalSingleton;
+                        EditorRuntime editor = EditorRuntime.GlobalSingleton;
                         UIManager manager = editor.UIManager;
 
-                        foreach (UIDockHost host in manager.ActiveHosts)
+                        foreach (IWindowHost host in manager.ActiveHosts)
                         {
-                            ImGui.PushID(host.UniqueDockHostId);
+                            ImGui.PushID(host.GetHashCode());
                             if (ImGui.TreeNodeEx("Dock host"u8, ImGuiTreeNodeFlags.DefaultOpen))
                             {
-                                foreach (UIWindow window in host.TabbedWindows)
+                                if (host is IWindowDockHost dockHost)
                                 {
-                                    ImGui.PushID(window.UniqueWindowId);
-                                    if (ImGui.Selectable($"{window.WindowTitle}({window.GetType().Name})", _targetWindow == window))
-                                        _targetWindow = window;
-                                    ImGui.PopID();
+                                    foreach (IWindow window in dockHost.Windows)
+                                    {
+                                        ImGui.PushID(window.GetHashCode());
+                                        if (ImGui.Selectable($"{window}({window.GetType().Name})", _targetWindow == window))
+                                            _targetWindow = window;
+                                        ImGui.PopID();
 
-                                    _alreadyShown.Add(window);
+                                        _alreadyShown.Add(window);
+                                    }
+                                }
+                                else
+                                {
+                                    IWindow? window = host.ActiveWindow;
+
+                                    if (window != null)
+                                    {
+                                        ImGui.PushID(window.GetHashCode());
+                                        if (ImGui.Selectable($"{window}({window.GetType().Name})", _targetWindow == window))
+                                            _targetWindow = window;
+                                        ImGui.PopID();
+
+                                        _alreadyShown.Add(window);
+                                    }
                                 }
 
                                 ImGui.TreePop();
@@ -460,7 +525,7 @@ namespace Editor.DearImGui
                 _alreadyShown.Clear();
             }
 
-            public UIWindow? TargetWindow => _hasSelected ? _targetWindow : null;
+            public IWindow? TargetWindow => _hasSelected ? _targetWindow : null;
 
             public DearImGuiPopupFlags Flags => DearImGuiPopupFlags.None;
         }
@@ -507,14 +572,14 @@ namespace Editor.DearImGui
         }
         private sealed class InteractionViewPopup : IDearImGuiPopup
         {
-            private readonly UIWindow _targetWindow;
+            private readonly IWindow _targetWindow;
 
             private CircularBuffer<FiredEventData> _firedEvents;
             private int _inspectingEvent;
 
             private bool _autoUpdate;
 
-            internal InteractionViewPopup(UIWindow targetWindow)
+            internal InteractionViewPopup(IWindow targetWindow)
             {
                 _targetWindow = targetWindow;
 
@@ -526,7 +591,7 @@ namespace Editor.DearImGui
                 targetWindow.ParentHost!.InteractionManager.EventFired += EventFiredCallback;
             }
 
-            private void EventFiredCallback(UIElement element, Ref<UIEvent> eventDataRef)
+            private void EventFiredCallback(IInteractable element, Ref<UIEvent> eventDataRef)
             {
                 _firedEvents.PushFront(new FiredEventData(element, eventDataRef.Value));
 
@@ -568,7 +633,7 @@ namespace Editor.DearImGui
                                 ImGui.TableNextRow();
 
                                 ImGui.TableNextColumn();
-                                if (ImGui.Selectable(eventData.Element.Id ?? eventData.Element.GetType().Name, i == _inspectingEvent, ImGuiSelectableFlags.SpanAllColumns))
+                                if (ImGui.Selectable((eventData.Element is UIElement element ? element.Id : null) ?? eventData.Element.GetType().Name, i == _inspectingEvent, ImGuiSelectableFlags.SpanAllColumns))
                                 {
                                     _inspectingEvent = i;
                                 }
@@ -594,11 +659,11 @@ namespace Editor.DearImGui
 
                             ImDrawListPtr drawList = ImGui.GetBackgroundDrawList();
 
-                            Boundaries bounds = Boundaries.Offset(eventData.Element.PixelCoordinates, _targetWindow.ParentHost!.ClientOffset.AsVector2());
-                            drawList.AddRect(bounds.Minimum, bounds.Maximum, 0xffffff00);
+                            //Boundaries bounds = Boundaries.Offset(eventData.Element.PixelCoordinates, _targetWindow.ParentHost!.ClientOffset.AsVector2());
+                            //drawList.AddRect(bounds.Minimum, bounds.Maximum, 0xffffff00);
 
-                            if (eventData.Element.Id != null)
-                                ImGui.TextUnformatted($"{eventData.Element.Id} ({eventData.Element.GetType().Name})");
+                            if (eventData.Element is UIElement element && element.Id != null)
+                                ImGui.TextUnformatted($"{element.Id} ({eventData.Element.GetType().Name})");
                             else
                                 ImGui.TextUnformatted(eventData.Element.GetType().Name);
                             ImGui.TextUnformatted(@event.Type.ToString());
@@ -651,15 +716,6 @@ namespace Editor.DearImGui
                                         drawList.AddCircle(data.Position, 4.0f, 0xffff0000);
                                         break;
                                     }
-                                case UIEventType.MouseDeactivate:
-                                    {
-                                        UIMouseEvent data = @event.Mouse;
-                                        ImGui.TextUnformatted($"Position: {data.Position}");
-                                        ImGui.TextUnformatted($"Button: {data.Button}");
-
-                                        drawList.AddCircle(data.Position, 4.0f, 0xffff0000);
-                                        break;
-                                    }
                             }
 
                             ImGui.Unindent();
@@ -679,7 +735,7 @@ namespace Editor.DearImGui
 
             public DearImGuiPopupFlags Flags => DearImGuiPopupFlags.Unique;
 
-            private readonly record struct FiredEventData(UIElement Element, UIEvent Data);
+            private readonly record struct FiredEventData(IInteractable Element, UIEvent Data);
         }
         private sealed class RenderingViewPopup : IDearImGuiPopup
         {
@@ -697,7 +753,7 @@ namespace Editor.DearImGui
             {
                 _targetWindow = targetWindow;
 
-                UIRenderer renderer = Editor.GlobalSingleton.UIManager.Renderer;
+                UIRenderer renderer = EditorRuntime.GlobalSingleton.UIManager.Renderer;
                 //_heldCommandBuffer = new UICommandBuffer(renderer);
                 //_heldBakedCommandBuffer = new UIBakedCommandBuffer();
 

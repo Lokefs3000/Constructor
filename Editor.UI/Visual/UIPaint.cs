@@ -20,10 +20,10 @@ namespace Editor.UI.Visual
 
         public UIPaint()
         {
-            _color = Color.White;
+            _color = Color.TransparentWhite;
 
             _strokeEnabled = false;
-            _strokeWidth = 0.0f;
+            _strokeWidth = 1.0f;
             _strokeColor = Color.Black;
 
             _customShader = null;

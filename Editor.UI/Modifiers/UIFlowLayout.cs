@@ -10,22 +10,16 @@ using System.Text;
 namespace Editor.UI.Modifiers
 {
     [ModifierPrettyName("FlowLayout")]
-    public class UIFlowLayout : IUILayoutModifier
+    public class UIFlowLayout : BaseLayoutModifier
     {
-        private readonly UIElement _element;
-
         private UIValue2 _padding;
 
-        public UIFlowLayout(UIElement element)
+        public UIFlowLayout(UIElement element) : base(element)
         {
-            _element = element;
-
             _padding = UIValue2.Zero;
         }
 
-        public void MeasureSize(UIMeasureContext context) { }
-
-        public void ModifyElement(UILayoutContext context)
+        public override void ModifyLayout(UILayoutContext context)
         {
             Vector2 padding = _padding.Evaluate(context.LocalRegion);
             Vector2 position = Vector2.Zero;
@@ -50,8 +44,6 @@ namespace Editor.UI.Modifiers
                 maxHeight = MathF.Max(maxHeight, childExtents.Y);
             }
         }
-
-        public void DrawVisual(UIPainterContext painter) { }
 
         #region Properties
         [EditableProperty(nameof(_padding))] public UIValue2 Padding { get => _padding; set { _padding = value; _element.AddStateFlags(UIStateFlags.InvalidLayout); } }

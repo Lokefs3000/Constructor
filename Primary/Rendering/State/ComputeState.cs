@@ -23,7 +23,7 @@ namespace Primary.Rendering.State
         {
             base.SoftResetForNextPass();
 
-            _pipeline.Value = -1;
+            _pipeline.Reset(-1);
         }
 
         internal override bool CommitState(LinearBlockAllocator allocator, CommandRecorder recorder)

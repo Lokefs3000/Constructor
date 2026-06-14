@@ -256,9 +256,15 @@ namespace Editor.Shaders.Processors
                     if (!usedReferences.Contains(varData.AsReferenceIndex()))
                     {
                         if (varData.Usage == RawVariableUsage.Constants)
-                            areConstantsSolo = false;
-
-                        continue;
+                        {
+                            if (areConstantsSolo)
+                            {
+                                areConstantsSolo = false;
+                                continue;
+                            }
+                        }
+                        else
+                            continue;
                     }
 
                     sb.Append("    ");
@@ -470,8 +476,9 @@ namespace Editor.Shaders.Processors
                             if (areConstantsSolo)
                                 continue;
 
-                            if (!isActuallyReferenced)
-                                throw new NotImplementedException();
+                            // TODO: decide what to do as i dont think it can just be culled since it could be referred to by a pass in "SetConstants"
+                            //if (!isActuallyReferenced)
+                            //throw new NotImplementedException();
 
                             SerializeGeneric(sb, varData.Generic, varData.Name);
                             sb.Append(' ');

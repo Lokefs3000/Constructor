@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.HighPerformance;
+using Editor.UI.Assets;
 using Editor.UI.Datatypes;
 using Editor.UI.Elements;
 using Editor.UI.Utility;
@@ -27,35 +28,42 @@ namespace Editor.UI.Visual
         private readonly UIManager _manager;
 
         private UIGradientManager _gradientManager;
+        private UIFontAsset? _interFont;
 
-        private HashSet<IWindowHost> _hostsToRedraw;
+        private HashSet<IRenderableHost> _hostsToRedraw;
 
         private Queue<DrawContext> _pooledDrawContexts;
 
-        private Queue<UIWindowRedraw> _queuedWindowRedraws;
+        private Queue<HostRedrawData> _queuedHostRedraws;
         private HashSet<UIDockHost> _uncompositedDockHosts;
 
-        private List<UIWindowRedraw> _unbuiltDraws;
+        private List<HostRedrawData> _unbuiltDraws;
 
         internal UIRenderer(UIManager manager)
         {
             _manager = manager;
 
             _gradientManager = new UIGradientManager();
+            _interFont = null;
 
-            _hostsToRedraw = new HashSet<IWindowHost>();
+            _hostsToRedraw = new HashSet<IRenderableHost>();
 
             _pooledDrawContexts = new Queue<DrawContext>();
 
-            _queuedWindowRedraws = new Queue<UIWindowRedraw>();
+            _queuedHostRedraws = new Queue<HostRedrawData>();
             _uncompositedDockHosts = new HashSet<UIDockHost>();
 
-            _unbuiltDraws = new List<UIWindowRedraw>();
+            _unbuiltDraws = new List<HostRedrawData>();
         }
 
-        internal void AddHostToRedrawQueue(IWindowHost host)
+        internal void AddHostToRedrawQueue(IRenderableHost host)
         {
             _hostsToRedraw.Add(host);
+        }
+
+        internal void RemoveHostToRedrawQueue(IRenderableHost host)
+        {
+            _hostsToRedraw.Remove(host);
         }
 
         public void InstallRenderPasses(RenderPassManager passes)
@@ -63,7 +71,7 @@ namespace Editor.UI.Visual
             passes.AddRenderPass<UIGenGradientsRenderPass>();
             passes.AddRenderPass<UIUpdateFontsRenderPass>();
             passes.AddRenderPass<UIWindowRenderPass>();
-            passes.AddRenderPass<UICompositorRenderPass>();
+            //passes.AddRenderPass<UICompositorRenderPass>();
             passes.AddRenderPass<UIOverlayRenderPass>();
         }
 
@@ -80,6 +88,9 @@ namespace Editor.UI.Visual
         {
             _gradientManager.ClearPreviousData();
 
+            if (_interFont == null)
+                _interFont = AssetManager.LoadAsset<UIFontAsset>("Editor/Fonts/Inter.uifont");
+
             foreach (DrawContext ctx in _pooledDrawContexts)
             {
                 ctx.Clear();
@@ -91,65 +102,103 @@ namespace Editor.UI.Visual
                 {
                     Debug.Assert(_unbuiltDraws.Count == 0);
 
-                    foreach (IWindowHost host in _hostsToRedraw)
+                    foreach (IRenderableHost host in _hostsToRedraw)
                     {
-                        PrepareWindowForDrawing(host.ActiveWindow!);
-
-                        if (host is UIDockHost dockHost)
-                        {
-                            UIDockHost child = dockHost;
-                            while (child.ParentHost != null)
-                                child = child.ParentHost;
-
-                            _uncompositedDockHosts.Add(child);
-                        }
+                        PrepareHostForDrawing(host);
                     }
                 }
             }
         }
 
-        private void PrepareWindowForDrawing(UIWindow window)
+        private void PrepareHostForDrawing(IRenderableHost host)
         {
-            using (new ProfilingScope(window.WindowTitle))
+            using (new ProfilingScope("Host"))
             {
                 if (!_pooledDrawContexts.TryDequeue(out DrawContext context))
                     context = new DrawContext(new UIPainter(), new UIDrawBuilder(), new UIMeshBuilder());
 
                 context.Clear();
 
-                Boundaries invalidRegion = Boundaries.Clip(window.InvalidVisualRegion, new Boundaries(Vector2.Zero, window.ClientSize.AsVector2()));
-                invalidRegion = new Boundaries(Vector2.Zero, window.ClientSize.AsVector2());
+                Rect contentMetrics = host.ContentMetrics;
 
-                ushort objectIndex = 0;
-                RecursiveDraw(window.RootElement, 0);
+                Boundaries invalidRegion = Boundaries.Clip(host.InvalidVisualRegion, new Boundaries(Vector2.Zero, contentMetrics.Size.AsVector2()));
+                invalidRegion = new Boundaries(Vector2.Zero, contentMetrics.Size.AsVector2());
 
-                void RecursiveDraw(UIElement element, int zIndex)
+                long drawTimestampStart = Stopwatch.GetTimestamp();
+
+                ushort objectIndex = 1;
+
+                if (host is IWindowHost windowHost)
                 {
+                    IRenderableWindow? window = windowHost.ActiveWindow as IRenderableWindow;
+                    if (window != null)
+                    {
+                        RecursiveDraw(invalidRegion, window.RootElement, 0);
+                        window.RootElement.RemoveStateFlags(UIStateFlags.InvalidVisual);
+                    }
+                }
+
+                host.DrawVisual(new UIPainterContext(context.Painter, ushort.MaxValue, 0));
+                host.RemoveStateFlags(UIStateFlags.InvalidVisual);
+
+                void RecursiveDraw(Boundaries invalidRegion, UIElement element, int zIndex)
+                {
+                    UIPainterContext painter = new UIPainterContext(context.Painter, (ushort)zIndex, objectIndex);
                     if (element.PixelCoordinates.IsIntersecting(invalidRegion))
                     {
-                        element.DrawVisual(new UIPainterContext(context.Painter, (ushort)zIndex, objectIndex));
+                        element.DrawVisual(painter);
+                        element.ExecuteVisualMods(painter);
                     }
 
                     ++objectIndex;
 
                     if (element.Children.Count > 0)
                     {
+                        bool hasScroll = element.ScrollPosition != Vector2.Zero;
+                        if (hasScroll)
+                        {
+                            invalidRegion = Boundaries.Offset(invalidRegion, element.ScrollPosition);
+                            painter.PushMatrix(Matrix3x2.CreateTranslation(-element.ScrollPosition));
+                        }
+
+                        if (element.ClipDescendents)
+                            painter.PushClippingRect(element.PixelCoordinates);
+
                         ++zIndex;
                         foreach (UIElement child in element.Children)
                         {
-                            if (element.ElementTreeBounds.IsIntersecting(invalidRegion))
+                            if (!child.IsEnabled)
+                                break;
+
+                            if (Flags.HasFlag(child.StateFlags, UIStateFlags.InvalidVisual) || element.ElementTreeBounds.IsIntersecting(invalidRegion))
                             {
-                                RecursiveDraw(child, zIndex);
+                                RecursiveDraw(invalidRegion, child, zIndex);
+                                child.RemoveStateFlags(UIStateFlags.InvalidVisual);
                             }
                         }
-                    }
 
+                        if (element.ClipDescendents)
+                            painter.PopClippingRect();
+                        if (hasScroll)
+                            painter.PopMatrix();
+                    }
+                }
+
+                TimeSpan renderTimeTaken = Stopwatch.GetElapsedTime(drawTimestampStart);
+                if (false)
+                {
+                    UIPainterContext painter = new UIPainterContext(context.Painter, ushort.MaxValue, ushort.MaxValue);
+
+                    painter.DrawRect(new Boundaries(new Vector2(5.0f), new Vector2(135.0f, 65.0f)), UIPaint.FromColor(new Color(0.0f, 0.5f)));
+                    painter.DrawText(new Vector2(10.0f), UIPaint.FromColor(Color.Red), TextBuilder.Default, _interFont?.FindStyle(), 0.8f, @$"DrawVisual: {(int)renderTimeTaken.TotalMilliseconds}ms
+FrameIdx: {Time.FrameIndex}
+Objects: o{objectIndex} c{context.Painter.Cmds.Length} s{context.Painter.Segments.Length}");
                 }
 
                 context.Painter.FinishDrawing();
 
                 if (!context.Painter.Cmds.IsEmpty)
-                    _unbuiltDraws.Add(new UIWindowRedraw(window, context, invalidRegion));
+                    _unbuiltDraws.Add(new HostRedrawData(host, context, invalidRegion));
                 else
                 {
                     context.Clear();
@@ -158,9 +207,9 @@ namespace Editor.UI.Visual
             }
         }
 
-        internal bool TryDequeueQueuedWindow([NotNullWhen(true)] out UIWindowRedraw result)
+        internal bool TryDequeueQueuedWindow([NotNullWhen(true)] out HostRedrawData result)
         {
-            if (_queuedWindowRedraws.TryDequeue(out result))
+            if (_queuedHostRedraws.TryDequeue(out result))
             {
                 _pooledDrawContexts.Enqueue(result.Context);
                 return true;
@@ -173,13 +222,13 @@ namespace Editor.UI.Visual
         {
             using (new ProfilingScope("BuildCmds"))
             {
-                foreach (UIWindowRedraw redraw in _unbuiltDraws)
+                foreach (HostRedrawData redraw in _unbuiltDraws)
                 {
                     redraw.Context.Builder.BuildDraws(redraw.Context.Painter, redraw.Context.Mesh);
                     redraw.Context.Painter.ClearStoredObjects();
 
                     if (!redraw.Context.Mesh.IsEmpty)
-                        _queuedWindowRedraws.Enqueue(redraw);
+                        _queuedHostRedraws.Enqueue(redraw);
                     else
                     {
                         redraw.Context.Clear();
@@ -195,11 +244,11 @@ namespace Editor.UI.Visual
 
         public UIGradientManager GradientManager => _gradientManager;
 
-        public bool AreAnyWindowsQueued => _queuedWindowRedraws.Count > 0;
+        public bool AreAnyHostsQueued => _queuedHostRedraws.Count > 0;
         public bool HasUnbuiltDraws => _unbuiltDraws.Count > 0;
-        public bool HasUncompositedHosts => _uncompositedDockHosts.Count > 0;
+        public bool HasUncompositedHosts => false;
 
-        public int WindowQueueSize => _queuedWindowRedraws.Count;
+        public int HostQueueSize => _queuedHostRedraws.Count;
         public int CompositerQueueSize => _uncompositedDockHosts.Count;
 
         internal HashSet<UIDockHost> UncompositedHosts => _uncompositedDockHosts;
@@ -215,5 +264,5 @@ namespace Editor.UI.Visual
         }
     }
 
-    public readonly record struct UIWindowRedraw(UIWindow Window, DrawContext Context, Boundaries Region);
+    public readonly record struct HostRedrawData(IRenderableHost Host, DrawContext Context, Boundaries Region);
 }

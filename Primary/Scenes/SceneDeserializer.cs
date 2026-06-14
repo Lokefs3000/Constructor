@@ -3,32 +3,278 @@ using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Components;
 using Primary.Reflection;
+using Primary.Scenes.Json;
 using Primary.Scenes.Types;
 using Primary.Serialization;
 using Primary.Serialization.Structural;
 using System.Numerics;
 using System.Reflection;
+using System.Text.Json;
 
 namespace Primary.Scenes
 {
     public sealed class SceneDeserializer
     {
         private ComponentReflectionCache _componentCache;
-
+        private SceneJsonSerializer _jsonSerializer;
+        
         internal SceneDeserializer()
         {
             _componentCache = new ComponentReflectionCache();
+            _jsonSerializer = new SceneJsonSerializer();
         }
 
-        public void Deserialize(ReadOnlySpan<char> source, Scene scene)
+        public void Deserialize(Stream source, Scene scene)
         {
-            SDFReader reader = new SDFReader(source);
-            SDFDocument document = SDFDocument.Parse(ref reader);
-
-            foreach (var val in document)
+            Utf8JsonReader reader;
             {
-                if (val.Name == "Entity")
-                    DeserializeEntity(val, scene, SceneEntity.Null);
+                byte[] fullData = new byte[source.Length];
+                source.ReadExactly(fullData);
+
+                reader = new Utf8JsonReader(fullData.AsSpan(), new JsonReaderOptions { });
+            }
+
+            reader.Read();
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                EngLog.Scene.Error("Scene file should start with an object");
+                return;
+            }
+
+            Dictionary<int, SceneEntity> entityDict = new Dictionary<int, SceneEntity>();
+            List<SerializedEntity> entityList = new List<SerializedEntity>();
+
+            while (reader.TokenType != JsonTokenType.Null)
+            {
+                reader.Read();
+                if (reader.TokenType == JsonTokenType.EndObject)
+                    return;
+                else if (reader.TokenType != JsonTokenType.PropertyName)
+                {
+                    EngLog.Scene.Error("Scene file expects a name for data entry");
+                    return;
+                }
+
+                string key = reader.GetString()!;
+                if (key == "Entities")
+                {
+                    reader.Read();
+                    if (reader.TokenType != JsonTokenType.StartArray)
+                    {
+                        EngLog.Scene.Error("Expected array start for entites list");
+                        return;
+                    }
+
+                    while (reader.TokenType != JsonTokenType.Null)
+                    {
+                        reader.Read();
+                        if (reader.TokenType == JsonTokenType.EndArray)
+                            break;
+                        else if (reader.TokenType != JsonTokenType.StartObject)
+                        {
+                            EngLog.Scene.Error("Expected object start for entity");
+                            return;
+                        }
+
+                        SceneEntity currentEntity = scene.CreateEntity(SceneEntity.Null);
+
+                        int entityId = -1;
+                        int parentId = -1;
+                        int componentCount = 0;
+
+                        while (reader.TokenType != JsonTokenType.Null)
+                        {
+                            reader.Read();
+                            if (reader.TokenType == JsonTokenType.EndObject)
+                                break;
+                            else if (reader.TokenType != JsonTokenType.PropertyName)
+                            {
+                                EngLog.Scene.Error("Expected parameter name in entity object");
+                                return;
+                            }
+
+                            key = reader.GetString()!;
+                            if (key == "Id")
+                            {
+                                reader.Read();
+                                if (reader.TokenType != JsonTokenType.Number)
+                                {
+                                    EngLog.Scene.Error("Expected number for entity id");
+                                    return;
+                                }
+                                else if (reader.TryGetInt32(out int id))
+                                {
+                                    if (!entityDict.TryAdd(id, currentEntity))
+                                        EngLog.Scene.Error("Duplicate entity id {id}", id);
+                                    else
+                                        entityId = id;
+                                }
+                            }
+                            else if (key == "Parent")
+                            {
+                                reader.Read();
+                                if (reader.TokenType != JsonTokenType.Number)
+                                {
+                                    EngLog.Scene.Error("Expected number for entity parent id");
+                                    return;
+                                }
+                                else if (reader.TryGetInt32(out int id))
+                                {
+                                    parentId = id;
+                                }
+                            }
+                            else if (key == "Enabled")
+                            {
+                                reader.Read();
+                                if (reader.TokenType != JsonTokenType.True && reader.TokenType != JsonTokenType.False)
+                                {
+                                    EngLog.Scene.Error("Expected boolean for entity enabled state");
+                                    return;
+                                }
+                                else
+                                {
+                                    currentEntity.Enabled = reader.GetBoolean();
+                                }
+                            }
+                            else if (key == "Name")
+                            {
+                                reader.Read();
+                                if (reader.TokenType != JsonTokenType.String)
+                                {
+                                    EngLog.Scene.Error("Expected string for entity name");
+                                    return;
+                                }
+                                else
+                                {
+                                    currentEntity.Name = reader.GetString()!;
+                                }
+                            }
+                            else if (key == "Components")
+                            {
+                                reader.Read();
+                                if (reader.TokenType != JsonTokenType.StartArray)
+                                {
+                                    EngLog.Scene.Error("Expected array start for entity component list");
+                                    return;
+                                }
+                                else
+                                {
+                                    while (reader.TokenType != JsonTokenType.EndArray)
+                                    {
+                                        reader.Read();
+                                        if (reader.TokenType == JsonTokenType.String)
+                                        {
+                                            if (!_jsonSerializer.CreateComponent(currentEntity, reader.GetString()!))
+                                            {
+                                                EngLog.Scene.Error("Failed to create component specified in entity list {c}", reader.GetString());
+                                                return;
+                                            }
+
+                                            ++componentCount;
+
+                                            continue;
+                                        }
+                                        else if (reader.TokenType == JsonTokenType.EndArray)
+                                            break;
+
+                                        EngLog.Scene.Error("Unexpected token in entity component list");
+                                        return;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                EngLog.Scene.Error("Unexpected extra entry in entity {v}", key);
+                                return;
+                            }
+                        }
+
+                        entityList.Add(new SerializedEntity(currentEntity, parentId, componentCount));
+                    }
+
+                    if (reader.TokenType != JsonTokenType.EndArray)
+                    {
+                        EngLog.Scene.Error("Expected array end for entity list");
+                        return;
+                    }
+                }
+                else if (key == "Components")
+                {
+                    reader.Read();
+                    if (reader.TokenType != JsonTokenType.StartArray)
+                    {
+                        EngLog.Scene.Error("Expected array start for components list");
+                        return;
+                    }
+
+                    for (int i = 0; i < entityList.Count; i++)
+                    {
+                        SerializedEntity serialized = entityList[i];
+
+                        if (serialized.ParentId != -1)
+                        {
+                            if (entityDict.TryGetValue(serialized.ParentId, out SceneEntity parent))
+                            {
+                                SceneEntity entity = serialized.Entity;
+                                entity.Parent = parent;
+                            }
+                            else
+                                EngLog.Scene.Error("Failed to find parent entity with id {id}", serialized.ParentId);
+                        }
+
+                        for (int j = 0; j < serialized.ComponentCount; j++)
+                        {
+                            reader.Read();
+                            if (reader.TokenType != JsonTokenType.StartObject)
+                            {
+                                EngLog.Scene.Error("Expected a start object for component");
+
+                                reader.TrySkip();
+                                continue;
+                            }
+
+                            reader.Read();
+                            if (reader.TokenType != JsonTokenType.PropertyName || !reader.ValueTextEquals("Key"))
+                            {
+                                EngLog.Scene.Error("Expected a key property for component");
+
+                                reader.TrySkip();
+                                continue;
+                            }
+
+                            reader.Read();
+                            if (reader.TokenType != JsonTokenType.String)
+                            {
+                                EngLog.Scene.Error("Expected a string value for component key");
+
+                                reader.TrySkip();
+                                continue;
+                            }
+
+                            _jsonSerializer.DeserializeComponent(serialized.Entity, reader.GetString()!, ref reader);
+
+                            if (reader.TokenType != JsonTokenType.EndObject)
+                            {
+                                EngLog.Scene.Error("Component is still open after deserialization");
+
+                                reader.TrySkip();
+                                continue;
+                            }
+                        }
+                    }
+               
+                    reader.Read();
+                    if (reader.TokenType != JsonTokenType.EndArray)
+                    {
+                        EngLog.Scene.Error("Expected array end for components list");
+                        return;
+                    }
+                }
+                else
+                {
+                    EngLog.Scene.Error("Unexpected entry in scene data object {v}", key);
+                    return;
+                }
             }
         }
 
@@ -125,5 +371,7 @@ namespace Primary.Scenes
             { typeof(IAssetDefinition), new AssetDefinitionDeserializer() },
             { typeof(RenderMesh), new RenderMeshDeserializer() },
         };
+
+        private readonly record struct SerializedEntity(SceneEntity Entity, int ParentId, int ComponentCount);
     }
 }

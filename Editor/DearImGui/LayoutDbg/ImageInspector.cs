@@ -22,7 +22,7 @@ namespace Editor.DearImGui.LayoutDbg
 
             if (ImGui.Button(imageAsset?.Name ?? "null"))
             {
-                Editor.GlobalSingleton.DearImGuiWindowManager.OpenPopup(new AssetPicker(typeof(TextureAsset), imageAsset?.Id ?? AssetId.Invalid, null, (id) =>
+                EditorRuntime.GlobalSingleton.DearImGuiWindowManager.OpenPopup(new AssetPicker(typeof(TextureAsset), imageAsset?.Id ?? AssetId.Invalid, null, (id) =>
                 {
                     image.Image = AssetManager.LoadAsset<TextureAsset>(id);
                 }));

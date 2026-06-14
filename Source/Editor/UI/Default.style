@@ -13,21 +13,18 @@
     </Class>
     <Class Type="MenuItem">
         <Font Value="Editor/Fonts/Inter.uifont" />
-        <FontStyle Value="Regular" />
         <TextColor Value="#ffffff" />
     </Class>
     <Class Type="TreeView">
-        <ArrowColor Value="#a0a0a0" />
+		<ArrowColor Value="#cccccc" />
+		<NodeBackgroundColor Value="#3057d940" />
     </Class>
 	<Class Type="Label">
 		<Font Value="Editor/Fonts/Inter.uifont" />
-		<FontStyle Value="Regular" />
         <TextColor Value="#ffffff" />
 	</Class>
 	<Class Type="Label" Name=".Italic">
-		<Font Value="Editor/Fonts/InterItalic.uifont" />
 		<FontStyle Value="Italic" />
-		<TextColor Value="#ffffff" />
 	</Class>
 	<Class Type="Button">
 		<State Name="Normal">
@@ -44,5 +41,71 @@
 			<BackgroundColor Value="#3f3f3f" />
 			<StrokeColor Value="#808080" />
 		</State>
+	</Class>
+	<Class Type="ToggleButton">
+		<State Name="Toggled">
+			<StrokeColor Value="#f5a21d" />
+		</State>
+	</Class>
+	<Class Type="ScrollView">
+		<ScrollerBackgroundColor Value="#151515" />
+	</Class>
+	<Class Type="Scroller">
+		<State Name="Normal">
+			<BackgroundColor Value="#151515" />
+			<ForegroundColor Value="#4f4f4f" />
+			<CornerRadius Value="3" />
+		</State>
+		<State Name="Hovered">
+			<ForegroundColor Value="#6d6d6d" />
+		</State>
+		<State Name="Pressed">
+			<ForegroundColor Value="#3f3f3f" />
+		</State>
+		<State Name="Inactive">
+			<ForegroundColor Value="#252525" />
+		</State>
+	</Class>
+	<Class Type="TextField">
+		<State Name="Normal">
+			<Font Value="Editor/Fonts/Inter.uifont" />
+			<TextColor Value="#ffffff" />
+			<BackgroundColor Value="#252525" />
+			<StrokeColor Value="#1b1b1b" />
+			<StrokeWeight Value="1" />
+			<CornerRadius Value="8" />
+		</State>
+		<State Name="Hovered">
+			<StrokeColor Value="#151515" />
+		</State>
+		<State Name="Pressed">
+			<StrokeColor Value="#808080" />
+		</State>
+	</Class>
+
+	<Class Name="header-bar" Type="Frame">
+        <BackgroundColor Value="#505050" />
+        <StrokeColor Value="#101010" />
+        <StrokeWeight Value="1" />
+    </Class>
+
+	<Class Name="root-element" Type="Frame">
+        <BackgroundColor Value="#505050" />
+        <StrokeColor Value="#101010" />
+        <StrokeWeight Value="1" />
+		<CornerRadius Value="3" />
+    </Class>
+	<Class Name="dropdown-element" Type="Element">
+		<Size Value="0.0 200 0.0 24" />
+	</Class>
+	<Class Name="dropdown-label" Type="Label">
+		<Size Value="0.35 0 1.0 0" />
+		<FontSize Value="0.8" />
+		<Alignment Value="Middle" />
+	</Class>
+	<Class Name="dropdown-value" Type="TextField">
+		<Position Value="0.35 0 0.0 0" />
+		<Size Value="0.65 0 1.0 0" />
+		<FontSize Value="0.8" />
 	</Class>
 </Stylesheet>

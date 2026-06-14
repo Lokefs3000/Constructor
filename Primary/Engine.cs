@@ -10,16 +10,21 @@ using Primary.Threading;
 using Primary.Timing;
 using Primary.Rendering;
 using System.Runtime.CompilerServices;
+using Primary.GUI.ImGui;
+using Primary.Scripting;
+using Primary.Windowing;
 
 namespace Primary
 {
     /// <summary>
     /// Responsible for handling the core structures of the engine.
     /// </summary>
-    public class Engine : IDisposable
+    public abstract class Engine : IDisposable
     {
         private static Engine? s_instance = null;
 
+        private ThreadHelper _threadHelper;
+        private ScriptingManager _scriptingManager;
         private ConsoleManager _consoleManager;
         private Time _time;
         private ProfilingManager _profilingManager;
@@ -30,55 +35,67 @@ namespace Primary
         private SceneManager _sceneManager;
         private RenderingManager _renderingManager;
         private SystemManager _systemManager;
-        private ThreadHelper _threadHelper;
         private InputSystem _inputSystem;
+        private ImGuiManager _imguiManager;
 
         public Engine(ReadOnlySpan<string> args)
         {
             s_instance = this;
 
             AppArguments.Parse(args);
-        }
 
-        protected void Initialize(IAssetIdProvider assetIdProvider)
-        {
             Thread.CurrentThread.Name = "Main";
             SystemHelper.EnsureFeaturesPresent();
 
             SDL.SDL3.SDL_Init(SDL.SDL_InitFlags.SDL_INIT_VIDEO | SDL.SDL_InitFlags.SDL_INIT_EVENTS);
 
+            PreInitialization();
+
+            _threadHelper = new ThreadHelper();
+            _scriptingManager = new ScriptingManager();
             _consoleManager = new ConsoleManager();
             _time = new Time();
             _profilingManager = new ProfilingManager();
-            _assetFilesystem = new AssetFilesystem(); SetupAssetFilesystem();
-            _assetManager = new AssetManager(); _assetManager.LockInIdProvider(assetIdProvider);
+            _assetFilesystem = new AssetFilesystem();
+            _assetManager = new AssetManager();
             _eventManager = new EventManager();
             _windowManager = new WindowManager();
             _sceneManager = new SceneManager();
             _renderingManager = new RenderingManager();
             _systemManager = new SystemManager();
-            _threadHelper = new ThreadHelper();
             _inputSystem = new InputSystem();
+            _imguiManager = new ImGuiManager();
         }
 
         public virtual void Dispose()
         {
+            _imguiManager.Dispose();
+            _assetManager.Dispose();
             _renderingManager.Dispose();
             _sceneManager.Dispose();
             _windowManager.Dispose();
             _eventManager.Dispose();
-            _assetManager.Dispose();
             _profilingManager.Dispose();
+            _scriptingManager.Dispose();
 
             s_instance = null;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected virtual void SetupAssetFilesystem()
+        #region Implementation API
+        protected internal virtual void PreInitialization()
         {
-
         }
 
+        protected internal virtual void SetupFilesystems()
+        {
+        }
+
+        protected internal virtual void SetupAssets()
+        {
+        }
+        #endregion
+
+        public ScriptingManager ScriptingManager => _scriptingManager;
         public ConsoleManager ConsoleManager => _consoleManager;
         public Time Time => _time;
         public ProfilingManager ProfilingManager => _profilingManager;
@@ -91,6 +108,7 @@ namespace Primary
         public SystemManager SystemManager => _systemManager;
         public ThreadHelper ThreadHelper => _threadHelper;
         public InputSystem InputSystem => _inputSystem;
+        public ImGuiManager ImGuiManager => _imguiManager;
 
         public static Engine GlobalSingleton => s_instance!;
 
@@ -98,6 +116,12 @@ namespace Primary
         public const bool IsDebugBuild = true;
 #else
         public const bool IsDebugBuild = false;
+#endif
+
+#if AOT
+        public const bool IsAOTBuild = true;
+#else
+        public const bool IsAOTBuild = false;
 #endif
     }
 }

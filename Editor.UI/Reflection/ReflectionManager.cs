@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 
 namespace Editor.UI.Reflection
@@ -20,6 +21,9 @@ namespace Editor.UI.Reflection
 
             _elementCache.DiscoverAssembly(typeof(ReflectionManager).Assembly);
             _modifierCache.DiscoverAssembly(typeof(ReflectionManager).Assembly);
+
+            _elementCache.DiscoverAssembly(Assembly.GetEntryAssembly()!);
+            _modifierCache.DiscoverAssembly(Assembly.GetEntryAssembly()!);
         }
 
         public PropertyCache PropertyCache => _propertyCache;

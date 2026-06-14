@@ -1,24 +1,25 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
+using Primary.Collections;
 using Primary.Common;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.RHI2;
-using Primary.RHI2.Direct3D12;
+using Primary.RHI;
+using Primary.RHI.Direct3D12;
+using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using TerraFX.Interop.DirectX;
-using System.Collections.Frozen;
-
+using TerraFX.Interop.Windows;
 using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
 using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
 using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
+using static TerraFX.Interop.DirectX.D3D12_COMMAND_LIST_TYPE;
 using static TerraFX.Interop.DirectX.D3D12_RESOURCE_FLAGS;
 using static TerraFX.Interop.DirectX.D3D12_TEXTURE_BARRIER_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_COMMAND_LIST_TYPE;
 
 namespace Primary.Rendering.D3D12
 {
@@ -27,6 +28,7 @@ namespace Primary.Rendering.D3D12
     {
         private readonly NRDDevice _device;
 
+        private HashSet<nint> _pendingStates;
         private List<D3D12_BUFFER_BARRIER> _bufferBarriers;
         private List<D3D12_TEXTURE_BARRIER> _textureBarriers;
 
@@ -36,6 +38,7 @@ namespace Primary.Rendering.D3D12
         {
             _device = device;
 
+            _pendingStates = new HashSet<nint>();
             _bufferBarriers = new List<D3D12_BUFFER_BARRIER>();
             _textureBarriers = new List<D3D12_TEXTURE_BARRIER>();
 
@@ -51,6 +54,7 @@ namespace Primary.Rendering.D3D12
 
         internal void ClearPreviousBarriers()
         {
+            _pendingStates.Clear();
             _bufferBarriers.Clear();
             _textureBarriers.Clear();
         }
@@ -119,66 +123,122 @@ namespace Primary.Rendering.D3D12
 
         internal void FlushBarriers(ID3D12GraphicsCommandList10* cmdList, BarrierFlushTypes types)
         {
-            if (types == 0)
+            if (types == 0 || _pendingStates.Count == 0)
                 return;
 
-            if (_bufferBarriers.Count > 0 && Flags.HasFlag(types, BarrierFlushTypes.Buffer))
+            using RentedList<nint> removalList = new RentedList<nint>();
+
+            bool acceptBuffers = Flags.HasFlag(types, BarrierFlushTypes.Buffer);
+            bool acceptTextures = Flags.HasFlag(types, BarrierFlushTypes.Texture);
+
+            foreach (nint resourceId in _pendingStates)
             {
-                for (int i = 0; i < _bufferBarriers.Count; i++)
+                ref NRDResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, resourceId);
+
+                switch (state.Id)
                 {
-                    D3D12_BUFFER_BARRIER barrier = _bufferBarriers[i];
-                    ref NRDResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)barrier.pResource);
+                    case FGResourceId.Buffer:
+                        {
+                            if (acceptBuffers)
+                            {
+                                if (state.PreviousSync != state.RequestedSync && state.PreviousAccess != state.RequestedAccess)
+                                {
+                                    _bufferBarriers.Add(new D3D12_BUFFER_BARRIER
+                                    {
+                                        SyncBefore = state.PreviousSync,
+                                        SyncAfter = state.RequestedSync,
 
-                    state.PreviousSync = barrier.SyncAfter;
-                    state.PreviousAccess = barrier.AccessAfter;
+                                        AccessBefore = state.PreviousAccess,
+                                        AccessAfter = state.RequestedAccess,
 
-                    if (!state.Native.IsNull)
-                    {
-                        D3D12RHIBufferNative* native = (D3D12RHIBufferNative*)state.Native.Pointer;
-                        native->BarrierSync = barrier.SyncAfter;
-                        native->BarrierAccess = barrier.AccessAfter;
-                    }
+                                        pResource = (ID3D12Resource*)resourceId,
+                                        Offset = 0,
+                                        Size = ulong.MaxValue
+                                    });
+
+                                    state.PreviousSync = state.RequestedSync;
+                                    state.PreviousAccess = state.RequestedAccess;
+
+                                    if (!state.Native.IsNull)
+                                    {
+                                        D3D12RHIBufferNative* native = (D3D12RHIBufferNative*)state.Native.Pointer;
+                                        native->BarrierSync = state.RequestedSync;
+                                        native->BarrierAccess = state.RequestedAccess;
+                                    }
+                                }
+
+                                removalList.Add(resourceId);
+                            }
+
+                            break;
+                        }
+                    case FGResourceId.Texture:
+                        {
+                            if (acceptTextures)
+                            {
+                                if (state.PreviousSync != state.RequestedSync && state.PreviousAccess != state.RequestedAccess && state.PreviousLayout != state.RequestedLayout)
+                                {
+                                    _textureBarriers.Add(new D3D12_TEXTURE_BARRIER
+                                    {
+                                        SyncBefore = state.PreviousSync,
+                                        SyncAfter = state.RequestedSync,
+
+                                        AccessBefore = state.PreviousAccess,
+                                        AccessAfter = state.RequestedAccess,
+
+                                        LayoutBefore = state.PreviousLayout,
+                                        LayoutAfter = state.RequestedLayout,
+
+                                        pResource = (ID3D12Resource*)resourceId,
+                                        Subresources = new D3D12_BARRIER_SUBRESOURCE_RANGE(0xffffffff),
+                                        Flags = D3D12_TEXTURE_BARRIER_FLAG_NONE
+                                    });
+
+                                    state.PreviousSync = state.RequestedSync;
+                                    state.PreviousAccess = state.RequestedAccess;
+                                    state.PreviousLayout = state.RequestedLayout;
+
+                                    if (!state.Native.IsNull)
+                                    {
+                                        D3D12RHITextureNative* native = (D3D12RHITextureNative*)state.Native.Pointer;
+                                        native->BarrierSync = state.RequestedSync;
+                                        native->BarrierAccess = state.RequestedAccess;
+                                        native->BarrierLayout = state.RequestedLayout;
+                                    }
+                                }
+
+                                removalList.Add(resourceId);
+                            }
+
+                            break;
+                        }
                 }
-
-                fixed (D3D12_BUFFER_BARRIER* ptr = _bufferBarriers.AsSpan())
-                {
-                    D3D12_BARRIER_GROUP group = new D3D12_BARRIER_GROUP(
-                        (uint)_bufferBarriers.Count,
-                        ptr);
-
-                    cmdList->Barrier(1, &group);
-                }
-                _bufferBarriers.Clear();
             }
 
-            if (_textureBarriers.Count > 0 && Flags.HasFlag(types, BarrierFlushTypes.Texture))
+            if (!removalList.IsEmpty)
             {
-                for (int i = 0; i < _textureBarriers.Count; i++)
+                foreach (nint resourceId in removalList)
+                    _pendingStates.Remove(resourceId);
+
+                if (_bufferBarriers.Count > 0 || _textureBarriers.Count > 0)
                 {
-                    D3D12_TEXTURE_BARRIER barrier = _textureBarriers[i];
-                    ref NRDResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)barrier.pResource);
+                    D3D12_BARRIER_GROUP* groups = stackalloc D3D12_BARRIER_GROUP[2];
 
-                    state.PreviousSync = barrier.SyncAfter;
-                    state.PreviousAccess = barrier.AccessAfter;
-                    state.PreviousLayout = barrier.LayoutAfter;
-
-                    if (!state.Native.IsNull)
+                    int count = 0;
+                    fixed (D3D12_BUFFER_BARRIER* bufferBarriers = _bufferBarriers.AsSpan())
+                    fixed (D3D12_TEXTURE_BARRIER* textureBarriers = _textureBarriers.AsSpan())
                     {
-                        D3D12RHITextureNative* native = (D3D12RHITextureNative*)state.Native.Pointer;
-                        native->BarrierSync = barrier.SyncAfter;
-                        native->BarrierAccess = barrier.AccessAfter;
-                        native->BarrierLayout = barrier.LayoutAfter;
+                        if (_bufferBarriers.Count > 0)
+                            groups[count++] = new D3D12_BARRIER_GROUP((uint)_bufferBarriers.Count, bufferBarriers);
+                        if (_textureBarriers.Count > 0)
+                            groups[count++] = new D3D12_BARRIER_GROUP((uint)_textureBarriers.Count, textureBarriers);
+
+                        Debug.Assert(count > 0);
+                        cmdList->Barrier((uint)count, groups);
                     }
                 }
 
-                fixed (D3D12_TEXTURE_BARRIER* ptr = _textureBarriers.AsSpan())
-                {
-                    D3D12_BARRIER_GROUP group = new D3D12_BARRIER_GROUP(
-                    (uint)_textureBarriers.Count,
-                    ptr);
-
-                    cmdList->Barrier(1, &group);
-                }
+                _bufferBarriers.Clear();
                 _textureBarriers.Clear();
             }
         }
@@ -200,49 +260,41 @@ namespace Primary.Rendering.D3D12
 
             if (Unsafe.IsNullRef(ref state))
             {
-                _bufferBarriers.Add(new D3D12_BUFFER_BARRIER
-                {
-                    SyncBefore = D3D12_BARRIER_SYNC_ALL,
-                    SyncAfter = sync,
-
-                    AccessBefore = D3D12_BARRIER_ACCESS_COMMON,
-                    AccessAfter = access,
-
-                    pResource = (ID3D12Resource*)resource,
-                    Offset = 0,
-                    Size = ulong.MaxValue
-                });
-
                 if (native != null)
                 {
                     D3D12RHIBufferNative* bufferNative = (D3D12RHIBufferNative*)native;
-                    _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Buffer, native, bufferNative->BarrierSync, bufferNative->BarrierAccess);
+                    if (bufferNative->BarrierSync == sync && bufferNative->BarrierAccess == access)
+                        return;
+
+                    _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Buffer, native, bufferNative->BarrierSync, bufferNative->BarrierAccess)
+                    {
+                        RequestedSync = sync,
+                        RequestedAccess = access
+                    };
                 }
                 else
                 {
-                    _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Buffer, null, D3D12_BARRIER_SYNC_ALL, D3D12_BARRIER_ACCESS_COMMON);
+                    _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Buffer, null, D3D12_BARRIER_SYNC_ALL, D3D12_BARRIER_ACCESS_NO_ACCESS)
+                    {
+                        RequestedSync = sync,
+                        RequestedAccess = access
+                    };
                 }
+
+                _pendingStates.Add((nint)resource);
             }
             else
             {
                 if (state.PreviousSync == sync && state.PreviousAccess == access)
-                    return;
-
-                _bufferBarriers.Add(new D3D12_BUFFER_BARRIER
                 {
-                    SyncBefore = state.PreviousSync,
-                    SyncAfter = sync,
+                    _pendingStates.Remove((nint)resource);
+                    return;
+                }
 
-                    AccessBefore = state.PreviousAccess,
-                    AccessAfter = access,
+                state.RequestedSync = sync;
+                state.RequestedAccess = access;
 
-                    pResource = (ID3D12Resource*)resource,
-                    Offset = 0,
-                    Size = ulong.MaxValue
-                });
-
-                //state.PreviousSync = sync;
-                //state.PreviousAccess = access;
+                _pendingStates.Add((nint)resource);
             }
         }
 
@@ -271,63 +323,53 @@ namespace Primary.Rendering.D3D12
 
             if (Unsafe.IsNullRef(ref state))
             {
-                _textureBarriers.Add(new D3D12_TEXTURE_BARRIER
-                {
-                    SyncBefore = D3D12_BARRIER_SYNC_ALL,
-                    SyncAfter = sync,
-
-                    AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS,
-                    AccessAfter = access,
-
-                    LayoutBefore = D3D12_BARRIER_LAYOUT_UNDEFINED,
-                    LayoutAfter = layout,
-
-                    pResource = (ID3D12Resource*)resource,
-                    Subresources = range.GetValueOrDefault(new D3D12_BARRIER_SUBRESOURCE_RANGE(0xffffffff)),
-                    Flags = D3D12_TEXTURE_BARRIER_FLAG_NONE,
-                });
-
                 if (native != null)
                 {
                     D3D12RHITextureNative* textureNative = (D3D12RHITextureNative*)native;
-                    _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Texture, native, textureNative->BarrierSync, textureNative->BarrierAccess, textureNative->BarrierLayout);
+                    if (textureNative->BarrierSync == sync && textureNative->BarrierAccess == access && textureNative->BarrierLayout == layout)
+                        return;
+
+                    _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Texture, native, textureNative->BarrierSync, textureNative->BarrierAccess, textureNative->BarrierLayout)
+                    {
+                        RequestedSync = sync,
+                        RequestedAccess = access,
+                        RequestedLayout = layout
+                    };
                 }
                 else
                 {
-                    _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Texture, null, D3D12_BARRIER_SYNC_ALL, D3D12_BARRIER_ACCESS_COMMON, D3D12_BARRIER_LAYOUT_UNDEFINED);
+                    _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Texture, null, D3D12_BARRIER_SYNC_ALL, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_UNDEFINED)
+                    {
+                        RequestedSync = sync,
+                        RequestedAccess = access,
+                        RequestedLayout = layout
+                    };
                 }
+
+                _pendingStates.Add((nint)resource);
             }
             else
             {
                 if (state.PreviousSync == sync &&
                     state.PreviousAccess == access &&
                     state.PreviousLayout == layout)
-                    return;
-
-                _textureBarriers.Add(new D3D12_TEXTURE_BARRIER
                 {
-                    SyncBefore = state.PreviousSync,
-                    SyncAfter = sync,
+                    _pendingStates.Remove((nint)resource);
+                    return;
+                }
 
-                    AccessBefore = state.PreviousAccess,
-                    AccessAfter = access,
+                state.RequestedSync = sync;
+                state.RequestedAccess = access;
+                state.RequestedLayout = layout;
 
-                    LayoutBefore = state.PreviousLayout,
-                    LayoutAfter = layout,
-
-                    pResource = (ID3D12Resource*)resource,
-                    Subresources = range.GetValueOrDefault(new D3D12_BARRIER_SUBRESOURCE_RANGE(0xffffffff)),
-                    Flags = D3D12_TEXTURE_BARRIER_FLAG_NONE,
-                });
-
-                //state.PreviousSync = sync;
-                //state.PreviousAccess = access;
-                //state.PreviousLayout = layout;
+                _pendingStates.Add((nint)resource);
             }
         }
 
         internal void SetResourceState(ID3D12Resource* resource, NRDResourceState state) => _resourceStates[(nint)resource] = state;
+        
         internal ref readonly NRDResourceState GetResourceState(ID3D12Resource* resource) => ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
+        internal bool HasResourceState(ID3D12Resource* resource) => _resourceStates.ContainsKey((nint)resource);
 
         [Conditional("DEBUG")]
         internal void DbgEnsureState(NRDResource buffer, ID3D12GraphicsCommandList10* cmdList, D3D12_BARRIER_SYNC sync, D3D12_BARRIER_ACCESS access)
@@ -651,7 +693,7 @@ namespace Primary.Rendering.D3D12
                 D3D12_BARRIER_LAYOUT_DIRECT_QUEUE_GENERIC_READ_COMPUTE_QUEUE_ACCESSIBLE
                 ] }
         }.ToFrozenDictionary();
-    
+
         private enum IncompatibleBarrierFlags : byte
         {
             None = 0,
@@ -677,5 +719,9 @@ namespace Primary.Rendering.D3D12
         public D3D12_BARRIER_SYNC PreviousSync = StartSync;
         public D3D12_BARRIER_ACCESS PreviousAccess = StartAccess;
         public D3D12_BARRIER_LAYOUT PreviousLayout = StartLayout;
+
+        public D3D12_BARRIER_SYNC RequestedSync = StartSync;
+        public D3D12_BARRIER_ACCESS RequestedAccess = StartAccess;
+        public D3D12_BARRIER_LAYOUT RequestedLayout = StartLayout;
     }
 }

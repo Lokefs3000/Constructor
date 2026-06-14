@@ -6,7 +6,7 @@ using Primary.Assets.Loaders;
 using Primary.Common;
 using Primary.Mathematics;
 using Primary.Memory.Native;
-using Primary.RHI2;
+using Primary.RHI;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

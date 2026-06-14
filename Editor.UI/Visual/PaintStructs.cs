@@ -1,6 +1,7 @@
 ﻿using Editor.UI.Datatypes;
 using Editor.UI.Helpers;
 using Primary.Common;
+using Primary.Mathematics;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -38,81 +39,90 @@ namespace Editor.UI.Visual
     {
         [FieldOffset(0)] public readonly PaintType Type;
 
-        [FieldOffset(1)] public readonly uint CommandSortIndex;
+        [FieldOffset(1)] public readonly ulong CommandSortIndex;
 
+        [FieldOffset(5)] public readonly uint CommandIndex;
         [FieldOffset(3)] public readonly ushort ObjectIndex;
         [FieldOffset(1)] public readonly ushort ZIndex;
 
-        [FieldOffset(5)] public readonly CmdPointsData PointsData;
-        [FieldOffset(5)] public readonly CmdLinesData LinesData;
-        [FieldOffset(5)] public readonly CmdRectData RectData;
-        [FieldOffset(5)] public readonly CmdRoundedRectData RoundedRectData;
-        [FieldOffset(5)] public readonly CmdCircleData CircleData;
-        [FieldOffset(5)] public readonly CmdTriangleData TriangleData;
-        [FieldOffset(5)] public readonly CmdImageData ImageData;
-        [FieldOffset(5)] public readonly CmdTextData TextData;
+        [FieldOffset(9)] public readonly CmdPointsData PointsData;
+        [FieldOffset(9)] public readonly CmdLinesData LinesData;
+        [FieldOffset(9)] public readonly CmdRectData RectData;
+        [FieldOffset(9)] public readonly CmdRoundedRectData RoundedRectData;
+        [FieldOffset(9)] public readonly CmdCircleData CircleData;
+        [FieldOffset(9)] public readonly CmdTriangleData TriangleData;
+        [FieldOffset(9)] public readonly CmdImageData ImageData;
+        [FieldOffset(9)] public readonly CmdTextData TextData;
 
-        public PaintCmd(ushort zIndex, ushort objectIndex, CmdPointsData data)
+        public PaintCmd(ushort zIndex, ushort objectIndex, uint commandIndex, CmdPointsData data)
         {
             Type = PaintType.Points;
             ZIndex = zIndex;
             ObjectIndex = objectIndex;
+            CommandIndex = commandIndex;
             PointsData = data;
         }
 
-        public PaintCmd(ushort zIndex, ushort objectIndex, CmdLinesData data)
+        public PaintCmd(ushort zIndex, ushort objectIndex, uint commandIndex, CmdLinesData data)
         {
             Type = PaintType.Lines;
             ZIndex = zIndex;
             ObjectIndex = objectIndex;
+            CommandIndex = commandIndex;
             LinesData = data;
         }
 
-        public PaintCmd(ushort zIndex, ushort objectIndex, CmdRectData data)
+        public PaintCmd(ushort zIndex, ushort objectIndex, uint commandIndex, CmdRectData data)
         {
             Type = PaintType.Rect;
             ZIndex = zIndex;
             ObjectIndex = objectIndex;
+            CommandIndex = commandIndex;
             RectData = data;
         }
 
-        public PaintCmd(ushort zIndex, ushort objectIndex, CmdRoundedRectData data)
+        public PaintCmd(ushort zIndex, ushort objectIndex, uint commandIndex, CmdRoundedRectData data)
         {
             Type = PaintType.RoundedRect;
             ZIndex = zIndex;
             ObjectIndex = objectIndex;
+            CommandIndex = commandIndex;
             RoundedRectData = data;
         }
 
-        public PaintCmd(ushort zIndex, ushort objectIndex, CmdCircleData data)
+        public PaintCmd(ushort zIndex, ushort objectIndex, uint commandIndex, CmdCircleData data)
         {
             Type = PaintType.Circle;
             ZIndex = zIndex;
             ObjectIndex = objectIndex;
+            CommandIndex = commandIndex;
             CircleData = data;
         }
 
-        public PaintCmd(ushort zIndex, ushort objectIndex, CmdTriangleData data)
+        public PaintCmd(ushort zIndex, ushort objectIndex, uint commandIndex, CmdTriangleData data)
         {
             Type = PaintType.Triangle;
             ZIndex = zIndex;
             ObjectIndex = objectIndex;
+            CommandIndex = commandIndex;
             TriangleData = data;
         }
 
-        public PaintCmd(ushort zIndex, ushort objectIndex, CmdImageData data)
+        public PaintCmd(ushort zIndex, ushort objectIndex, uint commandIndex, CmdImageData data)
         {
             Type = PaintType.Image;
             ZIndex = zIndex;
             ObjectIndex = objectIndex;
+            CommandIndex = commandIndex;
             ImageData = data;
         }
 
-        public PaintCmd(ushort zIndex, ushort objectIndex, CmdTextData data)
+        public PaintCmd(ushort zIndex, ushort objectIndex, uint commandIndex, CmdTextData data)
         {
             Type = PaintType.Text;
             ZIndex = zIndex;
             ObjectIndex = objectIndex;
+            CommandIndex = commandIndex;
             TextData = data;
         }
 

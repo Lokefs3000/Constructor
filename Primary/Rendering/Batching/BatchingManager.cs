@@ -5,17 +5,19 @@ namespace Primary.Rendering.Batching
 {
     public sealed class BatchingManager
     {
+        private readonly RenderingManager _manager;
         private readonly OctreeRenderBatcher[] _subBatchers;
 
         private List<RenderList> _activeLists;
 
-        internal BatchingManager()
+        internal BatchingManager(RenderingManager manager)
         {
+            _manager = manager;
             _subBatchers = [
-                new OctreeRenderBatcher(0),
-                new OctreeRenderBatcher(1),
-                new OctreeRenderBatcher(2),
-                new OctreeRenderBatcher(3),
+                new OctreeRenderBatcher(0, manager),
+                new OctreeRenderBatcher(1, manager),
+                new OctreeRenderBatcher(2, manager),
+                new OctreeRenderBatcher(3, manager),
                 ];
 
             _activeLists = new List<RenderList>();
@@ -78,21 +80,21 @@ namespace Primary.Rendering.Batching
                     int previousLastIndex = 0;
                     ushort lastShaderIdx = ushort.MaxValue;
 
-                    for (int i = 0; i < keys.Length; i++)
+                    for (int i = 0; i < keys.Length; ++i)
                     {
                         ref readonly RenderKey key = ref keys[i];
                         if (key.ShaderId != lastShaderIdx)
                         {
                             OctreeRenderBatcher batcher = _subBatchers[key.Batcher];
                             if (lastShaderIdx != ushort.MaxValue)
-                                output.AddRange(batcher.Flags[key.Index].Material.Shader!, new ShaderKeyRange(previousLastIndex, i));
+                                output.AddRange(batcher.Flags[keys[previousLastIndex].Index].Material.Shader!, new ShaderKeyRange(previousLastIndex, i));
 
                             previousLastIndex = i;
                             lastShaderIdx = key.ShaderId;
                         }
                     }
 
-                    if (lastShaderIdx != ushort.MaxValue && previousLastIndex != keys.Length)
+                    if (lastShaderIdx != ushort.MaxValue && previousLastIndex < keys.Length)
                     {
                         ref readonly RenderKey key = ref keys[previousLastIndex];
                         OctreeRenderBatcher batcher = _subBatchers[key.Batcher];

@@ -1,4 +1,5 @@
 ﻿using Primary.Assets.Types;
+using Primary.Profiling;
 using System.Collections.Concurrent;
 
 namespace Editor.Storage
@@ -14,9 +15,12 @@ namespace Editor.Storage
 
         internal void HandlePendingUpdates()
         {
-            foreach (var kvp in _categories)
+            using (new ProfilingScope("AssetDbUpdate"))
             {
-                kvp.Value.HandlePendingUpdates();
+                foreach (var kvp in _categories)
+                {
+                    kvp.Value.HandlePendingUpdates();
+                }
             }
         }
 

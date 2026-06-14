@@ -1,7 +1,7 @@
-﻿using Primary.RHI2.Direct3D12;
+﻿using Primary.RHI.Direct3D12;
 using Serilog;
 
-namespace Primary.RHI2
+namespace Primary.RHI
 {
     public static class RHIDeviceFactory
     {

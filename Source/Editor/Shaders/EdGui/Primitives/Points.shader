@@ -23,7 +23,7 @@ PsInput VertexMain(uint vertexId : SV_VertexId, uint instanceId : SV_InstanceId)
     PointsMetadata metadata = baMetadata.Load<PointsMetadata>(0);
     PsInput output =
     {
-        float4(mul(transpose(cbGlobals.Model), float3(s_RectTLVertices[vertexId] + baMetadata.Load<float2>(0 + sizeof(PointsMetadata) + instanceId * 8), 1.0)), metadata.ZIndex * 0.01, 1.0),
+        float4(mul(transpose(cbGlobals.Model), float3(s_RectTLVertices[vertexId] + baMetadata.Load<float2>(0 + sizeof(PointsMetadata) + instanceId * 8), 1.0)), metadata.ZIndex * 0.00001, 1.0),
         metadata.Color,
 
         0 | (uint(metadata.HasStroke) << 31)

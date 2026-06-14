@@ -1,8 +1,10 @@
-﻿using Primary.Common;
+﻿using Arch.LowLevel;
+using Primary.Common;
 using Primary.Rendering.Resources;
-using Primary.RHI2;
-using Primary.RHI2.Direct3D12;
+using Primary.RHI;
+using Primary.RHI.Direct3D12;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.Versioning;
 using TerraFX.Interop.DirectX;
 using TerraFX.Interop.Windows;
@@ -251,6 +253,42 @@ namespace Primary.Rendering.D3D12
             }
 
             _allocatedDescriptors[resource] = handle;
+            return handle;
+        }
+
+        internal D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandleForSwapChain(ref D3D12RHISwapChainNative native, ref D3D12RHISwapChainBuffer currentBuffer)
+        {
+            NRDResource localResource = new NRDResource { Native = Unsafe.AsPointer(ref currentBuffer) };
+            if (_allocatedDescriptors.TryGetValue(localResource, out D3D12_CPU_DESCRIPTOR_HANDLE handle))
+                return handle;
+
+            if (_heapDescriptorOffset >= _maxDescriptorOffset)
+            {
+                _heapIndex++;
+                _heapDescriptorOffset = 0;
+
+                AddNewHeapToList();
+            }
+
+            HeapData data = _heaps[_heapIndex];
+            handle = _heapDescriptorOffset > 0 ? new D3D12_CPU_DESCRIPTOR_HANDLE(data.StartHandle, _heapDescriptorOffset) : data.StartHandle;
+
+            _heapDescriptorOffset += _incrementSize;
+
+            D3D12_RENDER_TARGET_VIEW_DESC desc = new D3D12_RENDER_TARGET_VIEW_DESC
+            {
+                Format = native.Base.Description.BackBufferFormat.ToTextureFormat(),
+                ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+                Texture2D = new D3D12_TEX2D_RTV
+                {
+                    MipSlice = 0,
+                    PlaneSlice = 0
+                }
+            };
+
+            _device.Device->CreateRenderTargetView((ID3D12Resource*)currentBuffer.Resource.Get(), &desc, handle);
+
+            _allocatedDescriptors[localResource] = handle;
             return handle;
         }
 

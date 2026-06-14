@@ -20,6 +20,9 @@
     <IsAotCompatible>True</IsAotCompatible>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Scenes\SceneEntityManager.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Interop.D3D12MemAlloc\Interop.D3D12MemAlloc.csproj" />
     <ProjectReference Include="..\Interop.NVAftermath\Interop.NVAftermath.csproj" />
     <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
@@ -31,35 +34,36 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Audio\" />
+    <Folder Include="Mathematics\" />
     <Folder Include="Networking\" />
     <Folder Include="Expression\" />
     <Folder Include="Physics\" />
-    <Folder Include="Scripting\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Scenes\SceneEntityManager.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Arch" Version="2.1.0" />
-    <PackageReference Include="CommunityToolkit.Diagnostics" Version="8.4.0" />
-    <PackageReference Include="CsToml" Version="1.8.0" />
+    <PackageReference Include="CommunityToolkit.Diagnostics" Version="8.4.2" />
+    <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.2" />
+    <PackageReference Include="CsToml" Version="1.8.2" />
     <PackageReference Include="K4os.Compression.LZ4" Version="1.3.8" />
     <PackageReference Include="K4os.Compression.LZ4.Streams" Version="1.3.8" />
-    <PackageReference Include="ppy.SDL3-CS" Version="2025.1205.0" />
-    <PackageReference Include="Serilog" Version="4.3.0" />
+    <PackageReference Include="ppy.SDL3-CS" Version="2026.320.0" />
+    <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
-    <PackageReference Include="Tomlyn" Version="2.0.0" />
-    <PackageReference Include="Vortice.DXGI" Version="3.8.1" />
+    <PackageReference Include="Tomlyn" Version="2.3.0" />
+    <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
     <PackageReference Include="ZeroAllocJobScheduler" Version="1.1.2" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="CoreArguments.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="D3D12\D3D12Core.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="D3D12\d3d12SDKLayers.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="RHI\D3D12\D3D12Core.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="RHI\D3D12\d3d12SDKLayers.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

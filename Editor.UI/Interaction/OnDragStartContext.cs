@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Diagnostics;
 using Editor.UI.Elements;
+using Primary.Input.Devices;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -7,7 +8,7 @@ using System.Text;
 
 namespace Editor.UI.Interaction
 {
-    public readonly record struct OnDragStartContext(UIElement Element, EventDispatcher Dispatcher)
+    public readonly record struct OnDragStartContext(IInteractable Interactable, EventDispatcher Dispatcher, MouseButton Button, Vector2 Position)
     {
         public void SetDragCallback(Action<OnDragEventArgs> callback)
         {

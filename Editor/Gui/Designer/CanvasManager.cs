@@ -85,7 +85,7 @@ namespace Editor.Gui.Designer
             _canvas.OnDragStart += CanvasDragCallback;
 
             _interaction.OnMouseMove += CanvasMouseMotion;
-            _interaction.OnMouseRelease += InteractionMouseRelease;
+            _interaction.OnMouseActivate += InteractionMouseRelease;
         }
 
         internal void ClearView()
@@ -133,7 +133,7 @@ namespace Editor.Gui.Designer
                 {
                     CachedElementData elementData = UIManager.Instance.ReflectionManager.ElementCache.GetElementData(_activeElementType);
 
-                    _activeElement = (UIElement)elementData.Constructor.Invoke(null);
+                    _activeElement = (UIElement)elementData.Constructor!.Invoke(null);
                     _activeElement.IsActive = false;
                     _activeElement.Size = new UIValue2(100, 100);
 
@@ -146,7 +146,7 @@ namespace Editor.Gui.Designer
 
                     CachedElementData elementData = UIManager.Instance.ReflectionManager.ElementCache.GetElementData(_activeElementType);
                     
-                    _activeElement = (UIElement)elementData.Constructor.Invoke(null);
+                    _activeElement = (UIElement)elementData.Constructor!.Invoke(null);
                     _activeElement.IsActive = false;
                     _activeElement.Size = new UIValue2(100, 100);
 
@@ -172,12 +172,13 @@ namespace Editor.Gui.Designer
                 Vector2 position = new Vector2(_activeElement.Position.X.Absolute, _activeElement.Position.Y.Absolute);
                 UIElement element = _hostedWindow.Raycast<UIElement>(position)!;
 
-                UIElement newElement = (UIElement)elementData.Constructor.Invoke(null);
+                UIElement newElement = (UIElement)elementData.Constructor!.Invoke(null);
 
                 newElement.Position = new UIValue2((int)position.X, (int)position.Y);
                 newElement.Size = new UIValue2(100, 100);
 
                 element.AddChild(newElement);
+                _designer.HierchyManager.AddHierchyElement(newElement);
             }
         }
 
@@ -191,7 +192,10 @@ namespace Editor.Gui.Designer
 
         internal void SetActiveElementType(Type type)
         {
-            _activeElementType = type;
+            if (type.IsAssignableTo(typeof(UIElement)))
+                _activeElementType = type;
         }
+
+        internal UIFrame RootElement => _rootElement;
     }
 }

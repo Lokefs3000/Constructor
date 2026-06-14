@@ -4,9 +4,10 @@ using Primary.Profiling;
 using Primary.Rendering.Data;
 using Primary.Rendering.Pass;
 using Primary.Rendering.Recording;
+using Primary.Rendering.Reflection;
 using Primary.Rendering.Resources;
 using Primary.Rendering.State;
-using Primary.RHI2;
+using Primary.RHI;
 using Primary.Utility;
 
 namespace Primary.Rendering
@@ -15,6 +16,7 @@ namespace Primary.Rendering
     {
         private RenderPass _renderPass;
         private RenderPassCompiler _renderPassCompiler;
+        private RenderPassSetupCache _renderPassSetupCache;
         private FrameGraphTimeline _timeline;
         private FrameGraphResources _resources;
         private FrameGraphRecorder _recorder;
@@ -29,7 +31,7 @@ namespace Primary.Rendering
         private RasterPassContext _rasterContext;
         private ComputePassContext _computeContext;
 
-        private List<IRenderPass> _activePasses;
+        private List<RenderPassData> _activePasses;
         private List<FrameGraphCommands> _commands;
 
         private bool _disposedValue;
@@ -38,6 +40,7 @@ namespace Primary.Rendering
         {
             _renderPass = new RenderPass(this);
             _renderPassCompiler = new RenderPassCompiler();
+            _renderPassSetupCache = new RenderPassSetupCache();
             _timeline = new FrameGraphTimeline();
             _resources = new FrameGraphResources(manager);
             _recorder = new FrameGraphRecorder(this);
@@ -49,10 +52,10 @@ namespace Primary.Rendering
 
             _intermediateAllocator = new LinearBlockAllocator(ushort.MaxValue /*65kb*/);
             _errorReporter = new RenderPassErrorReporter();
-            _rasterContext = new RasterPassContext(_errorReporter, _intermediateAllocator, _resources, manager.ContextContainer, _rasterState);
-            _computeContext = new ComputePassContext(_errorReporter, _intermediateAllocator, _resources, manager.ContextContainer, _computeState);
+            _rasterContext = new RasterPassContext(_errorReporter, _intermediateAllocator, _resources, _rasterState);
+            _computeContext = new ComputePassContext(_errorReporter, _intermediateAllocator, _resources, _computeState);
 
-            _activePasses = new List<IRenderPass>();
+            _activePasses = new List<RenderPassData>();
             _commands = new List<FrameGraphCommands>();
         }
 
@@ -62,6 +65,12 @@ namespace Primary.Rendering
             {
                 if (disposing)
                 {
+                    foreach (RenderPassData passData in _activePasses)
+                    {
+                        if (passData.Pass is IDisposable disposable)
+                            disposable.Dispose();
+                    }
+
                     _resources.Dispose();
                     _timeline.Dispose();
                     _recorder.Dispose();
@@ -94,44 +103,65 @@ namespace Primary.Rendering
             _computeState.ClearState();
         }
 
-        internal void SetupPasses(RenderContextContainer contextContainer)
+        internal void ClearLocalData()
+        {
+            _renderPass.ClearLocalData();
+            _timeline.ClearLocalData();
+            _resources.ClearLocalData();
+
+            _rasterState.ClearState();
+            _computeState.ClearState();
+        }
+
+        internal void SetupPasses(RenderPassRunContext runContext, RenderContextContainer contextContainer)
         {
             using (new ProfilingScope("Setup"))
             {
-                foreach (IRenderPass renderPass in _activePasses)
+                foreach (RenderPassData renderPass in _activePasses)
                 {
-                    renderPass.SetupRenderPasses(_renderPass, contextContainer);
+                    RenderPassSetupAttribute? setup = renderPass.SetupData;
+                    if ((setup?.RunContext ?? RenderPassRunContext.PerCamera) != runContext)
+                    {
+                        continue;
+                    }
+
+                    renderPass.Pass.SetupRenderPasses(_renderPass, contextContainer);
                 }
             }
         }
 
-        internal void CompilePasses(RenderContextContainer contextContainer)
+        internal void CompilePasses()
         {
             using (new ProfilingScope("Compile"))
             {
-                FrameGraphTexture texture = contextContainer.Get<RenderCameraData>()!.ColorTexture;
-                _renderPassCompiler.Compile(texture, _renderPass.Passes, _timeline, _resources, _state);
+                _renderPassCompiler.Compile(_renderPass.Passes, _renderPass.Groups, _timeline, _resources, _state);
             }
         }
 
-        internal void ExecutePasses(RenderContextContainer contextContainer)
+        internal void ExecutePasses()
         {
             using (new ProfilingScope("Execute"))
             {
                 ReadOnlySpan<RenderPassDescription> submittedPasses = _renderPass.Passes;
+                ReadOnlySpan<RenderPassGroup> passGroups = _renderPass.Groups;
+
                 foreach (int passIndex in _timeline.Passes)
                 {
-                    ref readonly RenderPassDescription desc = ref submittedPasses[passIndex];
+                    int actualIndex = passIndex - _timeline.PassIndexOffset;
+
+                    ref readonly RenderPassDescription desc = ref submittedPasses[actualIndex];
+                    ref readonly RenderPassGroup group = ref passGroups[desc.GroupIndex];
+
                     if (desc.Type == RenderPassType.Graphics)
                     {
                         CommandRecorder recorder = _recorder.GetNewRecorder(passIndex);
                         RenderPassStateData stateData = _state.GetStateData(passIndex);
 
                         stateData.SetupState(in desc);
-                        _rasterContext.SetupContext(stateData, recorder);
+                        _rasterContext.SetupContext(stateData, recorder, group.Context);
                         _rasterState.SoftResetForNextPass();
 
-                        submittedPasses[passIndex].Function?.Invoke(_rasterContext, desc.PassData);
+                        submittedPasses[actualIndex].Function?.Invoke(desc.RealFunction!, _rasterContext, desc.PassData);
 
                         _commands.Add(new FrameGraphCommands(recorder));
                     }
@@ -141,10 +171,10 @@ namespace Primary.Rendering
                         RenderPassStateData stateData = _state.GetStateData(passIndex);
 
                         stateData.SetupState(in desc);
-                        _computeContext.SetupContext(stateData, recorder);
+                        _computeContext.SetupContext(stateData, recorder, group.Context);
                         _computeState.SoftResetForNextPass();
 
-                        submittedPasses[passIndex].Function?.Invoke(_computeContext, desc.PassData);
+                        submittedPasses[actualIndex].Function?.Invoke(desc.RealFunction!, _computeContext, desc.PassData);
 
                         _commands.Add(new FrameGraphCommands(recorder));
                     }
@@ -152,25 +182,27 @@ namespace Primary.Rendering
             }
         }
 
-        internal void SetWindowOutput(RHISwapChain swapChain, FrameGraphTexture texture)
-        {
-            _setup.OutputSwapChain = swapChain;
-            _setup.DestinationTexture = texture;
-        }
+        /// <summary>Not thread-safe</summary>
+        internal void PushCurrentPassGroup(FrameGraphTexture finalTexture, RenderPassRunContext runContext, RenderContextContainer context) => _renderPass.PushCurrentPassGroup(finalTexture, runContext, context);
+        /// <summary>Not thread-safe</summary>
+        internal void ClearCurrentPassGroup() => _renderPass.ClearCurrentPassGroup();
 
         /// <summary>Not thread-safe</summary>
         public void AddRenderPass<T>() where T : class, IRenderPass, new()
         {
-            if (!_activePasses.Exists((x) => x is T))
+            if (!_activePasses.Exists((x) => x.Pass is T))
             {
-                _activePasses.Add(new T());
+                _activePasses.Add(new RenderPassData(new T(), _renderPassSetupCache.TryGetSetupData<T>()));
             }
         }
 
         /// <summary>Not thread-safe</summary>
         public void RemoveRenderPass<T>() where T : class, IRenderPass, new()
         {
-            _activePasses.RemoveWhere((x) => x is T);
+            if (_activePasses.RemoveWhere((x) => x.Pass is T, out RenderPassData data) && data.Pass is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
         }
 
         internal RenderPass RenderPass => _renderPass;
@@ -183,5 +215,7 @@ namespace Primary.Rendering
 
         public ReadOnlySpan<RenderPassDescription> CurrentPasses => _renderPass.Passes;
         public ReadOnlySpan<FrameGraphCommands> Commands => _commands.AsSpan();
+
+        private readonly record struct RenderPassData(IRenderPass Pass, RenderPassSetupAttribute? SetupData);
     }
 }

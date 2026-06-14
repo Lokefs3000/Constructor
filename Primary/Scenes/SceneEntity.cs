@@ -3,15 +3,16 @@ using Arch.Core.Extensions;
 using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Primary.Components;
+using Primary.Scenes.Components;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 
 namespace Primary.Scenes
 {
-    public struct SceneEntity : IEquatable<SceneEntity>, IEqualityComparer<SceneEntity>
+    public readonly record struct SceneEntity : IEquatable<SceneEntity>, IEqualityComparer<SceneEntity>
     {
-        private Entity _entity;
+        private readonly Entity _entity;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public SceneEntity()
@@ -31,16 +32,16 @@ namespace Primary.Scenes
         {
             if (IsNull)
                 throw new NullReferenceException();
-            return ref SceneEntityManager.AddComponent<T>(ref this);
+            return ref SceneEntityManager.Instance.AddComponent<T>(in _entity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [UnscopedRef]
-        public void RemoveComponent<T>() where T : struct, IComponent
+        public bool RemoveComponent<T>() where T : struct, IComponent
         {
             if (IsNull)
                 throw new NullReferenceException();
-            SceneEntityManager.RemoveComponent<T>(ref this);
+            return SceneEntityManager.Instance.RemoveComponent<T>(in _entity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -49,7 +50,7 @@ namespace Primary.Scenes
         {
             if (IsNull)
                 throw new NullReferenceException();
-            return ref SceneEntityManager.GetComponent<T>(ref this);
+            return ref _entity.TryGetRef<T>(out _);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -58,7 +59,7 @@ namespace Primary.Scenes
         {
             if (IsNull)
                 throw new NullReferenceException();
-            return ref SceneEntityManager.SetComponent<T>(ref this, value);
+            return ref SceneEntityManager.Instance.SetComponent(in _entity, value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -67,16 +68,16 @@ namespace Primary.Scenes
         {
             if (IsNull)
                 throw new NullReferenceException();
-            return SceneEntityManager.AddComponent(ref this, type);
+            return SceneEntityManager.Instance.AddComponent(in _entity, type);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [UnscopedRef]
-        public void RemoveComponent(Type type)
+        public bool RemoveComponent(Type type)
         {
             if (IsNull)
                 throw new NullReferenceException();
-            SceneEntityManager.RemoveComponent(ref this, type);
+            return SceneEntityManager.Instance.RemoveComponent(in _entity, type);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -85,7 +86,7 @@ namespace Primary.Scenes
         {
             if (IsNull)
                 throw new NullReferenceException();
-            return SceneEntityManager.GetComponent(ref this, type);
+            return _entity.Get(type) as IComponent;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -94,11 +95,18 @@ namespace Primary.Scenes
         {
             if (IsNull)
                 throw new NullReferenceException();
-            return SceneEntityManager.SetComponent(ref this, value, type);
+
+            return SceneEntityManager.Instance.SetComponent(in _entity, type, value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Destroy()
+        {
+            SceneEntityManager.Instance.DestroyEntity(_entity);
         }
 
         [IgnoreDataMember]
-        public SceneEntity Parent
+        public readonly SceneEntity Parent
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -113,11 +121,11 @@ namespace Primary.Scenes
             {
                 if (IsNull)
                     throw new NullReferenceException();
-                SceneEntityManager.ChangeParent(ref this, value);
+                SceneEntityManager.Instance.ChangeEntityParent(_entity, value.WrappedEntity);
             }
         }
 
-        public SceneEntityChildren Children
+        public readonly SceneEntityChildren Children
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -128,7 +136,7 @@ namespace Primary.Scenes
             }
         }
 
-        public bool Enabled
+        public readonly bool Enabled
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -146,15 +154,11 @@ namespace Primary.Scenes
             {
                 if (IsNull)
                     throw new NullReferenceException();
-#if DEBUG
-                if (!_entity.Has<EntityEnabled>())
-                    throw new NullReferenceException();
-#endif
-                _entity.Get<EntityEnabled>().Enabled = value;
+                SceneEntityManager.Instance.SetEntityEnabled(_entity, value);
             }
         }
 
-        public string Name
+        public readonly string Name
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -172,16 +176,12 @@ namespace Primary.Scenes
             {
                 if (IsNull)
                     throw new NullReferenceException();
-#if DEBUG
-                if (!_entity.Has<EntityName>())
-                    throw new NullReferenceException();
-#endif
-                _entity.Get<EntityName>().Name = value;
+                SceneEntityManager.Instance.SetEntityName(_entity, value);
             }
         }
 
         [IgnoreDataMember]
-        public int SceneId
+        public readonly int SceneId
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -201,7 +201,7 @@ namespace Primary.Scenes
             }
         }
 
-        public Scene Scene
+        public readonly Scene Scene
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -217,7 +217,7 @@ namespace Primary.Scenes
             set => SceneId = value.Id;
         }
 
-        public SceneEntityComponents Components
+        public readonly SceneEntityComponents Components
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -229,7 +229,19 @@ namespace Primary.Scenes
         }
 
         [IgnoreDataMember]
-        public bool IsSceneRoot
+        public readonly ReadOnlySpan<ComponentType> ComponentTypes
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                if (IsNull)
+                    throw new NullReferenceException();
+                return World.Worlds.DangerousGetReferenceAt(_entity.WorldId).GetEntityData(_entity).Archetype.Signature.Components;
+            }
+        }
+
+        [IgnoreDataMember]
+        public readonly bool IsSceneRoot
         {
             get
             {
@@ -239,25 +251,22 @@ namespace Primary.Scenes
             }
         }
 
-        public override string ToString() => IsNull ? "null" : Name;
-        public override int GetHashCode() => _entity.GetHashCode();
-        public bool Equals(SceneEntity entity) => entity._entity.Equals(_entity);
+        public readonly override string ToString() => IsNull ? "null" : Name;
+        public readonly override int GetHashCode() => _entity.GetHashCode();
+        public readonly bool Equals(SceneEntity entity) => entity._entity.Equals(_entity);
 
-        public bool Equals(SceneEntity x, SceneEntity y) => x._entity.Equals(y._entity);
-        public int GetHashCode([DisallowNull] SceneEntity obj) => obj._entity.GetHashCode();
-
-        [IgnoreDataMember]
-        public Entity WrappedEntity => _entity;
+        public readonly bool Equals(SceneEntity x, SceneEntity y) => x._entity.Equals(y._entity);
+        public readonly int GetHashCode([DisallowNull] SceneEntity obj) => obj._entity.GetHashCode();
 
         [IgnoreDataMember]
-        public bool IsNull => _entity == Entity.Null || !_entity.IsAlive();
+        public readonly Entity WrappedEntity => _entity;
+
+        [IgnoreDataMember]
+        public readonly bool IsNull => _entity == Entity.Null || !_entity.IsAlive();
 
         public static readonly SceneEntity Null = new SceneEntity(Entity.Null);
 
         public static implicit operator SceneEntity(Entity entity) => new SceneEntity(entity);
         public static explicit operator Entity(SceneEntity sceneEntity) => sceneEntity.WrappedEntity;
-
-        public static bool operator ==(SceneEntity left, SceneEntity right) => left.Equals(right);
-        public static bool operator !=(SceneEntity left, SceneEntity right) => !left.Equals(right);
     }
 }

@@ -38,5 +38,17 @@
 
             return false;
         }
+
+        public static int IndexOf<T>(this IReadOnlyList<T> self, T item)
+        {
+            EqualityComparer<T> comparer = EqualityComparer<T>.Default;
+            for (int i = 0; i < self.Count; ++i)
+            {
+                if (comparer.Equals(self[i], item))
+                    return i;
+            }
+
+            return -1;
+        }
     }
 }

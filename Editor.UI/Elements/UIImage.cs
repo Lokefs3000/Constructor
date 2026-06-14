@@ -12,7 +12,7 @@ namespace Editor.UI.Elements
     [UIElementPrettyName("Image")]
     public class UIImage : UIElement
     {
-        private TextureAsset? _image;
+        private object? _image;
 
         private Vector2 _uvMin;
         private Vector2 _uvMax;
@@ -33,14 +33,17 @@ namespace Editor.UI.Elements
         {
             if (_image != null)
             {
-                painter.DrawImage(PixelCoordinates, UIPaint.FromColor(_tintColor), _uvMin, _uvMax, _image);
+                if (_image is TextureAsset textureAsset)
+                    painter.DrawImage(_viewCoordinates, UIPaint.FromColor(_tintColor), _uvMin, _uvMax, textureAsset);
+                else if (_image is Sprite sprite)
+                    painter.DrawImage(_viewCoordinates, UIPaint.FromColor(_tintColor), sprite);
             }
 
             return true;
         }
 
         #region Properties
-        [StyleableProperty(nameof(_image), UIStateFlags.InvalidVisual)] public TextureAsset? Image { get => _image; set => SetStyleProperty(value); }
+        [StyleableProperty(nameof(_image), UIStateFlags.InvalidVisual)] public TextureAsset? Image { get => _image as TextureAsset; set => SetStyleProperty(value); }
 
         [StyleableProperty(nameof(_uvMin), UIStateFlags.InvalidVisual)] public Vector2 UVMin { get => _uvMin; set => SetStyleProperty(value); }
         [StyleableProperty(nameof(_uvMax), UIStateFlags.InvalidVisual)] public Vector2 UVMax { get => _uvMax; set => SetStyleProperty(value); }

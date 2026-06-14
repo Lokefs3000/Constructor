@@ -1,0 +1,2 @@
+"D:\source\repos\Constructor\Editor\bin\Debug\net10.0\Editor.exe" bundle -i ".\Font\InterLight.bmp.lz4" ".\Font\InterLight.json" ".\Font\InterRegular.bmp.lz4" ".\Font\InterRegular.json" ".\Font\InterSemiBold.bmp.lz4" ".\Font\InterSemiBold.json" ".\Splash\Splash_85p.bmp.lz4" -o SplashData.bundle
+copy SplashData.bundle ..\PrimaryEditor\SplashData.bundle

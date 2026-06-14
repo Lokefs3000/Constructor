@@ -1,104 +1,256 @@
 ﻿using Editor.Interaction.Controls;
 using Editor.Interaction.Tools;
+using Primary.Collections.ReadOnly;
+using Primary.Common;
 using Primary.Input;
 using Primary.Input.Devices;
+using Primary.Profiling;
+using Primary.Utility;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Editor.Interaction
 {
     public sealed class ToolManager
     {
-        private IControlTool[] _controls;
-        private ITool[] _tools;
+        private Dictionary<Type, ITool?> _tools;
 
-        private EditorTool _tool;
+        private Dictionary<Type, IToolControl> _toolControls;
+
+        private List<ToolTransformData> _transforms;
+        private List<ToolTransformData> _activeTransforms;
+
+        private HashSet<Type> _disabledTypes;
+
         private EditorOriginMode _originMode;
         private EditorToolSpace _toolSpace;
-
-        private EditorControlTool _currentControlTool;
 
         private bool _isSnappingDefault;
         private bool _isSnappingActive;
         private float _snapScale;
 
-        internal ToolManager()
+        private ITool? _currentTool;
+
+        internal ToolManager(EditorRuntime editor)
         {
-            _controls = [
-                new CoreControlTool(this),
-                //new GeoEditControlTool(this)
-                ];
+            _tools = new Dictionary<Type, ITool?>();
 
-            _tools = [
-                null!,//new TranslateTool(this),
-                null!,
-                null!,
-                ];
+            _toolControls = new Dictionary<Type, IToolControl>();
 
-            _tool = EditorTool.Translate;
+            _transforms = new List<ToolTransformData>();
+            _activeTransforms = new List<ToolTransformData>();
+
+            _disabledTypes = new HashSet<Type>();
+
             _originMode = EditorOriginMode.Individual;
             _toolSpace = EditorToolSpace.Local;
-
-            _currentControlTool = EditorControlTool.Generic;
 
             _isSnappingDefault = false;
             _isSnappingActive = false;
             _snapScale = 1.0f;
 
-            _controls[0].Activated();
-            //_tools[0].Selected();
+            _currentTool = null;
+
+            editor.ReflectionManager.TypeLoader.AddCallback<ToolControlTypesAttribute>(OnToolControlTypeLoaded);
+
+            SelectionManager.ObjectSelected += ObjectSelectedCallback;
+            SelectionManager.ObjectDeselected += ObjectDeselectedCallback;
+        }
+
+        private void ObjectSelectedCallback(object obj)
+        {
+            Type type = obj.GetType();
+            if (_toolControls.TryGetValue(type, out IToolControl? control))
+            {
+                IToolTransform? transform = control.Selected(obj);
+                if (transform != null)
+                {
+                    _transforms.Add(new ToolTransformData(obj, transform));
+
+                    if (!_disabledTypes.Contains(type))
+                        _activeTransforms.Add(new ToolTransformData(obj, transform));
+                }
+            }
+        }
+
+        private void ObjectDeselectedCallback(object obj)
+        {
+            Type type = obj.GetType();
+            if (_toolControls.TryGetValue(type, out IToolControl? control))
+            {
+                Predicate<ToolTransformData> predicate = (x) => x.Selected.Equals(obj);
+                if (_transforms.RemoveWhere(predicate, out ToolTransformData data))
+                {
+                    if (!_disabledTypes.Contains(type))
+                        _activeTransforms.RemoveWhere(predicate);
+
+                    control.Deselected(obj, data.Transform);
+                }
+            }
+        }
+
+        private void OnToolControlTypeLoaded(Type type, object obj)
+        {
+            if (!type.IsAssignableTo(typeof(IToolControl)))
+                return;
+
+            IToolControl? control = (IToolControl?)Activator.CreateInstance(type);
+            if (control == null)
+            {
+                EdLog.Interaction.Error("Failed to create tool control instance {t}", type);
+                return;
+            }
+
+            ToolControlTypesAttribute attrib = (ToolControlTypesAttribute)obj;
+            foreach (Type selectionType in attrib.Types)
+            {
+                if (!_toolControls.TryAdd(selectionType, control))
+                {
+                    EdLog.Interaction.Error("A tool control is already assigned to the type {t}", selectionType);
+                    return;
+                }
+            }
         }
 
         /// <summary>Not thread-safe</summary>
-        internal void SwitchTool(EditorTool tool)
+        private void SwitchToolFromType(Type newToolType)
         {
-            if (tool == _tool)
+            if (_currentTool?.GetType() == newToolType)
                 return;
 
-            _tools[(int)_tool].Deselected();
-            _tools[(int)tool].Selected();
+            ITool? tool = GetToolInfo(newToolType);
+            if (tool != null)
+            {
+                _currentTool?.Deselected(this);
+                tool.Selected(this);
 
-            _tool = tool;
+                OnToolChanged?.Invoke(_currentTool, tool);
+
+                _currentTool = tool;
+            }
         }
 
         /// <summary>Not thread-safe</summary>
-        internal void SwitchControl(EditorControlTool control)
+        private void SetSelectionTypeState(Type type, bool state)
         {
-            if (_currentControlTool == control)
-                return;
+            if (state)
+            {
+                if (_disabledTypes.Remove(type))
+                {
+                    foreach (ToolTransformData transformData in _transforms)
+                    {
+                        if (transformData.Selected.GetType() == type)
+                            _activeTransforms.Add(transformData);
+                    }
 
-            _controls[(int)_currentControlTool].Deactivated();
-            _tools[(int)_tool].Deselected();
+                    OnTypeStateChanged?.Invoke(type, true);
+                }
+            }
+            else
+            {
+                if (_disabledTypes.Add(type))
+                {
+                    for (int i = 0; i < _activeTransforms.Count; i++)
+                    {
+                        if (_activeTransforms[i].Selected.GetType() == type)
+                            _activeTransforms.RemoveAt(i--);
+                    }
 
-            _currentControlTool = control;
+                    OnTypeStateChanged?.Invoke(type, false);
+                }
+            }
+        }
 
-            _controls[(int)control].Activated();
-            _tools[(int)_tool].Selected();
+        private ITool? GetToolInfo(Type type)
+        {
+            if (_tools.TryGetValue(type, out var tuple))
+                return tuple;
+
+            ITool? tool = Activator.CreateInstance(type) as ITool;
+
+            _tools.Add(type, tool);
+            return tool;
+        }
+
+        /// <summary>Not thread-safe</summary>
+        internal T? GetToolControl<T>() where T : class, IToolControl
+        {
+            foreach (var (_, controlTool) in _toolControls)
+            {
+                if (controlTool is T t)
+                    return t;
+            }
+
+            return null;
         }
 
         /// <summary>Not thread-safe</summary>
         internal void Update()
         {
-            _isSnappingActive = InputSystem.Keyboard.IsKeyDown(KeyCode.LeftControl)
-                || InputSystem.Keyboard.IsKeyDown(KeyCode.RightControl);
+            using (new ProfilingScope("UpdateTools"))
+            {
+                bool wasActivePreviously = _isSnappingActive;
+                _isSnappingActive = Flags.HasFlag(InputSystem.Keyboard.KeyModifiers, KeyModifier.Shift) || _isSnappingDefault;
 
-            if (_isSnappingDefault)
-                _isSnappingActive = !_isSnappingActive;
+                if (wasActivePreviously != _isSnappingActive)
+                    OnSnappingChanged?.Invoke(_isSnappingActive);
 
-            //_tools[(int)Tool].Update();
+                _currentTool?.Update(this);
+            }
         }
 
-        public EditorTool Tool => _tool;
+        public static void SwitchTool<T>() where T : ITool
+        {
+            ToolManager self = EditorRuntime.GlobalSingleton.ToolManager;
+            self.SwitchToolFromType(typeof(T));
+        }
+
+        public static void SetTypeState<T>(bool state)
+        {
+            ToolManager self = EditorRuntime.GlobalSingleton.ToolManager;
+            self.SetSelectionTypeState(typeof(T), state);
+        }
+
+        public static bool GetTypeState<T>()
+        {
+            ToolManager self = EditorRuntime.GlobalSingleton.ToolManager;
+            return !self._disabledTypes.Contains(typeof(T));
+        }
+
+        public ITool? CurrentTool => _currentTool;
+
+        public ROList<ToolTransformData> Transforms => _activeTransforms;
+
         public EditorOriginMode OriginMode { get => _originMode; set => _originMode = value; }
         public EditorToolSpace ToolSpace { get => _toolSpace; set => _toolSpace = value; }
 
-        internal ITool ToolObject => _tools[(int)_tool];
+        public static bool IsSnappingDefault { get => Instance._isSnappingDefault; set => Instance._isSnappingDefault = value; }
+        public static float SnapScale
+        {
+            get => Instance._snapScale;
+            set
+            {
+                if (Instance._snapScale != value)
+                {
+                    Instance._snapScale = value;
+                    OnSnapScaleChanged?.Invoke(value);
+                }
+            }
+        }
 
-        internal IControlTool ActiveControlTool => _controls[(int)_currentControlTool];
-        internal EditorControlTool ActiveControlToolType => _currentControlTool;
+        public static bool IsSnappingActive => Instance._isSnappingActive;
 
-        public static bool IsSnappingDefault { get => Editor.GlobalSingleton.ToolManager._isSnappingDefault; set => Editor.GlobalSingleton.ToolManager._isSnappingDefault = value; }
-        public static bool IsSnappingActive => Editor.GlobalSingleton.ToolManager._isSnappingActive;
-        public static float SnapScale { get => Editor.GlobalSingleton.ToolManager._snapScale; set => Editor.GlobalSingleton.ToolManager._snapScale = value; }
+        public static bool IsCurrentToolActive => Instance._currentTool?.IsInteracting ?? false;
+
+        public static event Action<ITool?, ITool?>? OnToolChanged;
+        public static event Action<Type, bool>? OnTypeStateChanged;
+
+        public static event Action<bool>? OnSnappingChanged;
+        public static event Action<float>? OnSnapScaleChanged;
+
+        public static ToolManager Instance => EditorRuntime.GlobalSingleton.ToolManager;
     }
+
+    public readonly record struct ToolTransformData(object Selected, IToolTransform Transform);
 
     public enum EditorTool : byte
     {

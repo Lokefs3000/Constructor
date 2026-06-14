@@ -80,6 +80,17 @@ namespace Editor.DearImGui
             return val;
         }
 
+        internal bool IsPopupOpen(Predicate<IDearImGuiPopup> predicate)
+        {
+            foreach (OpenPopupData openPopup in _popups)
+            {
+                if (predicate(openPopup.Popup))
+                    return true;
+            }
+
+            return false;
+        }
+
         private uint GetId()
         {
             while (true)

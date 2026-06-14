@@ -2,7 +2,7 @@
 using Primary.Assets;
 using Primary.Common;
 using Primary.Rendering.Resources;
-using Primary.RHI2;
+using Primary.RHI;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -45,32 +45,32 @@ namespace Primary.Rendering.Assets
             if (!Flags.HasFlag(buffer.Description.Usage, FGBufferUsage.Global))
                 return;
 
-            _globalProperties[name] = new PropertyData(buffer);
+            _globalProperties[name] = new PropertyData(ushort.MaxValue, buffer);
             _transitionalProperties[buffer.Index] = name;
         }
 
         internal void SetBuffer(string name, RHIBuffer buffer)
         {
-            _globalProperties[name] = new PropertyData(new FrameGraphResource(buffer, null));
+            _globalProperties[name] = new PropertyData(ushort.MaxValue, new FrameGraphResource(buffer, null));
         }
 
-        internal void SetTexture(string name, FrameGraphTexture texture)
+        internal void SetTexture(string name, FrameGraphTexture texture, PropertyBindIntent intent = PropertyBindIntent.Default)
         {
             if (!Flags.HasFlag(texture.Description.Usage, FGTextureUsage.Global))
                 return;
 
-            _globalProperties[name] = new PropertyData(texture);
+            _globalProperties[name] = new PropertyData(ushort.MaxValue, texture, Intent: intent);
             _transitionalProperties[texture.Index] = name;
         }
 
-        internal void SetTexture(string name, RHITexture texture)
+        internal void SetTexture(string name, RHITexture texture, PropertyBindIntent intent = PropertyBindIntent.Default)
         {
-            _globalProperties[name] = new PropertyData(new FrameGraphResource(texture, null));
+            _globalProperties[name] = new PropertyData(ushort.MaxValue, new FrameGraphResource(texture, null), Intent: intent);
         }
 
         internal void SetTexture(string name, TextureAsset texture)
         {
-            _globalProperties[name] = new PropertyData(FrameGraphResource.Invalid, texture);
+            _globalProperties[name] = new PropertyData(ushort.MaxValue, FrameGraphResource.Invalid, texture);
         }
 
         internal bool TryGetPropertyValue(string propertyName, out PropertyData data)
@@ -87,8 +87,8 @@ namespace Primary.Rendering.Assets
         public static void SetGlobalTexture(string name, TextureAsset texture) => Instance.SetTexture(name, texture);
         #endregion
 
-        internal IReadOnlyDictionary<FastStringHash, PropertyData> GlobalProperties => _globalProperties;
-        internal IReadOnlyDictionary<int, FastStringHash> TransitionalProperties => _transitionalProperties;
+        internal Dictionary<FastStringHash, PropertyData> GlobalProperties => _globalProperties;
+        internal Dictionary<int, FastStringHash> TransitionalProperties => _transitionalProperties;
 
         private static readonly WeakReference s_instance = new WeakReference(null);
         internal static ShaderGlobalsManager Instance => NullableUtility.ThrowIfNull(Unsafe.As<ShaderGlobalsManager>(s_instance.Target));

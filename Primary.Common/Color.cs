@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using CommunityToolkit.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -78,6 +79,20 @@ namespace Primary.Common
             return new Color32(ints.GetElement(0), ints.GetElement(1), ints.GetElement(2), ints.GetElement(3));
         }
 
+        public float this[int index]
+        {
+            get
+            {
+                Guard.IsLessThan((uint)index, 4);
+                return Unsafe.Add(ref Unsafe.As<Color, float>(ref this), index);
+            }
+            set
+            {
+                Guard.IsLessThan((uint)index, 4);
+                Unsafe.Add(ref Unsafe.As<Color, float>(ref this), index) = value;
+            }
+        }
+
         public override bool Equals([NotNullWhen(true)] object? obj) => obj is Color color && Equals(color);
         public bool Equals(Color color) => Vector128.EqualsAll(AsVector128(), color.AsVector128());
 
@@ -91,6 +106,7 @@ namespace Primary.Common
         public static Color Green => new Color(0.0f, 1.0f, 0.0f);
         public static Color Blue => new Color(0.0f, 0.0f, 1.0f);
         public static Color Yellow => new Color(1.0f, 1.0f, 0.0f);
+        public static Color Pink => new Color(0.0f, 1.0f, 1.0f);
 
         public static Color TransparentWhite => new Color(1.0f, 0.0f);
         public static Color TransparentBlack => new Color(0.0f, 0.0f);

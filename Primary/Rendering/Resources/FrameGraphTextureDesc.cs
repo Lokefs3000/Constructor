@@ -1,4 +1,4 @@
-﻿using Primary.RHI2;
+﻿using Primary.RHI;
 using System.Runtime.InteropServices;
 
 namespace Primary.Rendering.Resources

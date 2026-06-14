@@ -1,8 +1,8 @@
 ﻿using Primary.Rendering.Pass;
 using Primary.Rendering.Resources;
 using Primary.Rendering.Structures;
-using Primary.RHI2;
-using Primary.RHI2.Direct3D12;
+using Primary.RHI;
+using Primary.RHI.Direct3D12;
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -61,10 +61,10 @@ namespace Primary.Rendering.D3D12
                     // TODO: dispose managed state (managed objects)
                 }
 
-                if (_uploadAllocation != null)
-                    _uploadAllocation->Base.Release();
                 if (_uploadResource != null)
                     _uploadResource->Release();
+                if (_uploadAllocation != null)
+                    _uploadAllocation->Base.Release();
 
                 _uploadAllocation = null;
                 _uploadResource = null;
@@ -93,11 +93,11 @@ namespace Primary.Rendering.D3D12
                 if (_mappedResourcePtr != nint.Zero)
                     _uploadResource->Unmap(0, null);
 
-                if (_uploadAllocation != null)
-                    _uploadAllocation->Base.Release();
                 if (_uploadResource != null)
                     _uploadResource->Release();
-
+                if (_uploadAllocation != null)
+                    _uploadAllocation->Base.Release();
+                
                 _mappedResourcePtr = nint.Zero;
                 _uploadAllocation = null;
                 _uploadResource = null;
@@ -172,7 +172,10 @@ namespace Primary.Rendering.D3D12
 
             if (buffer.IsExternal)
             {
-                throw new NotImplementedException();
+                _device.BarrierManager.AddBufferBarrier(buffer, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_DEST);
+                _device.BarrierManager.FlushBarriers(cmdList, BarrierFlushTypes.Buffer);
+
+                cmdList->CopyBufferRegion((ID3D12Resource*)buffer.GetNativeResource(_device.ResourceManager), (ulong)dataOffset, (ID3D12Resource*)_uploadResource, (ulong)upload.BufferOffset, (ulong)dataSize);
             }
             else
             {

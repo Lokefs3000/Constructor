@@ -1,4 +1,6 @@
 ﻿using Primary.Assets;
+using Primary.Components;
+using Primary.R2.ForwardPlus.Statistics;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Batching;
@@ -7,6 +9,7 @@ using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.Rendering.Structures;
+using Primary.RHI;
 using System.Runtime.CompilerServices;
 
 namespace Primary.R2.ForwardPlus.Passes
@@ -19,7 +22,10 @@ namespace Primary.R2.ForwardPlus.Passes
             RenderCameraData cameraData = context.Get<RenderCameraData>()!;
 
             ForwardPlusRenderPath renderPath = Unsafe.As<ForwardPlusRenderPath>(stateData.Path);
-            GenericResources resources = renderPass.Blackboard.Get<GenericResources>()!;
+            GenericResources? resources = renderPass.Blackboard.Get<GenericResources>();
+
+            if (resources == null)
+                return;
 
             using (RasterPassDescription desc = renderPass.SetupRasterPass("FP-Opaque", out PassData data))
             {
@@ -30,6 +36,8 @@ namespace Primary.R2.ForwardPlus.Passes
                     data.DynamicDataBuffer = resources.DynamicDataBuffer;
 
                     data.RenderList = renderPath.PrimaryRenderList;
+
+                    data.Statistics = renderPath.Statistics;
                 }
 
                 desc.UseResource(FGResourceUsage.ReadWrite, resources.DynamicDataBuffer);
@@ -45,16 +53,20 @@ namespace Primary.R2.ForwardPlus.Passes
         {
             RasterCommandBuffer cmd = context.CommandBuffer;
 
+            RenderCameraData cameraData = context.Container.Get<RenderCameraData>()!;
+
+            cmd.ClearRenderTarget(data.RtColor, cameraData.CameraEntity.GetComponent<Camera>().ClearColor);
+
             cmd.SetRenderTarget(0, data.RtColor);
             cmd.SetDepthStencil(data.DsDepth);
 
             MaterialAsset? lastMaterialAsset = null;
             IRenderMeshSource? lastRenderMeshSource = null;
-
+ 
             RenderList list = data.RenderList!;
             foreach (ShaderRenderBatcher batch in list.ShaderBatchers)
             {
-                cmd.SetPipeline(batch.ActiveShader!.GraphicsPipeline!);
+                cmd.SetPipeline(batch.ActiveShader!);
 
                 foreach (ref readonly RenderSegment segment in batch.Segments)
                 {
@@ -67,20 +79,48 @@ namespace Primary.R2.ForwardPlus.Passes
                     if (lastRenderMeshSource != segment.Mesh.Source)
                     {
                         lastRenderMeshSource = segment.Mesh.Source;
-                        cmd.SetVertexBuffer(new FGSetBufferDesc(lastRenderMeshSource.VertexBuffer!));
-                        cmd.SetIndexBuffer(new FGSetBufferDesc(lastRenderMeshSource.IndexBuffer!));
+
+                        RHIBuffer? vertexBuffer = lastRenderMeshSource.VertexBuffer;
+                        if (vertexBuffer == null)
+                            continue;
+
+                        cmd.SetVertexBuffer(new FGSetBufferDesc(vertexBuffer));
+                        
+                        if (segment.Mesh.HasIndices)
+                        {
+                            RHIBuffer? indexBuffer = lastRenderMeshSource.IndexBuffer;
+                            if (indexBuffer == null)
+                                continue;
+
+                            cmd.SetIndexBuffer(new FGSetBufferDesc(indexBuffer));
+                        }
                     }
-
+                    
                     cmd.Upload(data.DynamicDataBuffer, new DynamicDataData((uint)segment.FlagIndexStart));
-
+                    
                     RawRenderMesh renderMesh = segment.Mesh;
-                    cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc(
-                        renderMesh.IndexCount,
-                        (uint)(segment.FlagIndexEnd - segment.FlagIndexStart),
-                        renderMesh.IndexOffset,
-                        (int)renderMesh.VertexOffset));
+                    if (renderMesh.HasIndices)
+                    {
+                        cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc(
+                            renderMesh.IndexCount,
+                            (uint)(segment.FlagIndexEnd - segment.FlagIndexStart),
+                            renderMesh.IndexOffset,
+                            (int)renderMesh.VertexOffset));
+                    }
+                    else
+                    {
+                        cmd.DrawInstanced(new FGDrawInstancedDesc(
+                            renderMesh.IndexCount,
+                            (uint)(segment.FlagIndexEnd - segment.FlagIndexStart),
+                            renderMesh.VertexOffset));
+                    }
                 }
+
+                data.Statistics!.Draw.OpaqueDrawCalls += batch.Segments.Length;
+                data.Statistics!.Draw.OpaqueFlagCount += batch.Flags.Length;
             }
+
+            data.Statistics!.Draw.OpaqueShaderCount += list.ShaderBatchers.Length;
         }
 
         private class PassData : IPassData
@@ -92,6 +132,8 @@ namespace Primary.R2.ForwardPlus.Passes
 
             public RenderList? RenderList;
 
+            public RenderPathStatistics? Statistics;
+
             public void Clear()
             {
                 RtColor = FrameGraphTexture.Invalid;
@@ -100,6 +142,8 @@ namespace Primary.R2.ForwardPlus.Passes
                 DynamicDataBuffer = FrameGraphBuffer.Invalid;
 
                 RenderList = null;
+
+                Statistics = null;
             }
         }
     }

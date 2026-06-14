@@ -53,8 +53,15 @@ namespace Editor.Processors.Texture
                     case ".png":
                         {
                             TexInterop.ImageBitmap bitmap = default;
-                            if (!TexInterop.LoadPNG(ref imageData, ref bitmap))
-                                throw new Exception($"Failed to load png: {filePath}");
+                            sbyte* errorOutput = null;
+
+                            if (!TexInterop.LoadPNG(ref imageData, ref bitmap, &errorOutput))
+                            {
+                                string str = GetErrorAsString(errorOutput);
+                                TexInterop.FreePNGError(errorOutput);
+
+                                throw new Exception($"Failed to load png: {filePath} because: {str}");
+                            }
 
                             ScopedPtr<Vector128<float>> pixelData = ScopedMemory.Allocate<Vector128<float>>(64, bitmap.Width * bitmap.Height);
 
@@ -78,8 +85,15 @@ namespace Editor.Processors.Texture
                     case ".jpg":
                         {
                             TexInterop.ImageBitmap bitmap = default;
-                            if (!TexInterop.LoadJPEG(ref imageData, ref bitmap))
-                                throw new Exception($"Failed to load jpeg: {filePath}");
+                            sbyte* errorOutput = null;
+
+                            if (!TexInterop.LoadJPEG(ref imageData, ref bitmap, &errorOutput))
+                            {
+                                string str = GetErrorAsString(errorOutput);
+                                TexInterop.FreeJPEGError(errorOutput);
+
+                                throw new Exception($"Failed to load png: {filePath} because: {str}");
+                            }
 
                             ScopedPtr<Vector128<float>> pixelData = ScopedMemory.Allocate<Vector128<float>>(64, bitmap.Width * bitmap.Height);
 
@@ -138,14 +152,21 @@ namespace Editor.Processors.Texture
                     case ".png":
                         {
                             TexInterop.ImageBitmap bitmap = default;
-                            if (!TexInterop.LoadPNG(ref imageData, ref bitmap))
-                                throw new Exception($"Failed to load png: {filePath}");
+                            sbyte* errorOutput = null;
+
+                            if (!TexInterop.LoadPNG(ref imageData, ref bitmap, &errorOutput))
+                            {
+                                string str = GetErrorAsString(errorOutput);
+                                TexInterop.FreePNGError(errorOutput);
+
+                                throw new Exception($"Failed to load png: {filePath} because: {str}");
+                            }
 
                             if (bitmap.Width != channel.Width || bitmap.Height != channel.Height)
                                 throw new Exception($"Image must match channel dimensions: {filePath}");
 
                             int maxIndex = (int)(bitmap.Width * bitmap.Height * channel.Stride);
-                            if (channel.DestinationChannelId + maxIndex >= channel.Data.Length)
+                            if (channel.DestinationChannelId + maxIndex > channel.Data.Length)
                                 throw new Exception($"Not enough data in provided for: {filePath}");
 
                             if (bitmap.Stride > channel.SourceChannelId)
@@ -173,14 +194,21 @@ namespace Editor.Processors.Texture
                     case ".jpg":
                         {
                             TexInterop.ImageBitmap bitmap = default;
-                            if (!TexInterop.LoadJPEG(ref imageData, ref bitmap))
-                                throw new Exception($"Failed to load jpeg: {filePath}");
+                            sbyte* errorOutput = null;
+
+                            if (!TexInterop.LoadJPEG(ref imageData, ref bitmap, &errorOutput))
+                            {
+                                string str = GetErrorAsString(errorOutput);
+                                TexInterop.FreeJPEGError(errorOutput);
+
+                                throw new Exception($"Failed to load jpeg: {filePath} because: {str}");
+                            }
 
                             if (bitmap.Width != channel.Width || bitmap.Height != channel.Height)
                                 throw new Exception($"Image must match channel dimensions: {filePath}");
 
                             int maxIndex = (int)(bitmap.Width * bitmap.Height * channel.Stride);
-                            if (channel.DestinationChannelId + maxIndex >= channel.Data.Length)
+                            if (channel.DestinationChannelId + maxIndex > channel.Data.Length)
                                 throw new Exception($"Not enough data in provided for: {filePath}");
 
                             if (bitmap.Stride > channel.SourceChannelId)
@@ -243,8 +271,15 @@ namespace Editor.Processors.Texture
                     case ".png":
                         {
                             TexInterop.ImageMetrics metrics = default;
-                            if (!TexInterop.QueryPNG(ref imageData, ref metrics))
-                                throw new Exception($"Failed to query png: {filePath}");
+                            sbyte* errorOutput = null;
+
+                            if (!TexInterop.QueryPNG(ref imageData, ref metrics, &errorOutput))
+                            {
+                                string str = GetErrorAsString(errorOutput);
+                                TexInterop.FreePNGError(errorOutput);
+
+                                throw new Exception($"Failed to query png: {filePath} because: {str}");
+                            }
 
                             return new Int2((int)metrics.Width, (int)metrics.Height);
                         }
@@ -252,14 +287,26 @@ namespace Editor.Processors.Texture
                     case ".jpg":
                         {
                             TexInterop.ImageMetrics metrics = default;
-                            if (!TexInterop.QueryJPEG(ref imageData, ref metrics))
-                                throw new Exception($"Failed to query jpeg: {filePath}");
+                            sbyte* errorOutput = null;
+
+                            if (!TexInterop.QueryJPEG(ref imageData, ref metrics, &errorOutput))
+                            {
+                                string str = GetErrorAsString(errorOutput);
+                                TexInterop.FreeJPEGError(errorOutput);
+
+                                throw new Exception($"Failed to query jpeg: {filePath} because: {str}");
+                            }
 
                             return new Int2((int)metrics.Width, (int)metrics.Height);
                         }
                     default: throw new Exception($"Unknown image file type: {filePath}");
                 }
             }
+        }
+
+        private static string GetErrorAsString(sbyte* ptr)
+        {
+            return ptr == null ? "No reason provided" : new string(ptr);
         }
     }
 

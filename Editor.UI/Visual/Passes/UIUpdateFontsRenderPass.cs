@@ -2,13 +2,14 @@
 using Primary.Rendering.Commands;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Structures;
-using Primary.RHI2;
+using Primary.RHI;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Editor.UI.Visual.Passes
 {
+    [RenderPassSetupAttribute(RunContext = RenderPassRunContext.PerWindow)]
     internal sealed class UIUpdateFontsRenderPass : IRenderPass
     {
         public UIUpdateFontsRenderPass()
@@ -36,8 +37,8 @@ namespace Editor.UI.Visual.Passes
             RasterCommandBuffer cmd = context.CommandBuffer;
             while (data.FontManager!.PendingFontUpdates.TryDequeue(out UIFontUpdate update))
             {
-                RHITexture dest = update.Style.AtlasTexture!;
-                if (update.LoadIndex == update.Style.Font.LoadIndex && update.OldAtlas != null)
+                RHITexture dest = update.TypeData.AtlasTexture!;
+                if (update.LoadIndex == update.TypeData.Font.LoadIndex && update.OldAtlas != null)
                 {
                     cmd.Copy(new FGTextureCopyDesc(
                         new FGTextureCopySource(update.OldAtlas, 0), null,

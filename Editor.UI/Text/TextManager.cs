@@ -2,6 +2,7 @@
 using Editor.UI.Helpers;
 using Editor.UI.Text.Wrappers;
 using Microsoft.Extensions.ObjectPool;
+using Primary.Common;
 using Primary.Common.Memory;
 using Primary.Profiling;
 using System;
@@ -25,6 +26,8 @@ namespace Editor.UI.Text
 
         private LinearBlockAllocator _stringMemory;
         private StringHandleAllocator _stringAllocator;
+
+        private ConcurrentBag<KeyValuePair<TextShapeCacheKey, DeferredShapingData>> _pendingShapingData;
 
         private bool _disposedValue;
 
@@ -70,13 +73,41 @@ namespace Editor.UI.Text
                     _textShapeCache.ReturnTextData(result);
                 }
             }
+
+            _stringAllocator.Clear();
+            _textShapeCache.CullCachedData();
         }
 
         /// <summary>Not thread-safe</summary>
         public ShapedTextData ShapeTextDeferred(in TextWrapInfo wrapInfo, UITextOverflow overflow, ReadOnlySpan<char> text)
         {
             StringHandle handle = _stringAllocator.GetStringHandle(text);
-            TextShapeCacheKey key = new TextShapeCacheKey(handle.Hash == StringHandle.InvalidHashCode ? handle.Pointer : handle.Hash, wrapInfo.DefaultVisualInfo.Style, wrapInfo.DefaultVisualInfo.FontSize, wrapInfo.MaxExtents.X, overflow);
+            TextShapeCacheKey key = new TextShapeCacheKey(handle.Hash == StringHandle.InvalidHashCode ? handle.Pointer : handle.Hash, wrapInfo.DefaultVisualInfo.TypeData, wrapInfo.DefaultVisualInfo.FontSize, wrapInfo.MaxExtents.X, overflow);
+
+            ShapedTextData? textData;
+            if (handle.Hash != int.MinValue)
+            {
+                if (_textShapeCache.TryFindInCache(key, out textData))
+                    return textData;
+            }
+
+            if (_deferredData.TryGetValue(key, out DeferredShapingData shapingData))
+                return shapingData.TextData;
+
+            textData = _textShapeCache.GetBlankTextData();
+
+            _deferredData.Add(key, new DeferredShapingData(textData, wrapInfo, handle));
+            if (handle.Hash != StringHandle.InvalidHashCode)
+                _textShapeCache.StoreDataInCache(key, textData);
+
+            return textData;
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public ShapedTextData ShapeTextDeferred<T>(in TextWrapInfo wrapInfo, UITextOverflow overflow, T text) where T : IJaggedString
+        {
+            StringHandle handle = _stringAllocator.GetStringHandle(text);
+            TextShapeCacheKey key = new TextShapeCacheKey(handle.Hash == StringHandle.InvalidHashCode ? handle.Pointer : handle.Hash, wrapInfo.DefaultVisualInfo.TypeData, wrapInfo.DefaultVisualInfo.FontSize, wrapInfo.MaxExtents.X, overflow);
 
             ShapedTextData? textData;
             if (handle.Hash != int.MinValue)
@@ -100,7 +131,7 @@ namespace Editor.UI.Text
         /// <summary>Not thread-safe</summary>
         public ShapedTextData ShapeText(in TextWrapInfo wrapInfo, UITextOverflow overflow, Span<char> text, int hashCode)
         {
-            TextShapeCacheKey key = new TextShapeCacheKey(hashCode == StringHandle.InvalidHashCode ? long.MinValue : hashCode, wrapInfo.DefaultVisualInfo.Style, wrapInfo.DefaultVisualInfo.FontSize, wrapInfo.MaxExtents.X, overflow);
+            TextShapeCacheKey key = new TextShapeCacheKey(hashCode == StringHandle.InvalidHashCode ? long.MinValue : hashCode, wrapInfo.DefaultVisualInfo.TypeData, wrapInfo.DefaultVisualInfo.FontSize, wrapInfo.MaxExtents.X, overflow);
 
             if (hashCode != int.MinValue)
             {
@@ -134,6 +165,8 @@ namespace Editor.UI.Text
                     }
                 case UITextOverflow.WrapWords:
                     {
+                        goto case UITextOverflow.Overflow;
+
                         WordTextWrapper textWrapper = _wordPool.Get();
                         textWrapper.WrapText(wrapInfo, textData, text);
 
@@ -150,55 +183,114 @@ namespace Editor.UI.Text
         }
 
         /// <summary>Not thread-safe</summary>
+        public StringHandle GetStringHandle(ReadOnlySpan<char> text) => _stringAllocator.GetStringHandle(text);
+
+        /// <summary>Not thread-safe</summary>
         internal void ShapeAllDeferredTextData()
         {
             if (_deferredData.Count > 0)
             {
                 using (new ProfilingScope("ShapeText"))
                 {
-                    Action<KeyValuePair<TextShapeCacheKey, DeferredShapingData>> callback = (kvp) =>
+                    if (_deferredData.Count == 1 || true)
                     {
-                        using (new ProfilingScope("Wrap"))
+                        foreach (var kvp in _deferredData)
                         {
-                            TextShapeCacheKey key = kvp.Key;
-                            DeferredShapingData value = kvp.Value;
-
-                            value.TextData.InitializeLetterArray(value.Text.String.Length);
-
-                            Vector2 extentsInEms = value.WrapInfo.MaxExtents / PixelsPerEM;
-                            switch (key.Overflow)
+                            using (new ProfilingScope("Wrap"))
                             {
-                                case UITextOverflow.Overflow:
-                                    {
-                                        OverflowTextWrapper textWrapper = _overflowPool.Get();
-                                        textWrapper.WrapText(value.WrapInfo, value.TextData, value.Text.String);
+                                TextShapeCacheKey key = kvp.Key;
+                                DeferredShapingData value = kvp.Value;
 
-                                        _overflowPool.Return(textWrapper);
-                                        break;
-                                    }
-                                case UITextOverflow.WrapWords:
-                                    {
-                                        WordTextWrapper textWrapper = _wordPool.Get();
-                                        textWrapper.WrapText(value.WrapInfo, value.TextData, value.Text.String);
+                                value.TextData.InitializeLetterArray(value.Text.String.Length);
 
-                                        _wordPool.Return(textWrapper);
-                                        break;
-                                    }
+                                Vector2 extentsInEms = value.WrapInfo.MaxExtents / PixelsPerEM;
+                                switch (key.Overflow)
+                                {
+                                    case UITextOverflow.Overflow:
+                                        {
+                                            OverflowTextWrapper textWrapper = _overflowPool.Get();
+                                            textWrapper.WrapText(value.WrapInfo, value.TextData, value.Text.String);
+
+                                            _overflowPool.Return(textWrapper);
+                                            break;
+                                        }
+                                    case UITextOverflow.WrapWords:
+                                        {
+                                            goto case UITextOverflow.Overflow;
+
+                                            WordTextWrapper textWrapper = _wordPool.Get();
+                                            textWrapper.WrapText(value.WrapInfo, value.TextData, value.Text.String);
+
+                                            _wordPool.Return(textWrapper);
+                                            break;
+                                        }
+                                }
+
+                                value.TextData.SortSections();
+
+                                if (value.Text.Hash == StringHandle.InvalidHashCode)
+                                    _keptShapingData.Add(value.TextData);
                             }
-
-                            value.TextData.SortSections();
-
-                            if (value.Text.Hash == StringHandle.InvalidHashCode)
-                                _keptShapingData.Add(value.TextData);
                         }
-                    };
+                    }
+                    else
+                    {
+                        using RentedArray<Task> tasks = RentedArray<Task>.Rent(_deferredData.Count);
 
-                    Parallel.ForEach(_deferredData, callback);
+                        int i = 0;
+                        foreach (var kvp in _deferredData)
+                        {
+                            Action callback = () =>
+                            {
+                                using (new ProfilingScope("Wrap"))
+                                {
+                                    TextShapeCacheKey key = kvp.Key;
+                                    DeferredShapingData value = kvp.Value;
+
+                                    value.TextData.InitializeLetterArray(value.Text.String.Length);
+
+                                    Vector2 extentsInEms = value.WrapInfo.MaxExtents / PixelsPerEM;
+                                    switch (key.Overflow)
+                                    {
+                                        case UITextOverflow.Overflow:
+                                            {
+                                                OverflowTextWrapper textWrapper = _overflowPool.Get();
+                                                textWrapper.WrapText(value.WrapInfo, value.TextData, value.Text.String);
+
+                                                _overflowPool.Return(textWrapper);
+                                                break;
+                                            }
+                                        case UITextOverflow.WrapWords:
+                                            {
+                                                goto case UITextOverflow.Overflow;
+
+                                                WordTextWrapper textWrapper = _wordPool.Get();
+                                                textWrapper.WrapText(value.WrapInfo, value.TextData, value.Text.String);
+
+                                                _wordPool.Return(textWrapper);
+                                                break;
+                                            }
+                                    }
+
+                                    value.TextData.SortSections();
+
+                                    if (value.Text.Hash == StringHandle.InvalidHashCode)
+                                        _keptShapingData.Add(value.TextData);
+                                }
+                            };
+
+                            tasks[i++] = Task.Factory.StartNew(callback);
+                        }
+
+                        Task.WaitAll(tasks.Span);
+                    }
 
                     _deferredData.Clear();
                 }
             }
         }
+
+        internal TextShapeCache TextShapeCache => _textShapeCache;
 
         //Should be scalable externally
         public const float PixelsPerEM = 16.0f;
