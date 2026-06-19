@@ -58,6 +58,8 @@ namespace Primary.Input
                     {
                         scheme.UpdateActions();
                     }
+
+                    _hasUpdatePending = false;
                 }
 
                 foreach (var kvp in _devices)

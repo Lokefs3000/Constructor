@@ -25,12 +25,14 @@ namespace PrimaryEditor.Startup
 
         private Thread _updateThread;
         private CancellationTokenSource _updateCts;
-        private AutoResetEvent _updateEvent;
+        private ManualResetEventSlim _updateEvent;
 
         private float _actionNameTextWidth;
+        private float _previousProgressFraction;
 
         private Lock _updateLock;
         private string? _actionName;
+        private Func<float>? _progressReporter;
 
         private bool _disposedValue;
 
@@ -56,15 +58,17 @@ namespace PrimaryEditor.Startup
             {
                 _updateThread = new Thread(UpdateProc);
                 _updateCts = new CancellationTokenSource();
-                _updateEvent = new AutoResetEvent(false);
+                _updateEvent = new ManualResetEventSlim(false);
             }
 
             {
                 _updateLock = new Lock();
                 _actionName = null;
+                _progressReporter = null;
             }
 
             _actionNameTextWidth = 0.0f;
+            _previousProgressFraction = -1.0f;
 
             SDL3.SDL_ShowWindow(_window);
             SDL3.SDL_SetWindowHitTest(_window, &WindowHitTest, nint.Zero);
@@ -117,7 +121,7 @@ namespace PrimaryEditor.Startup
             TimeSpan maxWaitTime = TimeSpan.FromSeconds(0.05);
             while (!_updateCts.IsCancellationRequested)
             {
-                _updateEvent.WaitOne(maxWaitTime);
+                _updateEvent.Wait(maxWaitTime);
                 _updateEvent.Reset();
 
                 bool hasModifiedImage = false;
@@ -128,11 +132,69 @@ namespace PrimaryEditor.Startup
                     {
                         Int2 position = new Int2(14, WindowHeight - 102);
                         ResetRegionToBackground(new Rect(new Int2(position.X, position.Y - 16), new Int2(Math.Min((int)MathF.Ceiling(_actionNameTextWidth), WindowWidth - 14), 20)));
-                        
+
                         _actionNameTextWidth = DrawText(position, _interRegular, _actionName);
                         _actionName = null;
 
                         hasModifiedImage = true;
+                    }
+
+                    if (_progressReporter != null)
+                    {
+                        if (_previousProgressFraction < 0.0f)
+                        {
+                            SDL_FRect rect = new SDL_FRect
+                            {
+                                x = 8,
+                                y = WindowHeight - 24 - 8,
+                                w = WindowWidth - 16,
+                                h = 24
+                            };
+
+                            SDL3.SDL_SetRenderDrawColor(_renderer, 170, 170, 170, 255);
+                            SDL3.SDL_RenderRect(_renderer, &rect);
+                            SDL3.SDL_SetRenderDrawColor(_renderer, 255, 255, 255, 255);
+
+                            hasModifiedImage = true;
+
+                            _previousProgressFraction = 0.0f;
+                        }
+
+                        float currentFraction = _progressReporter();
+                        float difference = currentFraction - _previousProgressFraction;
+
+                        if (difference < 0.0f)
+                        {
+                            int offset = (int)(currentFraction * (WindowWidth - 20));
+                            int width = (int)(-difference * (WindowWidth - 20)) + 1;
+
+                            ResetRegionToBackground(new Rect(offset + 10, WindowHeight - 24 - 6, Math.Min(width, WindowWidth - offset - 20), 20));
+                        }
+                        else
+                        {
+                            int offset = (int)(_previousProgressFraction * (WindowWidth - 20)) - 1;
+                            int width = (int)(difference * (WindowWidth - 20));
+
+                            SDL_FRect rect = new SDL_FRect
+                            {
+                                x = 10 + Math.Max(offset, 0),
+                                y = WindowHeight - 24 - 6,
+                                w = Math.Min(width, WindowWidth - offset - 20),
+                                h = 20
+                            };
+
+                            SDL3.SDL_RenderFillRect(_renderer, &rect);
+                        }
+
+                        _previousProgressFraction = currentFraction;
+                        hasModifiedImage = true;
+                    }
+                    else
+                    {
+                        if (_previousProgressFraction >= 0.0f)
+                        {
+                            ResetRegionToBackground(new Rect(8, WindowHeight - 24 - 8, WindowWidth - 16, 24));
+                        }
                     }
                 }
 
@@ -211,6 +273,18 @@ namespace PrimaryEditor.Startup
                 using (_updateLock.EnterScope())
                 {
                     _actionName = value;
+                    _updateEvent.Set();
+                }
+            }
+        }
+
+        public Func<float>? ProgressReporter
+        {
+            set
+            {
+                using (_updateLock.EnterScope())
+                {
+                    _progressReporter = value;
                     _updateEvent.Set();
                 }
             }

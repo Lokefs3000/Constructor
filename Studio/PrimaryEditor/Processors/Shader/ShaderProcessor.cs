@@ -1,0 +1,685 @@
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using CommunityToolkit.HighPerformance;
+using Editor.Shaders;
+using Editor.Shaders.Attributes;
+using Editor.Shaders.Data;
+using Primary.Assets;
+using Primary.Assets.Loaders;
+using Primary.Assets.Types;
+using Primary.Common;
+using Primary.RHI;
+using PrimaryEditor.Assets;
+using PrimaryEditor.Utility;
+
+namespace PrimaryEditor.Processors.Shader
+{
+    public static class ShaderProcessor
+    {
+        public static ShaderProcesserResult Execute(ShaderConfiguration shader, ShaderCompileTarget compileTarget, Stream stream)
+        {
+            IAssetIdProvider idProvider = shader.IdProvider!;
+
+            string? filePath = idProvider.RetrievePathForId(shader.DefaultId);
+            if (filePath == null)
+            {
+                throw new Exception($"Failed to get path for id: {shader.DefaultId}");
+            }
+
+            string? sourceIn = FilesystemManager.ReadAllText(filePath);
+            if (sourceIn == null)
+            {
+                throw new Exception($"Failed to read source: {filePath}");
+            }
+
+            Editor.Shaders.ShaderProcessor processor = new Editor.Shaders.ShaderProcessor(EdLog.Assets, ShaderAttributeSettings.Graphics);
+            ShaderProcesserResult? resultNullable = processor.Process(new ShaderProcessorArgs
+            {
+                InputSource = sourceIn,
+                SourceFileName = filePath,
+
+                IncludeDirectories = shader.IncludeDirectories,
+
+                Targets = compileTarget
+            });
+
+            if (!resultNullable.HasValue)
+            {
+                throw new Exception($"Failed to process shader: {filePath}");
+            }
+
+            ShaderProcesserResult result = resultNullable.Value;
+
+            using BinaryWriter bw = new BinaryWriter(stream);
+
+            Dictionary<ReferenceIndex, ShPropertyStages> dataStageUsageDict = CreateStageUsageDictionary(result.Data);
+
+            WriteHeader(bw, ref result, result.Data);
+            WriteDescription(bw, shader, result.Data);
+            WriteResourceList(bw, result.Data, dataStageUsageDict);
+            WriteRawPropertyList(bw, result.Data);
+            WriteInputLayout(bw, result.Data);
+            WriteStaticSamplers(bw, result.Data);
+            WriteBytecodeOffsetBlock(bw, ref result);
+            WriteBytecode(bw, ref result);
+
+            return result;
+        }
+
+        private static void WriteHeader(BinaryWriter bw, ref readonly ShaderProcesserResult result, ShaderData data)
+        {
+            SBCTarget target = SBCTarget.None;
+
+            if (Flags.HasFlag(result.Targets, ShaderCompileTarget.Direct3D12))
+                target |= SBCTarget.Direct3D12;
+            if (Flags.HasFlag(result.Targets, ShaderCompileTarget.Vulkan))
+                target |= SBCTarget.Vulkan;
+
+            SBCStages stages = SBCStages.None;
+
+            if (Flags.HasFlag(result.Stages, ShaderCompileStage.Vertex))
+                stages |= SBCStages.Vertex;
+            if (Flags.HasFlag(result.Stages, ShaderCompileStage.Pixel))
+                stages |= SBCStages.Pixel;
+
+            SBCHeaderFlags flags = SBCHeaderFlags.None;
+
+            if (!data.GeneratePropertiesInHeader)
+                flags |= SBCHeaderFlags.ExternalProperties;
+            if (data.AreConstantsSeparated)
+                flags |= SBCHeaderFlags.HeaderIsBuffer;
+
+            SBCHeader header = new SBCHeader
+            {
+                Header = SBCHeader.ConstHeader,
+                Version = SBCHeader.ConstVersion,
+
+                Targets = target,
+                Stages = stages,
+
+                Flags = flags,
+                HeaderSize = (ushort)data.HeaderBytesize
+            };
+
+            bw.Write(header);
+        }
+
+        private static void WriteDescription(BinaryWriter bw, ShaderConfiguration shader, ShaderData data)
+        {
+            int expectedConstantsSize = 0;
+            int idx = data.Resources.FindIndex((x) => x.Type == ResourceType.ConstantBuffer && Array.Exists(x.Attributes, (y) => y.Signature is AttributeConstants));
+            if (idx != -1)
+            {
+                ref readonly ResourceData resData = ref data.Resources[idx];
+                ref readonly StructData @struct = ref data.GetRefSource(resData.Value);
+
+                Checking.Assert(!Unsafe.IsNullRef(in @struct));
+                expectedConstantsSize = EstimateStructSize(in @struct);
+
+                int EstimateStructSize(ref readonly StructData @struct)
+                {
+                    int size = 0;
+                    foreach (ref readonly VariableData variable in @struct.Variables.AsSpan())
+                    {
+                        ValueDataRef generic = variable.Generic;
+                        if (generic.Generic == ValueGeneric.Custom)
+                        {
+                            ref readonly StructData varStruct = ref data.GetRefSource(generic);
+                            Debug.Assert(!Unsafe.IsNullRef(in varStruct));
+
+                            size += EstimateStructSize(in varStruct);
+                        }
+                        else
+                        {
+                            size += generic.Generic switch
+                            {
+                                ValueGeneric.Float => sizeof(float),
+                                ValueGeneric.Double => sizeof(double),
+                                ValueGeneric.UInt => sizeof(uint),
+                                ValueGeneric.Int => sizeof(int),
+                                _ => throw new NotSupportedException()
+                            } * generic.Rows * generic.Columns;
+                        }
+                    }
+
+                    return size;
+                }
+
+                if (expectedConstantsSize > 128)
+                    throw new Exception($"Constants size is larger then 128 bytes (actual: {expectedConstantsSize}) (TODO: Add custom exception)"/*TODO: Add custom exception*/);
+            }
+
+            bw.Write(shader.TopologyType);
+            bw.Write((byte)expectedConstantsSize);
+
+            bw.Write(shader.RasterizerInfo);
+            bw.Write(shader.DepthStencilInfo);
+
+            bw.Write(new SBCBlend { AlphaToCoverageEnable = shader.BlendInfo.AlphaToCoverageEnable, IndependentBlendEnable = shader.BlendInfo.IndependentBlendEnable });
+            bw.Write((byte)shader.BlendInfo.Blends.Length);
+
+            foreach (ref readonly var rtBlend in shader.BlendInfo.Blends.AsSpan())
+            {
+                bw.Write(rtBlend);
+            }
+        }
+
+        private static void WriteResourceList(BinaryWriter bw, ShaderData data, Dictionary<ReferenceIndex, ShPropertyStages> usageDict)
+        {
+            int count = 0;
+
+            int i = 0;
+            foreach (ref readonly ResourceData resource in data.Resources)
+            {
+                if (usageDict.ContainsKey(new ReferenceIndex(ReferenceType.Resource, i++)))
+                    count++;
+            }
+
+            bw.Write((ushort)count);
+
+            i = 0;
+            foreach (ref readonly ResourceData resource in data.Resources)
+            {
+                if (!usageDict.TryGetValue(new ReferenceIndex(ReferenceType.Resource, i++), out ShPropertyStages stages))
+                    continue;
+
+                bw.Write(resource.Type switch
+                {
+                    ResourceType.Texture1D => SBCResourceType.Texture1D,
+                    ResourceType.Texture2D => SBCResourceType.Texture2D,
+                    ResourceType.Texture3D => SBCResourceType.Texture3D,
+                    ResourceType.TextureCube => SBCResourceType.TextureCube,
+                    ResourceType.ConstantBuffer => SBCResourceType.ConstantBuffer,
+                    ResourceType.StructuredBuffer => SBCResourceType.StructuredBuffer,
+                    ResourceType.ByteAddressBuffer => SBCResourceType.ByteAddressBuffer,
+                    ResourceType.SamplerState => SBCResourceType.SamplerState,
+                    _ => throw new NotSupportedException()
+                });
+
+                bw.Write(stages switch
+                {
+                    ShPropertyStages.VertexShading => SBCShaderStages.VertexShading,
+                    ShPropertyStages.PixelShading => SBCShaderStages.PixelShading,
+                    ShPropertyStages.ComputeShading => SBCShaderStages.ComputeShading,
+                    ShPropertyStages.AllShading => SBCShaderStages.AllShading,
+                    _ => throw new NotSupportedException()
+                });
+
+                long backup = bw.BaseStream.Position;
+
+                bw.Write(SBCResourceFlags.None);
+                bw.Write(resource.Name);
+
+                AttributeData attributeData = new AttributeData();
+                SBCResourceFlags flags = SBCResourceFlags.None;
+
+                if (resource.IsReadWrite)
+                    flags |= SBCResourceFlags.IsReadWrite;
+
+                if ((attributeData = Array.Find(resource.Attributes, static (x) => x.Signature is AttributeConstants)).Signature != null)
+                {
+                    flags |= SBCResourceFlags.Constants;
+                }
+                if ((attributeData = Array.Find(resource.Attributes, static (x) => x.Signature is AttributeDisplay)).Signature != null && attributeData.Data != null)
+                {
+                    flags |= SBCResourceFlags.Display;
+                    bw.Write(attributeData.GetVariable<PropertyDisplay>("Display") switch
+                    {
+                        PropertyDisplay.Default => SBCPropertyDisplay.Default,
+                        PropertyDisplay.Color => SBCPropertyDisplay.Color,
+                        _ => throw new NotImplementedException()
+                    });
+                }
+                if ((attributeData = Array.Find(resource.Attributes, static (x) => x.Signature is AttributeGlobal)).Signature != null)
+                {
+                    flags |= SBCResourceFlags.Global;
+
+                    string? customName = attributeData.GetVariable<string>("Name");
+                    bw.Write(new SBCAttributeGlobal
+                    {
+                        HasCustomName = customName != null
+                    });
+
+                    if (customName != null)
+                        bw.Write(customName);
+                }
+                if ((attributeData = Array.Find(resource.Attributes, static (x) => x.Signature is AttributeProperty)).Signature != null)
+                {
+                    flags |= SBCResourceFlags.Property;
+
+                    string? customName = attributeData.GetVariable<string>("Name");
+                    bw.Write(new SBCAttributeProperty
+                    {
+                        Default = attributeData.GetVariable<PropertyDefault>("Default") switch
+                        {
+                            PropertyDefault.NumOne => SBCPropertyDefault.NumOne,
+                            PropertyDefault.NumZero => SBCPropertyDefault.NumZero,
+                            PropertyDefault.NumIdentity => SBCPropertyDefault.NumIdentity,
+                            PropertyDefault.TexWhite => SBCPropertyDefault.TexWhite,
+                            PropertyDefault.TexBlack => SBCPropertyDefault.TexBlack,
+                            PropertyDefault.TexMask => SBCPropertyDefault.TexMask,
+                            PropertyDefault.TexNormal => SBCPropertyDefault.TexNormal,
+                            _ => throw new NotImplementedException()
+                        },
+                        HasCustomName = customName != null
+                    });
+
+                    if (customName != null)
+                        bw.Write(customName);
+                }
+                if ((attributeData = Array.Find(resource.Attributes, static (x) => x.Signature is AttributeSampled)).Signature != null)
+                {
+                    flags |= SBCResourceFlags.Sampled;
+
+                    string? customName = attributeData.GetVariable<string>("Sampler");
+                    bw.Write(new SBCAttributeSampled
+                    {
+                        HasCustomName = customName != null
+                    });
+
+                    if (customName != null)
+                        bw.Write(customName);
+                }
+
+                long current = bw.BaseStream.Position;
+
+                bw.BaseStream.Seek(backup, SeekOrigin.Begin);
+                bw.Write(flags);
+                bw.BaseStream.Seek(current, SeekOrigin.Begin);
+            }
+        }
+
+        private static void WriteRawPropertyList(BinaryWriter bw, ShaderData data)
+        {
+            List<ValueTuple<VariableData, bool>> variables = new List<ValueTuple<VariableData, bool>>();
+            foreach (ref readonly PropertyData resource in data.Properties)
+            {
+                ValueDataRef generic = resource.Generic;
+                Checking.Assert(generic.IsSpecified);
+
+                variables.Add((new VariableData(resource.Name, resource.Attributes, generic, null), false));
+
+                if (generic.Generic == ValueGeneric.Custom)
+                {
+                    ref readonly StructData @struct = ref data.GetRefSource(generic);
+                    AppendSubStructMembers(in @struct, variables);
+                }
+            }
+
+            bw.Write((ushort)variables.Count);
+
+            int localByteOffset = 0;
+            int globalByteOffset = 0;
+
+            foreach (ref readonly ValueTuple<VariableData, bool> tuple in variables.AsSpan())
+            {
+                VariableData variable = tuple.Item1;
+
+                ValueDataRef generic = variable.Generic;
+                Checking.Assert(generic.IsSpecified);
+
+                int size = data.CalculateSize(generic);
+
+                if (generic.Generic == ValueGeneric.Custom)
+                {
+                    bw.Write((ushort)((1 << 15) | size));
+                }
+                else
+                {
+                    bw.Write((ushort)((int)(generic.Generic switch
+                    {
+                        ValueGeneric.Float => SBCValueGeneric.Single,
+                        ValueGeneric.Double => SBCValueGeneric.Double,
+                        ValueGeneric.Int => SBCValueGeneric.Int,
+                        ValueGeneric.UInt => SBCValueGeneric.UInt,
+                        _ => throw new NotImplementedException(),
+                    }) | (generic.Rows << 12) | (generic.Columns << 9)));
+                }
+
+                long backup = bw.BaseStream.Position;
+
+                bw.Write(ushort.MaxValue);
+                bw.Write(SBCPropertyFlags.None);
+
+                bw.Write(variable.Name);
+
+                AttributeData attributeData = new AttributeData();
+                SBCPropertyFlags flags = SBCPropertyFlags.None;
+
+                if (tuple.Item2)
+                    flags |= SBCPropertyFlags.HasParent;
+
+                if ((attributeData = Array.Find(variable.Attributes, static (x) => x.Signature is AttributeDisplay)).Signature != null && attributeData.Data != null)
+                {
+                    flags |= SBCPropertyFlags.Display;
+                    bw.Write(attributeData.GetVariable<PropertyDisplay>("Display") switch
+                    {
+                        PropertyDisplay.Default => SBCPropertyDisplay.Default,
+                        PropertyDisplay.Color => SBCPropertyDisplay.Color,
+                        _ => throw new NotImplementedException()
+                    });
+                }
+                if ((attributeData = Array.Find(variable.Attributes, static (x) => x.Signature is AttributeGlobal)).Signature != null)
+                {
+                    flags |= SBCPropertyFlags.Global;
+
+                    string? customName = attributeData.GetVariable<string>("Name");
+                    bw.Write(new SBCAttributeGlobal
+                    {
+                        HasCustomName = customName != null
+                    });
+
+                    if (customName != null)
+                        bw.Write(customName);
+                }
+                if ((attributeData = Array.Find(variable.Attributes, static (x) => x.Signature is AttributeProperty)).Signature != null)
+                {
+                    flags |= SBCPropertyFlags.Property;
+
+                    string? customName = attributeData.GetVariable<string>("Name");
+                    bw.Write(new SBCAttributeProperty
+                    {
+                        Default = attributeData.GetVariable<PropertyDefault>("Default") switch
+                        {
+                            PropertyDefault.NumOne => SBCPropertyDefault.NumOne,
+                            PropertyDefault.NumZero => SBCPropertyDefault.NumZero,
+                            PropertyDefault.NumIdentity => SBCPropertyDefault.NumIdentity,
+                            PropertyDefault.TexWhite => SBCPropertyDefault.TexWhite,
+                            PropertyDefault.TexBlack => SBCPropertyDefault.TexBlack,
+                            PropertyDefault.TexMask => SBCPropertyDefault.TexMask,
+                            PropertyDefault.TexNormal => SBCPropertyDefault.TexNormal,
+                            _ => throw new NotImplementedException()
+                        },
+                        HasCustomName = customName != null
+                    });
+
+                    if (customName != null)
+                        bw.Write(customName);
+                }
+
+                long current = bw.BaseStream.Position;
+
+                bw.BaseStream.Seek(backup, SeekOrigin.Begin);
+                bw.Write((ushort)(Flags.HasFlag(flags, SBCPropertyFlags.Global) ? globalByteOffset : localByteOffset));
+                bw.Write(flags);
+                bw.BaseStream.Seek(current, SeekOrigin.Begin);
+
+                if (Flags.HasFlag(flags, SBCPropertyFlags.Global))
+                    globalByteOffset += size;
+                else
+                    localByteOffset += size;
+            }
+
+            void AppendSubStructMembers(ref readonly StructData @struct, List<ValueTuple<VariableData, bool>> variables)
+            {
+                foreach (ref readonly VariableData variable in @struct.Variables.AsSpan())
+                {
+                    ValueDataRef generic = variable.Generic;
+                    Checking.Assert(generic.IsSpecified);
+
+                    variables.Add((variable, true));
+
+                    if (generic.Generic == ValueGeneric.Custom)
+                    {
+                        ref readonly StructData childStruct = ref data.GetRefSource(generic);
+                        AppendSubStructMembers(in @struct, variables);
+                    }
+                }
+            }
+        }
+
+        private static void WriteInputLayout(BinaryWriter bw, ShaderData data)
+        {
+            int idx = data.Functions.FindIndex((x) => Array.Exists(x.Attributes, (y) => y.Signature is AttributeVertex));
+            Checking.Assert(idx != -1);
+
+            ref readonly FunctionData vertexEntry = ref data.Functions[idx];
+            int structData = Array.FindIndex(vertexEntry.Arguments, (x) => x.Generic.Generic == ValueGeneric.Custom);
+
+            if (structData != -1)
+            {
+                ref readonly StructData @struct = ref data.GetRefSource(vertexEntry.Arguments[structData].Generic);
+                if (@struct.Variables.Length > 0)
+                {
+                    using RentedArray<SBCInputElement> inputElements = RentedArray<SBCInputElement>.Rent(@struct.Variables.Length);
+                    int actualValid = 0;
+
+                    int byteOffset = 0;
+                    for (int i = 0; i < @struct.Variables.Length; i++)
+                    {
+                        ref readonly VariableData variable = ref @struct.Variables[i];
+
+                        ValueDataRef generic = variable.Generic;
+                        Checking.Assert(generic.IsSpecified && generic.Generic != ValueGeneric.Custom);
+                        Checking.Assert(variable.Semantic.HasValue);
+
+                        VarSemantic semantic = variable.Semantic.Value;
+                        if (semantic.Semantic >= SemanticName.SV_InstanceId)
+                            continue;
+
+                        SBCInputElement stagingElement = new SBCInputElement
+                        {
+                            Semantic = semantic.Semantic switch
+                            {
+                                SemanticName.Position => SBCInputSemantic.Position,
+                                SemanticName.Texcoord => SBCInputSemantic.Texcoord,
+                                SemanticName.Color => SBCInputSemantic.Color,
+                                SemanticName.Normal => SBCInputSemantic.Normal,
+                                SemanticName.Tangent => SBCInputSemantic.Tangent,
+                                //SemanticName.Bitangnet => SBCInputSemantic.Bitangnet,
+                                SemanticName.BlendIndices => SBCInputSemantic.BlendIndices,
+                                SemanticName.BlendWeight => SBCInputSemantic.BlendWeight,
+                                SemanticName.PositionT => SBCInputSemantic.PositionT,
+                                SemanticName.PSize => SBCInputSemantic.PSize,
+                                SemanticName.Fog => SBCInputSemantic.Fog,
+                                SemanticName.TessFactor => SBCInputSemantic.TessFactor,
+                                _ => throw new NotImplementedException()
+                            },
+                            SemanticIndex = (byte)semantic.Index,
+                            Format = (SBCInputFormat)((int)(generic.Generic switch
+                            {
+                                ValueGeneric.Float => SBCInputFormat.Float1,
+                                ValueGeneric.UInt => SBCInputFormat.UInt1,
+                                _ => throw new NotImplementedException()
+                            }) + Math.Max(generic.Rows - 1, 0)),
+
+                            InputSlot = 0,
+                            ByteOffset = ushort.MaxValue,
+
+                            InputSlotClass = SBCInputClassification.Vertex
+                        };
+
+                        byteOffset += generic.Generic switch
+                        {
+                            ValueGeneric.Float => sizeof(float),
+                            ValueGeneric.UInt => sizeof(uint),
+                            _ => throw new NotImplementedException()
+                        } * generic.Rows;
+
+                        inputElements[i] = stagingElement;
+                        actualValid++;
+                    }
+
+                    if (actualValid > 0)
+                    {
+                        for (int i = 0; i < vertexEntry.Attributes.Length; i++)
+                        {
+                            AttributeData layoutData = vertexEntry.Attributes[i];
+                            if (layoutData.Signature is AttributeIALayout and not null)
+                            {
+                                string elementName = layoutData.GetVariable<string>("Name")!;
+                                idx = @struct.Variables.FindIndex((x) => x.Name == elementName);
+
+                                if (idx == -1)
+                                    throw new Exception($"No input layout variable with name: {elementName} found (TODO: Add custom exception)"/*TODO: Add custom exception*/);
+
+                                ref SBCInputElement inputElement = ref inputElements[idx];
+
+                                if (layoutData.TryGetVariable("Offset", out int offset))
+                                    inputElement.ByteOffset = (ushort)offset;
+
+                                if (layoutData.TryGetVariable("Slot", out int slot))
+                                    inputElement.InputSlot = Math.Min((byte)slot, (byte)8);
+
+                                if (layoutData.TryGetVariable("Class", out RHIInputClass inputClass))
+                                    inputElement.InputSlotClass = inputClass switch
+                                    {
+                                        RHIInputClass.PerVertex => SBCInputClassification.Vertex,
+                                        RHIInputClass.PerInstance => SBCInputClassification.Instance,
+                                        _ => throw new NotImplementedException()
+                                    };
+
+                                if (layoutData.TryGetVariable("Format", out RHIElementFormat format))
+                                    inputElement.Format = format switch
+                                    {
+                                        RHIElementFormat.Single1 => SBCInputFormat.Float1,
+                                        RHIElementFormat.Single2 => SBCInputFormat.Float2,
+                                        RHIElementFormat.Single3 => SBCInputFormat.Float3,
+                                        RHIElementFormat.Single4 => SBCInputFormat.Float4,
+                                        RHIElementFormat.Byte4 => SBCInputFormat.Byte4,
+                                        _ => throw new NotImplementedException()
+                                    };
+                            }
+                        }
+
+                        bw.Write((byte)actualValid);
+                        for (int i = 0; i < @struct.Variables.Length; i++)
+                        {
+                            ref readonly VariableData variable = ref @struct.Variables[i];
+
+                            VarSemantic semantic = variable.Semantic!.Value;
+                            if (semantic.Semantic >= SemanticName.SV_InstanceId)
+                                continue;
+
+                            bw.Write(inputElements[i]);
+                        }
+                    }
+                    else
+                        bw.Write((byte)0);
+                }
+                else
+                    bw.Write((byte)0);
+            }
+            else
+                bw.Write((byte)0);
+
+        }
+
+        private static void WriteStaticSamplers(BinaryWriter bw, ShaderData data)
+        {
+            bw.Write((byte)data.StaticSamplers.Length);
+            if (!data.StaticSamplers.IsEmpty)
+            {
+                foreach (ref readonly StaticSamplerData samplerData in data.StaticSamplers)
+                {
+                    bw.Write(new SBCStaticSampler
+                    {
+                        Min = TranslateFilter(samplerData.Min),
+                        Mag = TranslateFilter(samplerData.Mag),
+                        Mip = TranslateFilter(samplerData.Mip),
+                        Reduction = samplerData.Reduction switch
+                        {
+                            SamplerReductionType.Standard => SBCSamplerReduction.Standard,
+                            _ => throw new NotImplementedException(),
+                        },
+                        AddressModeU = TranslateSAM(samplerData.AddressModeU),
+                        AddressModeV = TranslateSAM(samplerData.AddressModeV),
+                        AddressModeW = TranslateSAM(samplerData.AddressModeW),
+                        MaxAnisotropy = (byte)Math.Clamp(samplerData.MaxAnisotropy, 1, 16),
+                        MipLODBias = samplerData.MipLODBias,
+                        MinLOD = samplerData.MinLOD,
+                        MaxLOD = samplerData.MaxLOD,
+                        Border = samplerData.Border switch
+                        {
+                            SamplerBorder.TransparentBlack => SBCSamplerBorder.TransparentBlack,
+                            SamplerBorder.OpaqueBlack => SBCSamplerBorder.OpaqueBlack,
+                            SamplerBorder.OpaqueWhite => SBCSamplerBorder.OpaqueWhite,
+                            SamplerBorder.OpaqueBlackUInt => SBCSamplerBorder.OpaqueBlackUInt,
+                            SamplerBorder.OpaqueWhiteUInt => SBCSamplerBorder.OpaqueWhiteUInt,
+                            _ => throw new NotImplementedException(),
+                        }
+                    });
+                }
+            }
+
+            static SBCSamplerFilter TranslateFilter(SamplerFilter filter) => filter switch
+            {
+                SamplerFilter.Linear => SBCSamplerFilter.Linear,
+                SamplerFilter.Point => SBCSamplerFilter.Point,
+                _ => throw new NotImplementedException(),
+            };
+
+            static SBCSamplerAddressMode TranslateSAM(SamplerAddressMode addressMode) => addressMode switch
+            {
+                SamplerAddressMode.Repeat => SBCSamplerAddressMode.Repeat,
+                SamplerAddressMode.Mirror => SBCSamplerAddressMode.Mirror,
+                SamplerAddressMode.Clamp => SBCSamplerAddressMode.Clamp,
+                SamplerAddressMode.Border => SBCSamplerAddressMode.Border,
+                _ => throw new NotImplementedException(),
+            };
+        }
+
+        private static void WriteBytecodeOffsetBlock(BinaryWriter bw, ref readonly ShaderProcesserResult result)
+        {
+            int currentOffset = (int)(bw.BaseStream.Position + Unsafe.SizeOf<int>() * 2 * result.Bytecodes.Length);
+
+            result.Bytecodes.Sort((x, y) => x.TargetData.CompareTo(y.TargetData));
+            foreach (ShaderBytecode bytecode in result.Bytecodes)
+            {
+                bw.Write(currentOffset);
+                bw.Write(bytecode.Bytes.Length);
+
+                currentOffset += bytecode.Bytes.Length;
+            }
+        }
+
+        private static void WriteBytecode(BinaryWriter bw, ref readonly ShaderProcesserResult result)
+        {
+            foreach (ShaderBytecode bytecode in result.Bytecodes)
+            {
+                bw.Write(bytecode.Bytes);
+            }
+        }
+
+        private static Dictionary<ReferenceIndex, ShPropertyStages> CreateStageUsageDictionary(ShaderData data)
+        {
+            Dictionary<ReferenceIndex, ShPropertyStages> dict = new Dictionary<ReferenceIndex, ShPropertyStages>();
+
+            foreach (FunctionData function in data.Functions)
+            {
+                if (Array.Exists(function.Attributes, (x) => x.Signature is AttributeVertex))
+                {
+                    TravelForStageRecursive(ShPropertyStages.VertexShading, function.IncludeData);
+                }
+                else if (Array.Exists(function.Attributes, (x) => x.Signature is AttributePixel))
+                {
+                    TravelForStageRecursive(ShPropertyStages.PixelShading, function.IncludeData);
+                }
+            }
+
+            void TravelForStageRecursive(ShPropertyStages stage, FunctionIncludeData includes)
+            {
+                foreach (ref readonly ReferenceIndex index in includes.Indices)
+                {
+                    switch (index.Type)
+                    {
+                        case ReferenceType.Function: TravelForStageRecursive(stage, data.Functions[index.Index].IncludeData); break;
+                        default:
+                            {
+                                ref ShPropertyStages stages = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, index, out bool exists);
+                                if (exists)
+                                    stages |= stage;
+                                else
+                                    stages = stage;
+
+                                break;
+                            }
+                    }
+                }
+            }
+
+            return dict;
+        }
+    }
+}

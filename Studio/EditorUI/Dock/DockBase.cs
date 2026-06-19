@@ -33,7 +33,7 @@ namespace EditorUI.Dock
 
         protected internal abstract void UpdateData();
         protected internal abstract void RecalculateLayout(Rect dockRect);
-        protected internal abstract void PaintVisual(PainterContext painter);
+        protected internal abstract void PaintVisual(ref readonly PainterContext painter);
 
         protected internal abstract bool TrySetDockHost(DockHost? newHost);
 

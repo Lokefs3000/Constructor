@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "PrimaryEditor": {
+      "commandName": "Project",
+      "commandLineArgs": "--project-path \"D:\\source\\repos\\Constructor\\Source\\DemoGame1\""
+    },
+    "VoxTrace": {
+      "commandName": "Project",
+      "commandLineArgs": "--project-path \"D:\\source\\repos\\VoxTrace\\data\""
+    }
+  }
+}

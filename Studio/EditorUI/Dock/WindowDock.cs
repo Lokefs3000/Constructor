@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Text;
 using CommunityToolkit.Diagnostics;
 using EditorUI.Visual;
+using EditorUI.Visual.Draw;
 using EditorUI.Windowing;
 using Primary.Collections.ReadOnly;
 using Primary.Common;
@@ -205,7 +206,7 @@ namespace EditorUI.Dock
             _windowRect = _dockFlags.HasFlags(DockFlags.SingleWindow) ? dockRect : Rect.OffsetMin(dockRect, 0, TabHeight);
         }
 
-        protected internal override void PaintVisual(PainterContext painter)
+        protected internal override void PaintVisual(ref readonly PainterContext painter)
         {
             if (_dockFlags.HasFlags(DockFlags.SingleWindow))
                 return;

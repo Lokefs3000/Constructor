@@ -4,6 +4,16 @@
             "name": "project-path",
             "shorthand": null,
             "type": "String"
+        },
+        {
+            "name": "asset-watcher",
+            "shorthand": null,
+            "type": null
+        },
+        {
+            "name": "suspend",
+            "shorthand": null,
+            "type": null
         }
     ],
     "includes": [

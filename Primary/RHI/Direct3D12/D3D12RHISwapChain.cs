@@ -53,8 +53,13 @@ namespace Primary.RHI.Direct3D12
                     Flags = (uint)DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING
                 };
 
+                ComPtr<IUnknown> cmdQueue = new ComPtr<IUnknown>();
+                device.DirectCmdQueue.As(ref cmdQueue);
+
                 using ComPtr<IDXGISwapChain1> swapChain = new ComPtr<IDXGISwapChain1>();
-                HRESULT hr = device.Factory.Get()->CreateSwapChainForHwnd((IUnknown*)device.DirectCmdQueue.Get(), new HWND(description.WindowHandle.ToPointer()), &desc, null, null, swapChain.GetAddressOf());
+                HRESULT hr = device.Factory.Get()->CreateSwapChainForHwnd(cmdQueue.Get(), new HWND(description.WindowHandle.ToPointer()), &desc, null, null, swapChain.GetAddressOf());
+
+                cmdQueue.Dispose();
                 if (hr.FAILED)
                 {
                     throw new RHIException($"Failed to create DXGI swap chain: {hr}");

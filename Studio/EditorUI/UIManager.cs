@@ -7,6 +7,7 @@ using EditorUI.Layout;
 using EditorUI.Reflection;
 using EditorUI.Scheduling;
 using EditorUI.Serialization;
+using EditorUI.Visual;
 using EditorUI.Widgets;
 using EditorUI.Windowing;
 using Primary.Common;
@@ -27,6 +28,7 @@ namespace EditorUI
 
         // data operators
         private LayoutManager _layoutManager;
+        private VisualManager _visualManager;
 
         private bool _disposedValue;
 
@@ -45,6 +47,7 @@ namespace EditorUI
             _widgetManager = new WidgetManager();
 
             _layoutManager = new LayoutManager();
+            _visualManager = new VisualManager(this);
         }
 
         private void Dispose(bool disposing)
@@ -74,6 +77,7 @@ namespace EditorUI
             CheckDockHostsUpdateStates();
 
             _layoutManager.RecalculateAll();
+            _visualManager.RenderAll();
         }
 
         private void CheckDockHostsUpdateStates()
@@ -109,6 +113,7 @@ namespace EditorUI
         public WidgetManager WidgetManager => _widgetManager;
 
         public LayoutManager LayoutManager => _layoutManager;
+        public VisualManager VisualManager => _visualManager;
 
         private static WeakReference s_instance = new WeakReference(null);
 

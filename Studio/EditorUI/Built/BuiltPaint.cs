@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using EditorUI.Common;
 using EditorUI.Visual;
+using EditorUI.Visual.Draw;
 
 namespace EditorUI.Built
 {

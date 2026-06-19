@@ -4,7 +4,7 @@ using System.Text;
 using EditorUI.Common;
 using Primary.Common;
 
-namespace EditorUI.Visual
+namespace EditorUI.Visual.Draw
 {
     public record struct Paint(UIColor Fill, UIColor Stroke, ushort StrokeWidth = 0, StrokePosition StrokePosition = StrokePosition.Outside)
     {
@@ -21,6 +21,6 @@ namespace EditorUI.Visual
     {
         Outside = 0,
         Middle,
-        Inner
+        Inside
     }
 }

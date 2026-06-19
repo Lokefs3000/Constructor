@@ -87,11 +87,11 @@ namespace EditorUI.Dock
             }
         }
 
-        internal void PaintVisual(PainterContext painter)
+        internal void PaintVisual(ref readonly PainterContext painter)
         {
             if (_rootDock != null)
             {
-                RecursivePaintDocks(_rootDock, painter);
+                RecursivePaintDocks(_rootDock, in painter);
             }
         }
 
@@ -155,14 +155,14 @@ namespace EditorUI.Dock
             dock.TryRemoveStateFlags(StateFlags.SelfInvalidLayout);
         }
 
-        private void RecursivePaintDocks(DockBase dock, PainterContext painter)
+        private void RecursivePaintDocks(DockBase dock, ref readonly PainterContext painter)
         {
             foreach (DockBase childDock in dock.Docks)
             {
-                RecursivePaintDocks(dock, painter);
+                RecursivePaintDocks(dock, in painter);
             }
 
-            dock.PaintVisual(painter);
+            dock.PaintVisual(in painter);
         }
 
         public void RegisterNewDock(DockBase dock)
@@ -211,6 +211,8 @@ namespace EditorUI.Dock
         {
             _ownedWindow.TakeFocus();
         }
+
+        public Window OwnedWindow => _ownedWindow;
 
         public Rect HostRect => new Rect(Int2.Zero, _ownedWindow.ClientSize);
 

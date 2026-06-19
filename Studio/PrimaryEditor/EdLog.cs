@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Primary.Logging;
 using Serilog;
 
 namespace PrimaryEditor
@@ -11,6 +12,10 @@ namespace PrimaryEditor
 
         private static ILogger CreateLogger() => new LoggerConfiguration()
             .WriteTo.Console()
+            .WriteTo.Logbook()
+#if DEBUG
+            .MinimumLevel.Debug()
+#endif
             .CreateLogger();
     }
 }

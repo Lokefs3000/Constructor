@@ -9,6 +9,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\Editor.Shaders\Editor.Shaders.csproj" />
 		<ProjectReference Include="..\EditorUI\EditorUI.csproj" />
 	</ItemGroup>
 

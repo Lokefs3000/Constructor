@@ -8,6 +8,10 @@ namespace Primary.Serialization.Toml
 {
     public sealed class AssetIdTomlConverter : TomlConverter<AssetId>
     {
+        public AssetIdTomlConverter()
+        {
+        }
+
         public override AssetId Read(TomlReader reader)
         {
             AssetId id = (AssetId)Guid.Parse(reader.GetString());

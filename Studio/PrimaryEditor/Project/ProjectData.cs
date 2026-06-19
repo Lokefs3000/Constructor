@@ -18,8 +18,13 @@ namespace PrimaryEditor.Project
         internal void SetupData(string projectPath, StartupSplash splash)
         {
             splash.ActionName = "Setting up project data..";
-            _paths.LoadPaths(projectPath);
+
+            projectPath = projectPath.Replace('\\', '/');
+
+            _paths.SetupPaths(projectPath);
         }
+
+        public ProjectPaths Paths => _paths;
 
         public static ProjectData Instance => EditorRuntime.Instance.ProjectData;
     }

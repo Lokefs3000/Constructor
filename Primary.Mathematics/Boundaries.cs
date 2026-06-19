@@ -114,6 +114,7 @@ namespace Primary.Mathematics
         public static Boundaries operator *(Boundaries left, float right) => new Boundaries(left.AsVector128() * right);
 
         public static readonly Boundaries Zero = new Boundaries();
+        public static readonly Boundaries One = new Boundaries(Vector2.Zero, Vector2.One);
 
         private const byte s_intersectShuffle = (byte)((1 << 6) | (0 << 4) | (3 << 2) | 2);
 

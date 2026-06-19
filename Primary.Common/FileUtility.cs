@@ -77,6 +77,33 @@
             return null;
         }
 
+        public static byte[]? TryReadAllBytes(string fullPath, int maxTries = 10, int timeoutMs = 250)
+        {
+            for (int i = 0; i < maxTries; i++)
+            {
+                FileStream? fs = null;
+                try
+                {
+                    return File.ReadAllBytes(fullPath);
+                }
+                catch (FileNotFoundException)
+                {
+                    return null;
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    return null;
+                }
+                catch (Exception)
+                {
+                    fs?.Dispose();
+                    Thread.Sleep(timeoutMs);
+                }
+            }
+
+            return null;
+        }
+
         public static bool TryDelete(string path)
         {
             try

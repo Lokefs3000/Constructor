@@ -13,6 +13,7 @@ using System.Runtime.CompilerServices;
 using Primary.GUI.ImGui;
 using Primary.Scripting;
 using Primary.Windowing;
+using Primary.Logging;
 
 namespace Primary
 {
@@ -23,6 +24,7 @@ namespace Primary
     {
         private static Engine? s_instance = null;
 
+        private Logbook _logbook;
         private ThreadHelper _threadHelper;
         private ScriptingManager _scriptingManager;
         private ConsoleManager _consoleManager;
@@ -49,6 +51,8 @@ namespace Primary
 
             SDL.SDL3.SDL_Init(SDL.SDL_InitFlags.SDL_INIT_VIDEO | SDL.SDL_InitFlags.SDL_INIT_EVENTS);
 
+            _logbook = new Logbook();
+
             PreInitialization();
 
             _threadHelper = new ThreadHelper();
@@ -56,8 +60,8 @@ namespace Primary
             _consoleManager = new ConsoleManager();
             _time = new Time();
             _profilingManager = new ProfilingManager();
-            _assetFilesystem = new AssetFilesystem();
-            _assetManager = new AssetManager();
+            _assetFilesystem = new AssetFilesystem(); SetupFilesystems();
+            _assetManager = new AssetManager(); SetupAssets();
             _eventManager = new EventManager();
             _windowManager = new WindowManager();
             _sceneManager = new SceneManager();
@@ -95,6 +99,7 @@ namespace Primary
         }
         #endregion
 
+        public Logbook Logbook => _logbook;
         public ScriptingManager ScriptingManager => _scriptingManager;
         public ConsoleManager ConsoleManager => _consoleManager;
         public Time Time => _time;

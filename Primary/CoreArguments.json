@@ -1,8 +1,10 @@
-[
-	{
-		"Name": "r-force-swapchain-8bit",
-		"Shorthand": null,
-		"AllowMultiple": false,
-		"HasValue": false
-	}
-]
+{
+    "arguments": [
+        {
+            "name": "r-force-swapchain-8bit",
+            "shorthand": null,
+            "type": null
+        }
+    ],
+    "includes": []
+}

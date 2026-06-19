@@ -45,7 +45,7 @@ namespace Editor.Assets.Importers
 
         public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
         {
-            string? str = filesystem.ReadString(localFilePath);
+            string? str = filesystem.ReadAllText(localFilePath);
             return str == null ? false : !TomlParser.Create(str).HasErrors;
         }
 

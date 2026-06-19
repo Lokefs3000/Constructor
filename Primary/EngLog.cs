@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using Primary.Logging;
+using Serilog;
 
 namespace Primary
 {
@@ -19,6 +20,7 @@ namespace Primary
         {
             return new LoggerConfiguration()
                 .WriteTo.Console(outputTemplate: $"[{{Timestamp:HH:mm:ss}} {{Level:u3}}] [P{prefix}] {{Message:lj}}{{NewLine}}{{Exception}}")
+                .WriteTo.Logbook()
 #if DEBUG
                 .MinimumLevel.Debug()
 #endif

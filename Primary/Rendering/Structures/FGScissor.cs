@@ -1,5 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
+using Primary.Mathematics;
 
 namespace Primary.Rendering.Structures
 {
@@ -7,6 +8,10 @@ namespace Primary.Rendering.Structures
     {
         public int Width { get => Right - Left; set => Right = Left + value; }
         public int Height { get => Bottom - Top; set => Bottom = Top + value; }
+
+        public FGRect(Rect rect) : this(rect.X, rect.Y, rect.X + rect.Width, rect.Y + rect.Height)
+        {
+        }
 
         public bool Equals(FGRect other)
         {

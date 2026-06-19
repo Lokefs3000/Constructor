@@ -41,7 +41,7 @@ namespace Primary.Console
 
             if (tokenizer.MoveNext())
             {
-                IGenericCVar generic = (IGenericCVar)variable.Field.GetValue(null)!;
+                IGenericConsoleVar generic = (IGenericConsoleVar)variable.Field.GetValue(null)!;
                 Type fieldType = generic.VariableType;
 
                 ReadOnlySpan<char> value = tokenizer.Current.Trim();
@@ -77,9 +77,9 @@ namespace Primary.Console
                 }
                 else
                 {
-                    foreach (ICVarModifier modifier in variable.Modifiers)
+                    foreach (IConsoleVarModifier modifier in variable.Modifiers)
                     {
-                        if (modifier is CVarRangeAttribute range)
+                        if (modifier is ConsoleVarRangeAttribute range)
                         {
                             IComparable? obj = generic.GetValue() as IComparable;
                             if (obj != null)
@@ -102,7 +102,7 @@ namespace Primary.Console
         PrintValue:
             EngLog.Console.Information("[{cv}]: {val}", cvarName, variable.Field.GetValue(null));
 
-            static bool Evaluate_Boolean(string cvarName, ReadOnlySpan<char> value, IGenericCVar cvar, out IGenericCVar updatedCVar)
+            static bool Evaluate_Boolean(string cvarName, ReadOnlySpan<char> value, IGenericConsoleVar cvar, out IGenericConsoleVar updatedCVar)
             {
                 if (value.IsEmpty)
                 {
@@ -110,7 +110,7 @@ namespace Primary.Console
                     return false;
                 }
 
-                CVar<bool> typed = (CVar<bool>)cvar;
+                ConsoleVar<bool> typed = (ConsoleVar<bool>)cvar;
                 if (value.Length == 1)
                 {
                     if (value[0] == '0')
@@ -137,9 +137,9 @@ namespace Primary.Console
                 return false;
             }
 
-            static bool Evaluate_Number<T>(string cvarName, ReadOnlySpan<char> value, IGenericCVar cvar, out IGenericCVar updatedCVar) where T : struct, INumberBase<T>
+            static bool Evaluate_Number<T>(string cvarName, ReadOnlySpan<char> value, IGenericConsoleVar cvar, out IGenericConsoleVar updatedCVar) where T : struct, INumberBase<T>
             {
-                CVar<T> typed = (CVar<T>)cvar;
+                ConsoleVar<T> typed = (ConsoleVar<T>)cvar;
 
                 object? result = Convert.ChangeType(value.ToString(), typeof(T));
                 if (result != null)
@@ -154,7 +154,7 @@ namespace Primary.Console
                 return false;
             }
 
-            static bool Evaluate_String(string cvarName, ReadOnlySpan<char> value, ReadOnlySpan<char> line, IGenericCVar cvar, out IGenericCVar updatedCVar)
+            static bool Evaluate_String(string cvarName, ReadOnlySpan<char> value, ReadOnlySpan<char> line, IGenericConsoleVar cvar, out IGenericConsoleVar updatedCVar)
             {
                 if (value.IsEmpty)
                 {
@@ -162,7 +162,7 @@ namespace Primary.Console
                     return false;
                 }
 
-                CVar<string> typed = (CVar<string>)cvar;
+                ConsoleVar<string> typed = (ConsoleVar<string>)cvar;
 
                 if (value[0] == '"')
                 {
@@ -188,7 +188,7 @@ namespace Primary.Console
             CommandClassNamespaceAttribute? namespaceAttribute = type.GetCustomAttribute<CommandClassNamespaceAttribute>();
             Checking.Assert(namespaceAttribute != null, "CVar class must have a namespace attribute attached");
 
-            List<ICVarModifier> genericModifiers = new List<ICVarModifier>();
+            List<IConsoleVarModifier> genericModifiers = new List<IConsoleVarModifier>();
 
             FieldInfo[] fields = type.GetFields(BindingFlags.Static | BindingFlags.Public);
             foreach (FieldInfo field in fields)
@@ -204,7 +204,7 @@ namespace Primary.Console
                 genericModifiers.Clear();
                 foreach (Attribute data in field.GetCustomAttributes())
                 {
-                    if (data is ICVarModifier modifier)
+                    if (data is IConsoleVarModifier modifier)
                     {
                         genericModifiers.Add(modifier);
                     }
@@ -227,12 +227,12 @@ namespace Primary.Console
                 return null;
             }
 
-            IGenericCVar cvar = (IGenericCVar)fi.Field.GetValue(null)!;
+            IGenericConsoleVar cvar = (IGenericConsoleVar)fi.Field.GetValue(null)!;
             return cvar.GetValue();
         }
 
         public static IEnumerable<string> Variables => Engine.GlobalSingleton.ConsoleManager._variables.Keys;
 
-        private readonly record struct ConsoleVariable(FieldInfo Field, ICVarModifier[] Modifiers);
+        private readonly record struct ConsoleVariable(FieldInfo Field, IConsoleVarModifier[] Modifiers);
     }
 }

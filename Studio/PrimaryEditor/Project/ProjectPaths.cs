@@ -6,6 +6,8 @@ namespace PrimaryEditor.Project
 {
     public sealed class ProjectPaths
     {
+        private string _rootFolder;
+        private string _contentFolder;
         private string _libraryFolder;
 
         private string _librarySavedFolder;
@@ -15,6 +17,7 @@ namespace PrimaryEditor.Project
 
         internal ProjectPaths()
         {
+            _contentFolder = string.Empty;
             _libraryFolder = string.Empty;
 
             _librarySavedFolder = string.Empty;
@@ -25,6 +28,8 @@ namespace PrimaryEditor.Project
 
         internal void SetupPaths(string projectDir)
         {
+            _rootFolder = projectDir;
+            _contentFolder = Path.Combine(projectDir, "Content");
             _libraryFolder = Path.Combine(projectDir, "Library");
 
             _librarySavedFolder = Path.Combine(_libraryFolder, "Saved");
@@ -33,6 +38,8 @@ namespace PrimaryEditor.Project
             _libraryCacheFolder = Path.Combine(_libraryFolder, "Cache");
         }
 
+        public string RootFolder => _rootFolder;
+        public string ContentFolder => _contentFolder;
         public string LibraryFolder => _libraryFolder;
 
         public string LibrarySavedFolder => _librarySavedFolder;

@@ -70,10 +70,10 @@ namespace Primary.Assets
                     NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_White.png", true)),
                     NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Black.png", true)),
                     NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Normal.png", true)),
-                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Mask.png", true)));
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Mask.png", true)),
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DebugTex_Loading.png", true)),
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DebugTex_Error.png", true)));
             }, LazyThreadSafetyMode.PublicationOnly);
-
-            Engine.GlobalSingleton.SetupAssets();
 
             s_instance = this;
         }
@@ -543,5 +543,7 @@ namespace Primary.Assets
         TextureAsset DefaultWhite,
         TextureAsset DefaultBlack,
         TextureAsset DefaultNormal,
-        TextureAsset DefaultMask);
+        TextureAsset DefaultMask,
+        TextureAsset DebugTexLoading,
+        TextureAsset DebugTexError);
 }

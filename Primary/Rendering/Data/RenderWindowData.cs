@@ -10,7 +10,6 @@ namespace Primary.Rendering.Data
         public Window Window { get; internal set; }
 
         public FrameGraphTexture ColorTexture { get; internal set; }
-        public FrameGraphTexture DepthTexture { get; internal set; }
 
         internal RenderWindowData()
         {

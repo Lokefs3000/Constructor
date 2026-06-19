@@ -46,7 +46,7 @@ namespace Editor.Assets.Importers
             TextureConfiguration config;
             if (fullFilePath.EndsWith(".texcomp"))
             {
-                string? sourceText = filesystem.ReadString(localInputFile);
+                string? sourceText = filesystem.ReadAllText(localInputFile);
                 if (sourceText == null)
                 {
                     EdLog.Assets.Error("[{p}]: Failed to read composite texture configuration", localInputFile);
@@ -105,7 +105,7 @@ namespace Editor.Assets.Importers
             }
             else if (fullFilePath.EndsWith(".cubemap"))
             {
-                string? sourceText = filesystem.ReadString(localInputFile);
+                string? sourceText = filesystem.ReadAllText(localInputFile);
                 if (sourceText == null)
                 {
                     EdLog.Assets.Error("[{p}]: Failed to read cubemap texture configuration", localInputFile);
@@ -168,7 +168,7 @@ namespace Editor.Assets.Importers
                     return false;
                 }
 
-                string? sourceText = filesystem.ReadString(configFile);
+                string? sourceText = filesystem.ReadAllText(configFile);
                 if (sourceText == null)
                 {
                     EdLog.Assets.Error("[{p}]: Failed to read texture configuration", localInputFile);
@@ -321,14 +321,14 @@ namespace Editor.Assets.Importers
 
             if (localFilePath.EndsWith(".texcomp"))
             {
-                string? sourceFile = filesystem.ReadString(localFilePath);
+                string? sourceFile = filesystem.ReadAllText(localFilePath);
                 if (sourceFile == null)
                     return false;
                 return TomlSerializer.TryDeserialize<CompositeConfiguration>(sourceFile, out _, s_tomlOptions);
             }
             else if (localFilePath.EndsWith(".cubemap"))
             {
-                string? sourceFile = filesystem.ReadString(localFilePath);
+                string? sourceFile = filesystem.ReadAllText(localFilePath);
                 if (sourceFile == null)
                     return false;
                 return TomlSerializer.TryDeserialize<CubemapConfiguration>(sourceFile, out _, s_tomlOptions);

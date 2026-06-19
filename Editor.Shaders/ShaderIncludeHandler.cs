@@ -2,6 +2,7 @@
 // Licensed under the MIT License (MIT). See LICENSE in the repository root for more information.
 
 using Primary.Common;
+using Primary.Utility;
 using Serilog;
 using SharpGen.Runtime;
 using System.Runtime.InteropServices;
@@ -11,12 +12,12 @@ namespace Editor.Shaders;
 
 public class ShaderIncludeHandler : CallbackBase, IDxcIncludeHandler
 {
-    private readonly string[] _includeDirectories;
+    private readonly List<string> _includeDirectories;
     private readonly Dictionary<string, SourceCodeBlob> _sourceFiles = new Dictionary<string, SourceCodeBlob>();
 
     public ShaderIncludeHandler(params string[] includeDirectories)
     {
-        _includeDirectories = includeDirectories;
+        _includeDirectories = [.. includeDirectories];
     }
 
     protected override void DisposeCore(bool disposing)
@@ -75,7 +76,7 @@ public class ShaderIncludeHandler : CallbackBase, IDxcIncludeHandler
 
     private string? GetFilePath(string fileName)
     {
-        for (int i = 0; i < _includeDirectories.Length; i++)
+        for (int i = 0; i < _includeDirectories.Count; i++)
         {
             var filePath = _includeDirectories[i].Length == 0 ? fileName : Path.GetFullPath(Path.Combine(_includeDirectories[i], fileName));
 

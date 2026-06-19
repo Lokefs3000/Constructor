@@ -26,18 +26,18 @@
         internal string Alias => _alias;
     }
 
-    internal interface ICVarModifier
+    internal interface IConsoleVarModifier
     {
 
     }
 
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
-    internal class CVarRangeAttribute : Attribute, ICVarModifier
+    internal class ConsoleVarRangeAttribute : Attribute, IConsoleVarModifier
     {
         private readonly int _min;
         private readonly int _max;
 
-        internal CVarRangeAttribute(int min, int max)
+        internal ConsoleVarRangeAttribute(int min, int max)
         {
             _min = min;
             _max = max;

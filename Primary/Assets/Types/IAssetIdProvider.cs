@@ -1,10 +1,12 @@
-﻿using Primary.Serialization.Toml;
+﻿using Primary.Serialization.Json;
+using Primary.Serialization.Toml;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using System.Text.Json.Serialization;
 using Tomlyn.Serialization;
 
 namespace Primary.Assets.Types
@@ -19,6 +21,7 @@ namespace Primary.Assets.Types
         public static readonly AssetId Invalid = new AssetId(Guid.Empty);
     }
 
+    [JsonConverter(typeof(AssetIdJsonConverter)), TomlConverter(typeof(AssetIdTomlConverter))]
     public readonly record struct AssetId : IEquatable<AssetId>, IComparable<AssetId>, IFormattable, IComparisonOperators<AssetId, AssetId, bool>, IEqualityOperators<AssetId, AssetId, bool>
     {
         // assume little endian architecture

@@ -10,7 +10,6 @@ namespace Primary.Serialization.Arguments
     {
         public override ArgumentType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            reader.Read();
             if (reader.TokenType == JsonTokenType.Null)
             {
                 return new ArgumentType(ArgumentTypeLiteral.Null, false);

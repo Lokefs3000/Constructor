@@ -17,8 +17,6 @@ namespace Primary.Assets
             s_instance = this;
 
             _filesystem = new List<ISubFilesystem>();
-
-            Engine.GlobalSingleton.SetupFilesystems();
         }
 
         public void AddFilesystem(ISubFilesystem filesystem)
@@ -45,7 +43,7 @@ namespace Primary.Assets
             {
                 ISubFilesystem filesystem = _filesystem[i];
                 if (filesystem.Exists(path))
-                    return filesystem.ReadString(path);
+                    return filesystem.ReadAllText(path);
             }
 
             return null;

@@ -4,6 +4,7 @@ using EditorUI.Layout;
 using EditorUI.Mathematics;
 using EditorUI.Styling;
 using EditorUI.Visual;
+using EditorUI.Visual.Draw;
 using Primary;
 using Primary.Collections.ReadOnly;
 using Primary.Common;

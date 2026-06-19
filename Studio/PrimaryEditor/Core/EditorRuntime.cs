@@ -6,8 +6,10 @@ using EditorUI;
 using EditorUI.Diagnostics.ImGui;
 using EditorUI.Dock;
 using Primary;
+using Primary.GUI.ImGui;
 using Primary.Mathematics;
 using PrimaryEditor.Assets;
+using PrimaryEditor.Assets.Filesystem;
 using PrimaryEditor.Project;
 using PrimaryEditor.Rendering;
 using PrimaryEditor.Startup;
@@ -45,8 +47,10 @@ namespace PrimaryEditor.Core
         internal void Run()
         {
             RenderingManager.SetNewRenderPath(new EditorRenderPath());
+            RenderingManager.RenderPassManager.AddRenderPass<ImGuiRenderPass>();
 
             ImGuiManager.AddDrawer(new HierchyExplorer());
+            ImGuiManager.AddDrawer(new GuiStatistics());
             ImGuiManager.IsEnabled = true;
 
             WindowDock dock = _uiManager.DockManager.CreateWindowDock(DockFlags.SingleWindow);
@@ -72,6 +76,7 @@ namespace PrimaryEditor.Core
 
             // editor only
             {
+                _assetPipeline.HandleUpdates();
                 _uiManager.UpdateInternalData();
             }
 
@@ -87,17 +92,36 @@ namespace PrimaryEditor.Core
         #region Implentation
         protected override void PreInitialization()
         {
+            if (AppArguments.HasArgument("suspend"))
+                Console.ReadKey();
+
             _splash = new StartupSplash();
 
             _projectData = new ProjectData();
-            _assetPipeline = new AssetPipeline();
+            _assetPipeline = new AssetPipeline(this);
 
             // initialize
-            _projectData.SetupData(string.Empty, _splash);
+            if (!AppArguments.TryGetValue("project-path", out string? projectPath))
+            {
+                Environment.Exit(1);
+            }
+
+            _projectData.SetupData(projectPath, _splash);
             _assetPipeline.ImportAnyChangesLaunch(_splash);
+        }
+
+        protected override void SetupFilesystems()
+        {
+            AssetFilesystem.AddFilesystem(_assetPipeline.FilesystemManager);
+        }
+
+        protected override void SetupAssets()
+        {
+            AssetManager.LockInIdProvider(_assetPipeline.AssetRegistry);
         }
         #endregion
 
+        public ProjectData ProjectData => _projectData;
         public AssetPipeline AssetPipeline => _assetPipeline;
 
         public UIManager UIManager => _uiManager;

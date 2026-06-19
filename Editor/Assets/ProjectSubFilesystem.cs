@@ -126,7 +126,7 @@ namespace Editor.Assets
         }
 
         /// <summary>Thread-safe</summary>
-        public string? ReadString(ReadOnlySpan<char> path)
+        public string? ReadAllText(ReadOnlySpan<char> path)
         {
             if (!path.StartsWith(_namespace))
             {
