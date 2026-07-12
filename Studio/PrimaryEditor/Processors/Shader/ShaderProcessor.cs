@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 using CommunityToolkit.HighPerformance;
 using Editor.Shaders;
 using Editor.Shaders.Attributes;
@@ -21,8 +22,7 @@ namespace PrimaryEditor.Processors.Shader
         {
             IAssetIdProvider idProvider = shader.IdProvider!;
 
-            string? filePath = idProvider.RetrievePathForId(shader.DefaultId);
-            if (filePath == null)
+            if (!idProvider.TryGetLocalPathForId(shader.DefaultId, out string? filePath))
             {
                 throw new Exception($"Failed to get path for id: {shader.DefaultId}");
             }
@@ -51,7 +51,7 @@ namespace PrimaryEditor.Processors.Shader
 
             ShaderProcesserResult result = resultNullable.Value;
 
-            using BinaryWriter bw = new BinaryWriter(stream);
+            using BinaryWriter bw = new BinaryWriter(stream, Encoding.UTF8, true);
 
             Dictionary<ReferenceIndex, ShPropertyStages> dataStageUsageDict = CreateStageUsageDictionary(result.Data);
 

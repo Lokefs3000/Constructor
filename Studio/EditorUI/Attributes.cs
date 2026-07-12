@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Text;
 
 namespace EditorUI
@@ -29,5 +30,26 @@ namespace EditorUI
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public sealed class ValueConverterAttribute : Attribute
     {
+    }
+
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+    public sealed class StyleUpdateCallbackAttribute(params string[] propertyNames) : Attribute
+    {
+        private readonly ImmutableArray<string> _propertyNames = [.. propertyNames];
+
+        public ImmutableArray<string> PropertyNames => _propertyNames;
+    }
+
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public sealed class UIWidgetAttribute : Attribute
+    {
+    }
+
+    [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
+    public sealed class StyleConverterTypesAttribute(params Type[] types) : Attribute
+    {
+        private readonly Type[] _types = types;
+
+        public Type[] Types => _types;
     }
 }

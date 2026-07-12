@@ -6,18 +6,18 @@ using System.Text;
 
 namespace EditorUI.Reflection.Dynamic
 {
-    public record class PropertyMethods(Delegate SetDirect)
+    public record class PropertyMethods(Delegate? SetDirect)
     {
-        public SetFieldDirect<T> GetSetFieldDirectUnsafe<T>()
+        public SetFieldDirect<T>? GetSetFieldDirectUnsafe<T>()
         {
             Debug.Assert(SetDirect is SetFieldDirect<T>);
-            return Unsafe.As<SetFieldDirect<T>>(SetDirect);
+            return Unsafe.As<SetFieldDirect<T>?>(SetDirect);
         }
 
-        public SetPropertyDirect<T> GetSetPropertyDirectUnsafe<T>()
+        public SetPropertyDirect<T>? GetSetPropertyDirectUnsafe<T>()
         {
             Debug.Assert(SetDirect is SetPropertyDirect<T>);
-            return Unsafe.As<SetPropertyDirect<T>>(SetDirect);
+            return Unsafe.As<SetPropertyDirect<T>?>(SetDirect);
         }
     }
 

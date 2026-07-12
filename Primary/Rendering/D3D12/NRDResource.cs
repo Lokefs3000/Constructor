@@ -1,10 +1,10 @@
 ﻿using Primary.Common;
 using Primary.RHI;
 using Primary.RHI.Direct3D12;
+using Silk.NET.Direct3D12;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
 
 namespace Primary.Rendering.D3D12
 {

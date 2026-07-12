@@ -1,32 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using System.Text;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
-using CommunityToolkit.HighPerformance;
-
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
-using static Interop.D3D12MemAlloc.ALLOCATION_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_HEAP_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_HEAP_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_DIMENSION;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_FLAGS;
-using static TerraFX.Interop.DirectX.DXGI_FORMAT;
-using static TerraFX.Interop.DirectX.D3D12_TEXTURE_LAYOUT;
-
-using D3D12MemAlloc = Interop.D3D12MemAlloc;
-using Primary.Memory.Native;
-using System.Runtime.CompilerServices;
 using CommunityToolkit.Diagnostics;
-using System.Collections.Concurrent;
+using CommunityToolkit.HighPerformance;
 using Primary.Collections;
-using Primary.Common;
-using Primary.Interop;
+using Primary.Memory.Native;
+using Silk.NET.Core.Native;
+using Silk.NET.Direct3D12;
+using Silk.NET.DXGI;
+using static Interop.D3D12MemAlloc.ALLOCATION_FLAGS;
+using D3D12MemAlloc = Interop.D3D12MemAlloc;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -38,8 +22,8 @@ namespace Primary.RHI.Direct3D12
         private List<PendingDataUpload> _pendingUploads;
         private Lock _uploadListLock;
 
-        private List<D3D12_BUFFER_BARRIER> _bufferBarriers;
-        private List<D3D12_TEXTURE_BARRIER> _textureBarriers;
+        private List<BufferBarrier> _bufferBarriers;
+        private List<TextureBarrier> _textureBarriers;
 
         private bool _disposedValue;
 
@@ -50,8 +34,8 @@ namespace Primary.RHI.Direct3D12
             _pendingUploads = new List<PendingDataUpload>();
             _uploadListLock = new Lock();
 
-            _bufferBarriers = new List<D3D12_BUFFER_BARRIER>();
-            _textureBarriers = new List<D3D12_TEXTURE_BARRIER>();
+            _bufferBarriers = new List<BufferBarrier>();
+            _textureBarriers = new List<TextureBarrier>();
         }
 
         private void Dispose(bool disposing)
@@ -91,7 +75,7 @@ namespace Primary.RHI.Direct3D12
         internal void AddBufferUpload(D3D12RHIBuffer buffer, ArrayPtr<byte> data)
         {
             RHIBufferDescription desc = buffer.Description;
-            D3D12_RESOURCE_DESC1 resDesc = buffer.Resource.Get()->GetDesc1();
+            ResourceDesc1 resDesc = buffer.Resource.GetDesc1();
 
             Guard.IsEqualTo(desc.Width, data.Length);
 
@@ -114,7 +98,7 @@ namespace Primary.RHI.Direct3D12
             desc.DepthOrArraySize = Math.Max(desc.DepthOrArraySize / (ushort)(1 << mipLevel), 1);
 
             long resourcePitch = fi.CalculatePitch(desc.Width);
-            long alignedPitch = ResourceHelper.Align(resourcePitch, D3D12.D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+            long alignedPitch = ResourceHelper.Align(resourcePitch, D3D12.TextureDataPitchAlignment);
 
             Guard.IsEqualTo(fi.CalculateSize(desc.Width, desc.Height, desc.DepthOrArraySize), data.Length);
 
@@ -138,10 +122,10 @@ namespace Primary.RHI.Direct3D12
             }
 
             lock (_uploadListLock)
-                _pendingUploads.Add(new PendingDataUpload(rawData, texture, subresource, alignedPitch, D3D12.D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT));
+                _pendingUploads.Add(new PendingDataUpload(rawData, texture, subresource, alignedPitch, D3D12.TextureDataPlacementAlignment));
         }
 
-        internal void UploadPending(ID3D12GraphicsCommandList10* cmds)
+        internal void UploadPending(ref ID3D12GraphicsCommandList10 cmds)
         {
             if (_pendingUploads.Count == 0)
                 return;
@@ -155,17 +139,17 @@ namespace Primary.RHI.Direct3D12
 
             //PIX.PIXBeginEventOnCommandList((nint)cmds, 0xffffffff, "RHI-Upload");
 
-            CreateAndFlushBarriers(cmds, uploads.AsSpan());
+            CreateAndFlushBarriers(ref cmds, uploads.AsSpan());
             CreateUploadBuffer(requiredUploadSize, out ComPtr<ID3D12Resource2> uploadBuffer, out D3D12MemAlloc.Allocation* uploadAllocation);
 
-            if (uploadBuffer.Get() == null || uploadAllocation == null)
+            if (Unsafe.IsNullRef(in uploadBuffer.Get()) || uploadAllocation == null)
                 return;
 
             ArrayPtr<byte> mapped = new ArrayPtr<byte>(null, (int)requiredUploadSize);
-            HRESULT hr = uploadBuffer.Get()->Map(0, null, (void**)&mapped);
-            if (hr.FAILED)
+            HResult hr = uploadBuffer.Map(0, (Silk.NET.Direct3D12.Range*)null, (void**)&mapped);
+            if (hr.IsFailure)
             {
-                throw new RHIException($"Failed to map resource upload buffer: {hr.ToString()}");
+                throw new D3D12RHIException($"Failed to map resource upload buffer", hr.Value);
             }
 
             foreach (ActiveDataUpload upload in uploads)
@@ -176,10 +160,10 @@ namespace Primary.RHI.Direct3D12
                 {
                     if (upload.RawData.TryCopyTo(mapped.Slice((int)upload.BufferOffset)))
                     {
-                        cmds->CopyBufferRegion(
-                            (ID3D12Resource*)buffer.Resource.Get(),
+                        cmds.CopyBufferRegion(
+                            (ID3D12Resource*)Unsafe.AsPointer(ref buffer.Resource.Get()),
                             0,
-                            (ID3D12Resource*)uploadBuffer.Get(),
+                            (ID3D12Resource*)Unsafe.AsPointer(ref uploadBuffer.Get()),
                             (ulong)upload.BufferOffset,
                             (ulong)upload.RawData.Length);
                     }
@@ -192,11 +176,11 @@ namespace Primary.RHI.Direct3D12
                     {
                         (int _, int mipLevel) = ResourceHelper.DecodeSubresource(upload.SubresourceIndex, texture.Description.MipLevels);
 
-                        D3D12_TEXTURE_COPY_LOCATION destLoc = new D3D12_TEXTURE_COPY_LOCATION((ID3D12Resource*)texture.Resource.Get(), (uint)upload.SubresourceIndex);
-                        D3D12_TEXTURE_COPY_LOCATION srcLoc = new D3D12_TEXTURE_COPY_LOCATION((ID3D12Resource*)uploadBuffer.Get(), new D3D12_PLACED_SUBRESOURCE_FOOTPRINT
+                        TextureCopyLocation destLoc = new TextureCopyLocation((ID3D12Resource*)Unsafe.AsPointer(ref texture.Resource.Get()), type: TextureCopyType.SubresourceIndex, subresourceIndex: (uint)upload.SubresourceIndex);
+                        TextureCopyLocation srcLoc = new TextureCopyLocation((ID3D12Resource*)Unsafe.AsPointer(ref uploadBuffer.Get()), type: TextureCopyType.PlacedFootprint, placedFootprint: new PlacedSubresourceFootprint
                         {
                             Offset = (ulong)upload.BufferOffset,
-                            Footprint = new D3D12_SUBRESOURCE_FOOTPRINT
+                            Footprint = new SubresourceFootprint
                             {
                                 Format = texture.Description.Format.ToTextureFormat(),
                                 Width = (uint)Math.Max(texture.Description.Width / (1 << mipLevel), 1),
@@ -206,7 +190,7 @@ namespace Primary.RHI.Direct3D12
                             }
                         });
 
-                        cmds->CopyTextureRegion(&destLoc, 0, 0, 0, &srcLoc, null);
+                        cmds.CopyTextureRegion(&destLoc, 0, 0, 0, &srcLoc, null);
                     }
                     else
                         EngLog.RHI.Error("Failed to upload raw data to upload texture ({res}): {src} -> {dst} ({dstReal})", upload.Resource.DebugName, upload.RawData, mapped.Slice((int)upload.BufferOffset), mapped);
@@ -217,11 +201,11 @@ namespace Primary.RHI.Direct3D12
 
             _device.AddResourceFreeNextFrame(() =>
             {
-                uploadBuffer.Reset();
+                uploadBuffer.Dispose();
                 uploadAllocation->Base.Release();
             });
 
-            uploadBuffer.Get()->Unmap(0, null);
+            uploadBuffer.Unmap(0, (Silk.NET.Direct3D12.Range*)null);
             //PIX.PIXEndEventOnCommandList((nint)cmds);
 
             uploads.Dispose();
@@ -268,49 +252,49 @@ namespace Primary.RHI.Direct3D12
             }
         }
 
-        private void CreateAndFlushBarriers(ID3D12GraphicsCommandList10* cmds, Span<ActiveDataUpload> uploads)
+        private void CreateAndFlushBarriers(ref ID3D12GraphicsCommandList10 cmds, Span<ActiveDataUpload> uploads)
         {
             foreach (ActiveDataUpload upload in uploads)
             {
                 if (upload.Resource is D3D12RHIBuffer buffer)
                 {
                     D3D12RHIBufferNative* native = (D3D12RHIBufferNative*)buffer.GetAsNative();
-                    if (native->BarrierSync == D3D12_BARRIER_SYNC_COPY &&
-                        native->BarrierAccess == D3D12_BARRIER_ACCESS_COPY_DEST)
+                    if (native->BarrierSync == BarrierSync.Copy &&
+                        native->BarrierAccess == BarrierAccess.CopyDest)
                         continue;
 
-                    _bufferBarriers.Add(new D3D12_BUFFER_BARRIER(
+                    _bufferBarriers.Add(new BufferBarrier(
                         native->BarrierSync,
-                        D3D12_BARRIER_SYNC_COPY,
+                        BarrierSync.Copy,
                         native->BarrierAccess,
-                        D3D12_BARRIER_ACCESS_COPY_DEST,
-                        (ID3D12Resource*)buffer.Resource.Get()));
+                        BarrierAccess.CopyDest,
+                        (ID3D12Resource*)Unsafe.AsPointer(ref buffer.Resource.Get())));
 
-                    native->BarrierSync = D3D12_BARRIER_SYNC_COPY;
-                    native->BarrierAccess = D3D12_BARRIER_ACCESS_COPY_DEST;
+                    native->BarrierSync = BarrierSync.Copy;
+                    native->BarrierAccess = BarrierAccess.CopyDest;
                 }
                 else if (upload.Resource is D3D12RHITexture texture)
                 {
                     D3D12RHITextureNative* native = (D3D12RHITextureNative*)texture.GetAsNative();
-                    if (native->BarrierSync == D3D12_BARRIER_SYNC_COPY &&
-                        native->BarrierAccess == D3D12_BARRIER_ACCESS_COPY_DEST &&
-                        native->BarrierLayout == D3D12_BARRIER_LAYOUT_COPY_DEST)
+                    if (native->BarrierSync == BarrierSync.Copy &&
+                        native->BarrierAccess == BarrierAccess.CopyDest &&
+                        native->BarrierLayout == BarrierLayout.CopyDest)
                         continue;
 
                     //TODO: reduce the amount of barriers by transitioning all subresources and ignoring repeats
-                    _textureBarriers.Add(new D3D12_TEXTURE_BARRIER(
+                    _textureBarriers.Add(new TextureBarrier(
                         native->BarrierSync,
-                        D3D12_BARRIER_SYNC_COPY,
+                        BarrierSync.Copy,
                         native->BarrierAccess,
-                        D3D12_BARRIER_ACCESS_COPY_DEST,
+                        BarrierAccess.CopyDest,
                         native->BarrierLayout,
-                        D3D12_BARRIER_LAYOUT_COPY_DEST,
-                        (ID3D12Resource*)texture.Resource.Get(),
-                        new D3D12_BARRIER_SUBRESOURCE_RANGE(uint.MaxValue)));
+                        BarrierLayout.CopyDest,
+                        (ID3D12Resource*)Unsafe.AsPointer(ref texture.Resource.Get()),
+                        new BarrierSubresourceRange(uint.MaxValue)));
 
-                    native->BarrierSync = D3D12_BARRIER_SYNC_COPY;
-                    native->BarrierAccess = D3D12_BARRIER_ACCESS_COPY_DEST;
-                    native->BarrierLayout = D3D12_BARRIER_LAYOUT_COPY_DEST;
+                    native->BarrierSync = BarrierSync.Copy;
+                    native->BarrierAccess = BarrierAccess.CopyDest;
+                    native->BarrierLayout = BarrierLayout.CopyDest;
                 }
             }
 
@@ -318,19 +302,19 @@ namespace Primary.RHI.Direct3D12
 
             if (_bufferBarriers.Count > 0)
             {
-                fixed (D3D12_BUFFER_BARRIER* ptr = _bufferBarriers.AsSpan())
+                fixed (BufferBarrier* ptr = _bufferBarriers.AsSpan())
                 {
-                    D3D12_BARRIER_GROUP group = new D3D12_BARRIER_GROUP((uint)_bufferBarriers.Count, ptr);
-                    cmds->Barrier(1, &group);
+                    BarrierGroup group = new BarrierGroup(type: BarrierType.Buffer, numBarriers: (uint)_bufferBarriers.Count, pBufferBarriers: ptr);
+                    cmds.Barrier(1, &group);
                 }
             }
 
             if (_textureBarriers.Count > 0)
             {
-                fixed (D3D12_TEXTURE_BARRIER* ptr = _textureBarriers.AsSpan())
+                fixed (TextureBarrier* ptr = _textureBarriers.AsSpan())
                 {
-                    D3D12_BARRIER_GROUP group = new D3D12_BARRIER_GROUP((uint)_textureBarriers.Count, ptr);
-                    cmds->Barrier(1, &group);
+                    BarrierGroup group = new BarrierGroup(type: BarrierType.Texture, numBarriers: (uint)_textureBarriers.Count, pTextureBarriers: ptr);
+                    cmds.Barrier(1, &group);
                 }
             }
 
@@ -343,32 +327,32 @@ namespace Primary.RHI.Direct3D12
             D3D12MemAlloc.ALLOCATION_DESC allocDesc = new D3D12MemAlloc.ALLOCATION_DESC
             {
                 Flags = ALLOCATION_FLAG_NONE,
-                HeapType = D3D12_HEAP_TYPE_UPLOAD,
-                ExtraHeapFlags = D3D12_HEAP_FLAG_NONE,
+                HeapType = HeapType.Upload,
+                ExtraHeapFlags = HeapFlags.None,
                 CustomPool = null,
                 pPrivateData = null,
             };
 
-            D3D12_RESOURCE_DESC1 resDesc = new D3D12_RESOURCE_DESC1
+            ResourceDesc1 resDesc = new ResourceDesc1
             {
-                Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+                Dimension = ResourceDimension.Buffer,
                 Alignment = 0,
                 Width = (ulong)requiredSize,
                 Height = 1,
                 DepthOrArraySize = 1,
                 MipLevels = 1,
-                Format = DXGI_FORMAT_UNKNOWN,
-                SampleDesc = new DXGI_SAMPLE_DESC { Count = 1, Quality = 0 },
-                Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-                Flags = D3D12_RESOURCE_FLAG_NONE,
-                SamplerFeedbackMipRegion = new D3D12_MIP_REGION { Width = 0, Height = 0, Depth = 0 }
+                Format = Format.FormatUnknown,
+                SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
+                Layout = TextureLayout.LayoutRowMajor,
+                Flags = _device.Setup.UseTightAlignment ? ResourceFlags.UseTightAlignment : ResourceFlags.None,
+                SamplerFeedbackMipRegion = new MipRegion { Width = 0, Height = 0, Depth = 0 }
             };
 
             resource = new ComPtr<ID3D12Resource2>();
             D3D12MemAlloc.Allocation* temp = null;
 
-            HRESULT hr = D3D12MemAlloc.Allocator.CreateResource3(_device.Allocator, &allocDesc, &resDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, null, 0, null, &temp, UuidOf.Get<ID3D12Resource2>(), (void**)resource.GetAddressOf());
-            if (hr.FAILED)
+            HResult hr = D3D12MemAlloc.Allocator.CreateResource3(_device.Allocator, &allocDesc, &resDesc, BarrierLayout.Undefined, null, 0, null, &temp, SilkMarshal.GuidPtrOf<ID3D12Resource2>(), (void**)resource.GetAddressOf());
+            if (hr.IsFailure)
             {
                 _device.FlushPendingMessages();
                 _device.Logger?.Error($"Failed to create resource upload buffer: {hr.ToString()}");
@@ -380,7 +364,7 @@ namespace Primary.RHI.Direct3D12
 
             allocation = temp;
 
-            ResourceHelper.SetResourceName(resource.Get(), "RHIUploadBuffer");
+            ResourceHelper.SetResourceName(ref resource.Get(), "RHIUploadBuffer");
         }
 
         internal bool HasPendingUploads => _pendingUploads.Count > 0;

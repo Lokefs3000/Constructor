@@ -1,6 +1,6 @@
-default_style = "Normal Normal"
-glyph_size = 48
-distance_range = 2.0
+# default_style = "Normal Normal"
+glyph_size = 32
+distance_range = 2.75
 miter_limit = 1.0
 
 [[fonts]]

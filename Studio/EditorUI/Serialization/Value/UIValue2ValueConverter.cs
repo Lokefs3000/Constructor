@@ -19,18 +19,18 @@ namespace EditorUI.Serialization.Value
             // x
 
             tokenizer.MoveNext();
-            value.X.Relative = float.Parse(tokenizer.Current);
+            value.X.Relative = float.Parse(tokenizer.Current, CultureInfo.InvariantCulture);
 
             tokenizer.MoveNext();
-            value.X.Absolute = int.Parse(tokenizer.Current);
+            value.X.Absolute = int.Parse(tokenizer.Current, CultureInfo.InvariantCulture);
 
             // y
 
             tokenizer.MoveNext();
-            value.Y.Relative = float.Parse(tokenizer.Current);
+            value.Y.Relative = float.Parse(tokenizer.Current, CultureInfo.InvariantCulture);
 
             tokenizer.MoveNext();
-            value.Y.Absolute = int.Parse(tokenizer.Current);
+            value.Y.Absolute = int.Parse(tokenizer.Current, CultureInfo.InvariantCulture);
 
             return value;
         }

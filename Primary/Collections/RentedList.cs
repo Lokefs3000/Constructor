@@ -1,13 +1,16 @@
 ﻿using CommunityToolkit.Diagnostics;
 using CommunityToolkit.HighPerformance;
+using Primary.Collections.Display;
 using System.Buffers;
 using System.Collections;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace Primary.Collections
 {
-    public ref struct RentedList<T> : IDisposable, IList<T>, IReadOnlyList<T>, IEnumerable<T>
+    [DebuggerTypeProxy(typeof(RentedListDebugView<>))]
+    public record struct RentedList<T> : IDisposable, IList<T>, IReadOnlyList<T>, IEnumerable<T>
     {
         private readonly ArrayPool<T> _sourcePool;
         private bool _clearOnReturn;
@@ -23,7 +26,7 @@ namespace Primary.Collections
         {
             Guard.IsGreaterThanOrEqualTo(initialCapacity, 0);
 
-            _sourcePool = ArrayPool<T>.Shared;
+            _sourcePool = sourcePool;
             _clearOnReturn = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
 
             _version = 0;

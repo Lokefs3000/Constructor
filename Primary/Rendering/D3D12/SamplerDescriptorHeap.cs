@@ -1,16 +1,14 @@
-﻿using CommunityToolkit.HighPerformance;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Primary.RHI;
 using Primary.RHI.Direct3D12;
 using Primary.Utility;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
-using static TerraFX.Interop.DirectX.D3D12_DESCRIPTOR_HEAP_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_DESCRIPTOR_HEAP_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_SAMPLER_FLAGS;
+using SharpGen.Runtime;
+using Silk.NET.Core.Native;
+using Silk.NET.Direct3D12;
 
 namespace Primary.Rendering.D3D12
 {
@@ -37,7 +35,7 @@ namespace Primary.Rendering.D3D12
         {
             _device = device;
 
-            _descriptorHandleSize = (int)device.Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+            _descriptorHandleSize = (int)device.Device->GetDescriptorHandleIncrementSize(DescriptorHeapType.Sampler);
             _descriptorHeapSize = heapSize;
 
             _averageDescriptorUse = new AverageAnalyser<int>(16, 0.0f);
@@ -60,7 +58,7 @@ namespace Primary.Rendering.D3D12
                 }
 
                 foreach (HeapData heap in _activeHeaps)
-                    heap.Heap.Pointer->Release();
+                    heap.Heap.Dispose();
                 _activeHeaps.Clear();
 
                 _disposedValue = true;
@@ -115,9 +113,9 @@ namespace Primary.Rendering.D3D12
 
             _activeDescriptors[sampler] = index;
 
-            D3D12_CPU_DESCRIPTOR_HANDLE dstDescriptor = new D3D12_CPU_DESCRIPTOR_HANDLE(heap.StartHandle, _activeHeapOffset);
+            CpuDescriptorHandle dstDescriptor = new CpuDescriptorHandle((nuint)(heap.StartHandle.Ptr + (ulong)_activeHeapOffset));
 
-            D3D12_SAMPLER_DESC2 desc = new D3D12_SAMPLER_DESC2
+            SamplerDesc2 desc = new SamplerDesc2
             {
                 Filter = sampler.Description.MaxAnisotropy > 1 ?
                     ResourceHelper.EncodeAnisotropicFilter(sampler.Description.Reduction) :
@@ -130,16 +128,16 @@ namespace Primary.Rendering.D3D12
                 ComparisonFunc = sampler.Description.ComparisonFunction.ToComparisonFunc(),
                 MinLOD = sampler.Description.MinLOD,
                 MaxLOD = sampler.Description.MaxLOD,
-                Flags = D3D12_SAMPLER_FLAG_NONE
+                Flags = SamplerFlags.None
             };
 
             if (sampler.Description.BorderColorAsUInt)
             {
-                desc.Flags |= D3D12_SAMPLER_FLAG_UINT_BORDER_COLOR;
-                Unsafe.WriteUnaligned(ref Unsafe.As<uint, byte>(ref desc.UintBorderColor.DangerousGetReference()), sampler.Description.BorderColor);
+                desc.Flags |= SamplerFlags.UintBorderColor;
+                Unsafe.WriteUnaligned(ref Unsafe.AsRef<byte>(desc.Anonymous.UintBorderColor), sampler.Description.BorderColor);
             }
             else
-                Unsafe.WriteUnaligned(ref Unsafe.As<float, byte>(ref desc.FloatBorderColor.DangerousGetReference()), sampler.Description.BorderColor);
+                Unsafe.WriteUnaligned(ref Unsafe.AsRef<byte>(desc.Anonymous.FloatBorderColor), sampler.Description.BorderColor);
 
             _device.Device->CreateSampler2(&desc, dstDescriptor);
 
@@ -151,38 +149,47 @@ namespace Primary.Rendering.D3D12
 
         private void AddNewHeapToList()
         {
-            D3D12_DESCRIPTOR_HEAP_DESC desc = new D3D12_DESCRIPTOR_HEAP_DESC
+            DescriptorHeapDesc desc = new DescriptorHeapDesc
             {
-                Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+                Type = DescriptorHeapType.Sampler,
                 NumDescriptors = (uint)_descriptorHeapSize,
-                Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+                Flags = DescriptorHeapFlags.ShaderVisible,
                 NodeMask = 0
             };
 
-            ID3D12DescriptorHeap* temp = null;
-            HRESULT hr = _device.Device->CreateDescriptorHeap(&desc, UuidOf.Get<ID3D12DescriptorHeap>(), (void**)&temp);
+            ComPtr<ID3D12DescriptorHeap> descriptorHeap = new ComPtr<ID3D12DescriptorHeap>();
+            HResult hr = _device.Device->CreateDescriptorHeap(&desc, out descriptorHeap);
 
-            if (hr.FAILED)
+            if (hr.IsFailure)
             {
                 _device.RHIDevice.FlushPendingMessages();
                 throw new NotImplementedException("Add error message");
             }
 
-            _activeHeaps.Add(new HeapData(temp, temp->GetCPUDescriptorHandleForHeapStart()));
+            _activeHeaps.Add(new HeapData(descriptorHeap, descriptorHeap.GetCPUDescriptorHandleForHeapStart()));
         }
 
         internal ID3D12DescriptorHeap* GetActiveHeapOrCreateNew()
         {
             if (_activeHeapIndex < _activeHeaps.Count)
-                return _activeHeaps[_activeHeapIndex].Heap.Pointer;
+                return (ID3D12DescriptorHeap*)Unsafe.AsPointer(ref _activeHeaps[_activeHeapIndex].Heap.Get());
 
             AddNewHeapToList();
-            return _activeHeaps[_activeHeapIndex].Heap.Pointer;
+            return (ID3D12DescriptorHeap*)Unsafe.AsPointer(ref _activeHeaps[_activeHeapIndex].Heap.Get());
         }
 
-        internal ID3D12DescriptorHeap* CurrentActiveHeap => _activeHeapIndex < _activeHeaps.Count ? _activeHeaps[_activeHeapIndex].Heap.Pointer : null;
+        internal ref ID3D12DescriptorHeap CurrentActiveHeap
+        {
+            get
+            {
+                if (_activeHeapIndex < _activeHeaps.Count)
+                    return ref _activeHeaps[_activeHeapIndex].Heap.Get();
+                else
+                    return ref Unsafe.NullRef<ID3D12DescriptorHeap>();
+            }
+        }
 
-        internal readonly record struct HeapData(Ptr<ID3D12DescriptorHeap> Heap, D3D12_CPU_DESCRIPTOR_HANDLE StartHandle);
+        internal readonly record struct HeapData(ComPtr<ID3D12DescriptorHeap> Heap, CpuDescriptorHandle StartHandle);
     }
 
     internal readonly record struct SamplerDesc(RHISamplerDescription Description) : IEquatable<SamplerDesc>

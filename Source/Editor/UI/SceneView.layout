@@ -1,0 +1,21 @@
+<Widget Size="1.0 0 1.0 0">
+    <Stylesheet Path="Editor/UI/Stylesheets/Main.style" />
+
+    <LayoutFrame Class="toolbar">
+        <LayoutFrame Class="toolbar-group">
+            <Button Class="toolbar-button" InputState="Swallow">
+                <Image Picture="url(Editor/UI/Icons/Toolbar/SceneViewToolbar.atlas) OriginCenter" />
+                <Label Position="0.0 24 0.0 0" Text="Center" />
+            </Button>
+            <Button Class="toolbar-button" InputState="Swallow">
+                <Image Picture="url(Editor/UI/Icons/Toolbar/SceneViewToolbar.atlas) SpaceLocal" />
+                <Label Position="0.0 24 0.0 0" Text="Local" />
+            </Button>
+        </LayoutFrame>
+        <LayoutFrame Class="toolbar-group">
+            <Button Class="toolbar-button" InputState="Swallow">
+                <Image Picture="url(Editor/UI/Icons/Toolbar/SceneViewToolbar.atlas) SnappingOff" />
+            </Button>
+        </LayoutFrame>
+    </LayoutFrame>
+</Widget>

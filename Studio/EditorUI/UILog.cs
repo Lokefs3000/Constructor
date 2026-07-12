@@ -11,6 +11,9 @@ namespace EditorUI
 
         internal static void CreateDefault() => Logger = new LoggerConfiguration()
             .WriteTo.Console()
+#if DEBUG
+            .MinimumLevel.Debug()
+#endif
             .CreateLogger();
     }
 }

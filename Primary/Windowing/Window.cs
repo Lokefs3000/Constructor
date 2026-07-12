@@ -1,15 +1,18 @@
-﻿using Primary.Common;
+﻿using Primary.Collections.ReadOnly;
+using Primary.Common;
 using Primary.Mathematics;
 using Primary.Polling;
+using Primary.Threading;
 using SDL;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using TerraFX.Interop.Windows;
 using static SDL.SDL3;
 
 namespace Primary.Windowing
 {
-    public class Window : IDisposable, IEventHandler
+    public unsafe sealed class Window : IDisposable, IEventHandler
     {
         private string _windowTitle;
         private Int2 _clientSize;
@@ -17,16 +20,21 @@ namespace Primary.Windowing
         private bool _isFocused;
         private bool _isClosed;
         private bool _isShown;
+        private bool _isTransparent;
 
         private Display _display;
 
         private SDL_PropertiesID _props;
-        private nint _window;
+        private SDL_Window* _window;
         private SDL_WindowID _id;
 
         private HitTestDelegate? _currentHitTest;
+        private GCHandle _hitProcGCHandle;
 
-        private GCHandle _handle;
+        private Window? _parentWindow;
+        private List<Window>? _ownedWindows;
+
+        private bool _isCurrentlyModal;
 
         private bool _disposedValue;
 
@@ -37,8 +45,14 @@ namespace Primary.Windowing
             _position = Int2.Zero;
             _isFocused = false;
             _isClosed = false;
+            _isTransparent = Flags.HasFlag(flags, CreateWindowFlags.Transparent);
 
             _currentHitTest = null;
+            _hitProcGCHandle = default;
+
+            _parentWindow = null;
+            _ownedWindows = null;
+            _isCurrentlyModal = false;
 
             _props = SDL_CreateProperties();
 
@@ -54,34 +68,100 @@ namespace Primary.Windowing
                 SDL_SetBooleanProperty(_props, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, true);
             if (Flags.HasFlag(flags, CreateWindowFlags.AlwaysOnTop))
                 SDL_SetBooleanProperty(_props, SDL_PROP_WINDOW_CREATE_ALWAYS_ON_TOP_BOOLEAN, true);
+            if (Flags.HasFlag(flags, CreateWindowFlags.Transparent))
+                SDL_SetBooleanProperty(_props, SDL_PROP_WINDOW_CREATE_TRANSPARENT_BOOLEAN, true);
 
-            _window = (nint)SDL_CreateWindowWithProperties(_props);
-            _id = SDL_GetWindowID((SDL_Window*)_window);
+            _window = SDL_CreateWindowWithProperties(_props);
+            _id = SDL_GetWindowID(_window);
 
             SDL_DestroyProperties(_props);
-            _props = SDL_GetWindowProperties((SDL_Window*)_window);
+            _props = SDL_GetWindowProperties(_window);
 
             fixed (Int2* pos = &_position)
             {
-                SDL_GetWindowPosition((SDL_Window*)_window, &pos->X, &pos->Y);
+                SDL_GetWindowPosition(_window, &pos->X, &pos->Y);
             }
 
-            _display = Engine.GlobalSingleton.WindowManager.Displays[(uint)SDL_GetDisplayForWindow((SDL_Window*)_window)];
+            if (OperatingSystem.IsWindows())
+            {
+#pragma warning disable CA1416 // Validate platform compatibility
 
-            _isFocused = Flags.HasFlag(SDL_GetWindowFlags((SDL_Window*)_window), SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS);
-            _isShown = !Flags.HasFlag(SDL_GetWindowFlags((SDL_Window*)_window), SDL_WindowFlags.SDL_WINDOW_HIDDEN);
+                // Annoying workaround for SDL because doesn't support the extended window style
+                if (Flags.HasFlag(flags, CreateWindowFlags.Transparent))
+                {
+                    nint oldWindowStyle = Windows.GetWindowLongPtr((HWND)NativeWindowHandle, GWL.GWL_EXSTYLE);
+                    Windows.SetWindowLongPtr((HWND)NativeWindowHandle, GWL.GWL_EXSTYLE, oldWindowStyle | WS.WS_EX_NOREDIRECTIONBITMAP);
+
+                    // Ensure no data is cached to allow for an immediate window update
+                    SDL_SetWindowPosition(_window, _position.X, _position.Y);
+
+#pragma warning restore CA1416 // Validate platform compatibility
+                }
+            }
+
+            _display = Engine.GlobalSingleton.WindowManager.Displays[(uint)SDL_GetDisplayForWindow(_window)];
+
+            _isFocused = Flags.HasFlag(SDL_GetWindowFlags(_window), SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS);
+            _isShown = !Flags.HasFlag(SDL_GetWindowFlags(_window), SDL_WindowFlags.SDL_WINDOW_HIDDEN);
 
             Engine.GlobalSingleton.EventManager.AddHandler(this);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void ProcessEvent(SDL_Event @event) => Handle(ref @event);
+        private void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                WindowManager.Instance.DestroyWindow(this);
+                OnDestroy?.Invoke(this);
+
+                ThreadHelper.ExecuteOnMainThread(() =>
+                {
+                    if (_hitProcGCHandle.IsAllocated)
+                        _hitProcGCHandle.Free();
+
+                    if (_window != null)
+                        SDL_DestroyWindow(_window);
+
+                    _hitProcGCHandle = default;
+                    _window = null;
+                });
+
+                Engine.GlobalSingleton.EventManager.RemoveHandler(this);
+
+                if (_parentWindow != null)
+                    SetWindowParent(null);
+                if (_ownedWindows != null)
+                {
+                    foreach (Window window in _ownedWindows)
+                    {
+                        window.Dispose();
+                    }
+
+                    _ownedWindows = null;
+                }
+
+                _disposedValue = true;
+            }
+        }
+
+        ~Window()
+        {
+            Dispose(disposing: false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
 
         public void Handle(ref readonly SDL_Event @event)
         {
             if (@event.window.windowID == _id)
             {
-                //TODO: convert to switch statement instead
+                // TODO: convert to switch statement instead
+                // UPDATE: yandere-dev level coding and im still too lazy to refactor -_-
+
                 if (@event.window.type == SDL_EventType.SDL_EVENT_WINDOW_MOVED)
                 {
                     _position = new Int2(@event.window.data1, @event.window.data2);
@@ -120,38 +200,44 @@ namespace Primary.Windowing
                     _isShown = false;
                     OnVisiblityChanged?.Invoke(_isShown);
                 }
-            }
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!_disposedValue)
-            {
-                if (_handle.IsAllocated)
-                    _handle.Free();
-                unsafe
+                else if (@event.Type == SDL_EventType.SDL_EVENT_WINDOW_DESTROYED)
                 {
-                    SDL_DestroyWindow((SDL_Window*)_window);
+                    if (!_disposedValue)
+                        EngLog.Core.Error("Window destroyed event recieved without previous dispose call");
                 }
-
-                Engine.GlobalSingleton.EventManager.RemoveHandler(this);
-
-                _disposedValue = true;
             }
         }
 
-        ~Window()
+        private void SetWindowParent(Window? newParentWindow)
         {
-            Dispose(disposing: false);
+            if (_parentWindow == newParentWindow)
+                return;
+
+            if (_isCurrentlyModal)
+                SDL_SetWindowModal(_window, false);
+
+            if (_parentWindow != null)
+            {
+                _parentWindow._ownedWindows?.Remove(this);
+            }
+
+            if (newParentWindow != null)
+            {
+                (newParentWindow._ownedWindows ??= new List<Window>()).Add(this);
+
+                SDL_SetWindowParent(_window, newParentWindow._window);
+                if (_isCurrentlyModal)
+                    _isCurrentlyModal = SDL_SetWindowModal(_window, true);
+            }
+            else
+            {
+                SDL_SetWindowParent(_window, null);
+            }
+
+            _parentWindow = newParentWindow;
         }
 
-        public void Dispose()
-        {
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
-        }
-
-        public unsafe void StartTextInput() => SDL_StartTextInput((SDL_Window*)_window);
+        public unsafe void StartTextInput() => SDL_StartTextInput(_window);
 
         private unsafe void ChangeHitTest(HitTestDelegate? @delegate)
         {
@@ -160,21 +246,21 @@ namespace Primary.Windowing
 
             if (@delegate == null)
             {
-                SDL_SetWindowHitTest((SDL_Window*)_window, null, nint.Zero);
+                SDL_SetWindowHitTest(_window, null, nint.Zero);
                 _currentHitTest = null;
 
-                if (_handle.IsAllocated)
-                    _handle.Free();
+                if (_hitProcGCHandle.IsAllocated)
+                    _hitProcGCHandle.Free();
 
                 return;
             }
 
             if (_currentHitTest == null)
             {
-                if (!_handle.IsAllocated)
-                    _handle = GCHandle.Alloc(this, GCHandleType.Weak);
+                if (!_hitProcGCHandle.IsAllocated)
+                    _hitProcGCHandle = GCHandle.Alloc(this, GCHandleType.Weak);
 
-                if (!SDL_SetWindowHitTest((SDL_Window*)_window, &HitTestWrapper, GCHandle.ToIntPtr(_handle)))
+                if (!SDL_SetWindowHitTest(_window, &HitTestWrapper, GCHandle.ToIntPtr(_hitProcGCHandle)))
                     return;
             }
 
@@ -192,14 +278,14 @@ namespace Primary.Windowing
                 return (SDL_HitTestResult)window._currentHitTest(window, new Int2(area->x, area->y));
             }
 
-            SDL_SetWindowHitTest((SDL_Window*)window._window, null, nint.Zero);
-            if (window._handle.IsAllocated)
-                window._handle.Free();
+            SDL_SetWindowHitTest(window._window, null, nint.Zero);
+            if (window._hitProcGCHandle.IsAllocated)
+                window._hitProcGCHandle.Free();
 
             return SDL_HitTestResult.SDL_HITTEST_NORMAL;
         }
 
-        public unsafe bool TakeFocus() => SDL_RaiseWindow((SDL_Window*)_window);
+        public unsafe bool TakeFocus() => SDL_RaiseWindow(_window);
 
         public void Show() => IsShown = true;
         public void Hide() => IsShown = false;
@@ -211,17 +297,17 @@ namespace Primary.Windowing
 
         public uint WindowId => (uint)_id;
 
-        public unsafe string WindowTitle { get => _windowTitle; set { if (SDL_SetWindowTitle((SDL_Window*)_window, value)) _windowTitle = value; } }
+        public unsafe string WindowTitle { get => _windowTitle; set { if (SDL_SetWindowTitle(_window, value)) _windowTitle = value; } }
         public unsafe Int2 ClientSize
         {
             get => _clientSize;
             set
             {
-                if (SDL_SetWindowSize((SDL_Window*)_window, value.X, value.Y))
+                if (SDL_SetWindowSize(_window, value.X, value.Y))
                 {
-                    SDL_SyncWindow((SDL_Window*)_window);
+                    SDL_SyncWindow(_window);
                     fixed (Int2* ptr = &_clientSize)
-                        SDL_GetWindowSizeInPixels((SDL_Window*)_window, &ptr->X, &ptr->Y);
+                        SDL_GetWindowSizeInPixels(_window, &ptr->X, &ptr->Y);
                     //WindowResized?.Invoke(_clientSize);
                 }
                 else
@@ -233,17 +319,19 @@ namespace Primary.Windowing
             get => _position;
             set
             {
-                if (SDL_SetWindowPosition((SDL_Window*)_window, value.X, value.Y))
+                if (SDL_SetWindowPosition(_window, value.X, value.Y))
                 {
-                    SDL_SyncWindow((SDL_Window*)_window);
+                    SDL_SyncWindow(_window);
                     fixed (Int2* ptr = &_clientSize)
-                        SDL_GetWindowPosition((SDL_Window*)_window, &ptr->X, &ptr->Y);
+                        SDL_GetWindowPosition(_window, &ptr->X, &ptr->Y);
                     //WindowMoved?.Invoke(_clientSize);
                 }
                 else
                     EngLog.Render.Error("Failed to set window position\n    {reason}", SDL_GetError());
             }
         }
+
+        public Rect ClientRect => new Rect(_position, _clientSize);
 
         public bool IsFocused => _isFocused;
         public bool IsClosed { get => _isClosed; set => _isClosed = value; }
@@ -256,12 +344,14 @@ namespace Primary.Windowing
                 {
                     _isShown = value;
                     if (value)
-                        SDL_ShowWindow((SDL_Window*)_window);
+                        SDL_ShowWindow(_window);
                     else
-                        SDL_HideWindow((SDL_Window*)_window);
+                        SDL_HideWindow(_window);
                 }
             }
         }
+
+        public bool IsTransparent => _isTransparent;
 
         public bool IsPrimary => WindowManager.Instance.PrimaryWindow == this;
 
@@ -273,10 +363,29 @@ namespace Primary.Windowing
             set => ChangeHitTest(value);
         }
 
+        public Window? Parent { get => _parentWindow; set => SetWindowParent(value); }
+        public ROList<Window> Children => _ownedWindows ?? ROList<Window>.Empty;
+
+        public bool IsModal
+        {
+            get => _isCurrentlyModal;
+            set
+            {
+                if (_parentWindow != null)
+                    _isCurrentlyModal = SDL_SetWindowModal(_window, value) && _isCurrentlyModal;
+                else
+                    _isCurrentlyModal = value;
+            }
+        }
+
+        public bool IsDestroyed => _disposedValue;
+
         public nint NativeWindowHandle => SDL_GetPointerProperty(_props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nint.Zero);
-        public nint InternalWindowInterop => _window;
+        public nint InternalWindowInterop => (nint)_window;
 
         public event Action<Window>? WindowClosed;
+        public event Action<Window>? OnDestroy;
+
         public event Action<Int2>? WindowResized;
         public event Action<Int2>? WindowMoved;
 
@@ -297,7 +406,8 @@ namespace Primary.Windowing
         Borderless = 1 << 0,
         Resizable = 1 << 1,
         Hidden = 1 << 2,
-        AlwaysOnTop = 1 << 3
+        AlwaysOnTop = 1 << 3,
+        Transparent = 1 << 4
     }
 
     public enum HitTestResult : byte

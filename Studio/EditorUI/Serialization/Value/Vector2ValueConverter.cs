@@ -18,10 +18,10 @@ namespace EditorUI.Serialization.Value
             var tokenizer = source.Tokenize(' ');
 
             tokenizer.MoveNext();
-            value.X = float.Parse(tokenizer.Current);
+            value.X = float.Parse(tokenizer.Current, CultureInfo.InvariantCulture);
 
             tokenizer.MoveNext();
-            value.Y = float.Parse(tokenizer.Current);
+            value.Y = float.Parse(tokenizer.Current, CultureInfo.InvariantCulture);
 
             return value;
         }

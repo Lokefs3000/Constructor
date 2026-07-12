@@ -1,11 +1,14 @@
 ﻿using CommunityToolkit.HighPerformance;
+using Primary.Collections.ReadOnly.Display;
 using System.Collections;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Xml.Linq;
-using TerraFX.Interop.Windows;
 
 namespace Primary.Collections.ReadOnly
 {
+    [DebuggerTypeProxy(typeof(ROListDisplay<>))]
+    [DebuggerDisplay("Count = {Count}")]
     public readonly record struct ROList<T> : IEquatable<ROList<T>>, IList<T>, IReadOnlyList<T>, IImmutableList<T>
     {
         private readonly List<T> _list;

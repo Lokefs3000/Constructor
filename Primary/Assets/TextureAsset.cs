@@ -13,12 +13,12 @@ namespace Primary.Assets
         {
         }
 
-        public RHITexture? RawRHITexture => AssetData.Texture;
-        public RHISampler? RawRHISampler => AssetData.Sampler;
+        public RHITexture? RawRHITexture => IsLoaded ? AssetData.Texture : null;
+        public RHISampler? RawRHISampler => IsLoaded ? AssetData.Sampler : null;
 
-        public int Width => AssetData.Width;
-        public int Height => AssetData.Height;
-        public RHIFormat Format => AssetData.Format;
+        public int Width => IsLoaded ? AssetData.Width : 0;
+        public int Height => IsLoaded ? AssetData.Height : 0;
+        public RHIFormat Format => IsLoaded ? AssetData.Format : RHIFormat.Unknown;
     }
 
     public class TextureAssetData : IInternalAssetData

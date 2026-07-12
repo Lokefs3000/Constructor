@@ -32,7 +32,7 @@ namespace Primary.Assets.Loaders
             return new MaterialAsset(materialData);
         }
 
-        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
+        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, string localPath, BundleReader? bundleToReadFrom)
         {
             if (asset is not MaterialAsset material)
                 throw new ArgumentException(nameof(asset));
@@ -278,7 +278,7 @@ namespace Primary.Assets.Loaders
                 {
                     materialData.UpdateAssetFailed(material);
 
-                    EngLog.Assets.Error("[a:{path}]: " + message, [sourcePath, .. args]);
+                    EngLog.Assets.Error("[a:{path}]: " + message, [localPath, .. args]);
                     throw new Exception("Unexpected error");
                 }
             }

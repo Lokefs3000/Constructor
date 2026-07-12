@@ -1,0 +1,10 @@
+[
+	{
+		"Path": "D:/source/repos/Constructor/Source/Editor",
+		"NamespaceKey": "Editor"
+	},
+	{
+		"Path": "D:/source/repos/Constructor/Source/Engine",
+		"NamespaceKey": "Engine"
+	}
+]

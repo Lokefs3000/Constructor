@@ -4,7 +4,7 @@
 DefaultPsInput VertexMain(VsInput input)
 {
     DefaultPsInput output = {
-        float4(mul(transpose(cbGlobalData.Model), float3(input.Position, 1.0)), input.Depth * 0.0001, 1.0),
+        mul(cbGlobalData.Model, float4(input.Position, 0.0, 1.0)),
         input.UV,
         input.UV2,
         input.Tint,
@@ -17,18 +17,17 @@ DefaultPsInput VertexMain(VsInput input)
     return output;
 }
 
-struct RectangleShaderData
+struct ImageShaderData
 {
     SharedData Shared;
-    uint16_t2 BoxSize;
-    float16_t4 CornerRadii;
 }
 
 [property]
 Sampler2D(float4, txImage);
 
 [pixel]
-float4 PixelMain(DefaultPsInput input) : SV_Target
+PsOutput PixelMain(DefaultPsInput input) : SV_Target
 {
-    return input.Color * txImage.Sample(GetSampler(txImage), input.UV);
+    PsOutput output = { input.Color * txImage.SampleLevel(GetSampler(txImage), input.UV, -1.0f)/*, input.Position.z*/ };
+    return output;
 }

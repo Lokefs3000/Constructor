@@ -6,7 +6,7 @@ using EditorUI.Reflection.Dynamic;
 
 namespace EditorUI.Reflection
 {
-    public record class PropertyData(string Name, PropertyDataFlags Flags, StateFlags StateFlags, Type PropertyType, ushort TriggerMask, StyleProperty Property, FieldInfo? Field, PropertyMethods Methods);
+    public record class PropertyData(string Name, string StyleFriendlyName, PropertyDataFlags Flags, StateFlags StateFlags, Type[] PropertyTypes, ushort? TriggerMask, StyleProperty Property, FieldInfo? Field, PropertyMethods Methods, string[]? Callbacks);
 
     [Flags]
     public enum PropertyDataFlags : byte

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -36,6 +37,16 @@ namespace Primary.Assets.Default
             _pathToIdSpan = _pathToId.GetAlternateLookup<ReadOnlySpan<char>>();
         }
 
+        public bool DoesPathHaveLookup(ReadOnlySpan<char> path)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool IsIdValid(AssetId assetId)
+        {
+            throw new NotImplementedException();
+        }
+
         public string? RetrievePathForId(AssetId assetId)
         {
             _idToPath.TryGetValue(assetId, out string? path);
@@ -46,6 +57,26 @@ namespace Primary.Assets.Default
         {
             _pathToIdSpan.TryGetValue(path, out AssetId id);
             return id;
+        }
+
+        public bool TryGetAnyPathForId(AssetId assetId, [NotNullWhen(true)] out string? value)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TryGetLocalAndAssetPathsForId(AssetId assetId, [NotNullWhen(true)] out string? localPath, [MaybeNullWhen(true)] out string? assetPath)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TryGetPathForId(AssetId assetId, bool getLocalPath, [NotNullWhen(true)] out string? value)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TryLookupIdForPath(ReadOnlySpan<char> path, [NotNullWhen(true)] out AssetId value)
+        {
+            throw new NotImplementedException();
         }
     }
 }

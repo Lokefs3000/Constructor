@@ -2,14 +2,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using System.Text;
-using TerraFX.Interop.Windows;
-using static Primary.Scenes.Components.ComponentRegistryEntry;
+using Primary.Collections.ReadOnly.Display;
 
 namespace Primary.Collections.ReadOnly
 {
+    [DebuggerTypeProxy(typeof(RODictionaryDisplay<,>))]
+    [DebuggerDisplay("Count = {Count}")]
     public readonly record struct RODictionary<TKey, TValue> : IEquatable<RODictionary<TKey, TValue>>, IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>, IImmutableDictionary<TKey, TValue> where TKey : notnull
     {
         private readonly Dictionary<TKey, TValue> _dictionary;

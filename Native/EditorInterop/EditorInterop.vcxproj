@@ -411,13 +411,13 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.313.2\Include;$(ProjectDir)freetype;$(ProjectDir);$(ProjectDir)msdfgen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)freetype;$(ProjectDir);$(ProjectDir)msdfgen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.313.2\Lib;$(ProjectDir)nativelib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.350.0\Lib;$(ProjectDir)nativelib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>SPIRVd.lib;SPIRV-Tools-optd.lib;SPIRV-Toolsd.lib;%(AdditionalDependencies);freetype.lib</AdditionalDependencies>
       <DelayLoadDLLs>SPIRVd.dll;SPIRV-Tools-sharedd.dll</DelayLoadDLLs>
     </Link>
@@ -441,13 +441,13 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.313.2\Include;$(ProjectDir)freetype;$(ProjectDir);$(ProjectDir)msdfgen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)freetype;$(ProjectDir);$(ProjectDir)msdfgen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.313.2\Lib;$(ProjectDir)nativelib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.350.0\Lib;$(ProjectDir)nativelib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>SPIRV.lib;SPIRV-Tools-opt.lib;SPIRV-Tools.lib;%(AdditionalDependencies);freetype.lib</AdditionalDependencies>
       <DelayLoadDLLs>SPIRV.dll;SPIRV-Tools-shared.dll</DelayLoadDLLs>
     </Link>
@@ -471,13 +471,13 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.313.2\Include;$(ProjectDir)freetype;$(ProjectDir);$(ProjectDir)msdfgen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)freetype;$(ProjectDir);$(ProjectDir)msdfgen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.313.2\Lib;$(ProjectDir)nativelib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.350.0\Lib;$(ProjectDir)nativelib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>SPIRV.lib;SPIRV-Tools-opt.lib;SPIRV-Tools.lib;%(AdditionalDependencies);freetype.lib</AdditionalDependencies>
       <DelayLoadDLLs>SPIRV.dll;SPIRV-Tools-shared.dll</DelayLoadDLLs>
     </Link>

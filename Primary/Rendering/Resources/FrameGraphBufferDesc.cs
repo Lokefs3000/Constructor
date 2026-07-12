@@ -16,6 +16,7 @@
         }
     }
 
+    [Flags]
     public enum FGBufferUsage : ushort
     {
         Undefined = 0,

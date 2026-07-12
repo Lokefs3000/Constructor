@@ -1,9 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using CommunityToolkit.HighPerformance;
 using EditorUI.Dock;
+using EditorUI.Input;
 using EditorUI.Serialization;
+using EditorUI.Statistics;
 using EditorUI.Styling;
+using EditorUI.Visual;
 using EditorUI.Widgets;
 using Primary.Mathematics;
 
@@ -20,6 +24,8 @@ namespace EditorUI.Windowing
         private readonly StylesheetProvider _stylesheetProvider;
         private readonly WindowRoot _rootWidget;
 
+        private LayoutStatistics _layoutStatistics;
+
         public WidgetWindow(WindowManager windowManager, ValueSerializer valueSerializer)
         {
             _windowManager = windowManager;
@@ -30,6 +36,8 @@ namespace EditorUI.Windowing
      
             _stylesheetProvider = new StylesheetProvider(valueSerializer);
             _rootWidget = new WindowRoot();
+
+            _layoutStatistics = default;
 
             _rootWidget.SetWidgetWindow(this);
         }
@@ -90,12 +98,23 @@ namespace EditorUI.Windowing
             TryAddStateFlags(StateFlags.SelfInvalidLayout);
         }
 
+        protected internal override void PaintOverlay(ref readonly PainterContext painter)
+        {
+        }
+
+        protected internal override void HandleEvent(IInteractable interactable, ref readonly UIInputEvent inputEvent)
+        {
+            OnEventDispatched?.Invoke(interactable, new ReadOnlyRef<UIInputEvent>(in inputEvent));
+        }
+
         protected internal override void DestroySelf()
         {
             _parentDock?.TryRemoveWindow(this);
             _parentDock = null;
 
             _rootWidget.Destroy();
+
+            _stylesheetProvider.Dispose();
         }
 
         protected internal override void TryAddStateFlags(StateFlags flags) => _rootWidget.AddStateFlags(flags);
@@ -109,5 +128,9 @@ namespace EditorUI.Windowing
 
         public override StylesheetProvider StylesheetProvider => _stylesheetProvider;
         public override Widget RootWidget => _rootWidget;
+
+        public override event Action<IInteractable, ReadOnlyRef<UIInputEvent>>? OnEventDispatched;
+
+        public LayoutStatistics LayoutStatistics { get => _layoutStatistics; protected internal set => _layoutStatistics = value; }
     }
 }

@@ -4,11 +4,10 @@ using Primary.Rendering.State;
 using Primary.Rendering.Structures;
 using Primary.RHI;
 using Primary.RHI.Direct3D12;
+using Silk.NET.Core.Native;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
 
 namespace Primary.Rendering.D3D12
 {
@@ -156,19 +155,5 @@ namespace Primary.Rendering.D3D12
             CmdResourceType.Sampler => new NRDResource((D3D12RHISamplerNative*)resource.Resource),
             _ => NRDResource.Null
         };
-
-        internal static HRESULT SetResourceNameStack(ID3D12Resource* resource, string name)
-        {
-            Debug.Assert(name.Length + 1 < 1024);
-            Span<char> stack = stackalloc char[name.Length + 1];
-
-            name.CopyTo(stack);
-            stack[^1] = '\0';
-
-            fixed (char* ptr = stack)
-            {
-                return resource->SetName(ptr);
-            }
-        }
     }
 }

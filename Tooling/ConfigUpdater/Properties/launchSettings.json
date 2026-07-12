@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ConfigUpdater": {
+      "commandName": "Project",
+      "commandLineArgs": "D:\\source\\repos\\Constructor\\Source\\Engine"
+    }
+  }
+}

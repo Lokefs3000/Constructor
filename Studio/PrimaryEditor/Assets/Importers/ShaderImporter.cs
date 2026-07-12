@@ -12,27 +12,25 @@ using Primary.Collections;
 using Primary.Serialization.Toml;
 using PrimaryEditor.Assets.Exceptions;
 using PrimaryEditor.Assets.Filesystem;
+using PrimaryEditor.Assets.Utility;
 using PrimaryEditor.Processors.Shader;
 using PrimaryEditor.Project;
 using Tomlyn;
-using static Silk.NET.Core.Native.WinString;
 using ShaderProcessor = PrimaryEditor.Processors.Shader.ShaderProcessor;
 
 namespace PrimaryEditor.Assets.Importers
 {
     public sealed class ShaderImporter : IAssetImporter
     {
-        public void ImportFile(AssetPipeline pipeline, AssetId id, Stream inputStream, Stream outputStream, string localPath, string localOutputPath)
+        public void ImportFile(AssetPipeline pipeline, AssetId id, Stream inputStream, Stream outputStream, string localPath, string localOutputPath, bool isTrialImport)
         {
             pipeline.FilesystemManager.SetFileRemap(localPath, null);
 
-            string? configFile = null;
-            bool isLocal = false;
-
-            configFile = pipeline.Configuration.GetFilePathOrLocal(localPath, "Shader", out isLocal);
+            string? configFile = pipeline.Configuration.GetLocalConfigPath(localPath);
             if (configFile == null)
             {
-                throw new AssetImportException();
+                pipeline.ReportImportAsIgnored(id, this);
+                throw new AssetIgnoredException();
             }
 
             string? sourceText = FilesystemManager.ReadAllText(configFile);
@@ -49,6 +47,9 @@ namespace PrimaryEditor.Assets.Importers
             }
             catch (TomlException ex)
             {
+                if (isTrialImport)
+                    throw new AssetIgnoredException();
+
                 EdLog.Assets.Error(ex, "[{file}]: Error occured parsing shader configuration", localPath);
                 throw new AssetImportException();
             }
@@ -73,24 +74,18 @@ namespace PrimaryEditor.Assets.Importers
                 throw new AssetLoadException();
             }
 
-            AssetId configFileId = isLocal ? AssetId.Invalid : pipeline.AssetRegistry.GetOrRegisterIdFor(configFile);
             if (result.IncludedFiles.Length == 0)
             {
-                if (!configFileId.IsInvalid)
-                    pipeline.Associator.MakeAssociation(id, configFileId, true);
+                pipeline.Associator.ClearAssociations(id);
             }
             else
             {
                 using RentedList<AssetId> includedFileIds = new RentedList<AssetId>();
-
-                if (!configFileId.IsInvalid)
-                    includedFileIds.Add(configFileId);
-
                 foreach (string includedFile in result.IncludedFiles)
                 {
                     if (FilesystemManager.TryGetLocalPath(includedFile, out string? includeLocalPath))
                     {
-                        includedFileIds.Add(pipeline.AssetRegistry.GetOrRegisterIdFor(includeLocalPath));
+                        includedFileIds.Add(pipeline.GetOrRegisterIdForPath(includeLocalPath));
                     }
                 }
 
@@ -108,7 +103,7 @@ namespace PrimaryEditor.Assets.Importers
 
         public bool ValidateFile(AssetPipeline pipeline, AssetId id, string localPath)
         {
-            string? configFile = pipeline.Configuration.GetFilePathOrLocal(localPath, "Shader", out bool _);
+            string? configFile = pipeline.Configuration.GetConfigPath(localPath);
             if (configFile == null)
                 return false;
 
@@ -131,10 +126,12 @@ namespace PrimaryEditor.Assets.Importers
             return true;
         }
 
+        public string UniqueId => "shader";
+
         private static readonly TomlSerializerOptions s_tomlOptions = new TomlSerializerOptions
         {
             Converters = [
-                new AssetIdTomlConverter()
+                new EarlyAssetIdTomlConverter()
                 ],
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         };

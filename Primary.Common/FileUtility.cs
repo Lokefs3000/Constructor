@@ -117,6 +117,24 @@
             }
         }
 
+        public static bool TryWriteAllText(string fullPath, ReadOnlySpan<char> contents, int maxTries = 10, int timeoutMs = 250)
+        {
+            for (int i = 0; i < maxTries; i++)
+            {
+                try
+                {
+                    File.WriteAllText(fullPath, contents);
+                    return true;
+                }
+                catch (Exception)
+                {
+                    Thread.Sleep(timeoutMs);
+                }
+            }
+
+            return false;
+        }
+
         public static string FormatSize(long size, string? format = "G", IFormatProvider? provider = null)
         {
             if (size < 1025)

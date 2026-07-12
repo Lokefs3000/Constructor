@@ -145,8 +145,8 @@ namespace Primary.GUI.ImGui
             int baseCount = _vertices.Count;
 
             _vertices.Add(new ImGuiVertex { Position = min, UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = new Vector2(max.X, min.Y), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = new Vector2(min.X, max.Y), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(max.X, min.Y), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(min.X, max.Y), UV = _whiteUVs, Color = color });
             _vertices.Add(new ImGuiVertex { Position = max, UV = _whiteUVs, Color = color });
 
             _indices.Add((ushort)(baseCount + 2));
@@ -177,15 +177,15 @@ namespace Primary.GUI.ImGui
             outerTlbr += add;
             innerTlbr -= add;
 
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, Vector2>(ref outerTlbr), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = new Vector2(outerTlbr[2], outerTlbr[1]), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = new Vector2(outerTlbr[0], outerTlbr[3]), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, Vector2>(ref outerTlbr), 1), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, ImGuiVector2>(ref outerTlbr), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(outerTlbr[2], outerTlbr[1]), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(outerTlbr[0], outerTlbr[3]), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, ImGuiVector2>(ref outerTlbr), 1), UV = _whiteUVs, Color = color });
 
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, Vector2>(ref innerTlbr), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = new Vector2(innerTlbr[2], innerTlbr[1]), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = new Vector2(innerTlbr[0], innerTlbr[3]), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, Vector2>(ref innerTlbr), 1), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, ImGuiVector2>(ref innerTlbr), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(innerTlbr[2], innerTlbr[1]), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(innerTlbr[0], innerTlbr[3]), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, ImGuiVector2>(ref innerTlbr), 1), UV = _whiteUVs, Color = color });
 
             /*
                 0 ------ 1
@@ -256,15 +256,15 @@ namespace Primary.GUI.ImGui
             add = Vector64.Create(thickness, thickness);
             trVec += Vector128.Create(add, -add);
 
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, Vector2>(ref tlVec), 1), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, Vector2>(ref trVec), 1), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, Vector2>(ref blVec), 1), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, Vector2>(ref brVec), 1), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, ImGuiVector2>(ref tlVec), 1), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, ImGuiVector2>(ref trVec), 1), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, ImGuiVector2>(ref blVec), 1), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.Add(ref Unsafe.As<Vector128<float>, ImGuiVector2>(ref brVec), 1), UV = _whiteUVs, Color = color });
 
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, Vector2>(ref tlVec), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, Vector2>(ref trVec), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, Vector2>(ref blVec), UV = _whiteUVs, Color = color });
-            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, Vector2>(ref brVec), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, ImGuiVector2>(ref tlVec), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, ImGuiVector2>(ref trVec), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, ImGuiVector2>(ref blVec), UV = _whiteUVs, Color = color });
+            _vertices.Add(new ImGuiVertex { Position = Unsafe.As<Vector128<float>, ImGuiVector2>(ref brVec), UV = _whiteUVs, Color = color });
 
             /*
                 0 ------ 1
@@ -434,8 +434,8 @@ namespace Primary.GUI.ImGui
                     int baseCount = _vertices.Count;
 
                     _vertices.Add(new ImGuiVertex { Position = min, UV = _whiteUVs, Color = color });
-                    _vertices.Add(new ImGuiVertex { Position = new Vector2(max.X, min.Y), UV = _whiteUVs, Color = color });
-                    _vertices.Add(new ImGuiVertex { Position = new Vector2(min.X, max.Y), UV = _whiteUVs, Color = color });
+                    _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(max.X, min.Y), UV = _whiteUVs, Color = color });
+                    _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(min.X, max.Y), UV = _whiteUVs, Color = color });
                     _vertices.Add(new ImGuiVertex { Position = max, UV = _whiteUVs, Color = color });
 
                     _indices.Add((ushort)(baseCount + 2));
@@ -569,10 +569,10 @@ namespace Primary.GUI.ImGui
 
                 int baseCount = _vertices.Count;
 
-                _vertices.Add(new ImGuiVertex { Position = new Vector2(planeBounds.X, planeBounds.Y), UV = new Vector2(atlasUVs.X, atlasUVs.Y), Color = color });
-                _vertices.Add(new ImGuiVertex { Position = new Vector2(planeBounds.Z, planeBounds.Y), UV = new Vector2(atlasUVs.Z, atlasUVs.Y), Color = color });
-                _vertices.Add(new ImGuiVertex { Position = new Vector2(planeBounds.X, planeBounds.W), UV = new Vector2(atlasUVs.X, atlasUVs.W), Color = color });
-                _vertices.Add(new ImGuiVertex { Position = new Vector2(planeBounds.Z, planeBounds.W), UV = new Vector2(atlasUVs.Z, atlasUVs.W), Color = color });
+                _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(planeBounds.X, planeBounds.Y), UV = new ImGuiVector2(atlasUVs.X, atlasUVs.Y), Color = color });
+                _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(planeBounds.Z, planeBounds.Y), UV = new ImGuiVector2(atlasUVs.Z, atlasUVs.Y), Color = color });
+                _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(planeBounds.X, planeBounds.W), UV = new ImGuiVector2(atlasUVs.X, atlasUVs.W), Color = color });
+                _vertices.Add(new ImGuiVertex { Position = new ImGuiVector2(planeBounds.Z, planeBounds.W), UV = new ImGuiVector2(atlasUVs.Z, atlasUVs.W), Color = color });
 
                 _indices.Add((ushort)(baseCount + 2));
                 _indices.Add((ushort)baseCount);

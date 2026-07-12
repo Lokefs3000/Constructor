@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using CommunityToolkit.HighPerformance;
 using EditorUI.Dock;
+using EditorUI.Input;
 using EditorUI.Styling;
+using EditorUI.Visual;
 using EditorUI.Widgets;
 using Primary.Mathematics;
 
@@ -26,6 +29,8 @@ namespace EditorUI.Windowing
         internal protected abstract void OnFocusLost();
 
         internal protected abstract void RecalculateLayout(Rect windowRect);
+        internal protected abstract void PaintOverlay(ref readonly PainterContext painter);
+        internal protected abstract void HandleEvent(IInteractable interactable, ref readonly UIInputEvent inputEvent);
 
         internal protected abstract void DestroySelf();
 
@@ -40,5 +45,7 @@ namespace EditorUI.Windowing
 
         public abstract StylesheetProvider StylesheetProvider { get; }
         public abstract Widget RootWidget { get; }
+
+        public abstract event Action<IInteractable, ReadOnlyRef<UIInputEvent>>? OnEventDispatched;
     }
 }

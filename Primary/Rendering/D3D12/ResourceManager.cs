@@ -1,26 +1,17 @@
-﻿using Primary.Common;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Runtime.Versioning;
+using CommunityToolkit.HighPerformance;
+using Primary.Common;
 using Primary.Profiling;
 using Primary.Rendering.Pass;
 using Primary.Rendering.Resources;
 using Primary.RHI;
 using Primary.RHI.Direct3D12;
-using System.Diagnostics;
-using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
-using static TerraFX.Interop.DirectX.D3D12_CLEAR_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_HEAP_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_HEAP_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_DIMENSION;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_TEXTURE_LAYOUT;
-using static TerraFX.Interop.DirectX.DXGI_FORMAT;
-using static TerraFX.Interop.DirectX.D3D12;
+using Silk.NET.Core.Native;
+using Silk.NET.Direct3D12;
+using Silk.NET.DXGI;
 using D3D12MemAlloc = Interop.D3D12MemAlloc;
-using CommunityToolkit.HighPerformance;
 
 namespace Primary.Rendering.D3D12
 {
@@ -33,7 +24,7 @@ namespace Primary.Rendering.D3D12
         private D3D12MemAlloc.Allocation* _resourcesMemory;
         private int _resourceMemorySize;
 
-        private Dictionary<NRDResource, Ptr<ID3D12Resource2>> _allocatedResources;
+        private Dictionary<NRDResource, ComPtr<ID3D12Resource2>> _allocatedResources;
         private HashSet<NRDResource> _initializedResources;
 
         private HashSet<NRDResource> _pendingInitializes;
@@ -51,7 +42,7 @@ namespace Primary.Rendering.D3D12
             _resourcesMemory = null;
             _resourceMemorySize = 0;
 
-            _allocatedResources = new Dictionary<NRDResource, Ptr<ID3D12Resource2>>();
+            _allocatedResources = new Dictionary<NRDResource, ComPtr<ID3D12Resource2>>();
             _initializedResources = new HashSet<NRDResource>();
 
             _pendingInitializes = new HashSet<NRDResource>();
@@ -102,7 +93,7 @@ namespace Primary.Rendering.D3D12
 
                 Debug.Assert(_allocatedResources.Count == 0);
 
-                const int SafetyNetSize = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+                const int SafetyNetSize = Silk.NET.Direct3D12.D3D12.DefaultResourcePlacementAlignment;
 
                 int memoryUsageRequired = resources.HighestMemoryUsage + SafetyNetSize;
                 memoryUsageRequired = (memoryUsageRequired + (-memoryUsageRequired & 255));
@@ -122,11 +113,11 @@ namespace Primary.Rendering.D3D12
                         D3D12MemAlloc.POOL_DESC poolDesc = new D3D12MemAlloc.POOL_DESC
                         {
                             Flags = D3D12MemAlloc.POOL_FLAGS.POOL_FLAG_ALGORITHM_LINEAR,
-                            HeapProperties = new D3D12_HEAP_PROPERTIES
+                            HeapProperties = new HeapProperties
                             {
-                                Type = D3D12_HEAP_TYPE_DEFAULT
+                                Type = HeapType.Default
                             },
-                            HeapFlags = D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES,
+                            HeapFlags = HeapFlags.AllowAllBuffersAndTextures,
                         };
 
                         D3D12MemAlloc.Pool* tempAllocPtr = null;
@@ -145,15 +136,15 @@ namespace Primary.Rendering.D3D12
                         D3D12MemAlloc.ALLOCATION_DESC allocDesc = new D3D12MemAlloc.ALLOCATION_DESC
                         {
                             Flags = D3D12MemAlloc.ALLOCATION_FLAGS.ALLOCATION_FLAG_CAN_ALIAS,
-                            HeapType = D3D12_HEAP_TYPE_DEFAULT,
-                            ExtraHeapFlags = D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES,
+                            HeapType = HeapType.Default,
+                            ExtraHeapFlags = HeapFlags.AllowAllBuffersAndTextures,
                             CustomPool = _resourcesPool
                         };
 
-                        D3D12_RESOURCE_ALLOCATION_INFO resAllocDesc = new D3D12_RESOURCE_ALLOCATION_INFO
+                        ResourceAllocationInfo resAllocDesc = new ResourceAllocationInfo
                         {
                             SizeInBytes = (ulong)memoryUsageRequired,
-                            Alignment = 256
+                            Alignment = 0 // this was once upon a time '256'
                         };
 
                         D3D12MemAlloc.Allocation* tempAllocPtr = null;
@@ -175,13 +166,14 @@ namespace Primary.Rendering.D3D12
                 ulong heapOffset = D3D12MemAlloc.Allocation.GetOffset(_resourcesMemory);
                 Debug.Assert(heapOffset == 0);
 
-                Guid* resourceGuid = UuidOf.Get<ID3D12Resource2>();
+                ResourceFlags startingFlags = Unsafe.As<D3D12RHIDevice>(_device.RHIDevice).Setup.UseTightAlignment ? ResourceFlags.UseTightAlignment : ResourceFlags.None;
+
                 foreach (ref readonly FGResourceLocation location in resources.Locations)
                 {
-                    D3D12_RESOURCE_DESC1 resDesc = default;
-                    D3D12_CLEAR_VALUE clearValue = default;
+                    ResourceDesc1 resDesc = default;
+                    ClearValue clearValue = default;
 
-                    D3D12_BARRIER_LAYOUT initialLayout = D3D12_BARRIER_LAYOUT_UNDEFINED;
+                    BarrierLayout initialLayout = BarrierLayout.Undefined;
 
                     bool isClearValueCompatible = false;
 
@@ -193,14 +185,14 @@ namespace Primary.Rendering.D3D12
 
                                 Debug.Assert(texDesc.Width > 0 && texDesc.Height > 0 && texDesc.Depth > 0);
 
-                                resDesc = new D3D12_RESOURCE_DESC1
+                                resDesc = new ResourceDesc1
                                 {
                                     Dimension = texDesc.Dimension switch
                                     {
-                                        FGTextureDimension._1D => D3D12_RESOURCE_DIMENSION_TEXTURE1D,
-                                        FGTextureDimension._2D => D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-                                        FGTextureDimension._3D => D3D12_RESOURCE_DIMENSION_TEXTURE3D,
-                                        FGTextureDimension.Cube => D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                                        FGTextureDimension._1D => ResourceDimension.Texture1D,
+                                        FGTextureDimension._2D => ResourceDimension.Texture2D,
+                                        FGTextureDimension._3D => ResourceDimension.Texture3D,
+                                        FGTextureDimension.Cube => ResourceDimension.Texture2D,
                                     },
                                     Alignment = 0,
                                     Width = (ulong)texDesc.Width,
@@ -208,33 +200,35 @@ namespace Primary.Rendering.D3D12
                                     DepthOrArraySize = (ushort)texDesc.Depth,
                                     MipLevels = 1,
                                     Format = texDesc.Format.ToTextureFormat(),
-                                    SampleDesc = new DXGI_SAMPLE_DESC { Count = 1, Quality = 0 },
-                                    Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN,
-                                    Flags = D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT,
+                                    SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
+                                    Layout = TextureLayout.LayoutUnknown,
+                                    Flags = startingFlags,
                                     SamplerFeedbackMipRegion = default
                                 };
 
                                 if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.RenderTarget))
                                 {
-                                    resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+                                    resDesc.Flags |= ResourceFlags.AllowRenderTarget;
 
-                                    Color color = new Color(0.0f);
-                                    clearValue = new D3D12_CLEAR_VALUE(resDesc.Format, (float*)&color);
+                                    clearValue = new ClearValue(resDesc.Format);
+                                    *((Color*)clearValue.Anonymous.Color) = Color.Black;
 
                                     isClearValueCompatible = true;
                                 }
 
                                 if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.DepthStencil))
                                 {
-                                    resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+                                    resDesc.Flags |= ResourceFlags.AllowDepthStencil;
 
-                                    clearValue = new D3D12_CLEAR_VALUE(resDesc.Format, 1.0f, 0xff);
+                                    clearValue = new ClearValue(resDesc.Format);
+                                    clearValue.DepthStencil = new DepthStencilValue(1.0f, 0xff);
+
                                     isClearValueCompatible = true;
                                 }
 
                                 if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.UnorderedAccess))
                                 {
-                                    resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+                                    resDesc.Flags |= ResourceFlags.AllowUnorderedAccess;
                                 }
 
                                 break;
@@ -245,34 +239,34 @@ namespace Primary.Rendering.D3D12
 
                                 Debug.Assert(bufDesc.Width > 0);
 
-                                resDesc = new D3D12_RESOURCE_DESC1
+                                resDesc = new ResourceDesc1
                                 {
-                                    Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+                                    Dimension = ResourceDimension.Buffer,
                                     Alignment = 0,
                                     Width = bufDesc.Width,
                                     Height = 1,
                                     DepthOrArraySize = 1,
                                     MipLevels = 1,
-                                    Format = DXGI_FORMAT_UNKNOWN,
-                                    SampleDesc = new DXGI_SAMPLE_DESC { Count = 1, Quality = 0 },
-                                    Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-                                    Flags = D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT,
+                                    Format = Format.FormatUnknown,
+                                    SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
+                                    Layout = TextureLayout.LayoutRowMajor,
+                                    Flags = startingFlags,
                                     SamplerFeedbackMipRegion = default
                                 };
 
                                 if (Flags.HasFlag(bufDesc.Usage, FGBufferUsage.UnorderedAccess))
                                 {
-                                    resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+                                    resDesc.Flags |= ResourceFlags.AllowUnorderedAccess;
                                 }
 
                                 break;
                             }
                     }
 
-                    ID3D12Resource2* resourcePtr = null;
-                    HRESULT r = D3D12MemAlloc.Allocator.CreateAliasingResource2(_device.Allocator, _resourcesMemory, (ulong)location.MemoryOffset, &resDesc, initialLayout, !isClearValueCompatible ? null : &clearValue, 0, null, resourceGuid, (void**)&resourcePtr);
+                    ComPtr<ID3D12Resource2> resource = new ComPtr<ID3D12Resource2>();
+                    HResult r = D3D12MemAlloc.Allocator.CreateAliasingResource2(_device.Allocator, _resourcesMemory, (ulong)location.MemoryOffset, &resDesc, initialLayout, !isClearValueCompatible ? null : &clearValue, 0, null, SilkMarshal.GuidPtrOf<ID3D12Resource2>(), (void**)resource.GetAddressOf());
 
-                    if (r.FAILED)
+                    if (r.IsFailure)
                     {
                         _device.RHIDevice.FlushPendingMessages();
                         return false;
@@ -280,10 +274,10 @@ namespace Primary.Rendering.D3D12
 
                     if (location.Resource.DebugName != null)
                     {
-                        ResourceUtility.SetResourceNameStack((ID3D12Resource*)resourcePtr, location.Resource.DebugName);
+                        ResourceHelper.SetResourceName(ref resource.Get(), location.Resource.DebugName);
                     }
 
-                    _allocatedResources[ResourceUtility.AsNRDResource(location.Resource)] = resourcePtr;
+                    _allocatedResources[ResourceUtility.AsNRDResource(location.Resource)] = resource;
                 }
 
                 return true;
@@ -294,7 +288,7 @@ namespace Primary.Rendering.D3D12
         {
             foreach (var kvp in _allocatedResources)
             {
-                kvp.Value.Pointer->Release(); //FIXME: GPU reference corruption
+                kvp.Value.Dispose();
             }
 
             _allocatedResources.Clear();
@@ -306,7 +300,7 @@ namespace Primary.Rendering.D3D12
             _currentEventIndex = 0;
         }
 
-        internal void CheckoutResourcesForPass(ID3D12GraphicsCommandList10* cmdList, int passIndex)
+        internal void CheckoutResourcesForPass(ref ID3D12GraphicsCommandList10 cmdList, int passIndex)
         {
             if (_frameResourceData != null && _currentEventIndex < _frameResourceData.Events.Length)
             {
@@ -325,11 +319,11 @@ namespace Primary.Rendering.D3D12
                                 NRDResource resource = ResourceUtility.AsNRDResource(@event.Resource);
                                 if (resource.EncId == NRDResourceId.Texture)
                                 {
-                                    _device.BarrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS, D3D12_BARRIER_LAYOUT_UNDEFINED);
+                                    _device.BarrierManager.AddTextureBarrier(resource, BarrierSync.None, BarrierAccess.NoAccess, BarrierLayout.Undefined);
                                 }
                                 else
                                 {
-                                    _device.BarrierManager.AddBufferBarrier(resource, D3D12_BARRIER_SYNC_NONE, D3D12_BARRIER_ACCESS_NO_ACCESS);
+                                    _device.BarrierManager.AddBufferBarrier(resource, BarrierSync.None, BarrierAccess.NoAccess);
                                 }
 
                                 updatedResources = true;
@@ -340,7 +334,7 @@ namespace Primary.Rendering.D3D12
 
                 if (updatedResources)
                 {
-                    _device.BarrierManager.FlushBarriers(cmdList, BarrierFlushTypes.Buffer | BarrierFlushTypes.Texture);
+                    _device.BarrierManager.FlushBarriers(ref cmdList, BarrierFlushTypes.Buffer | BarrierFlushTypes.Texture);
                 }
             }
         }
@@ -357,8 +351,8 @@ namespace Primary.Rendering.D3D12
                 };
             }
 
-            if (_allocatedResources.TryGetValue(resource, out Ptr<ID3D12Resource2> ptr))
-                return ptr.Pointer;
+            if (_allocatedResources.TryGetValue(resource, out ComPtr<ID3D12Resource2> ptr))
+                return (ID3D12Resource2*)Unsafe.AsPointer(ref ptr.Get());
 
             return null;
         }
@@ -420,7 +414,7 @@ namespace Primary.Rendering.D3D12
             return resource.IsExternal ? ((D3D12RHITextureNative*)resource.Native)->IsInitialized : _initializedResources.Contains(resource);
         }
 
-        internal void FlushPendingInits(ID3D12GraphicsCommandList10* cmdList)
+        internal void FlushPendingInits(ref ID3D12GraphicsCommandList10 cmdList)
         {
             if (_pendingInitializes.Count == 0)
                 return;
@@ -432,7 +426,7 @@ namespace Primary.Rendering.D3D12
                 if (resource.IsExternal)
                 {
                     D3D12RHITextureNative* native = (D3D12RHITextureNative*)resource.Native;
-                    _device.BarrierManager.AddTextureBarrier((ID3D12Resource*)native->Resource, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+                    _device.BarrierManager.AddTextureBarrier((ID3D12Resource*)native->Resource, BarrierSync.RenderTarget, BarrierAccess.RenderTarget, BarrierLayout.RenderTarget);
                 }
                 else if (resource.EncId == NRDResourceId.Texture)
                 {
@@ -441,16 +435,16 @@ namespace Primary.Rendering.D3D12
 
                     if (Flags.HasFlag(desc.Usage, FGTextureUsage.RenderTarget))
                     {
-                        _device.BarrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+                        _device.BarrierManager.AddTextureBarrier(resource, BarrierSync.RenderTarget, BarrierAccess.RenderTarget, BarrierLayout.RenderTarget);
                     }
                     else if (Flags.HasFlag(desc.Usage, FGTextureUsage.DepthStencil))
                     {
-                        _device.BarrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+                        _device.BarrierManager.AddTextureBarrier(resource, BarrierSync.DepthStencil, BarrierAccess.DepthStencilWrite, BarrierLayout.DepthStencilWrite);
                     }
                 }
             }
 
-            _device.BarrierManager.FlushBarriers(cmdList, BarrierFlushTypes.Texture);
+            _device.BarrierManager.FlushBarriers(ref cmdList, BarrierFlushTypes.Texture);
 
             foreach (NRDResource resource in _pendingInitializes)
             {
@@ -462,19 +456,19 @@ namespace Primary.Rendering.D3D12
                     if (Flags.HasFlag(desc.Usage, RHIResourceUsage.RenderTarget))
                     {
 #if DEBUG
-                        _device.BarrierManager.DbgEnsureState(resource, cmdList, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+                        _device.BarrierManager.DbgEnsureState(resource, ref cmdList, BarrierSync.RenderTarget, BarrierAccess.RenderTarget, BarrierLayout.RenderTarget);
 #endif
 
                         Color color = new Color(0.0f);
-                        cmdList->ClearRenderTargetView(_device.RTVDescriptorHeap.GetDescriptorHandle(resource), (float*)&color, 0, null);
+                        cmdList.ClearRenderTargetView(_device.RTVDescriptorHeap.GetDescriptorHandle(resource), (float*)&color, 0, null);
                     }
                     else if (Flags.HasFlag(desc.Usage, RHIResourceUsage.DepthStencil))
                     {
 #if DEBUG
-                        _device.BarrierManager.DbgEnsureState(resource, cmdList, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+                        _device.BarrierManager.DbgEnsureState(resource, ref cmdList, BarrierSync.DepthStencil, BarrierAccess.DepthStencilWrite, BarrierLayout.DepthStencilWrite);
 #endif
 
-                        cmdList->ClearDepthStencilView(_device.DSVDescriptorHeap.GetDescriptorHandle(resource), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0xff, 0, null);
+                        cmdList.ClearDepthStencilView(_device.DSVDescriptorHeap.GetDescriptorHandle(resource), ClearFlags.Depth | ClearFlags.Stencil, 1.0f, 0xff, 0, null);
                     }
 
                     native->IsInitialized = true;
@@ -487,19 +481,19 @@ namespace Primary.Rendering.D3D12
                     if (Flags.HasFlag(desc.Usage, FGTextureUsage.RenderTarget))
                     {
 #if DEBUG
-                        _device.BarrierManager.DbgEnsureState(resource, cmdList, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+                        _device.BarrierManager.DbgEnsureState(resource, ref cmdList, BarrierSync.RenderTarget, BarrierAccess.RenderTarget, BarrierLayout.RenderTarget);
 #endif
 
                         Color color = new Color(0.0f);
-                        cmdList->ClearRenderTargetView(_device.RTVDescriptorHeap.GetDescriptorHandle(resource), (float*)&color, 0, null);
+                        cmdList.ClearRenderTargetView(_device.RTVDescriptorHeap.GetDescriptorHandle(resource), (float*)&color, 0, null);
                     }
                     else if (Flags.HasFlag(desc.Usage, FGTextureUsage.DepthStencil))
                     {
 #if DEBUG
-                        _device.BarrierManager.DbgEnsureState(resource, cmdList, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
+                        _device.BarrierManager.DbgEnsureState(resource, ref cmdList, BarrierSync.DepthStencil, BarrierAccess.DepthStencilWrite, BarrierLayout.DepthStencilWrite);
 #endif
 
-                        cmdList->ClearDepthStencilView(_device.DSVDescriptorHeap.GetDescriptorHandle(resource), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0xff, 0, null);
+                        cmdList.ClearDepthStencilView(_device.DSVDescriptorHeap.GetDescriptorHandle(resource), ClearFlags.Depth | ClearFlags.Stencil, 1.0f, 0xff, 0, null);
                     }
                 }
 
@@ -509,9 +503,9 @@ namespace Primary.Rendering.D3D12
             _pendingInitializes.Clear();
         }
 
-        internal static D3D12_RESOURCE_DESC1 GetResourceDescription(FrameGraphResource resource)
+        internal static ResourceDesc1 GetResourceDescription(NRDDevice device, FrameGraphResource resource)
         {
-            D3D12_RESOURCE_DESC1 resDesc = default;
+            ResourceDesc1 resDesc = default;
 
             switch (resource.ResourceId)
             {
@@ -519,14 +513,14 @@ namespace Primary.Rendering.D3D12
                     {
                         ref readonly FrameGraphTextureDesc texDesc = ref resource.TextureDesc;
 
-                        resDesc = new D3D12_RESOURCE_DESC1
+                        resDesc = new ResourceDesc1
                         {
                             Dimension = texDesc.Dimension switch
                             {
-                                FGTextureDimension._1D => D3D12_RESOURCE_DIMENSION_TEXTURE1D,
-                                FGTextureDimension._2D => D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-                                FGTextureDimension._3D => D3D12_RESOURCE_DIMENSION_TEXTURE3D,
-                                FGTextureDimension.Cube => D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                                FGTextureDimension._1D => ResourceDimension.Texture1D,
+                                FGTextureDimension._2D => ResourceDimension.Texture2D,
+                                FGTextureDimension._3D => ResourceDimension.Texture3D,
+                                FGTextureDimension.Cube => ResourceDimension.Texture2D,
                             },
                             Alignment = 0,
                             Width = (ulong)texDesc.Width,
@@ -534,19 +528,19 @@ namespace Primary.Rendering.D3D12
                             DepthOrArraySize = (ushort)texDesc.Depth,
                             MipLevels = 1,
                             Format = texDesc.Format.ToTextureFormat(),
-                            SampleDesc = new DXGI_SAMPLE_DESC { Count = 1, Quality = 0 },
-                            Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN,
-                            Flags = D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT
+                            SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
+                            Layout = TextureLayout.LayoutUnknown,
+                            Flags = Unsafe.As<D3D12RHIDevice>(device.RHIDevice).Setup.UseTightAlignment ? ResourceFlags.UseTightAlignment : ResourceFlags.None
                         };
 
                         if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.RenderTarget))
                         {
-                            resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+                            resDesc.Flags |= ResourceFlags.AllowRenderTarget;
                         }
 
                         if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.DepthStencil))
                         {
-                            resDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+                            resDesc.Flags |= ResourceFlags.AllowDepthStencil;
                         }
 
                         break;
@@ -555,18 +549,18 @@ namespace Primary.Rendering.D3D12
                     {
                         ref readonly FrameGraphBufferDesc bufDesc = ref resource.BufferDesc;
 
-                        resDesc = new D3D12_RESOURCE_DESC1
+                        resDesc = new ResourceDesc1
                         {
-                            Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+                            Dimension = ResourceDimension.Buffer,
                             Alignment = 0,
                             Width = bufDesc.Width,
                             Height = 1,
                             DepthOrArraySize = 1,
                             MipLevels = 1,
-                            Format = DXGI_FORMAT_UNKNOWN,
-                            SampleDesc = new DXGI_SAMPLE_DESC { Count = 1, Quality = 0 },
-                            Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-                            Flags = D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT
+                            Format = Format.FormatUnknown,
+                            SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
+                            Layout = TextureLayout.LayoutRowMajor,
+                            Flags = Unsafe.As<D3D12RHIDevice>(device.RHIDevice).Setup.UseTightAlignment ? ResourceFlags.UseTightAlignment : ResourceFlags.None
                         };
 
                         break;
@@ -576,20 +570,20 @@ namespace Primary.Rendering.D3D12
             return resDesc;
         }
 
-        internal static D3D12_RESOURCE_DESC1 GetBufferDescription(int width)
+        internal static ResourceDesc1 GetBufferDescription(NRDDevice device, int width)
         {
-            D3D12_RESOURCE_DESC1 resDesc = new D3D12_RESOURCE_DESC1
+            ResourceDesc1 resDesc = new ResourceDesc1
             {
-                Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+                Dimension = ResourceDimension.Buffer,
                 Alignment = 0,
                 Width = (ulong)width,
                 Height = 1,
                 DepthOrArraySize = 1,
                 MipLevels = 1,
-                Format = DXGI_FORMAT_UNKNOWN,
-                SampleDesc = new DXGI_SAMPLE_DESC { Count = 1, Quality = 0 },
-                Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-                Flags = D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT
+                Format = Format.FormatUnknown,
+                SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
+                Layout = TextureLayout.LayoutRowMajor,
+                Flags = Unsafe.As<D3D12RHIDevice>(device.RHIDevice).Setup.UseTightAlignment ? ResourceFlags.UseTightAlignment : ResourceFlags.None
             };
 
             return resDesc;

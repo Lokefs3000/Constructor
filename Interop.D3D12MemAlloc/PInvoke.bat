@@ -1,0 +1,1 @@
+ClangSharpPInvokeGenerator -n "Interop.D3D12MemAlloc" -o ".\\Generated.cs" -f "D:\D3D12MemoryAllocator\include\D3D12MemAlloc.h" -m "D3D12MA" -l "d3d12ma" -c preview-codegen generate-helper-types generate-guid-member generate-vtbl-index-attribute

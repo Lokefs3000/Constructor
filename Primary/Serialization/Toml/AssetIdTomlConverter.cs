@@ -1,4 +1,5 @@
-﻿using Primary.Assets.Types;
+﻿using Primary.Assets;
+using Primary.Assets.Types;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -14,10 +15,13 @@ namespace Primary.Serialization.Toml
 
         public override AssetId Read(TomlReader reader)
         {
-            AssetId id = (AssetId)Guid.Parse(reader.GetString());
+            string str = reader.GetString();
             reader.Read();
 
-            return id;
+            if (Guid.TryParse(str, out Guid result))
+                return new AssetId(result);
+            else
+                return Engine.GlobalSingleton.AssetManager.IdProvider.TryLookupIdForPath(str, out AssetId assetId) ? assetId : AssetId.Invalid;
         }
 
         public override void Write(TomlWriter writer, AssetId value)

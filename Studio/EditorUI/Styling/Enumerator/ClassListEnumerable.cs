@@ -23,7 +23,7 @@ namespace EditorUI.Styling.Enumerator
             private bool _useDefault;
             private int _index;
 
-            private ArraySegment<StylesheetClass> _classList;
+            private ROList<Stylesheet> _classList;
             private int _classListIndex;
 
             private StylesheetClass? _value;
@@ -37,7 +37,7 @@ namespace EditorUI.Styling.Enumerator
                 _useDefault = user.Count == 0;
                 _index = _useDefault ? @default.Count - 1 : user.Count - 1;
 
-                _classList = ArraySegment<StylesheetClass>.Empty;
+                _classList = ROList<Stylesheet>.Empty;
                 _classListIndex = -1;
 
                 _value = null;
@@ -48,7 +48,7 @@ namespace EditorUI.Styling.Enumerator
                 _useDefault = false;
                 _index = -1;
 
-                _classList = ArraySegment<StylesheetClass>.Empty;
+                _classList = ROList<Stylesheet>.Empty;
                 _classListIndex = -1;
 
                 _value = null;
@@ -65,10 +65,29 @@ namespace EditorUI.Styling.Enumerator
 
                 if (_classList.Count > 0)
                 {
-                    _value = _classList[_classListIndex--];
+                    string className = _user[_index];
+                    bool foundClassWithName = false;
 
-                    if (_classListIndex == -1)
-                        _classList = ArraySegment<StylesheetClass>.Empty;
+                    for (_classListIndex = 0; _classListIndex < _classList.Count; ++_classListIndex)
+                    {
+                        Stylesheet stylesheet = _classList[_classListIndex];
+                        if (stylesheet.TryGetClass(ClassType.Named, className, out _value))
+                        {
+                            // --_classListIndex;
+                            foundClassWithName = true;
+                            break;
+                        }
+                    }
+
+                    if (--_index < 0)
+                    {
+                        _classList = ROList<Stylesheet>.Empty;
+                        _index = _default.Count == 0 ? -1 : _default.Count - 1;
+                        _useDefault = true;
+                    }
+
+                    if (!foundClassWithName)
+                        goto RetryMoveNext;
 
                     return true;
                 }
@@ -79,21 +98,16 @@ namespace EditorUI.Styling.Enumerator
                 }
                 else
                 {
-                    string className = _user[_index--];
-
-                    if (_index < 0)
-                        _index = _default.Count - 1;
-
-                    if (_stylesheets.TryGetClasses(new ClassKey(ClassType.Named, className), out _classList) && _classList.Count > 0)
+                    _classList = _stylesheets.Stylesheets;
+                    _classListIndex = 0;
+                    
+                    if (_classList.Count == 0)
                     {
-                        _classListIndex = _classList.Count - 1;
-                        _value = _classList[_classListIndex--];
-
-                        if (_classListIndex == -1)
-                            _classList = ArraySegment<StylesheetClass>.Empty;
+                        _useDefault = true;
+                        _index = _default.Count == 0 ? -1 : _default.Count - 1;
                     }
-                    else
-                        goto RetryMoveNext;
+
+                    goto RetryMoveNext;
                 }
 
                 return true;
@@ -104,7 +118,7 @@ namespace EditorUI.Styling.Enumerator
                 _useDefault = _user.Count == 0;
                 _index = _useDefault ? _default.Count - 1 : _user.Count - 1;
 
-                _classList = ArraySegment<StylesheetClass>.Empty;
+                _classList = ROList<Stylesheet>.Empty;
                 _classListIndex = -1;
 
                 _value = null;

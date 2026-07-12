@@ -8,6 +8,7 @@
 		<ImplicitUsings>true</ImplicitUsings>
 		<LangVersion>Latest</LangVersion>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<FileVersion>1.0.32.0</FileVersion>
 	</PropertyGroup>
 
 	<ItemGroup>

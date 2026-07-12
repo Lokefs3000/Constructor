@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 
 namespace EditorUI.Serialization.Value
@@ -58,5 +59,26 @@ namespace EditorUI.Serialization.Value
     {
         public override ulong TryDeserialize(ReadOnlySpan<char> source) => ulong.Parse(source);
         public override string TrySerialize(ulong value) => value.ToString();
+    }
+
+    [ValueConverter]
+    internal sealed class SingleValueConverter : ValueConverter<float>
+    {
+        public override float TryDeserialize(ReadOnlySpan<char> source) => ulong.Parse(source, CultureInfo.InvariantCulture);
+        public override string TrySerialize(float value) => value.ToString(CultureInfo.InvariantCulture);
+    }
+
+    [ValueConverter]
+    internal sealed class DoubleValueConverter : ValueConverter<double>
+    {
+        public override double TryDeserialize(ReadOnlySpan<char> source) => ulong.Parse(source, CultureInfo.InvariantCulture);
+        public override string TrySerialize(double value) => value.ToString(CultureInfo.InvariantCulture);
+    }
+
+    [ValueConverter]
+    internal sealed class BooleanValueConverter : ValueConverter<bool>
+    {
+        public override bool TryDeserialize(ReadOnlySpan<char> source) => bool.Parse(source);
+        public override string TrySerialize(bool value) => value.ToString(CultureInfo.InvariantCulture);
     }
 }

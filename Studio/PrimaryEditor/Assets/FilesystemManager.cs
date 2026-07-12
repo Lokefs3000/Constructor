@@ -82,7 +82,26 @@ namespace PrimaryEditor.Assets
 
                 foreach (RemappingDataEntry entry in data.Remappings)
                 {
-                    TryFindFilesystemFor(entry.Remap, out BaseFilesystem? filesystem);
+                    if (!TryFindFilesystemFor(entry.Remap, out BaseFilesystem? filesystem))
+                    {
+                        EdLog.Assets.Warning("Failed to find filesystem for file remap '{rm}'", entry.Remap);
+                    }
+                    else
+                    {
+                        // this should not fail
+                        if (filesystem.TryGetFullPath(entry.Remap, out string? fullPath))
+                        {
+                            if (!File.Exists(fullPath))
+                            {
+                                EdLog.Assets.Error("File pointed to by the remapping '{rm}' does not exist", entry.Remap);
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            EdLog.Assets.Warning("Unexpected failure trying to get full path for remap '{rm}'", entry.Remap);
+                        }
+                    }
 
                     if (!_fileRemappings.TryAdd(entry.Source, new FileRemapData(entry.Remap, filesystem)))
                     {
@@ -136,10 +155,7 @@ namespace PrimaryEditor.Assets
 
         internal void UpdateFileRemap(string localPath, string newLocalPath)
         {
-            if (_fileRemappings.TryRemove(localPath, out FileRemapData remapData))
-            {
-                _fileRemappings.TryAdd(newLocalPath, remapData);
-            }
+            
         }
 
         public void SetFileRemap(string fileToRemap, string? remapLocation)
@@ -176,7 +192,7 @@ namespace PrimaryEditor.Assets
             return false;
         }
 
-        #region Sub filesystem implementation
+        #region Subfilesystem implementation
         public string? ReadAllText(ReadOnlySpan<char> path)
         {
             return ReadAllText(path.ToString());
@@ -229,10 +245,10 @@ namespace PrimaryEditor.Assets
             return fullPath != null;
         }
 
-        public static string? ReadAllText(string localPath)
+        public static string? ReadAllText(string localPath, bool ignoreRemapping = false)
         {
             FilesystemManager self = EditorRuntime.Instance.AssetPipeline.FilesystemManager;
-            if (self._fileRemappings.TryGetValue(localPath, out FileRemapData remapData))
+            if (!ignoreRemapping && self._fileRemappings.TryGetValue(localPath, out FileRemapData remapData))
             {
                 if (remapData.Filesystem != null)
                     return remapData.Filesystem.ReadAllText(remapData.RemapPath);
@@ -253,10 +269,10 @@ namespace PrimaryEditor.Assets
             return null;
         }
 
-        public static byte[]? ReadAllBytes(string localPath)
+        public static byte[]? ReadAllBytes(string localPath, bool ignoreRemapping = false)
         {
             FilesystemManager self = EditorRuntime.Instance.AssetPipeline.FilesystemManager;
-            if (self._fileRemappings.TryGetValue(localPath, out FileRemapData remapData))
+            if (!ignoreRemapping && self._fileRemappings.TryGetValue(localPath, out FileRemapData remapData))
             {
                 if (remapData.Filesystem != null)
                     return remapData.Filesystem.ReadAllBytes(remapData.RemapPath);
@@ -277,10 +293,10 @@ namespace PrimaryEditor.Assets
             return null;
         }
 
-        public static Stream? OpenStream(string localPath)
+        public static Stream? OpenStream(string localPath, bool ignoreRemapping = false)
         {
             FilesystemManager self = EditorRuntime.Instance.AssetPipeline.FilesystemManager;
-            if (self._fileRemappings.TryGetValue(localPath, out FileRemapData remapData))
+            if (!ignoreRemapping && self._fileRemappings.TryGetValue(localPath, out FileRemapData remapData))
             {
                 if (remapData.Filesystem != null)
                     return remapData.Filesystem.OpenStream(remapData.RemapPath);

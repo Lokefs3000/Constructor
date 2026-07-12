@@ -29,78 +29,127 @@ namespace PrimaryEditor.Assets
         {
             if (File.Exists(s_registryFile))
             {
-                PhysicalFileJson json;
-                try
+                using Stream? inputStream = FileUtility.TryWaitOpenNoThrow(s_registryFile, FileMode.Open, FileAccess.Read, FileShare.Read);
+                if (inputStream == null)
                 {
-                    json = JsonSerializer.Deserialize(File.ReadAllText(s_registryFile), PhysicalFileJsonContext.Default.PhysicalFileJson)!;
-                }
-                catch (Exception ex)
-                {
-                    EdLog.Assets.Error(ex, "Failed to read physical file registry from disk!");
+                    EdLog.Assets.Error("Failed to open file stream '{f}' for reading registry data", s_registryFile);
+                    FileUtility.TryDelete(s_registryFile);
                     return;
                 }
 
-                if (json.Version != PhysicalFileJson.FileVersion)
-                {
-                    EdLog.Assets.Error("Incorrect physical file registry version '{v}'", json.Version);
-                    return;
-                }
+                using DataReader serializer = new DataReader(inputStream);
 
-                foreach (var (key, value) in json.Files)
+                if (serializer.ReadVersionHeader() != CurrentVersion)
+                    throw new Exception("Invalid version in registry data");
+
+                while (!serializer.IsAtEndOfStream)
                 {
-                    if (!_physicalFiles.TryAdd(key, value))
-                    {
-                        EdLog.Assets.Warning("Duplicate physical file info id '{k}'", key);
-                    }
+                    AssetId assetId = (AssetId)serializer.ReadGuid()!.Value;
+                    DateTime lastFileWriteTime = serializer.ReadDateTime()!.Value;
+                    DateTime lastDataWriteTime = serializer.ReadDateTime()!.Value;
+
+                    serializer.ReadNewLine();
+
+                    _physicalFiles[assetId] = new PhysicalFileInfo(lastFileWriteTime, lastDataWriteTime);
                 }
             }
         }
 
         internal void SaveRegistryToDisk()
         {
-            PhysicalFileJson data = new PhysicalFileJson();
-
-            data.Files = [.. _physicalFiles];
-
-            try
+            using Stream? outputStream = FileUtility.TryWaitOpenNoThrow(s_registryFile, FileMode.Create, FileAccess.Write, FileShare.None);
+            if (outputStream == null)
             {
-                File.WriteAllText(s_registryFile, JsonSerializer.Serialize(data, PhysicalFileJsonContext.Default.PhysicalFileJson));
+                EdLog.Assets.Error("Failed to open file stream '{f}' for writing registry data", s_registryFile);
+                FileUtility.TryDelete(s_registryFile);
+                return;
             }
-            catch (Exception ex)
+
+            using DataWriter serializer = new DataWriter(outputStream);
+
+            serializer.WriteVersionHeader(CurrentVersion);
+
+            foreach (var (id, data) in _physicalFiles)
             {
-                EdLog.Assets.Error(ex, "Failed to read file remappings from disk!");
-                throw;
-            }
-        }
+                serializer.WriteValue(id);
+                serializer.WriteValue(data.LastFileWriteTime);
+                serializer.WriteValue(data.LastDataWriteTime);
 
-        internal void TryRegisterFileFromPath(AssetId id, string fullPath)
-        {
-            _physicalFiles.AddOrUpdate(id, New, (id, fileInfo, arg) => New(id, arg), fullPath);
-
-            PhysicalFileInfo New(AssetId id, string fullPath)
-            {
-                using Stream stream = FileUtility.TryWaitOpen(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-
-                return new PhysicalFileInfo(
-                    File.GetLastWriteTime(fullPath),
-                    stream.Length,
-                    CreateChecksumFrom(stream));
+                serializer.FinishLine();
             }
         }
 
-        internal void TryUpdateFileFromPath(AssetId id, string fullPath)
+        internal void StoreFileData(AssetId id, string fullFilePath, string? fullDataPath)
         {
-            _physicalFiles.AddOrUpdate(id, New, (id, fileInfo, arg) => New(id, arg), fullPath);
+            DateTime lastWriteTimeFile = File.GetLastWriteTimeUtc(fullFilePath);
+            DateTime lastWriteTimeData = fullDataPath == null ? PhysicalFileInfo.UninitializedDate : File.GetLastWriteTimeUtc(fullDataPath);
 
-            PhysicalFileInfo New(AssetId id, string fullPath)
+            PhysicalFileInfo fileInfo = _physicalFiles.GetOrAdd(id, PhysicalFileInfo.Uninitialized);
+            PhysicalFileInfo newFileInfo = new PhysicalFileInfo(lastWriteTimeFile, fullDataPath == null ? fileInfo.LastDataWriteTime : lastWriteTimeData);
+
+            _physicalFiles.TryUpdate(id, fileInfo, newFileInfo);
+        }
+
+        internal bool IsFileOutOfDate(AssetId id, string fullFilePath)
+        {
+            PhysicalFileInfo fileInfo = _physicalFiles.GetOrAdd(id, PhysicalFileInfo.Uninitialized);
+            DateTime lastWriteTime = File.GetLastWriteTimeUtc(fullFilePath);
+
+            bool isFileUninitialized = fileInfo.LastFileWriteTime == PhysicalFileInfo.UninitializedDate;
+            bool isFileOutOfDate = !isFileUninitialized && lastWriteTime > fileInfo.LastFileWriteTime;
+
+            if (isFileUninitialized || isFileOutOfDate)
             {
-                using Stream stream = FileUtility.TryWaitOpen(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                PhysicalFileInfo newFileInfo = new PhysicalFileInfo(lastWriteTime, fileInfo.LastDataWriteTime);
+                _physicalFiles.TryUpdate(id, newFileInfo, fileInfo);
 
-                return new PhysicalFileInfo(
-                    File.GetLastWriteTime(fullPath),
-                    stream.Length,
-                    CreateChecksumFrom(stream));
+                return isFileOutOfDate;
             }
+
+            return false;
+        }
+
+        internal bool IsDataOutOfDate(AssetId id, string fullDataPath)
+        {
+            PhysicalFileInfo fileInfo = _physicalFiles.GetOrAdd(id, PhysicalFileInfo.Uninitialized);
+            DateTime lastWriteTime = File.GetLastWriteTimeUtc(fullDataPath);
+
+            bool isFileUninitialized = fileInfo.LastDataWriteTime == PhysicalFileInfo.UninitializedDate;
+            bool isFileOutOfDate = !isFileUninitialized && lastWriteTime > fileInfo.LastDataWriteTime;
+
+            if (isFileUninitialized || isFileOutOfDate)
+            {
+                PhysicalFileInfo newFileInfo = new PhysicalFileInfo(fileInfo.LastFileWriteTime, lastWriteTime);
+                _physicalFiles.TryUpdate(id, newFileInfo, fileInfo);
+
+                return isFileOutOfDate;
+            }
+
+            return false;
+        }
+
+        internal bool IsFileOrDataOutOfDate(AssetId id, string fullFilePath, string fullDataPath)
+        {
+            PhysicalFileInfo fileInfo = _physicalFiles.GetOrAdd(id, PhysicalFileInfo.Uninitialized);
+
+            DateTime lastWriteTimeFile = File.GetLastWriteTimeUtc(fullFilePath);
+            DateTime lastWriteTimeData = File.GetLastWriteTimeUtc(fullDataPath);
+
+            bool isFileUninitialized = fileInfo.LastFileWriteTime == PhysicalFileInfo.UninitializedDate;
+            bool isDataUninitialized = fileInfo.LastDataWriteTime == PhysicalFileInfo.UninitializedDate;
+
+            bool isFileOutOfDate = !isFileUninitialized && lastWriteTimeFile > fileInfo.LastFileWriteTime;
+            bool isDataOutOfDate = !isDataUninitialized && lastWriteTimeData > fileInfo.LastDataWriteTime;
+
+            if (isFileUninitialized || isDataUninitialized || isFileOutOfDate || isDataOutOfDate)
+            {
+                PhysicalFileInfo newFileInfo = new PhysicalFileInfo(lastWriteTimeFile, lastWriteTimeData);
+                _physicalFiles.TryUpdate(id, newFileInfo, fileInfo);
+
+                return isFileOutOfDate || isDataOutOfDate;
+            }
+
+            return false;
         }
 
         internal bool HasRegisteredFile(AssetId id)
@@ -108,45 +157,19 @@ namespace PrimaryEditor.Assets
             return _physicalFiles.ContainsKey(id);
         }
 
-        internal bool TryRegisterFile(AssetId id, DateTime lastWriteTime, long fileSize, FileChecksum checksum)
-        {
-            if (!_physicalFiles.TryAdd(id, new PhysicalFileInfo(lastWriteTime, fileSize, checksum)))
-            {
-                EdLog.Assets.Warning("Failed to register new physical file with the id '{id}' because it's already in the dictionary", id);
-                return false;
-            }
-
-            return true;
-        }
-
         public bool TryGetFileInfo(AssetId id, [NotNullWhen(true)] out PhysicalFileInfo value)
         {
             return _physicalFiles.TryGetValue(id, out value);
         }
 
-        public FileChecksum CreateChecksumFrom(Stream stream)
-        {
-            return new FileChecksum((s_hashAlgorithm ??= SHA256.Create()).ComputeHash(stream));
-        }
+        private static string s_registryFile => Path.Combine(ProjectData.Instance.Paths.LibrarySavedFolder, "PhysicalFiles.dat");
 
-        private static string s_registryFile => Path.Combine(ProjectData.Instance.Paths.LibrarySavedFolder, "PhysicalFiles.json");
-
-        [ThreadStatic]
-        private static SHA256? s_hashAlgorithm;
+        public const int CurrentVersion = 1;
     }
 
-    public readonly record struct PhysicalFileInfo(DateTime LastModifiedTime, long FileSize, FileChecksum Checksum);
-
-    public readonly record struct FileChecksum : IEquatable<FileChecksum>
+    public readonly record struct PhysicalFileInfo(DateTime LastFileWriteTime, DateTime LastDataWriteTime) : IEquatable<PhysicalFileInfo>
     {
-        public readonly long Part0;
-        public readonly long Part1;
-        public readonly long Part2;
-        public readonly long Part3;
-
-        public FileChecksum(ReadOnlySpan<byte> hash)
-        {
-            this = Unsafe.ReadUnaligned<FileChecksum>(ref hash.DangerousGetReference());
-        }
+        public static PhysicalFileInfo Uninitialized => new PhysicalFileInfo(UninitializedDate, UninitializedDate);
+        public static DateTime UninitializedDate => DateTime.MinValue;
     }
 }

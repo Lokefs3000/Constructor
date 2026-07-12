@@ -2,17 +2,9 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
-using TerraFX.Interop.WinRT;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
-using static TerraFX.Interop.DirectX.DXGI_ALPHA_MODE;
-using static TerraFX.Interop.DirectX.DXGI_FORMAT;
-using static TerraFX.Interop.DirectX.DXGI_SCALING;
-using static TerraFX.Interop.DirectX.DXGI_SWAP_CHAIN_FLAG;
-using static TerraFX.Interop.DirectX.DXGI_SWAP_EFFECT;
+using Silk.NET.Core.Native;
+using Silk.NET.Direct3D12;
+using Silk.NET.DXGI;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -23,6 +15,8 @@ namespace Primary.RHI.Direct3D12
 
         private ComPtr<IDXGISwapChain4> _swapChain;
         private D3D12RHISwapChainBuffer* _buffers;
+
+        private CompositionSurface? _compositionSurface;
 
         private int _activeBufferIndex;
 
@@ -37,38 +31,66 @@ namespace Primary.RHI.Direct3D12
 
             _pendingResize = null;
 
+            if (description.EnableComposition && _device.CompositionDevice == null)
+                throw new D3D12RHIException("Trying to create composited swap chain without a valid composition device!");
+
             {
-                DXGI_SWAP_CHAIN_DESC1 desc = new DXGI_SWAP_CHAIN_DESC1
+                SwapChainDesc1 desc = new SwapChainDesc1
                 {
                     Width = (uint)description.WindowSize.X,
                     Height = (uint)description.WindowSize.Y,
                     Format = description.BackBufferFormat.ToSwapChainFormat(),
                     Stereo = false,
-                    SampleDesc = new DXGI_SAMPLE_DESC { Count = 1, Quality = 0 },
-                    BufferUsage = DXGI.DXGI_USAGE_BACK_BUFFER,
+                    SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
+                    BufferUsage = DXGI.UsageBackBuffer,
                     BufferCount = (uint)description.BackBufferCount,
-                    Scaling = DXGI_SCALING_NONE,
-                    SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
-                    AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED,
-                    Flags = (uint)DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING
+                    Scaling = Scaling.None,
+                    SwapEffect = SwapEffect.FlipDiscard,
+                    AlphaMode = AlphaMode.Unspecified,
+                    Flags = (uint)SwapChainFlag.AllowTearing
                 };
 
-                ComPtr<IUnknown> cmdQueue = new ComPtr<IUnknown>();
-                device.DirectCmdQueue.As(ref cmdQueue);
+                ComPtr<IDXGISwapChain1> swapChain = new ComPtr<IDXGISwapChain1>();
+                HResult hr;
 
-                using ComPtr<IDXGISwapChain1> swapChain = new ComPtr<IDXGISwapChain1>();
-                HRESULT hr = device.Factory.Get()->CreateSwapChainForHwnd(cmdQueue.Get(), new HWND(description.WindowHandle.ToPointer()), &desc, null, null, swapChain.GetAddressOf());
-
-                cmdQueue.Dispose();
-                if (hr.FAILED)
+                if (description.EnableComposition)
                 {
-                    throw new RHIException($"Failed to create DXGI swap chain: {hr}");
+                    desc.AlphaMode = AlphaMode.Premultiplied;
+                    hr = device.Factory.CreateSwapChainForComposition(device.DirectCmdQueue, &desc, ref Unsafe.NullRef<IDXGIOutput>(), ref swapChain);
+                }
+                else
+                {
+                    hr = device.Factory.CreateSwapChainForHwnd(device.DirectCmdQueue, description.WindowHandle, &desc, null, ref Unsafe.NullRef<IDXGIOutput>(), ref swapChain);
                 }
 
-                hr = swapChain.Get()->QueryInterface(UuidOf.Get<IDXGISwapChain4>(), (void**)_swapChain.GetAddressOf());
-                if (hr.FAILED)
+                if (hr.IsFailure)
                 {
-                    throw new RHIException($"Failed to query DXGI swap chain 4: {hr}");
+                    swapChain.Dispose();
+                    _device.FlushPendingMessages();
+                    throw new D3D12RHIException($"Failed to create DXGI swap chain", hr.Value);
+                }
+
+                hr = swapChain.QueryInterface(out _swapChain);
+                if (hr.IsFailure)
+                {
+                    swapChain.Dispose();
+                    _device.FlushPendingMessages();
+                    throw new D3D12RHIException($"Failed to query DXGI swap chain 4", hr.Value);
+                }
+
+                swapChain.Dispose();
+            }
+
+            if (description.EnableComposition)
+            {
+                try
+                {
+                    _compositionSurface = _device.CompositionDevice?.CreateSurface(description.WindowHandle.ToPointer(), (void*)_swapChain.Handle);
+                }
+                catch (Exception)
+                {
+                    _swapChain.Dispose();
+                    throw;
                 }
             }
             
@@ -77,15 +99,15 @@ namespace Primary.RHI.Direct3D12
             for (int i = 0; i < description.BackBufferCount; i++)
             {
                 ComPtr<ID3D12Resource2> resource = new ComPtr<ID3D12Resource2>();
-                HRESULT hr = _swapChain.Get()->GetBuffer((uint)i, UuidOf.Get<ID3D12Resource2>(), (void**)resource.GetAddressOf());
+                HResult hr = _swapChain.GetBuffer((uint)i, out resource);
 
                 _buffers[i] = new D3D12RHISwapChainBuffer
                 {
                     Resource = resource,
 
-                    BarrierSync = D3D12_BARRIER_SYNC_DRAW,
-                    BarrierAccess = D3D12_BARRIER_ACCESS_COMMON,
-                    BarrierLayout = D3D12_BARRIER_LAYOUT_PRESENT
+                    BarrierSync = BarrierSync.Draw,
+                    BarrierAccess = BarrierAccess.Common,
+                    BarrierLayout = BarrierLayout.Present
                 };
             }
 
@@ -95,9 +117,9 @@ namespace Primary.RHI.Direct3D12
                 {
                     Description = description,
                 };
-                _nativeRep->SwapChain = _swapChain.Get();
+                _nativeRep->SwapChain = (IDXGISwapChain4*)Unsafe.AsPointer(ref _swapChain.Get());
                 _nativeRep->Buffers = _buffers;
-                _nativeRep->ActiveBufferIndex = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
+                _nativeRep->ActiveBufferIndex = (int)_swapChain.GetCurrentBackBufferIndex();
             }
         }
 
@@ -111,18 +133,21 @@ namespace Primary.RHI.Direct3D12
                         NativeMemory.Free(_nativeRep);
                     _nativeRep = null;
 
+                    _compositionSurface?.Dispose();
+                    _compositionSurface = null;
+
                     if (_buffers != null)
                     {
                         for (int i = 0; i < _description.BackBufferCount; i++)
                         {
-                            _buffers[i].Resource.Reset();
+                            _buffers[i].Resource.Dispose();
                         }
 
                         NativeMemory.Free(_buffers);
                     }
                     _buffers = null;
 
-                    _swapChain.Reset();
+                    _swapChain.Dispose();
 
                     _device.ResourceTracker.Untrack(this);
                 });
@@ -137,9 +162,9 @@ namespace Primary.RHI.Direct3D12
             {
                 for (int i = 0; i < _description.BackBufferCount; i++)
                 {
-                    if (_buffers[i].Resource.Get() != null)
+                    if (!Unsafe.IsNullRef(in _buffers[i].Resource.Get()))
                     {
-                        ResourceHelper.SetResourceName(_buffers[i].Resource.Get(), $"{debugName}-Tex{i}");
+                        ResourceHelper.SetResourceName(ref _buffers[i].Resource.Get(), $"{debugName}-Tex{i}");
                     }
                 }
             }
@@ -147,17 +172,17 @@ namespace Primary.RHI.Direct3D12
 
         public override void Present()
         {
-            DXGI_PRESENT_PARAMETERS @params = default;
-            HRESULT hr = _swapChain.Get()->Present1(0, DXGI.DXGI_PRESENT_ALLOW_TEARING, &@params);
+            PresentParameters @params = default;
+            HResult hr = _swapChain.Present1(0, DXGI.PresentAllowTearing, &@params);
 
-            if (hr.FAILED)
+            if (hr.IsFailure)
             {
                 //TODO: exception handling
                 _device.FlushPendingMessages();
                 throw new Exception(hr.ToString());
             }
 
-            _nativeRep->ActiveBufferIndex = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
+            _nativeRep->ActiveBufferIndex = (int)_swapChain.GetCurrentBackBufferIndex();
         }
 
         public override void Resize(Vector2 newSize)
@@ -180,13 +205,13 @@ namespace Primary.RHI.Direct3D12
             {
                 for (int i = 0; i < _description.BackBufferCount; i++)
                 {
-                    _buffers[i].Resource.Reset();
+                    _buffers[i].Resource.Dispose();
                 }
             }
 
             IUnknown*[] queues = new IUnknown*[_description.BackBufferCount];
             for (int i = 0; i < queues.Length; i++)
-                queues[i] = (IUnknown*)_device.DirectCmdQueue.Get();
+                queues[i] = (IUnknown*)Unsafe.AsPointer(ref _device.DirectCmdQueue.Get());
 
             uint[] nodeMasks = new uint[_description.BackBufferCount];
             Array.Fill<uint>(nodeMasks, 0);
@@ -195,8 +220,8 @@ namespace Primary.RHI.Direct3D12
             {
                 fixed (uint* ptr2 = nodeMasks)
                 {
-                    HRESULT hr = _swapChain.Get()->ResizeBuffers1((uint)_description.BackBufferCount, (uint)newSize.X, (uint)newSize.Y, DXGI_FORMAT_UNKNOWN, (uint)DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING, ptr2, ptr1);
-                    if (hr.FAILED)
+                    HResult hr = _swapChain.ResizeBuffers1((uint)_description.BackBufferCount, (uint)newSize.X, (uint)newSize.Y, Format.FormatUnknown, (uint)SwapChainFlag.AllowTearing, ptr2, ptr1);
+                    if (hr.IsFailure)
                     {
                         //TODO: exception handling
                         throw new Exception(hr.ToString());
@@ -209,15 +234,15 @@ namespace Primary.RHI.Direct3D12
                 for (int i = 0; i < _description.BackBufferCount; i++)
                 {
                     ComPtr<ID3D12Resource2> resource = new ComPtr<ID3D12Resource2>();
-                    HRESULT hr = _swapChain.Get()->GetBuffer((uint)i, UuidOf.Get<ID3D12Resource2>(), (void**)resource.GetAddressOf());
+                    HResult hr = _swapChain.GetBuffer((uint)i, out resource);
 
                     _buffers[i] = new D3D12RHISwapChainBuffer
                     {
                         Resource = resource,
 
-                        BarrierSync = D3D12_BARRIER_SYNC_DRAW,
-                        BarrierAccess = D3D12_BARRIER_ACCESS_COMMON,
-                        BarrierLayout = D3D12_BARRIER_LAYOUT_PRESENT
+                        BarrierSync = BarrierSync.Draw,
+                        BarrierAccess = BarrierAccess.Common,
+                        BarrierLayout = BarrierLayout.Present
                     };
                 }
             }
@@ -225,7 +250,7 @@ namespace Primary.RHI.Direct3D12
             _description.WindowSize = newSize;
             _nativeRep->Base.Description.WindowSize = newSize;
 
-            _nativeRep->ActiveBufferIndex = (int)_swapChain.Get()->GetCurrentBackBufferIndex();
+            _nativeRep->ActiveBufferIndex = (int)_swapChain.GetCurrentBackBufferIndex();
         }
 
         public override string ToString()
@@ -256,8 +281,8 @@ namespace Primary.RHI.Direct3D12
     {
         public ComPtr<ID3D12Resource2> Resource;
 
-        public D3D12_BARRIER_SYNC BarrierSync;
-        public D3D12_BARRIER_ACCESS BarrierAccess;
-        public D3D12_BARRIER_LAYOUT BarrierLayout;
+        public BarrierSync BarrierSync;
+        public BarrierAccess BarrierAccess;
+        public BarrierLayout BarrierLayout;
     }
 }

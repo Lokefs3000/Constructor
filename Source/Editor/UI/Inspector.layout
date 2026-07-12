@@ -1,14 +1,8 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<Layout>
-	<Stylesheet Path="Editor/UI/Default.style" />
-	<Stylesheet Path="Editor/UI/Styles/EditorViewToolbar.style" />
+<Widget Size="1.0 0 1.0 0">
+    <Stylesheet Path="Editor/UI/Stylesheets/Inspector.style" />
+    <Stylesheet Path="Editor/UI/Stylesheets/Main.style" />
 
-	<Window>
-		<Element Size="1.0 0 1.0 0">
-			<ScrollView Id="object-list" Size="1.0 0 1.0 0">
-				<ListLayout Direction="Vertical" Padding="0.0 2" />
-			</ScrollView>
-			<Label IsEnabled="False" Size="1.0 0 1.0 0" Text="The inspectors specified are incompatible" Overflow="Wrap" />
-		</Element>
-	</Window>
-</Layout>
+    <LayoutFrame Id="values-view" Class="background root-values" Size="1.0 0 1.0 0">
+
+    </LayoutFrame>
+</Widget>

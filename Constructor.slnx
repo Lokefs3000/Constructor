@@ -80,11 +80,24 @@
     </Project>
     <Project Path="D:/source/repos/Constructor/ExtraFramework/ExtraFramework.csproj" />
   </Folder>
+  <Folder Name="/Library/">
+    <Project Path="Library/xxHash/xxHash.csproj" Id="76fbbe98-a0c8-4f04-9a8c-72e4a07273e7">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
   </Folder>
   <Folder Name="/SourceGenerators/">
     <Project Path="D:/source/repos/Constructor/Primary.SourceGenerator/Primary.SourceGenerator.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Tooling/">
+    <Project Path="Tooling/ConfigUpdater/ConfigUpdater.csproj" Id="fb05eb6c-38a1-42ac-8fa0-e5a8011fe432">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Tooling/InteropGenerator/InteropGenerator.csproj" Id="3236f452-d8be-4265-983e-1ac4db1f10f8">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
   </Folder>

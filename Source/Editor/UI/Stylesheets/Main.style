@@ -1,0 +1,179 @@
+@use "Editor/UI/Stylesheets/Globals.style";
+
+.background {
+    background-color: $primary-bg-colour;
+}
+
+.side-tab-background {
+    background-color: $primary-deep-bg-colour;
+}
+
+.side-tab-button {
+    size: 1.0 0 0.0 36;
+    background-color: none;
+    stroke-width: 0;
+    corner-radius: 0 0 0 0;
+
+    !:is-hovered {
+        background-color: $primary-bg-colour;
+    }
+
+    !:is-held {
+        background-color: $default-button-colour;
+    }
+
+    &:first-child {
+        position: 0.0 8 0.5 0;
+        anchor: 0.0 0.5;
+    }
+}
+
+.toolbar {
+    size: 1.0 0 0.0 28;
+    background-color: $primary-bg-colour;
+    stroke-width: 1;
+    stroke-color: $primary-deep-bg-colour;
+    stroke-position: Outside;
+    layout-direction: Horizontal;
+    item-padding: 16;
+}
+
+.toolbar-group {
+    size: 0.0 0 1.0 0;
+    auto-resize: ResizeX;
+    layout-direction: Horizontal;
+    item-padding: 4;
+}
+
+.toolbar-button {
+    size: 0.0 0 1.0 0;
+    auto-resize: ResizeX;
+    
+    image:first-of-type {
+        size: 0.0 0 1.0 0;
+        aspect-source: Y;
+    }
+}
+
+.with-border-left {
+    stroke-color: $primary-deep-bg-colour;
+    stroke-width: 1;
+    stroke-position: Outside;
+    margin: 1 0 0 0;
+}
+
+.popup-darken {
+    background-color: #00000080;
+}
+
+button {
+    background-color: $default-button-colour;
+    stroke-color: $default-button-border-colour;
+    stroke-width: 1;
+    corner-radius: 4 4 4 4;
+    padding: 4 4 4 4;
+
+    !:is-hovered {
+        background-color: $hovered-button-colour;
+        stroke-color: $hovered-button-border-colour;
+    }
+
+    !:is-held {
+        background-color: $held-button-colour;
+        stroke-color: $held-button-border-colour;
+    }
+}
+
+label {
+    text-color: $primary-text-colour;
+    font-family: $primary-font-family;
+    font-size: 16;
+}
+
+scrollView {
+    scrollbar-background-color: $primary-deep-bg-colour;
+}
+
+scroller {
+    scroller-color: $default-button-border-colour;
+    corner-radius: 3 3 3 3;
+
+    !:is-hovered {
+        scroller-color: $hovered-button-border-colour;
+    }
+
+    !:is-held {
+        scroller-color: $held-button-border-colour;
+    }
+}
+
+dropdownField {
+    text-color: $primary-text-colour;
+    font-family: $primary-font-family;
+    font-size: 16;
+}
+
+checkbox {
+    checkmark-color: White;
+}
+
+contextMenu {
+    background-color: $primary-bg-colour;
+    font-family: $primary-font-family;
+    font-size: 14;
+    max-width: 400;
+}
+
+popupMenuAction {
+    background-color: none;
+    text-color: $primary-text-colour;
+
+    !:is-hovered {
+        background-color: $hovered-button-colour;
+    }
+}
+
+popupMenuMenu {
+    background-color: none;
+    text-color: $primary-text-colour;
+    arrow-color: $hovered-button-border-colour;
+
+    !:is-hovered {
+        background-color: $hovered-button-colour;
+    }
+}
+
+popupMenuSeparator {
+    foreground-color: $default-button-colour;
+}
+
+windowDock {
+    font-family: $primary-font-family;
+    font-size: 16;
+
+    tab-corner-radius: 0 6 0 6;
+
+    background-color: $primary-deep-bg-colour;
+    tab-color: $primary-bg-colour;
+    text-color: $primary-text-colour;
+
+    stroke-color: $default-button-border-colour;
+    stroke-width: 1;
+
+    active-tab-color: $default-button-colour;
+}
+
+treeNodeStylist {
+    background-color: none;
+    text-color: $primary-text-colour;
+    font-family: $primary-font-family;
+    font-size: 16;
+}
+
+.stylist-treenode-hovered {
+    background-color: $default-button-colour;
+}
+
+.stylist-treenode-selected {
+    background-color: $selected-highlight-color;
+}

@@ -2,17 +2,8 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
-using static TerraFX.Interop.DirectX.D3D12_CONSERVATIVE_RASTERIZATION_MODE;
-using static TerraFX.Interop.DirectX.D3D12_LOGIC_OP;
-using static TerraFX.Interop.DirectX.D3D12_PIPELINE_STATE_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_ROOT_DESCRIPTOR_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_ROOT_PARAMETER_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_ROOT_SIGNATURE_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_SAMPLER_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_SHADER_VISIBILITY;
-using static TerraFX.Interop.DirectX.DXGI_FORMAT;
+using Silk.NET.Core.Native;
+using Silk.NET.Direct3D12;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -34,16 +25,16 @@ namespace Primary.RHI.Direct3D12
             _bytecode = new RHIComputePipelineBytecode(bytecode);
 
             {
-                D3D12_ROOT_PARAMETER1[] parameters = new D3D12_ROOT_PARAMETER1[2];
+                RootParameter1[] parameters = new RootParameter1[2];
 
                 int index = 0;
                 if ((!description.UseBufferForHeader && description.Header32BitConstants > 0) || (description.UseBufferForHeader && description.Expected32BitConstants > 0))
                 {
-                    parameters[index++] = new D3D12_ROOT_PARAMETER1
+                    parameters[index++] = new RootParameter1
                     {
-                        ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS,
-                        ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL,
-                        Constants = new D3D12_ROOT_CONSTANTS
+                        ParameterType = RootParameterType.Type32BitConstants,
+                        ShaderVisibility = ShaderVisibility.All,
+                        Constants = new RootConstants
                         {
                             ShaderRegister = 0,
                             RegisterSpace = 0,
@@ -54,27 +45,27 @@ namespace Primary.RHI.Direct3D12
 
                 if (description.UseBufferForHeader && description.Header32BitConstants > 0)
                 {
-                    parameters[index++] = new D3D12_ROOT_PARAMETER1
+                    parameters[index++] = new RootParameter1
                     {
-                        ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV,
-                        ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL,
-                        Descriptor = new D3D12_ROOT_DESCRIPTOR1
+                        ParameterType = RootParameterType.TypeCbv,
+                        ShaderVisibility = ShaderVisibility.All,
+                        Descriptor = new RootDescriptor1
                         {
                             ShaderRegister = 1,
                             RegisterSpace = 0,
-                            Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC
+                            Flags = RootDescriptorFlags.DataStatic
                         }
                     };
                 }
 
-                D3D12_STATIC_SAMPLER_DESC1[] samplers = description.ImmutableSamplers.Length == 0 ?
-                    Array.Empty<D3D12_STATIC_SAMPLER_DESC1>() :
-                    new D3D12_STATIC_SAMPLER_DESC1[description.ImmutableSamplers.Length];
+                StaticSamplerDesc1[] samplers = description.ImmutableSamplers.Length == 0 ?
+                    Array.Empty<StaticSamplerDesc1>() :
+                    new StaticSamplerDesc1[description.ImmutableSamplers.Length];
 
                 for (int i = 0; i < samplers.Length; i++)
                 {
                     RHIGPImmutableSampler @is = description.ImmutableSamplers[i];
-                    samplers[i] = new D3D12_STATIC_SAMPLER_DESC1
+                    samplers[i] = new StaticSamplerDesc1
                     {
                         Filter = @is.MaxAnisotropy > 1 ?
                             ResourceHelper.EncodeAnisotropicFilter(@is.ReductionType) :
@@ -90,50 +81,50 @@ namespace Primary.RHI.Direct3D12
                         MaxLOD = @is.MaxLOD,
                         ShaderRegister = (uint)i,
                         RegisterSpace = 0,
-                        ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL,
-                        Flags = @is.Border >= RHISamplerBorder.OpaqueBlackUInt ? D3D12_SAMPLER_FLAG_UINT_BORDER_COLOR : D3D12_SAMPLER_FLAG_NONE
+                        ShaderVisibility = ShaderVisibility.All,
+                        Flags = @is.Border >= RHISamplerBorder.OpaqueBlackUInt ? SamplerFlags.UintBorderColor : SamplerFlags.None
                     };
                 }
 
-                fixed (D3D12_ROOT_PARAMETER1* ptr1 = parameters)
+                fixed (RootParameter1* ptr1 = parameters)
                 {
-                    fixed (D3D12_STATIC_SAMPLER_DESC1* ptr2 = samplers)
+                    fixed (StaticSamplerDesc1* ptr2 = samplers)
                     {
-                        D3D12_ROOT_SIGNATURE_DESC2 desc = new D3D12_ROOT_SIGNATURE_DESC2
+                        RootSignatureDesc2 desc = new RootSignatureDesc2
                         {
                             NumParameters = (uint)index,
-                            pParameters = ptr1,
+                            PParameters = ptr1,
                             NumStaticSamplers = (uint)samplers.Length,
-                            pStaticSamplers = ptr2,
+                            PStaticSamplers = ptr2,
                             Flags =
-                                D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-                                D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-                                D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
+                                RootSignatureFlags.AllowInputAssemblerInputLayout |
+                                RootSignatureFlags.CbvSrvUavHeapDirectlyIndexed |
+                                RootSignatureFlags.SamplerHeapDirectlyIndexed
                         };
 
-                        D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionDesc = new D3D12_VERSIONED_ROOT_SIGNATURE_DESC(desc);
+                        VersionedRootSignatureDesc versionDesc = new VersionedRootSignatureDesc(version: D3DRootSignatureVersion.Version12, desc12: desc);
 
-                        ID3DBlob* blob = null;
-                        ID3DBlob* error = null;
+                        ID3D10Blob* blob = null;
+                        ID3D10Blob* error = null;
 
                         try
                         {
-                            HRESULT hr = DirectX.D3D12SerializeVersionedRootSignature(&versionDesc, &blob, &error);
+                            HResult hr = D3D12RHIDevice.D3D12.SerializeVersionedRootSignature(&versionDesc, &blob, &error);
                             if (error != null)
                             {
                                 string str = new string((sbyte*)error->GetBufferPointer(), 0, (int)error->GetBufferSize());
-                                throw new RHIException(str);
+                                throw new D3D12RHIException(str, hr.Value);
                             }
 
-                            if (hr.FAILED)
+                            if (hr.IsFailure)
                             {
-                                throw new RHIException($"Failed to serialize root signature blob: {hr}");
+                                throw new D3D12RHIException($"Failed to serialize root signature blob", hr.Value);
                             }
 
-                            hr = device.Device.Get()->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), UuidOf.Get<ID3D12RootSignature>(), (void**)_rootSignature.GetAddressOf());
-                            if (hr.FAILED)
+                            hr = device.Device.CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), out _rootSignature);
+                            if (hr.IsFailure)
                             {
-                                throw new RHIException($"Failed to create D3D12 root signature: {hr}");
+                                throw new D3D12RHIException($"Failed to create D3D12 root signature", hr.Value);
                             }
                         }
                         finally
@@ -150,19 +141,19 @@ namespace Primary.RHI.Direct3D12
             {
                 using MemoryHandle handle = _bytecode.Compute.Pin();
 
-                D3D12_COMPUTE_PIPELINE_STATE_DESC desc = new D3D12_COMPUTE_PIPELINE_STATE_DESC
+                ComputePipelineStateDesc desc = new ComputePipelineStateDesc
                 {
-                    pRootSignature = _rootSignature.Get(),
-                    CS = new D3D12_SHADER_BYTECODE(handle.Pointer, (nuint)_bytecode.Compute.Length),
+                    PRootSignature = (ID3D12RootSignature*)Unsafe.AsPointer(ref _rootSignature.Get()),
+                    CS = new ShaderBytecode(handle.Pointer, (nuint)_bytecode.Compute.Length),
                     NodeMask = 0,
                     CachedPSO = default,
-                    Flags = D3D12_PIPELINE_STATE_FLAG_NONE
+                    Flags = PipelineStateFlags.None
                 };
 
-                HRESULT hr = _device.Device.Get()->CreateComputePipelineState(&desc, UuidOf.Get<ID3D12PipelineState>(), (void**)_pipelineState.GetAddressOf());
-                if (hr.FAILED)
+                HResult hr = _device.Device.CreateComputePipelineState(&desc, out _pipelineState);
+                if (hr.IsFailure)
                 {
-                    throw new RHIException($"Failed to create D3D12 pipeline state: {hr}");
+                    throw new D3D12RHIException($"Failed to create D3D12 pipeline state", hr.Value);
                 }
             }
 
@@ -172,8 +163,8 @@ namespace Primary.RHI.Direct3D12
                 {
 
                 };
-                _nativeRep->RootSignature = _rootSignature.Get();
-                _nativeRep->PipelineState = _pipelineState.Get();
+                _nativeRep->RootSignature = (ID3D12RootSignature*)Unsafe.AsPointer(ref _rootSignature.Get());
+                _nativeRep->PipelineState = (ID3D12PipelineState*)Unsafe.AsPointer(ref _pipelineState.Get());
             }
         }
 
@@ -187,8 +178,8 @@ namespace Primary.RHI.Direct3D12
                         NativeMemory.Free(_nativeRep);
                     _nativeRep = null;
 
-                    _pipelineState.Reset();
-                    _rootSignature.Reset();
+                    _pipelineState.Dispose();
+                    _rootSignature.Dispose();
 
                     _device.ResourceTracker.Untrack(this);
                 });
@@ -199,14 +190,14 @@ namespace Primary.RHI.Direct3D12
 
         protected override void SetDebugName(string? debugName)
         {
-            if (_rootSignature.Get() != null)
+            if (!Unsafe.IsNullRef(in _rootSignature.Get()))
             {
-                ResourceHelper.SetResourceName((ID3D12Resource2*)_rootSignature.Get(), debugName == null ? null : $"{debugName}-RootSig");
+                ResourceHelper.SetResourceName(ref _rootSignature.Get(), debugName == null ? null : $"{debugName}-RootSig");
             }
 
-            if (_pipelineState.Get() != null)
+            if (!Unsafe.IsNullRef(in _pipelineState.Get()))
             {
-                ResourceHelper.SetResourceName((ID3D12Resource2*)_pipelineState.Get(), debugName);
+                ResourceHelper.SetResourceName(ref _pipelineState.Get(), debugName);
             }
         }
 

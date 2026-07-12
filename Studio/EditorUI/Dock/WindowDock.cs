@@ -1,19 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using CommunityToolkit.Diagnostics;
+using EditorUI.Assets;
+using EditorUI.Built;
+using EditorUI.Common;
+using EditorUI.Input;
+using EditorUI.Text;
 using EditorUI.Visual;
-using EditorUI.Visual.Draw;
+using EditorUI.Widgets;
 using EditorUI.Windowing;
 using Primary.Collections.ReadOnly;
 using Primary.Common;
+using Primary.Input.Devices;
 using Primary.Mathematics;
 using Primary.Utility;
 
 namespace EditorUI.Dock
 {
-    public sealed class WindowDock : DockBase
+    public sealed class WindowDock : DockBase, IInteractable
     {
         private readonly DockManager _dockManager;
         private readonly WindowManager _windowManager;
@@ -31,6 +39,25 @@ namespace EditorUI.Dock
 
         private int _activeWindow;
 
+        private int _dockingSpaceDragStart;
+
+        private IAssetProvider<FontFamily>? _fontFamily;
+        private FontStyle _fontStyle;
+        private FontWeight _fontWeight;
+
+        private float _fontSize;
+
+        private UIColor _backgroundColor;
+        private UIColor _tabColor;
+        private UIColor _textColor;
+
+        private UIColor _activeTabColor;
+
+        private ushort _strokeWidth;
+        private UIColor _strokeColor;
+
+        private Vector4 _tabCornerRadius;
+
         internal WindowDock(DockFlags flags, DockManager dockManager, WindowManager windowManager) : base(flags)
         {
             _dockManager = dockManager;
@@ -39,7 +66,7 @@ namespace EditorUI.Dock
             _parentDock = null;
 
             _dockingSide = DockingSide.Left;
-            _dockingSpace = 0;
+            _dockingSpace = WindowDock.TabHeight;
 
             _dockRect = Rect.Zero;
             _windowRect = Rect.Zero;
@@ -48,6 +75,22 @@ namespace EditorUI.Dock
             _docks = new List<DockBase>();
 
             _activeWindow = -1;
+
+            _dockingSpaceDragStart = -1;
+
+            _fontFamily = null;
+            _fontStyle = FontStyle.Normal;
+            _fontWeight = FontWeight.Normal;
+
+            _fontSize = 16.0f;
+
+            _backgroundColor = Color.White;
+            _tabColor = Color.White;
+            _textColor = Color.White;
+
+            _activeTabColor = Color.White;
+
+            _tabCornerRadius = Vector4.Zero;
         }
 
         private void DestroySelf()
@@ -88,14 +131,17 @@ namespace EditorUI.Dock
             if (newDock.TryAddDockChild(this))
             {
                 _parentDock = newDock;
+                _dockingSide = side;
 
                 if (newDock.Host != _parentHost)
                 {
                     _parentHost?.UnregisterDock(this);
                     newDock.Host?.RegisterNewDock(this);
+
+                    AddStateFlags(StateFlags.SelfInvalidStyle);
                 }
 
-                TryAddStateFlags(StateFlags.SelfInvalidLayout);
+                AddStateFlags(StateFlags.SelfInvalidLayout);
                 return true;
             }
             else
@@ -116,7 +162,7 @@ namespace EditorUI.Dock
 
         public override bool TryAddWindow(WindowBase window)
         {
-            if (_windows.Count > 0 && _dockFlags.HasFlags(DockFlags.SingleWindow))
+            if (_windows.Count > 0 && _dockFlags.HasFlag(DockFlags.SingleWindow))
                 return false;
 
             if (_windows.AddUnique(window))
@@ -124,7 +170,7 @@ namespace EditorUI.Dock
                 if (_activeWindow == -1)
                     TryFocusWindow(window);
 
-                TryAddStateFlags(StateFlags.SelfInvalidLayout);
+                AddStateFlags(StateFlags.SelfInvalidLayout);
             }
 
             return true;
@@ -144,13 +190,13 @@ namespace EditorUI.Dock
                 }
 
                 _windows.RemoveAt(windowIndex);
-                
+
                 // if (_windows.Count == 0)
                 // {
                 //     DestroySelf();
                 // }
 
-                TryAddStateFlags(StateFlags.SelfInvalidLayout);
+                AddStateFlags(StateFlags.SelfInvalidLayout);
                 return true;
             }
 
@@ -195,7 +241,7 @@ namespace EditorUI.Dock
                 StateFlags windowStateFlags = window.StateFlags;
                 if (windowStateFlags != StateFlags.None)
                 {
-                    TryAddStateFlags(windowStateFlags.RemoveFlags(StateFlags.This));
+                    AddStateFlags(windowStateFlags.RemoveFlags(StateFlags.This));
                 }
             }
         }
@@ -203,19 +249,134 @@ namespace EditorUI.Dock
         protected internal override void RecalculateLayout(Rect dockRect)
         {
             _dockRect = dockRect;
-            _windowRect = _dockFlags.HasFlags(DockFlags.SingleWindow) ? dockRect : Rect.OffsetMin(dockRect, 0, TabHeight);
+            _windowRect = _dockFlags.HasFlag(DockFlags.SingleWindow) ? dockRect : Rect.OffsetMin(dockRect, 0, TabHeight + _strokeWidth);
         }
 
         protected internal override void PaintVisual(ref readonly PainterContext painter)
         {
-            if (_dockFlags.HasFlags(DockFlags.SingleWindow))
+            if (_dockFlags.HasFlag(DockFlags.SingleWindow))
                 return;
 
-            painter.AddRectangle(new Boundaries(Vector2.Zero, new Vector2(_dockRect.Width, TabHeight)), new Paint(Color.Yellow));
+            Boundaries tabLineBoundaries = new Boundaries(_dockRect.Position.AsVector2(), _dockRect.Position.AsVector2() + new Vector2(_dockRect.Width, TabHeight + _strokeWidth));
 
-            painter.AddCircle(new Vector2(_dockRect.Width, TabHeight) * 0.5f, TabHeight * 0.5f, new Paint(Color.Blue));
-            painter.AddCircle(new Vector2(_dockRect.Width, TabHeight) * 0.5f - new Vector2(TabHeight * 1.25f, 0.0f), TabHeight * 0.25f, new Paint(Color.Blue));
-            painter.AddCircle(new Vector2(_dockRect.Width, TabHeight) * 0.5f + new Vector2(TabHeight * 1.25f, 0.0f), TabHeight * 0.25f, new Paint(Color.Blue));
+            if (_backgroundColor.IsVisible)
+                painter.AddRectangle(tabLineBoundaries, new Paint(_backgroundColor));
+
+            if (_windows.Count > 0)
+            {
+                if (_textColor.IsVisible && _fontFamily != null && _fontFamily.Value != null && _fontFamily.IsReadyToUse)
+                {
+                    TextManager textManager = UIManager.Instance.TextManager;
+                    TextBuilder textBuilder = new TextBuilder(200.0f - _fontSize - 4.0f, TextWrapMode.Ellipsis, AllowRichText: false);
+                    BuiltTextBuilder builtTextBuilder = BuiltTextBuilder.Build(in textBuilder);
+
+                    FontStyleData fontStyleData = _fontFamily.Value!.GetFontStyle(_fontStyle, _fontWeight);
+                    float positionX = tabLineBoundaries.Minimum.X;
+
+                    float selectionLineStartX = 0.0f;
+                    float selectionLineEndX = 0.0f;
+
+                    float closeSize = _fontSize * 0.75f;
+                    float closeMinY = tabLineBoundaries.Minimum.Y + TabHeight * 0.5f - closeSize * 0.5f;
+                    float closeMaxY = tabLineBoundaries.Minimum.Y + TabHeight * 0.5f + closeSize * 0.5f;
+
+                    for (int i = 0; i < _windows.Count; i++)
+                    {
+                        WindowBase windowBase = _windows[i];
+                        TextShapingData shapingData = textManager.ShapeText(windowBase.GetType().Name, _fontSize, builtTextBuilder, fontStyleData);
+
+                        float totalWidth = shapingData.TotalSize.X + 8.0f + _fontSize + 4.0f;
+                        Boundaries tabBoundaries = new Boundaries(new Vector2(positionX, tabLineBoundaries.Minimum.Y), new Vector2(positionX + totalWidth, tabLineBoundaries.Maximum.Y));
+
+                        if (_activeWindow == i)
+                        {
+                            if (_activeTabColor.IsVisible)
+                            {
+                                painter.AddRectangle(tabBoundaries, new Paint(_activeTabColor, _strokeColor, _strokeWidth, StrokePosition.Inside), _tabCornerRadius);
+
+                                selectionLineStartX = positionX;
+                                selectionLineEndX = positionX + totalWidth;
+                            }
+                        }
+                        else
+                        {
+                            if (_tabColor.IsVisible)
+                                painter.AddRectangle(tabBoundaries, new Paint(_tabColor), _tabCornerRadius);
+                        }
+
+                        painter.AddText(new Vector2(positionX + 4.0f, tabLineBoundaries.Maximum.Y - 6.0f), shapingData, tabBoundaries.Size, new Paint(_textColor));
+
+                        float closePositionBase = positionX + shapingData.TotalSize.X + 8.0f + (_fontSize - closeSize) * 0.5f;
+                        CrossLineBuffer lineBuffer = new CrossLineBuffer
+                        {
+                            Point0 = new Vector2(closePositionBase, closeMinY),
+                            Point1 = new Vector2(closePositionBase + closeSize, closeMaxY),
+                            Point2 = new Vector2(closePositionBase + closeSize, closeMinY),
+                            Point3 = new Vector2(closePositionBase, closeMaxY)
+                        };
+
+                        painter.AddLines(MemoryMarshal.CreateReadOnlySpan(ref lineBuffer.Point0, 4), new Paint(_textColor), thickness: 1.5f);
+
+                        positionX += totalWidth + 1.0f;
+                    }
+
+                    if (selectionLineStartX != selectionLineEndX)
+                    {
+                        float y = tabLineBoundaries.Maximum.Y - _strokeWidth;
+
+                        if (selectionLineStartX > tabLineBoundaries.Minimum.X)
+                            painter.AddLine(new Vector2(tabLineBoundaries.Minimum.X, y), new Vector2(selectionLineStartX, y), new Paint(_strokeColor), _strokeWidth);
+                        if (selectionLineEndX < tabLineBoundaries.Maximum.X)
+                            painter.AddLine(new Vector2(selectionLineEndX, y), new Vector2(tabLineBoundaries.Maximum.X, y), new Paint(_strokeColor), _strokeWidth);
+                    }
+                }
+                else
+                {
+
+                }
+            }
+        }
+
+        public void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        {
+            switch (inputEvent.EventType)
+            {
+                case UIInputEventType.MouseWheel:
+                    {
+                        int nextWindowIndex = Math.Clamp((int)(-inputEvent.Mouse.Delta.Y + _activeWindow), 0, _windows.Count - 1);
+                        if (nextWindowIndex != _activeWindow)
+                        {
+                            TryFocusWindow(_windows[nextWindowIndex]);
+                        }
+                        break;
+                    }
+
+                case UIInputEventType.DragBegin:
+                    {
+                        if (inputEvent.Drag.Button == MouseButton.Left)
+                        {
+                            _dockingSpaceDragStart = _dockingSpace;
+                        }
+
+                        break;
+                    }
+                case UIInputEventType.DragUpdate:
+                case UIInputEventType.DragEnd:
+                    {
+                        if (inputEvent.Drag.Button == MouseButton.Left && _dockingSpaceDragStart != -1)
+                        {
+                            int newDockingSpace = _dockingSpaceDragStart - (int)((_dockingSide == DockingSide.Left || _dockingSide == DockingSide.Right) ? inputEvent.Drag.Delta.X : inputEvent.Drag.Delta.Y);
+                            
+                            if (newDockingSpace != _dockingSpace)
+                                Space = newDockingSpace;
+
+                            if (inputEvent.EventType == UIInputEventType.DragEnd)
+                                _dockingSpaceDragStart = -1;
+                        }
+
+                        break;
+                    }
+            }
         }
 
         protected internal override bool TrySetDockHost(DockHost? newHost)
@@ -232,14 +393,14 @@ namespace EditorUI.Dock
         protected internal override bool TryAddDockChild(DockBase child)
         {
             // this dock cannot be docked into
-            if (_dockFlags.HasFlags(DockFlags.NoDocking))
+            if (_dockFlags.HasFlag(DockFlags.NoDocking))
                 return false;
 
             if (child == this)
                 return false;
-            
+
             if (_docks.AddUnique(child))
-                TryAddStateFlags(StateFlags.SelfInvalidLayout);
+                AddStateFlags(StateFlags.SelfInvalidLayout);
 
             return true;
         }
@@ -251,7 +412,7 @@ namespace EditorUI.Dock
 
             if (_docks.Remove(child))
             {
-                TryAddStateFlags(StateFlags.SelfInvalidLayout);
+                AddStateFlags(StateFlags.SelfInvalidLayout);
                 return true;
             }
 
@@ -266,13 +427,18 @@ namespace EditorUI.Dock
             }
         }
 
-        protected internal override void TryAddStateFlags(StateFlags flags)
+        public override void AddStateFlags(StateFlags flags)
         {
-            base.TryAddStateFlags(flags);
+            base.AddStateFlags(flags);
 
             if (_parentDock != null)
-                _parentDock.TryAddStateFlags(flags);
+                _parentDock.AddStateFlags(flags);
         }
+
+        public IInteractable GetInteractable(Vector2 point) => this;
+
+        public IInteractionShape? Shape => null;
+        public WidgetInputState InputState => WidgetInputState.Sink;
 
         public override Rect DockRect => _dockRect;
         public override Rect WindowRect => _windowRect;
@@ -287,7 +453,7 @@ namespace EditorUI.Dock
                 if (_dockingSide != value)
                 {
                     _dockingSide = value;
-                    TryAddStateFlags(StateFlags.SelfInvalidLayout);
+                    AddStateFlags(StateFlags.SelfInvalidLayout);
                 }
             }
         }
@@ -300,7 +466,7 @@ namespace EditorUI.Dock
                 if (_dockingSpace != clampedSpace)
                 {
                     _dockingSpace = clampedSpace;
-                    TryAddStateFlags(StateFlags.SelfInvalidLayout);
+                    AddStateFlags(StateFlags.SelfInvalidLayout);
                 }
             }
         }
@@ -310,6 +476,33 @@ namespace EditorUI.Dock
 
         public override ROList<DockBase> Docks => _docks;
 
+        #region Serializable
+        [Styled(nameof(_fontFamily))] public IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
+        [Styled(nameof(_fontStyle))] public FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
+        [Styled(nameof(_fontWeight))] public FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
+
+        [Styled(nameof(_fontSize))] public float FontSize { get => _fontSize; set => SetStyledField(value); }
+
+        [Styled(nameof(_backgroundColor))] public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
+        [Styled(nameof(_tabColor))] public UIColor TabColor { get => _tabColor; set => SetStyledField(value); }
+        [Styled(nameof(_textColor))] public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
+
+        [Styled(nameof(_activeTabColor))] public UIColor ActiveTabColor { get => _activeTabColor; set => SetStyledField(value); }
+
+        [Styled(nameof(_strokeWidth))] public ushort StrokeWidth { get => _strokeWidth; set => SetStyledField(value); }
+        [Styled(nameof(_strokeColor))] public UIColor StrokeColor { get => _strokeColor; set => SetStyledField(value); }
+
+        [Styled(nameof(_tabCornerRadius))] public Vector4 TabCornerRadius { get => _tabCornerRadius; set => SetStyledField(value); }
+        #endregion
+
         public const int TabHeight = 24;
+
+        private record struct CrossLineBuffer
+        {
+            public Vector2 Point0;
+            public Vector2 Point1;
+            public Vector2 Point2;
+            public Vector2 Point3;
+        }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using CommunityToolkit.Diagnostics;
@@ -46,22 +47,24 @@ namespace EditorUI.Styling
         #region Update
         internal void ResolveInvalidProperties(ref readonly StylesheetContext context)
         {
-            if (_arePropertiesInvalid || _triggerMask != _updatedTriggerMask)
+            if (_arePropertiesInvalid || _triggerMask != _updatedTriggerMask || context.GetAllProperties)
             {
                 ClassListEnumerable classList = context.GetClassList(_classList ?? ROList<string>.Empty);
                 PropertyEnumerable properties = context.GetProperties(_updatedTriggerMask, _arePropertiesInvalid ? StylesheetContext.ReturnAll : (ushort)(_triggerMask ^ _updatedTriggerMask));
 
-                foreach (StyleKey key in properties)
+                // ushort triggerMask = _arePropertiesInvalid ? StylesheetContext.ReturnAll : (ushort)(_triggerMask ^ _updatedTriggerMask);
+
+                foreach (StylePropertyData key in properties)
                 {
-                    if (_cachedData.TryGetPropertyData(key.Property, out PropertyData? propertyData))
+                    if (_cachedData.TryGetPropertyData(key.PropertyName, out PropertyData? propertyData))
                     {
-                        if (_overrideSet.Contains(propertyData.Property))
+                        if (_overrideSet.Contains(propertyData.Property) || propertyData.Methods.SetDirect == null)
                             continue;
 
                         foreach (StylesheetClass stylesheetClass in classList)
                         {
-                            ClassStyleKey styleKey = new ClassStyleKey(stylesheetClass, key);
-                            if (context.Stylesheets.TryGetClassValue(styleKey, propertyData.PropertyType, out object? value))
+                            ClassStyleKey styleKey = new ClassStyleKey(stylesheetClass, key.AsStyleKey(), key.TriggerMask);
+                            if (context.Stylesheets.TryGetClassValue(styleKey, propertyData, out object? value))
                             {
                                 if (propertyData.Field != null)
                                     propertyData.Field.SetValue(this, value);
@@ -72,8 +75,16 @@ namespace EditorUI.Styling
                                 {
                                     AddStateFlags(propertyData.StateFlags);
 
-                                    if (propertyData.Flags.HasFlags(PropertyDataFlags.EffectsParent))
+                                    if (propertyData.Flags.HasFlag(PropertyDataFlags.EffectsParent))
                                         ParentObject?.AddStateFlags(propertyData.StateFlags);
+                                }
+
+                                if (propertyData.Callbacks != null && propertyData.Callbacks.Length > 0)
+                                {
+                                    for (int i = 0; i < propertyData.Callbacks.Length; i++)
+                                    {
+                                        (t_callbackSet ??= new HashSet<string>()).Add(propertyData.Callbacks[i]);
+                                    }
                                 }
 
                                 break;
@@ -82,16 +93,28 @@ namespace EditorUI.Styling
                     }
                 }
 
+                if (t_callbackSet != null && t_callbackSet.Count > 0)
+                {
+                    foreach (string callbackName in t_callbackSet)
+                    {
+                        if (_cachedData.TryGetCallbackMethod(callbackName, out MethodInfo? callbackDelegate))
+                        {
+                            callbackDelegate.Invoke(this, null);
+                        }
+                    }
+
+                    t_callbackSet.Clear();
+                }
+
                 _arePropertiesInvalid = false;
                 _triggerMask = _updatedTriggerMask;
             }
         }
         #endregion
-
         #region Public
         public void ClearOverride(string propertyName)
         {
-            if (_cachedData.TryGetPropertyData(propertyName, out PropertyData? propertyData) && !propertyData.Flags.HasFlags(PropertyDataFlags.IsEditable))
+            if (_cachedData.TryGetPropertyData(propertyName, out PropertyData? propertyData) && !propertyData.Flags.HasFlag(PropertyDataFlags.IsEditable))
             {
                 if (_overrideSet.Remove(propertyData.Property))
                 {
@@ -135,10 +158,10 @@ namespace EditorUI.Styling
             int index = _classList?.IndexOf(className) ?? -1;
             if (index != -1)
             {
-                if (index < _classList!.Count - 1)
+                if (index > 0)
                 {
-                    _classList.RemoveAt(index);
-                    _classList.Add(className);
+                    _classList!.RemoveAt(index);
+                    _classList.Insert(0, className);
 
                     _arePropertiesInvalid = true;
                     AddStateFlags(StateFlags.SelfInvalidStyle);
@@ -187,42 +210,64 @@ namespace EditorUI.Styling
             return -1;
         }
         #endregion
-
         #region Templated
         public abstract void AddStateFlags(StateFlags flags);
+        public abstract void RemoveStateFlags(StateFlags flags);
+
+        protected internal abstract void GetUnstyledObjects(ref StyleQueueContext context);
 
         protected internal abstract StyledObject? ParentObject { get; }
-        #endregion
 
+        public abstract StateFlags StateFlags { get; }
+        #endregion
         #region Setters
         private void SetValue<T>(T value, string propertyName, bool setAsOverriden)
         {
             if (_cachedData.TryGetPropertyData(propertyName, out PropertyData? propertyData))
             {
-                if (propertyData.Field != null)
+                if (propertyData.Methods.SetDirect != null)
                 {
-                    propertyData.Methods.GetSetFieldDirectUnsafe<T>()(this, in value);
-                }
-                else
-                {
-                    propertyData.Methods.GetSetPropertyDirectUnsafe<T>()(this, in value);
+                    if (propertyData.Field != null)
+                    {
+                        propertyData.Methods.GetSetFieldDirectUnsafe<T>()!(this, in value);
+                    }
+                    else
+                    {
+                        propertyData.Methods.GetSetPropertyDirectUnsafe<T>()!(this, in value);
+                    }
                 }
 
-                if (propertyData.TriggerMask > 0)
+                if (propertyData.TriggerMask.HasValue)
                 {
                     Debug.Assert(typeof(T) == typeof(bool));
 
                     if (BoolUtil<T>.GetAsBoolean(ref value))
-                        _updatedTriggerMask |= propertyData.TriggerMask;
+                        _updatedTriggerMask |= (ushort)(1 << propertyData.TriggerMask.Value);
                     else
-                        _updatedTriggerMask &= (ushort)~propertyData.TriggerMask;
+                        _updatedTriggerMask &= (ushort)~(1 << propertyData.TriggerMask.Value);
 
                     AddStateFlags(StateFlags.SelfInvalidStyle);
                 }
 
-                if (setAsOverriden && !propertyData.Flags.HasFlags(PropertyDataFlags.IsEditable))
+                if (setAsOverriden && !propertyData.Flags.HasFlag(PropertyDataFlags.IsEditable))
                 {
                     _overrideSet.Add(propertyData.Property);
+                }
+
+                if (propertyData.StateFlags != StateFlags.None)
+                {
+                    AddStateFlags(propertyData.StateFlags);
+                }
+
+                if (propertyData.Callbacks != null && propertyData.Callbacks.Length > 0)
+                {
+                    for (int i = 0; i < propertyData.Callbacks.Length; ++i)
+                    {
+                        if (_cachedData.TryGetCallbackMethod(propertyData.Callbacks[i], out MethodInfo? callbackDelegate))
+                        {
+                            callbackDelegate.Invoke(this, null);
+                        }
+                    }
                 }
 
                 _requiredUpdatesSet.Remove(propertyData.Property);
@@ -234,5 +279,8 @@ namespace EditorUI.Styling
         #endregion
 
         public ROList<string> ClassList => _classList ?? ROList<string>.Empty;
+
+        [ThreadStatic]
+        private static HashSet<string>? t_callbackSet;
     }
 }

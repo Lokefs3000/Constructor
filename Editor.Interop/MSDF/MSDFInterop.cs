@@ -19,6 +19,9 @@ namespace Editor.Interop.MSDF
         [LibraryImport(LibraryName, EntryPoint = "MSDF_LoadFont", StringMarshalling = StringMarshalling.Utf8), UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         public static partial MSDF_FontFace* LoadFont(MSDF_FTContext* ft, string fileName);
 
+        [LibraryImport(LibraryName, EntryPoint = "MSDF_LoadFont_Memory", StringMarshalling = StringMarshalling.Utf8), UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        public static partial MSDF_FontFace* LoadFont_Memory(MSDF_FTContext* ft, byte* memory, ulong fileSize);
+
         [LibraryImport(LibraryName, EntryPoint = "MSDF_DestroyFont", StringMarshalling = StringMarshalling.Utf8), UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         public static partial void DestroyFont(MSDF_FontFace* face);
 
@@ -38,11 +41,15 @@ namespace Editor.Interop.MSDF
         [LibraryImport(LibraryName, EntryPoint = "MSDF_GetMetrics", StringMarshalling = StringMarshalling.Utf8), UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         public static partial void GetMetrics(MSDF_FontFace* face, out short ascender, out short descner, out short lineHeight, out short underlineY, out short height);
 
+        [LibraryImport(LibraryName, EntryPoint = "MSDF_GetKerning", StringMarshalling = StringMarshalling.Utf8), UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static partial bool GetKerning(MSDF_FontFace* face, uint left, uint right, out MSDF_KernData kernData);
+
         [LibraryImport(LibraryName, EntryPoint = "MSDF_GetVarFontData", StringMarshalling = StringMarshalling.Utf8), UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         public static partial MSDF_VarFontData* GetVarFontData(MSDF_FontFace* face, MSDF_VarFontMetrics* metrics);
 
-        [LibraryImport(LibraryName, EntryPoint = "MSDF_DestroyVarFontData", StringMarshalling = StringMarshalling.Utf8), UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        public static partial void DestroyVarFontData(MSDF_FTContext* ft, MSDF_VarFontData* vars);
+        [LibraryImport(LibraryName, EntryPoint = "MSDF_DestroyVarData", StringMarshalling = StringMarshalling.Utf8), UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        public static partial void DestroyVarData(MSDF_FTContext* ft, MSDF_VarFontData* vars);
 
         [LibraryImport(LibraryName, EntryPoint = "MSDF_GetVarFontAxis", StringMarshalling = StringMarshalling.Utf8), UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         [return: MarshalAs(UnmanagedType.I1)]

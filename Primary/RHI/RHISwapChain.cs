@@ -58,6 +58,8 @@ namespace Primary.RHI
         public RHIFormat BackBufferFormat;
         public int BackBufferCount;
 
+        public bool EnableComposition;
+
         public RHISwapChainDescription()
         {
             WindowHandle = nint.Zero;
@@ -65,6 +67,8 @@ namespace Primary.RHI
 
             BackBufferFormat = RHIFormat.Unknown;
             BackBufferCount = 0;
+
+            EnableComposition = false;
         }
 
         public RHISwapChainDescription(RHISwapChainDescription other)
@@ -74,6 +78,8 @@ namespace Primary.RHI
 
             BackBufferFormat = other.BackBufferFormat;
             BackBufferCount = other.BackBufferCount;
+
+            EnableComposition = other.EnableComposition;
         }
     }
 }

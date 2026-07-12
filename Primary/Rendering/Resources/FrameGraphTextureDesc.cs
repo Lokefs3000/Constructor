@@ -76,6 +76,7 @@ namespace Primary.Rendering.Resources
         Cube
     }
 
+    [Flags]
     public enum FGTextureUsage : byte
     {
         Undefined = 0,

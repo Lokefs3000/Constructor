@@ -1,4 +1,6 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using CommunityToolkit.HighPerformance;
 
 namespace Primary.Utility
 {
@@ -29,6 +31,36 @@ namespace Primary.Utility
             }
 
             return array;
+        }
+
+        extension (Stream stream)
+        {
+            public bool TryRead<T>(out T value) where T : unmanaged
+            {
+                if (!stream.CanRead || stream.Position + Unsafe.SizeOf<T>() > stream.Length)
+                {
+                    value = default;
+                    return false;
+                }
+
+                value = stream.Read<T>();
+                return true;
+            }
+
+            public int Read<T>(Span<T> value) where T : unmanaged
+            {
+                return stream.Read(MemoryMarshal.Cast<T, byte>(value));
+            }
+
+            public void ReadExactly<T>(Span<T> value) where T : unmanaged
+            {
+                stream.ReadExactly(MemoryMarshal.Cast<T, byte>(value));
+            }
+
+            public void Write<T>(ReadOnlySpan<T> value) where T : unmanaged
+            {
+                stream.Write(MemoryMarshal.Cast<T, byte>(value));
+            }
         }
     }
 }

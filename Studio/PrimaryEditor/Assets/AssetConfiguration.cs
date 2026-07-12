@@ -15,53 +15,17 @@ namespace PrimaryEditor.Assets
             _pipeline = pipeline;
         }
 
-        public string GetConfigFilePath(string localPath, string keyword)
+        public string? GetConfigPath(string localPath)
         {
-            AssetId id = _pipeline.AssetRegistry.GetOrRegisterIdFor(localPath);
+            if (!FilesystemManager.TryGetFullPath(localPath, out string? fullPath))
+                return null;
 
-            string sourcePath = Path.Combine(ProjectData.Instance.Paths.LibraryConfigFolder, $"{id:N}_{keyword}.toml");
-            return sourcePath;
+            return fullPath + ".assetdat";
         }
 
-        public string? GetFilePathOrLocal(string localPath, string keyword, out bool isLocal)
+        public string? GetLocalConfigPath(string localPath)
         {
-            AssetId id = _pipeline.AssetRegistry.GetOrRegisterIdFor(localPath);
-
-            string sourcePath = Path.Combine(ProjectData.Instance.Paths.LibraryConfigFolder, $"{id:N}_{keyword}.toml");
-            if (!File.Exists(sourcePath))
-            {
-                sourcePath = Path.ChangeExtension(localPath, ".toml");
-                if (!FilesystemManager.TryGetFullPath(sourcePath, out string? fullPath) || !File.Exists(fullPath))
-                {
-                    isLocal = false;
-                    return null;
-                }
-
-                isLocal = true;
-                return sourcePath;
-            }
-            else
-            {
-                isLocal = false;
-                return sourcePath;
-            }
+            return localPath + ".assetdat";
         }
-
-        public bool DoesFileHaveConfig(string localPath, string keyword, bool allowLocalConfig = true)
-        {
-            if (FilesystemManager.TryGetFullPath(localPath, out string? fullPath))
-                localPath = fullPath;
-            else
-                return false;
-
-            AssetId id = _pipeline.AssetRegistry.GetOrRegisterIdFor(localPath);
-
-            string sourcePath = Path.Combine(ProjectData.Instance.Paths.LibraryConfigFolder, $"{id:N}_{keyword}.toml");
-            if (File.Exists(sourcePath))
-                return true;
-
-            return allowLocalConfig && File.Exists(Path.ChangeExtension(localPath, ".toml"));
-        }
-
     }
 }

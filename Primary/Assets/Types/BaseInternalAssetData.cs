@@ -35,18 +35,16 @@ namespace Primary.Assets.Types
         {
             _asset.Target = asset;
 
-            _status = ResourceStatus.Success;
-
             ++_loadIndex;
+            _status = ResourceStatus.Success;
         }
 
         public virtual void UpdateAssetFailed(T asset)
         {
             _asset.Target = asset;
 
-            _status = ResourceStatus.Error;
-
             ++_loadIndex;
+            _status = ResourceStatus.Error;
         }
 
         public virtual void SetAssetInternalName(string name) => _name = name;

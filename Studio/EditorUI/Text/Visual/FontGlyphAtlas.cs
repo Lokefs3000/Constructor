@@ -10,6 +10,7 @@ namespace EditorUI.Text.Visual
     public sealed class FontGlyphAtlas : IDisposable
     {
         private readonly IFontTextureFactory _factory;
+        private readonly Int2 _padding;
 
         private Int2 _atlasSize;
         private List<PackingRect> _rects;
@@ -19,9 +20,10 @@ namespace EditorUI.Text.Visual
 
         private bool _disposedValue;
 
-        internal FontGlyphAtlas(IFontTextureFactory factory)
+        internal FontGlyphAtlas(IFontTextureFactory factory, Int2 padding)
         {
             _factory = factory;
+            _padding = padding;
 
             _atlasSize = Int2.Zero;
             _rects = new List<PackingRect>();
@@ -52,15 +54,25 @@ namespace EditorUI.Text.Visual
             GC.SuppressFinalize(this);
         }
 
-        internal void FinishPacking()
+        internal IFontTexture? FinishPacking()
         {
             if (_hasAtlasResized)
             {
+                _hasAtlasResized = false;
+
                 if (_fontTexture != null)
-                    _fontTexture.Resize(_atlasSize);
-                else
+                {
                     _fontTexture = _factory.CreateTexture(_atlasSize);
-            }    
+                    return _fontTexture;
+                }
+                else
+                {
+                    _fontTexture = _factory.CreateTexture(_atlasSize);
+                    return null;
+                }
+            }
+
+            return null;
         }
 
         internal Int2 PackGlyphInto(Rect glyphRect)
@@ -70,27 +82,28 @@ namespace EditorUI.Text.Visual
             {
                 ref PackingRect packingRect = ref rects[i];
 
-                Int2 extents = packingRect.CurrentPosition + glyphRect.Size;
+                Int2 paddedSize = glyphRect.Size + _padding;
+                Int2 extents = packingRect.CurrentPosition + paddedSize;
 
                 bool fitsWithinX = extents.X <= packingRect.MaximumExtents.X;
                 bool fitsWithinY = extents.Y <= packingRect.MaximumExtents.Y;
 
-                if (fitsWithinX)
+                if (fitsWithinY)
                 {
                     Int2 position = Int2.Zero;
-                    if (fitsWithinY)
+                    if (fitsWithinX)
                     {
                         position = packingRect.CurrentPosition;
 
                         packingRect.CurrentPosition = new Int2(extents.X, packingRect.CurrentPosition.Y);
-                        packingRect.LineHeight = Math.Max(packingRect.LineHeight, glyphRect.Height);
+                        packingRect.LineHeight = Math.Max(packingRect.LineHeight, paddedSize.Y);
                     }
                     else
                     {
                         if (packingRect.CurrentPosition.X + PackingIgnoreSizeW > packingRect.MaximumExtents.X)
                         {
-                            packingRect.CurrentPosition = new Int2(packingRect.MinimumExtents.X + glyphRect.Width, packingRect.CurrentPosition.Y + packingRect.LineHeight);
-                            packingRect.LineHeight = glyphRect.Height;
+                            packingRect.CurrentPosition = new Int2(packingRect.MinimumExtents.X + paddedSize.X, packingRect.CurrentPosition.Y + packingRect.LineHeight);
+                            packingRect.LineHeight = paddedSize.Y;
 
                             position = new Int2(packingRect.MinimumExtents.X, packingRect.CurrentPosition.Y);
                         }
@@ -165,7 +178,7 @@ namespace EditorUI.Text.Visual
 
         private const int PackingIgnoreSizeW = 33;
 
-        private const int DefaultAtlasSize = 128;
+        private const int DefaultAtlasSize = 256;
     }
 
     public record struct PackingRect(Int2 CurrentPosition, Int2 MinimumExtents, Int2 MaximumExtents, int LineHeight);

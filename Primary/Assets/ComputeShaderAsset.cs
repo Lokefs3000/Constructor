@@ -6,7 +6,6 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
-using TerraFX.Interop.Windows;
 
 namespace Primary.Assets
 {

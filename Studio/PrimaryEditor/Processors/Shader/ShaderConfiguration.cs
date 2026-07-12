@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Primary.Assets.Loaders;
 using Primary.Assets.Types;
+using PrimaryEditor.Assets.Utility;
 using Tomlyn.Serialization;
 
 namespace PrimaryEditor.Processors.Shader
@@ -41,6 +42,7 @@ namespace PrimaryEditor.Processors.Shader
         public struct DepthStencil
         {
             public bool DepthEnable { get; set; }
+            [TomlPropertyName("depth_write_mask")]
             public SBCDepthWriteMask WriteMask { get; set; }
             public SBCComparisonFunc DepthFunc { get; set; }
             public bool StencilEnable { get; set; }

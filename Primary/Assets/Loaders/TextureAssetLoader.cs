@@ -32,7 +32,7 @@ namespace Primary.Assets.Loaders
             return new TextureAsset(textureData);
         }
 
-        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
+        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, string localPath, BundleReader? bundleToReadFrom)
         {
             if (asset is not TextureAsset texture)
                 throw new ArgumentException(nameof(asset));
@@ -163,7 +163,7 @@ namespace Primary.Assets.Loaders
                     Usage = RHIResourceUsage.ShaderResource,
 
                     Swizzle = new RHISwizzle(samplerInfo.Swizzle.Code),
-                }, planeSlices.AsSpan(), sourcePath);
+                }, planeSlices.AsSpan(), localPath);
 
                 rhiSampler = device.CreateSampler(new RHISamplerDescription
                 {
@@ -374,7 +374,7 @@ namespace Primary.Assets.Loaders
             catch (Exception ex)
             {
                 textureData.UpdateAssetFailed(texture);
-                EngLog.Assets.Error(ex, "Failed to load texture: {name}", sourcePath);
+                EngLog.Assets.Error(ex, "Failed to load texture: {name}", localPath);
             }
 #endif
         }

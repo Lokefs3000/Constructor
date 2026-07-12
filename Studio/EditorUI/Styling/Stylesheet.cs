@@ -15,18 +15,23 @@ namespace EditorUI.Styling
         private readonly string _sourceName;
 
         private readonly Dictionary<ClassKey, StylesheetClass> _classes;
+        private readonly Dictionary<string, string> _variables;
 
         public Stylesheet(string sourceName)
         {
             _sourceName = sourceName;
 
             _classes = new Dictionary<ClassKey, StylesheetClass>();
+            _variables = new Dictionary<string, string>();
         }
 
         public StylesheetClass CreateClass(ClassType classType, string name)
         {
             Guard.IsFalse(classType == ClassType.Pseudo, "A pseudo class must be parented to another class");
             Guard.IsTrue(IsNameValid(classType, name), "Name is not valid for a class");
+
+            if (classType == ClassType.Named)
+                name = name[1..];
 
             StylesheetClassName className = new StylesheetClassName(classType, name);
             StylesheetClass stylesheetClass = new StylesheetClass(className);
@@ -39,6 +44,9 @@ namespace EditorUI.Styling
         {
             Guard.IsFalse(classType == ClassType.Pseudo, "A pseudo class must be parented to another class");
             Guard.IsTrue(IsNameValid(classType, name), "Name is not valid for a class");
+
+            if (classType == ClassType.Named)
+                name = name[1..];
 
             ClassKey key = new ClassKey(classType, name);
             alreadyExists = _classes.TryGetValue(key, out StylesheetClass? stylesheetClass);
@@ -64,9 +72,20 @@ namespace EditorUI.Styling
             return _classes.TryGetValue(new ClassKey(classType, name), out stylesheetClass);
         }
 
+        public void SetVariable(string variableName, string value)
+        {
+
+        }
+
+        public void RemoveVariable(string variableName, string value)
+        {
+
+        }
+
         public string SourceName => _sourceName;
 
         public RODictionary<ClassKey, StylesheetClass> Classes => _classes;
+        public RODictionary<string, string> Variables => _variables;
 
         public static bool IsNameValid(ClassType classType, string name)
         {
@@ -132,17 +151,17 @@ namespace EditorUI.Styling
         public override int GetHashCode() => HashCode.Combine(Type, Name.GetDjb2HashCode());
     }
 
-    public readonly record struct ClassStyleKey(StylesheetClass Class, StyleKey Key)
+    public readonly record struct ClassStyleKey(StylesheetClass Class, StyleKey Key, int TriggerMask)
     {
         public override string ToString() => $"{{ {Class.ClassName}={Key} }}";
 
-        public override int GetHashCode() => HashCode.Combine(Class, Key.Property.GetDjb2HashCode(), Key.TriggerMask);
+        public override int GetHashCode() => HashCode.Combine(Class, Key.Property.GetDjb2HashCode());
     }
 
-    public readonly record struct StyleKey(string Property, ushort TriggerMask) : IEquatable<StyleKey>
+    public readonly record struct StyleKey(string Property) : IEquatable<StyleKey>
     {
-        public override string ToString() => $"{{ {Property} : {TriggerMask:x4} }}";
+        public override string ToString() => $"{{ {Property} }}";
 
-        public override int GetHashCode() => HashCode.Combine(Property.GetDjb2HashCode(), TriggerMask);
+        public override int GetHashCode() => Property.GetDjb2HashCode();
     }
 }

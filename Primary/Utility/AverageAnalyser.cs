@@ -73,9 +73,16 @@ namespace Primary.Utility
             return def;
         }
 
-        public int Count => _values.Length;
-        public float Timeout => _timeout;
+        public readonly ReadOnlySpan<T> Values => _values;
 
-        public bool IsValid => _isValid;
+        public readonly int Count => _values.Length;
+        public readonly float Timeout => _timeout;
+
+        public readonly bool IsValid => _isValid;
+
+        public readonly int Head => _head;
+        public readonly float Timer => _timer;
+
+        public readonly T Newest => _values[_head];
     }
 }

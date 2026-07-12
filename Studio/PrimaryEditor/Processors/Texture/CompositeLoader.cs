@@ -40,8 +40,7 @@ namespace Editor.Processors.Texture
                         _ => throw new NotImplementedException()
                     };
 
-                    string? filePath = idProvider.RetrievePathForId(channel.Asset);
-                    if (filePath == null)
+                    if (!idProvider.TryGetLocalPathForId(channel.Asset, out string? filePath))
                     {
                         throw new Exception($"Failed to get path for id: {channel.Asset} ({(TextureCompositeChannel)(1 << i)})");
                     }

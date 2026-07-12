@@ -3,9 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 using Primary.Collections;
-using Primary.Common;
 using Primary.Serialization.Arguments;
-using TerraFX.Interop.Windows;
 
 namespace Primary
 {
@@ -247,6 +245,13 @@ namespace Primary
 
             value = default;
             return false;
+        }
+
+        public static T? GetValueOrDefault<T>(string arg, T? defaultValue)
+        {
+            if (_arguments.TryGetValue(arg, out object? value))
+                return (T)value;
+            return defaultValue;
         }
 
         private static readonly object s_defaultObject = new object();

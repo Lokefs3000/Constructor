@@ -1,14 +1,18 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
+using EditorUI.Styling;
 using EditorUI.Visual;
+using EditorUI.Widgets;
 using EditorUI.Windowing;
 using Primary.Collections.ReadOnly;
+using Primary.Common;
 using Primary.Mathematics;
 
 namespace EditorUI.Dock
 {
-    public abstract class DockBase
+    public abstract class DockBase : StyledObject
     {
         protected StateFlags _stateFlags;
         protected DockFlags _dockFlags;
@@ -42,17 +46,25 @@ namespace EditorUI.Dock
 
         protected internal abstract void TryUpdateWindowFocus(WindowBase window);
 
-        protected internal virtual void TryAddStateFlags(StateFlags flags)
+        public override void AddStateFlags(StateFlags flags)
         {
             _stateFlags |= flags;
         }
 
-        protected internal virtual void TryRemoveStateFlags(StateFlags flags)
+        public override void RemoveStateFlags(StateFlags flags)
         {
             _stateFlags &= ~flags;
         }
 
-        public StateFlags StateFlags => _stateFlags;
+        protected internal override void GetUnstyledObjects(ref StyleQueueContext queue)
+        {
+            foreach (DockBase dock in Docks)
+            {
+                queue.TryEnqueue(dock);
+            }
+        }
+
+        public override StateFlags StateFlags => _stateFlags;
         public DockFlags DockFlags => _dockFlags;
 
         public abstract Rect DockRect { get; }
@@ -70,6 +82,8 @@ namespace EditorUI.Dock
         public WindowBase? CurrentWindow => ActiveWindow != -1 ? Windows[ActiveWindow] : null;
 
         public abstract ROList<DockBase> Docks { get; }
+
+        protected internal override StyledObject? ParentObject => Parent;
     }
 
     public enum DockingSide : byte

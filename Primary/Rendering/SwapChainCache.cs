@@ -85,14 +85,35 @@ namespace Primary.Rendering
             {
                 if (data.SwapChain == null)
                 {
-                    data.SwapChain = _manager.GraphicsDevice.CreateSwapChain(new RHISwapChainDescription
+                    RHISwapChainDescription desc = new RHISwapChainDescription
                     {
                         WindowHandle = window.NativeWindowHandle,
                         WindowSize = window.ClientSize.AsVector2(),
 
                         BackBufferFormat = RHIFormat.RGB10A2_UNorm,
-                        BackBufferCount = 2
-                    }) ?? throw new NullReferenceException();
+                        BackBufferCount = 2,
+
+                        EnableComposition = window.IsTransparent
+                    };
+
+                    try
+                    {
+                        data.SwapChain = _manager.GraphicsDevice.CreateSwapChain(desc) ?? throw new NullReferenceException();
+                    }
+                    catch (Exception)
+                    {
+                        if (desc.EnableComposition)
+                        {
+                            EngLog.Render.Error("Failed to create swap chain for composition on '{w}'", window);
+
+                            desc.EnableComposition = false;
+                            data.SwapChain = _manager.GraphicsDevice.CreateSwapChain(desc) ?? throw new NullReferenceException();
+                        }
+                        else
+                        {
+                            throw;
+                        }
+                    }
 
                     _swapChains[window.WindowId] = data;
                 }

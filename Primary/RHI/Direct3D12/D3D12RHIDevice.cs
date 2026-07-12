@@ -1,30 +1,20 @@
-﻿using Primary.Common;
-using Primary.Memory.Native;
-using Primary.RHI.Validation;
-using Serilog;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
+using Primary.Common;
+using Primary.Memory.Native;
+using Primary.RHI.Validation;
+using Serilog;
+using Silk.NET.Core.Native;
+using Silk.NET.Direct3D12;
+using Silk.NET.DXGI;
+
 using static Interop.D3D12MemAlloc.ALLOCATOR_FLAGS;
-using static TerraFX.Interop.DirectX.D3D_FEATURE_LEVEL;
-using static TerraFX.Interop.DirectX.D3D_SHADER_MODEL;
-using static TerraFX.Interop.DirectX.D3D12_COMMAND_LIST_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_COMMAND_QUEUE_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_COMMAND_QUEUE_PRIORITY;
-using static TerraFX.Interop.DirectX.D3D12_DRED_ENABLEMENT;
-using static TerraFX.Interop.DirectX.D3D12_FEATURE;
-using static TerraFX.Interop.DirectX.D3D12_MESSAGE_ID;
-using static TerraFX.Interop.DirectX.D3D12_MESSAGE_SEVERITY;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_BINDING_TIER;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_HEAP_TIER;
-using static TerraFX.Interop.DirectX.DXGI;
-using static TerraFX.Interop.DirectX.DXGI_GPU_PREFERENCE;
-using static TerraFX.Interop.DirectX.DXGI_MEMORY_SEGMENT_GROUP;
+
 using D3D12MA = Interop.D3D12MemAlloc;
+using Feature = Silk.NET.Direct3D12.Feature;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -33,8 +23,10 @@ namespace Primary.RHI.Direct3D12
     {
         private ILogger? _logger;
 
+        private D3D12RHISetup _setup;
+
         private CancellationTokenSource _videoBudgetCts;
-        private HANDLE _videoBudgetChangeEvent;
+        private TerraFX.Interop.Windows.HANDLE _videoBudgetChangeEvent;
         private Thread _videoBudgetThread;
         private uint _videoBudgetChangeCookie;
 
@@ -53,6 +45,8 @@ namespace Primary.RHI.Direct3D12
         private ComPtr<ID3D12CommandQueue> _copyCmdQueue;
 
         private D3D12MA.Allocator* _d3d12Allocator;
+
+        private CompositionDevice? _compositionDevice;
 
         private D3D12RHIDeviceNative* _nativeRep;
 
@@ -77,24 +71,32 @@ namespace Primary.RHI.Direct3D12
 
             _logger = logger;
 
+            //Setup
+            {
+                _setup = new D3D12RHISetup
+                {
+                    UseTightAlignment = !AppArguments.HasArgument("d3d12-no-tight-alignment")
+                };
+            }
+
             //DXGI
             {
                 uint flags = 0;
                 if (description.EnableValidation)
-                    flags |= DXGI_CREATE_FACTORY_DEBUG;
+                    flags |= DXGI.CreateFactoryDebug;
 
-                HRESULT hr = DirectX.CreateDXGIFactory2(flags, UuidOf.Get<IDXGIFactory7>(), (void**)_factory.GetAddressOf());
-                if (hr.FAILED)
+                HResult hr = DXGI.CreateDXGIFactory2(flags, out _factory);
+                if (hr.IsFailure)
                 {
-                    throw new RHIException($"Failed to create DXGI factory with error: {hr.ToString()}");
+                    throw new D3D12RHIException($"Failed to create DXGI factory with error", hr.Value);
                 }
             }
 
             {
-                HRESULT hr = _factory.Get()->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, UuidOf.Get<IDXGIAdapter4>(), (void**)_adapter.GetAddressOf());
-                if (hr.FAILED)
+                HResult hr = _factory.EnumAdapterByGpuPreference(0, GpuPreference.HighPerformance, out _adapter);
+                if (hr.IsFailure)
                 {
-                    throw new RHIException($"Failed to enumerate for a valid DXGI adapter: {hr.ToString()}");
+                    throw new D3D12RHIException($"Failed to enumerate for a valid DXGI adapter", hr.Value);
                 }
             }
 
@@ -102,12 +104,12 @@ namespace Primary.RHI.Direct3D12
             fixed (uint* cookie = &_videoBudgetChangeCookie)
             {
                 _videoBudgetCts = new CancellationTokenSource();
-                _videoBudgetChangeEvent = Windows.CreateEventA(null, false, true, null);
+                _videoBudgetChangeEvent = TerraFX.Interop.Windows.Windows.CreateEventA(null, false, true, null);
                 _videoBudgetThread = new Thread(VideoBudgetThreadProc) { IsBackground = true };
                 _videoBudgetChangeCookie = 0;
 
-                HRESULT hr = _adapter.Get()->RegisterVideoMemoryBudgetChangeNotificationEvent(_videoBudgetChangeEvent, cookie);
-                if (hr.SUCCEEDED)
+                HResult hr = _adapter.RegisterVideoMemoryBudgetChangeNotificationEvent(_videoBudgetChangeEvent, cookie);
+                if (hr.IsSuccess)
                 {
                     _videoBudgetThread.Start();
                 }
@@ -120,29 +122,52 @@ namespace Primary.RHI.Direct3D12
             //D3D12
             if (description.EnableValidation)
             {
-                HRESULT hr = DirectX.D3D12GetDebugInterface(UuidOf.Get<ID3D12Debug6>(), (void**)_debug.GetAddressOf());
-                if (hr.SUCCEEDED)
+                HResult hr = D3D12.GetDebugInterface(out _debug);
+                if (hr.IsSuccess)
                 {
-                    ID3D12Debug6* debug = _debug.Get();
-
-                    debug->EnableDebugLayer();
-                    debug->SetEnableAutoName(true);
+                    _debug.EnableDebugLayer();
+                    _debug.SetEnableAutoName(true);
                 }
                 else
                     _logger?.Warning("Failed to query D3D12 debug interface!");
             }
 
             {
-                HRESULT hr = DirectX.D3D12CreateDevice((IUnknown*)_adapter.Get(), D3D_FEATURE_LEVEL_12_2, UuidOf.Get<ID3D12Device14>(), (void**)_device.GetAddressOf());
-                if (hr.FAILED)
+                ComPtr<ID3D12Device14> deviceComPtr = default;
+
+                HResult hr = D3D12.CreateDevice(_adapter, D3DFeatureLevel.Level122, out deviceComPtr);
+                if (hr.IsFailure)
                 {
-                    throw new RHIException($"Failed to create D3D12 device: {hr.ToString()}");
+                    throw new D3D12RHIException($"Failed to create D3D12 device", hr.Value);
+                }
+
+                _device = deviceComPtr;
+
+                if (_device.Handle == null)
+                {
+                    throw new D3D12RHIException($"D3D12 device handle is null!");
                 }
             }
 
             //Validate device features
             {
-                ID3D12Device14* device = _device.Get();
+                D3DShaderModel shaderModel = D3DShaderModel.HighestShaderModel;
+
+                while (shaderModel > D3DShaderModel.ShaderModel51)
+                {
+                    FeatureDataShaderModel featureDataShaderModel = new FeatureDataShaderModel { HighestShaderModel = shaderModel };
+
+                    HResult hr = new HResult(_device.CheckFeatureSupport(Feature.ShaderModel, &featureDataShaderModel, (uint)Unsafe.SizeOf<FeatureDataShaderModel>()));
+                    if (hr.IsSuccess)
+                    {
+                        break;
+                    }
+
+                    --shaderModel;
+                }
+
+                if (shaderModel < D3DShaderModel.ShaderModel66)
+                    throw new D3D12RHIException("Needs atleast shader model 6.6 support");
 
                 //AssertFeatureSupport<D3D12_FEATURE_DATA_SHADER_MODEL>(D3D12_FEATURE_SHADER_MODEL, (x) =>
                 //{
@@ -150,52 +175,93 @@ namespace Primary.RHI.Direct3D12
                 //        throw new RHIException("Shader model 6.6 support not found!");
                 //});
 
-                AssertFeatureSupport<D3D12_FEATURE_DATA_D3D12_OPTIONS>(D3D12_FEATURE_D3D12_OPTIONS, (x) =>
+                ResourceBindingTier resourceBindingTier = 0;
+                ResourceHeapTier resourceHeapTier = 0;
+                TightAlignmentTier tightAlignmentTier = 0;
+                D3DRootSignatureVersion rootSignatureVersion = 0;
+                ShaderMinPrecisionSupport shaderMinPrecisionSupport = 0;
+                ConservativeRasterizationTier conservativeRasterizationTier = 0;
+
+                AssertFeatureSupport<FeatureDataD3D12Options>(Feature.D3D12Options, (x) =>
                 {
-                    if (x.ResourceBindingTier < D3D12_RESOURCE_BINDING_TIER_3)
-                        throw new RHIException("Needs atleast resource binding tier 3!");
-                    if (x.ResourceHeapTier < D3D12_RESOURCE_HEAP_TIER_2)
-                        throw new RHIException("Needs atleast resource heap tier 3!");
+                    if (x.ResourceBindingTier < ResourceBindingTier.Tier3)
+                        throw new D3D12RHIException("Needs atleast resource binding tier 3!");
+                    if (x.ResourceHeapTier < ResourceHeapTier.Tier2)
+                        throw new D3D12RHIException("Needs atleast resource heap tier 3!");
+
+                    resourceBindingTier = x.ResourceBindingTier;
+                    resourceHeapTier = x.ResourceHeapTier;
+                    shaderMinPrecisionSupport = x.MinPrecisionSupport;
+                    conservativeRasterizationTier = x.ConservativeRasterizationTier;
                 });
 
-                void AssertFeatureSupport<T>(D3D12_FEATURE feature, Action<T> callback) where T : unmanaged
+                AssertFeatureSupport<FeatureDataTightAlignment>(Feature.D3D12TightAlignment, (x) =>
+                {
+                    if (x.SupportTier < TightAlignmentTier.Tier1)
+                    {
+                        _setup.UseTightAlignment = false;
+                        _logger?.Information("No tight alignment support from GPU");
+                    }
+
+                    tightAlignmentTier = x.SupportTier;
+                });
+
+                // AssertFeatureSupport<FeatureDataRootSignature>(Feature.RootSignature, (x) =>
+                // {
+                //     if (x.HighestVersion < D3DRootSignatureVersion.Version12)
+                //         throw new RHIException("Needs atleast resource root signature version 1.2!");
+                // 
+                //     rootSignatureVersion = x.HighestVersion;
+                // });
+
+                EngLog.RHI.Information(@"Relevant d3d12 feature caps:
+    Shader model: {a}
+    Resource binding tier: {b}
+    Resource heap tier: {c}
+    Tight alignment tier: {d} (enabled: {i})
+    Root signature version: {e}
+    Shader minimum precision support: {f}
+    Conservative raster tier: {g}", shaderModel, resourceBindingTier, resourceHeapTier, tightAlignmentTier, _setup.UseTightAlignment, rootSignatureVersion, shaderMinPrecisionSupport, conservativeRasterizationTier);
+
+                void AssertFeatureSupport<T>(Feature feature, Action<T> callback) where T : unmanaged
                 {
                     T data = default;
-                    if (device->CheckFeatureSupport(feature, &data, (uint)Unsafe.SizeOf<T>()).FAILED)
-                        throw new RHIException($"Failed to query support for feature: {feature}");
+                    HResult hr = _device.CheckFeatureSupport(feature, &data, (uint)Unsafe.SizeOf<T>());
+                    if (hr.IsFailure)
+                        throw new D3D12RHIException($"Failed to query support for feature: {feature}", hr.Value);
 
                     callback(data);
                 }
             }
 
             {
-                if (_device.Get()->QueryInterface(UuidOf.Get<ID3D12InfoQueue1>(), (void**)_infoQueue1.GetAddressOf()).SUCCEEDED)
+                if (new HResult(_device.QueryInterface(out _infoQueue1)).IsSuccess)
                 {
                     //_infoQueue1.Get()->RegisterMessageCallback()
                 }
 
-                if (_device.Get()->QueryInterface(UuidOf.Get<ID3D12InfoQueue>(), (void**)_infoQueue.GetAddressOf()).SUCCEEDED)
+                if (new HResult(_device.QueryInterface(out _infoQueue)).IsSuccess)
                 {
-                    fixed (D3D12_MESSAGE_SEVERITY* ptr = s_allowedSeverities)
+                    fixed (MessageSeverity* ptr0 = s_allowedSeverities)
                     {
-                        fixed (D3D12_MESSAGE_ID* ptr2 = s_deniedIds)
+                        fixed (MessageID* ptr1 = s_deniedIds)
                         {
-                            D3D12_INFO_QUEUE_FILTER filter = new D3D12_INFO_QUEUE_FILTER
+                            var filter = new Silk.NET.Direct3D12.InfoQueueFilter
                             {
-                                AllowList = new D3D12_INFO_QUEUE_FILTER_DESC
+                                AllowList = new Silk.NET.Direct3D12.InfoQueueFilterDesc
                                 {
                                     NumSeverities = (uint)s_allowedSeverities.Length,
-                                    pSeverityList = ptr
+                                    PSeverityList = ptr0
                                 },
-                                DenyList = new D3D12_INFO_QUEUE_FILTER_DESC
+                                DenyList = new Silk.NET.Direct3D12.InfoQueueFilterDesc
                                 {
                                     NumIDs = (uint)s_deniedIds.Length,
-                                    pIDList = ptr2
+                                    PIDList = ptr1
                                 }
                             };
 
-                            _infoQueue.Get()->ClearStorageFilter();
-                            _infoQueue.Get()->PushStorageFilter(&filter);
+                            _infoQueue.ClearStorageFilter();
+                            _infoQueue.PushStorageFilter(&filter);
                         }
                     }
 
@@ -203,64 +269,84 @@ namespace Primary.RHI.Direct3D12
                     //_infoQueue.Get()->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
                 }
 
-                if (_device.Get()->QueryInterface(UuidOf.Get<ID3D12DeviceRemovedExtendedDataSettings1>(), (void**)_dredSettings.GetAddressOf()).SUCCEEDED)
+                if (new HResult(_device.QueryInterface(out _dredSettings)).IsSuccess)
                 {
-                    ID3D12DeviceRemovedExtendedDataSettings1* settings = _dredSettings.Get();
-
-                    settings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
-                    settings->SetBreadcrumbContextEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
-                    settings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+                    _dredSettings.SetAutoBreadcrumbsEnablement(DredEnablement.ForcedOn);
+                    _dredSettings.SetBreadcrumbContextEnablement(DredEnablement.ForcedOn);
+                    _dredSettings.SetPageFaultEnablement(DredEnablement.ForcedOn);
                 }
             }
 
             {
-                D3D12_COMMAND_QUEUE_DESC desc = new D3D12_COMMAND_QUEUE_DESC
+                CommandQueueDesc desc = new CommandQueueDesc
                 {
-                    Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
-                    Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
-                    Priority = (int)D3D12_COMMAND_QUEUE_PRIORITY_NORMAL,
+                    Type = CommandListType.Direct,
+                    Flags = CommandQueueFlags.AllowDynamicPriority,
+                    Priority = (int)CommandQueuePriority.Normal,
                     NodeMask = 0
                 };
 
-                HRESULT hr = _device.Get()->CreateCommandQueue(&desc, UuidOf.Get<ID3D12CommandQueue>(), (void**)_directCmdQueue.GetAddressOf());
-                if (hr.FAILED)
+                HResult hr = _device.CreateCommandQueue(&desc, out _directCmdQueue);
+                if (hr.IsFailure)
                 {
-                    throw new RHIException($"Failed to create direct command queue: {hr.ToString()}");
+                    throw new D3D12RHIException($"Failed to create direct command queue", hr.Value);
                 }
 
-                desc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
-                hr = _device.Get()->CreateCommandQueue(&desc, UuidOf.Get<ID3D12CommandQueue>(), (void**)_computeCmdQueue.GetAddressOf());
-                if (hr.FAILED)
+                desc.Type = CommandListType.Compute;
+                hr = _device.CreateCommandQueue(&desc, out _computeCmdQueue);
+                if (hr.IsFailure)
                 {
-                    throw new RHIException($"Failed to create compute command queue: {hr.ToString()}");
+                    throw new D3D12RHIException($"Failed to create compute command queue", hr.Value);
                 }
 
-                desc.Type = D3D12_COMMAND_LIST_TYPE_COPY;
-                hr = _device.Get()->CreateCommandQueue(&desc, UuidOf.Get<ID3D12CommandQueue>(), (void**)_copyCmdQueue.GetAddressOf());
-                if (hr.FAILED)
+                desc.Type = CommandListType.Copy;
+                hr = _device.CreateCommandQueue(&desc, out _copyCmdQueue);
+                if (hr.IsFailure)
                 {
-                    throw new RHIException($"Failed to create compute copy queue: {hr.ToString()}");
+                    throw new D3D12RHIException($"Failed to create compute copy queue", hr.Value);
                 }
             }
 
             {
                 D3D12MA.ALLOCATOR_DESC desc = new D3D12MA.ALLOCATOR_DESC
                 {
-                    pDevice = (ID3D12Device*)_device.Get(),
-                    pAdapter = (IDXGIAdapter*)_adapter.Get(),
+                    pDevice = (ID3D12Device*)Unsafe.AsPointer(ref _device.Get()),
+                    pAdapter = (IDXGIAdapter*)Unsafe.AsPointer(ref _adapter.Get()),
                     Flags = ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED | ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED,
                     pAllocationCallbacks = null,
                     PreferredBlockSize = 0
                 };
 
+                if (!_setup.UseTightAlignment)
+                    desc.Flags |= ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT;
+
                 D3D12MA.Allocator* ptr = null;
-                HRESULT hr = D3D12MA.D3D12MA.CreateAllocator(&desc, &ptr);
-                if (hr.FAILED)
+                HResult hr = D3D12MA.D3D12MA.CreateAllocator(&desc, &ptr);
+                if (hr.IsFailure)
                 {
-                    throw new RHIException($"Failed to create D3D12MA allocator: {hr.ToString()}");
+                    throw new D3D12RHIException($"Failed to create D3D12MA allocator", hr.Value);
                 }
 
                 _d3d12Allocator = ptr;
+            }
+
+            {
+                // using ComPtr<IDXGIDevice4> dxgiDevice = _device.QueryInterface<IDXGIDevice4>();
+                // if (dxgiDevice.Handle != null)
+                // {
+                //     try
+                //     {
+                //         _compositionDevice = new CompositionDevice((TerraFX.Interop.DirectX.IDXGIDevice4*)dxgiDevice.Handle);
+                //     }
+                //     catch (Exception ex)
+                //     {
+                //         EngLog.RHI.Error(ex, "Failed to create composition device");
+                //     }
+                // }
+                // else
+                // {
+                //     EngLog.RHI.Information("Failed to get DXGI device! No composition will be available for any swap chains");
+                // }
             }
 
             //Native
@@ -270,15 +356,15 @@ namespace Primary.RHI.Direct3D12
                 {
 
                 };
-                _nativeRep->Factory = _factory.Get();
-                _nativeRep->Adapter = _adapter.Get();
-                _nativeRep->Debug = _debug.Get();
-                _nativeRep->Device = _device.Get();
-                _nativeRep->InfoQueue = _infoQueue.Get();
-                _nativeRep->InfoQueue1 = _infoQueue1.Get();
-                _nativeRep->DirectCmdQueue = _directCmdQueue.Get();
-                _nativeRep->ComputeCmdQueue = _computeCmdQueue.Get();
-                _nativeRep->CopyCmdQueue = _copyCmdQueue.Get();
+                _nativeRep->Factory = (IDXGIFactory7*)Unsafe.AsPointer(ref _factory.Get());
+                _nativeRep->Adapter = (IDXGIAdapter4*)Unsafe.AsPointer(ref _adapter.Get());
+                _nativeRep->Debug = (ID3D12Debug6*)Unsafe.AsPointer(ref _debug.Get());
+                _nativeRep->Device = (ID3D12Device14*)Unsafe.AsPointer(ref _device.Get());
+                _nativeRep->InfoQueue = (ID3D12InfoQueue*)Unsafe.AsPointer(ref _infoQueue.Get());
+                _nativeRep->InfoQueue1 = (ID3D12InfoQueue1*)Unsafe.AsPointer(ref _infoQueue1.Get());
+                _nativeRep->DirectCmdQueue = (ID3D12CommandQueue*)Unsafe.AsPointer(ref _directCmdQueue.Get());
+                _nativeRep->ComputeCmdQueue = (ID3D12CommandQueue*)Unsafe.AsPointer(ref _computeCmdQueue.Get());
+                _nativeRep->CopyCmdQueue = (ID3D12CommandQueue*)Unsafe.AsPointer(ref _copyCmdQueue.Get());
                 _nativeRep->D3D12MAllocator = _d3d12Allocator;
             }
 
@@ -306,10 +392,10 @@ namespace Primary.RHI.Direct3D12
             {
                 if (_videoBudgetThread.ThreadState == ThreadState.Running)
                 {
-                    _adapter.Get()->UnregisterVideoMemoryBudgetChangeNotification(_videoBudgetChangeCookie);
+                    _adapter.UnregisterVideoMemoryBudgetChangeNotification(_videoBudgetChangeCookie);
                     _videoBudgetCts.Cancel();
 
-                    Windows.SetEvent(_videoBudgetChangeEvent);
+                    TerraFX.Interop.Windows.Windows.SetEvent(_videoBudgetChangeEvent);
 
                     _videoBudgetThread.Join();
                 }
@@ -337,24 +423,26 @@ namespace Primary.RHI.Direct3D12
 
                 _resourceTracker.PrintUnreleased();
 
+                _compositionDevice?.Dispose();
+
                 _d3d12Allocator->Base.Release();
 
-                _copyCmdQueue.Reset();
-                _computeCmdQueue.Reset();
-                _directCmdQueue.Reset();
+                _copyCmdQueue.Dispose();
+                _computeCmdQueue.Dispose();
+                _directCmdQueue.Dispose();
 
-                _infoQueue1.Reset();
-                _infoQueue.Reset();
-                _dredSettings.Reset();
+                _infoQueue1.Dispose();
+                _infoQueue.Dispose();
+                _dredSettings.Dispose();
 
-                _device.Reset();
-                _debug.Reset();
+                _device.Dispose();
+                _debug.Dispose();
 
-                Windows.CloseHandle(_videoBudgetChangeEvent);
+                TerraFX.Interop.Windows.Windows.CloseHandle(_videoBudgetChangeEvent);
                 _videoBudgetCts.Dispose();
 
-                _adapter.Reset();
-                _factory.Reset();
+                _adapter.Dispose();
+                _factory.Dispose();
 
                 _disposedValue = true;
             }
@@ -396,7 +484,7 @@ namespace Primary.RHI.Direct3D12
             ++_renderFrameIndex;
         }
 
-        public void UploadPendingData(ID3D12GraphicsCommandList10* cmds) => _uploadManager.UploadPending(cmds);
+        public void UploadPendingData(ref ID3D12GraphicsCommandList10 cmds) => _uploadManager.UploadPending(ref cmds);
 
         public override RHIBuffer? CreateBuffer(in RHIBufferDescription description, ArrayPtr<byte> rawData, [CallerMemberName] string? debugName = "")
         {
@@ -491,17 +579,16 @@ namespace Primary.RHI.Direct3D12
 
         public override void FlushPendingMessages()
         {
-            if (_infoQueue1.Get() != null)
+            if (!Unsafe.IsNullRef(in _infoQueue1.Get()))
             {
-                _infoQueue1.Get()->ClearStoredMessages();
+                _infoQueue1.ClearStoredMessages();
             }
-            else if (_infoQueue.Get() != null)
+            else if (!Unsafe.IsNullRef(in _infoQueue.Get()))
             {
-                ID3D12InfoQueue* infoQueue = _infoQueue.Get();
-                for (int i = 0; i < (int)infoQueue->GetNumStoredMessages(); i++)
+                for (int i = 0; i < (int)_infoQueue.GetNumStoredMessages(); i++)
                 {
                     uint length = 0;
-                    if (infoQueue->GetMessage((ulong)i, null, (nuint*)&length).FAILED)
+                    if (new HResult(_infoQueue.GetMessageA((ulong)i, (Message*)null, (nuint*)&length)).IsFailure)
                         continue;
 
                     if (_debugMessageWidth < length)
@@ -513,26 +600,26 @@ namespace Primary.RHI.Direct3D12
                         _debugMessageData = NativeMemory.Alloc((nuint)_debugMessageWidth);
                     }
 
-                    D3D12_MESSAGE* message = (D3D12_MESSAGE*)_debugMessageData;
-                    if (infoQueue->GetMessage((ulong)i, message, (nuint*)&length).FAILED)
+                    Message* message = (Message*)_debugMessageData;
+                    if (new HResult(_infoQueue.GetMessageA((ulong)i, message, (nuint*)&length)).IsFailure)
                         continue;
 
-                    string cat = message->Category.ToString().Substring(23);
-                    string id = message->ID.ToString().Substring(17);
-                    string desc = new string(message->pDescription, 0, (int)message->DescriptionByteLength);
+                    string cat = message->Category.ToString();
+                    string id = message->ID.ToString();
+                    string desc = new string((sbyte*)message->PDescription, 0, (int)message->DescriptionByteLength);
 
                     switch (message->Severity)
                     {
-                        case D3D12_MESSAGE_SEVERITY_CORRUPTION: _logger?.Fatal("[{cat}/{id}]: {desc}", cat, id, desc); break;
-                        case D3D12_MESSAGE_SEVERITY_ERROR: _logger?.Error("[{cat}/{id}]: {desc}", cat, id, desc); break;
-                        case D3D12_MESSAGE_SEVERITY_WARNING: _logger?.Warning("[{cat}/{id}]: {desc}", cat, id, desc); break;
-                        case D3D12_MESSAGE_SEVERITY_INFO: _logger?.Information("[{cat}/{id}]: {desc}", cat, id, desc); break;
-                        case D3D12_MESSAGE_SEVERITY_MESSAGE: _logger?.Debug("[{cat}/{id}]: {desc}", cat, id, desc); break;
+                        case MessageSeverity.Corruption: _logger?.Fatal("[{cat}/{id}]: {desc}", cat, id, desc); break;
+                        case MessageSeverity.Error: _logger?.Error("[{cat}/{id}]: {desc}", cat, id, desc); break;
+                        case MessageSeverity.Warning: _logger?.Warning("[{cat}/{id}]: {desc}", cat, id, desc); break;
+                        case MessageSeverity.Info: _logger?.Information("[{cat}/{id}]: {desc}", cat, id, desc); break;
+                        case MessageSeverity.Message: _logger?.Debug("[{cat}/{id}]: {desc}", cat, id, desc); break;
                     }
 
                     switch (message->ID)
                     {
-                        case D3D12_MESSAGE_ID_DEVICE_REMOVAL_PROCESS_AT_FAULT:
+                        case MessageID.DeviceRemovalProcessATFault:
                             {
                                 ReportDREDErrors();
                                 break;
@@ -540,7 +627,7 @@ namespace Primary.RHI.Direct3D12
                     }
                 }
 
-                infoQueue->ClearStoredMessages();
+                _infoQueue.ClearStoredMessages();
             }
         }
 
@@ -581,31 +668,29 @@ namespace Primary.RHI.Direct3D12
 
         internal void ReportDREDErrors()
         {
-            ComPtr<ID3D12DeviceRemovedExtendedData1> dataComPtr = new ComPtr<ID3D12DeviceRemovedExtendedData1>();
-            if (_device.Get()->QueryInterface(UuidOf.Get<ID3D12DeviceRemovedExtendedData1>(), (void**)dataComPtr.GetAddressOf()).SUCCEEDED)
+            ComPtr<ID3D12DeviceRemovedExtendedData1> data = new ComPtr<ID3D12DeviceRemovedExtendedData1>();
+            if (new HResult(_device.QueryInterface(out data)).IsSuccess)
             {
-                ID3D12DeviceRemovedExtendedData1* data = dataComPtr.Get();
-
                 Logger?.Fatal("Uh-oh a GPU crash/hung has occured!");
                 Logger?.Fatal("Dumping available DRED data:");
 
                 {
-                    D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT1 breadcrumps;
-                    if (data->GetAutoBreadcrumbsOutput1(&breadcrumps).SUCCEEDED)
+                    DredAutoBreadcrumbsOutput1 breadcrumps;
+                    if (new HResult(data.GetAutoBreadcrumbsOutput1(&breadcrumps)).IsSuccess)
                     {
                         Logger?.Fatal("    Breadcrumb data:");
 
-                        D3D12_AUTO_BREADCRUMB_NODE1* node = breadcrumps.pHeadAutoBreadcrumbNode;
+                        AutoBreadcrumbNode1* node = breadcrumps.PHeadAutoBreadcrumbNode;
                         while (node != null)
                         {
-                            Logger?.Fatal("        Command list debug name: {val} ({ptr:x8})", new string(node->pCommandListDebugNameW), (nint)node->pCommandList);
-                            Logger?.Fatal("        Command queue debug name: {val} ({ptr:x8})", new string(node->pCommandQueueDebugNameW), (nint)node->pCommandQueue);
+                            Logger?.Fatal("        Command list debug name: {val} ({ptr:x8})", new string(node->PCommandListDebugNameW), (nint)node->PCommandList);
+                            Logger?.Fatal("        Command queue debug name: {val} ({ptr:x8})", new string(node->PCommandQueueDebugNameW), (nint)node->PCommandQueue);
                             Logger?.Fatal("        Breadcrumbs:");
 
                             for (int i = 0; i < node->BreadcrumbCount; i++)
                             {
-                                D3D12_AUTO_BREADCRUMB_OP op = node->pCommandHistory[i];
-                                Logger?.Error("            Executed: {ex}, Operation: {op}", *node->pLastBreadcrumbValue >= i, op);
+                                AutoBreadcrumbOp op = node->PCommandHistory[i];
+                                Logger?.Error("            Executed: {ex}, Operation: {op}", *node->PLastBreadcrumbValue >= i, op);
                             }
 
                             if (node->BreadcrumbContextsCount > 0)
@@ -614,12 +699,12 @@ namespace Primary.RHI.Direct3D12
 
                                 for (int i = 0; i < node->BreadcrumbContextsCount; i++)
                                 {
-                                    D3D12_DRED_BREADCRUMB_CONTEXT context = node->pBreadcrumbContexts[i];
-                                    Logger?.Fatal("            Index: {idx}, Context: {str}", context.BreadcrumbIndex, new string(context.pContextString));
+                                    DredBreadcrumbContext context = node->PBreadcrumbContexts[i];
+                                    Logger?.Fatal("            Index: {idx}, Context: {str}", context.BreadcrumbIndex, new string(context.PContextString));
                                 }
                             }
 
-                            node = node->pNext;
+                            node = node->PNext;
                         }
                     }
                     else
@@ -627,8 +712,8 @@ namespace Primary.RHI.Direct3D12
                 }
 
                 {
-                    D3D12_DRED_PAGE_FAULT_OUTPUT1 pagefault;
-                    if (data->GetPageFaultAllocationOutput1(&pagefault).SUCCEEDED)
+                    DredPageFaultOutput1 pagefault;
+                    if (new HResult(data.GetPageFaultAllocationOutput1(&pagefault)).IsSuccess)
                     {
                         Logger?.Fatal("    Pagefault data:");
 
@@ -636,26 +721,26 @@ namespace Primary.RHI.Direct3D12
 
                         Logger?.Fatal("        Existing allocations:");
 
-                        D3D12_DRED_ALLOCATION_NODE1* node = pagefault.pHeadExistingAllocationNode;
+                        DredAllocationNode1* node = pagefault.PHeadExistingAllocationNode;
                         while (node != null)
                         {
                             Logger?.Fatal("            Object name: {val}", new string(node->ObjectNameW));
                             Logger?.Fatal("            Allocation type: {val}", node->AllocationType);
-                            Logger?.Fatal("            Object: {val:x8}", (nint)node->pObject);
+                            Logger?.Fatal("            Object: {val:x8}", (nint)node->PObject);
 
-                            node = node->pNext;
+                            node = node->PNext;
                         }
 
                         Logger?.Fatal("        Recent freed allocations:");
 
-                        node = pagefault.pHeadRecentFreedAllocationNode;
+                        node = pagefault.PHeadRecentFreedAllocationNode;
                         while (node != null)
                         {
                             Logger?.Fatal("            Object name: {val}", new string(node->ObjectNameW));
                             Logger?.Fatal("            Allocation type: {val}", node->AllocationType);
-                            Logger?.Fatal("            Object: {val:x8}", (nint)node->pObject);
+                            Logger?.Fatal("            Object: {val:x8}", (nint)node->PObject);
 
-                            node = node->pNext;
+                            node = node->PNext;
                         }
                     }
                     else
@@ -664,18 +749,20 @@ namespace Primary.RHI.Direct3D12
             }
             else
                 Logger?.Fatal("No DRED data available!");
+
+            data.Dispose();
         }
 
         private void VideoBudgetThreadProc()
         {
-            Windows.WaitForSingleObject(_videoBudgetChangeEvent, Windows.INFINITE);
+            TerraFX.Interop.Windows.Windows.WaitForSingleObject(_videoBudgetChangeEvent, TerraFX.Interop.Windows.Windows.INFINITE);
 
             while (!_videoBudgetCts.IsCancellationRequested)
             {
-                DXGI_QUERY_VIDEO_MEMORY_INFO queryResult = default;
-                HRESULT hr = _adapter.Get()->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &queryResult);
+                QueryVideoMemoryInfo queryResult = default;
+                HResult hr = _adapter.QueryVideoMemoryInfo(0, MemorySegmentGroup.Local, &queryResult);
 
-                if (hr.FAILED)
+                if (hr.IsFailure)
                 {
                     _logger?.Debug("Failed to query for new video memory info!");
                 }
@@ -688,7 +775,7 @@ namespace Primary.RHI.Direct3D12
                         FileUtility.FormatSize((long)queryResult.CurrentReservation, "f1", CultureInfo.InvariantCulture));
                 }
 
-                Windows.WaitForSingleObject(_videoBudgetChangeEvent, Windows.INFINITE);
+                TerraFX.Interop.Windows.Windows.WaitForSingleObject(_videoBudgetChangeEvent, TerraFX.Interop.Windows.Windows.INFINITE);
             }
         }
 
@@ -725,36 +812,42 @@ namespace Primary.RHI.Direct3D12
         public override unsafe RHIDeviceNative* GetAsNative() => (RHIDeviceNative*)_nativeRep;
 
         public ILogger? Logger => _logger;
+        public D3D12RHISetup Setup => _setup;
 
         public ComPtr<IDXGIFactory7> Factory => _factory;
 
         public ComPtr<ID3D12Device14> Device => _device;
         public D3D12MA.Allocator* Allocator => _d3d12Allocator;
 
-        public ComPtr<ID3D12CommandQueue> DirectCmdQueue => _directCmdQueue.Get();
-        public ComPtr<ID3D12CommandQueue> ComputeCmdQueue => _computeCmdQueue.Get();
-        public ComPtr<ID3D12CommandQueue> CopyCmdQueue => _copyCmdQueue.Get();
+        public ComPtr<ID3D12CommandQueue> DirectCmdQueue => _directCmdQueue;
+        public ComPtr<ID3D12CommandQueue> ComputeCmdQueue => _computeCmdQueue;
+        public ComPtr<ID3D12CommandQueue> CopyCmdQueue => _copyCmdQueue;
 
         public bool HasPendingUploads => _uploadManager.HasPendingUploads;
+
+        internal CompositionDevice? CompositionDevice => _compositionDevice;
 
         internal UploadManager UploadManager => _uploadManager;
         internal ResourceTracker ResourceTracker => _resourceTracker;
 
         public override RHIDeviceAPI DeviceAPI => RHIDeviceAPI.Direct3D12;
 
-        private static D3D12_MESSAGE_SEVERITY[] s_allowedSeverities = [
-            D3D12_MESSAGE_SEVERITY_CORRUPTION,
-            D3D12_MESSAGE_SEVERITY_ERROR,
-            D3D12_MESSAGE_SEVERITY_WARNING,
+        private static MessageSeverity[] s_allowedSeverities = [
+            MessageSeverity.Corruption,
+            MessageSeverity.Error,
+            MessageSeverity.Warning,
             //D3D12_MESSAGE_SEVERITY_INFO,
-            D3D12_MESSAGE_SEVERITY_MESSAGE,
+            MessageSeverity.Message,
             ];
 
-        private static D3D12_MESSAGE_ID[] s_deniedIds = [
-            D3D12_MESSAGE_ID_HEAP_ADDRESS_RANGE_INTERSECTS_MULTIPLE_BUFFERS,
-            D3D12_MESSAGE_ID_CLEARDEPTHSTENCILVIEW_MISMATCHINGCLEARVALUE,
-            D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE
+        private static MessageID[] s_deniedIds = [
+            MessageID.HeapAddressRangeIntersectsMultipleBuffers,
+            MessageID.CleardepthstencilviewMismatchingclearvalue,
+            MessageID.ClearrendertargetviewMismatchingclearvalue
             ];
+
+        internal readonly static D3D12 D3D12 = D3D12.GetApi();
+        internal readonly static DXGI DXGI = DXGI.GetApi(null);
     }
 
     public unsafe struct D3D12RHIDeviceNative
@@ -777,5 +870,10 @@ namespace Primary.RHI.Direct3D12
         public D3D12MA.Allocator* D3D12MAllocator;
 
         public static implicit operator RHIDeviceNative(D3D12RHIDeviceNative native) => native.Base;
+    }
+
+    public struct D3D12RHISetup
+    {
+        public bool UseTightAlignment;
     }
 }

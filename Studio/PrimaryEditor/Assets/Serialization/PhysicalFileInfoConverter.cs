@@ -23,7 +23,6 @@ namespace PrimaryEditor.Assets.Serialization
             AssetId id = AssetId.Invalid;
             DateTime lastModifiedTime = DateTime.MinValue;
             long fileSize = 0;
-            FileChecksum checksum = default;
 
             int foundMask = 0;
 
@@ -85,14 +84,6 @@ namespace PrimaryEditor.Assets.Serialization
                     if (Flags.HasFlag(foundMask, 1 << 3))
                         throw new JsonException("Checksum is already defined");
 
-                    using RentedArray<byte> rented = RentedArray<byte>.Rent(Unsafe.SizeOf<FileChecksum>());
-                    OperationStatus status = Base64Url.DecodeFromUtf8(reader.ValueSpan, rented.Span, out int _, out int bytesWritten);
-
-                    if (status == OperationStatus.Done)
-                        checksum = Unsafe.ReadUnaligned<FileChecksum>(ref rented.DangerousGetReference());
-                    else
-                        throw new JsonException($"Failed to parse Checksum from base64 '{status}'");
-
                     foundMask |= 1 << 3;
                 }
                 else
@@ -107,27 +98,11 @@ namespace PrimaryEditor.Assets.Serialization
             if (foundMask != 0b1111)
                 throw new JsonException("Not all properties defined");
 
-            return new KeyValuePair<AssetId, PhysicalFileInfo>(id, new PhysicalFileInfo(lastModifiedTime, fileSize, checksum));
+            return default;
         }
 
         public override void Write(Utf8JsonWriter writer, KeyValuePair<AssetId, PhysicalFileInfo> value, JsonSerializerOptions options)
         {
-            writer.WriteStartObject();
-
-            using RentedArray<byte> encodingArray = RentedArray<byte>.Rent(Base64.GetMaxEncodedToUtf8Length(Unsafe.SizeOf<FileChecksum>()));
-
-            FileChecksum checksum = value.Value.Checksum;
-            OperationStatus status = Base64Url.EncodeToUtf8(MemoryMarshal.CreateSpan(ref Unsafe.As<FileChecksum, byte>(ref checksum), Unsafe.SizeOf<FileChecksum>()), encodingArray.Span, out int _, out int bytesWritten);
-
-            if (status != OperationStatus.Done)
-                throw new JsonException($"Failed to encode checksum to base64 '{status}'");
-
-            writer.WriteString("id", value.Key.ToString());
-            writer.WriteNumber("lastModifiedTime", value.Value.LastModifiedTime.Ticks);
-            writer.WriteNumber("fileSize", value.Value.FileSize);
-            writer.WriteString("checksum", encodingArray.Span[..bytesWritten]);
-
-            writer.WriteEndObject();
         }
     }
 }

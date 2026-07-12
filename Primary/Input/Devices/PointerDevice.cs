@@ -1,5 +1,6 @@
 ﻿using Primary.Common;
 using Primary.Mathematics;
+using Primary.Windowing;
 using SDL;
 using System.Numerics;
 
@@ -50,6 +51,12 @@ namespace Primary.Input.Devices
             {
                 _mousePosition = new Vector2(@event.motion.x, @event.motion.y);
                 _mouseDelta = new Vector2(@event.motion.xrel, @event.motion.yrel);
+
+                unsafe
+                {
+                    Vector2 globalPos = WindowManager.Instance.FindWindow((uint)@event.motion.windowID)!.Position.AsVector2() + _mousePosition;
+                    _globalMousePosition = globalPos.AsInt2();
+                }
 
                 return true;
             }

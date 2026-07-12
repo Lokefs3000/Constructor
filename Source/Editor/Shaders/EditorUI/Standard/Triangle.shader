@@ -4,7 +4,7 @@
 DefaultPsInput VertexMain(VsInput input)
 {
     DefaultPsInput output = {
-        float4(mul(transpose(cbGlobalData.Model), float3(input.Position, 1.0)), input.Depth * 0.0001, 1.0),
+        mul(cbGlobalData.Model, float4(input.Position, 0.0, 1.0)),
         input.UV,
         input.UV2,
         input.Tint,
@@ -26,14 +26,21 @@ struct TriangleShaderData
     float16_t CornerRadius;
 }
 
+float2 GetInwardVector(float2 a, float2 b, float2 center)
+{
+    float2 vector = center - lerp(a, b, 0.5);
+    float angle = atan2(vector.y, vector.x);
+
+    return float2(sin(angle), cos(angle));
+}
+
 [pixel]
-float4 PixelMain(DefaultPsInput input) : SV_Target
+PsOutput PixelMain(DefaultPsInput input) : SV_Target
 {
     TriangleShaderData shaderData = baDataBuffer.Load<TriangleShaderData>(input.DataOffset);
+    SharedData sharedData = shaderData.Shared;
 
-    if (shaderData.CornerRadius < 0.0f)
-        return input.Color;
-
-    float sdf = opRound(sdTriangle(input.FragPos, shaderData.A, shaderData.B, shaderData.C), shaderData.CornerRadius);
-    return float4(input.Color.rgb, input.Color.a * SmoothSDF(sdf));
+    float sdf = sdTriangle(input.FragPos, shaderData.A, shaderData.B, shaderData.C);
+    PsOutput output = { float4(input.Color.rgb, input.Color.a * SmoothSDF(sdf))/*, input.Position.z*/ };
+    return output;
 }

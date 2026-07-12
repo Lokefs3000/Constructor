@@ -3,16 +3,12 @@ using Primary.Common;
 using Primary.Rendering.Resources;
 using Primary.RHI;
 using Primary.RHI.Direct3D12;
+using Silk.NET.Core.Native;
+using Silk.NET.Direct3D12;
+using Silk.NET.DXGI;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
-using static TerraFX.Interop.DirectX.D3D12_DESCRIPTOR_HEAP_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_DESCRIPTOR_HEAP_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_DSV_DIMENSION;
-using static TerraFX.Interop.DirectX.D3D12_RTV_DIMENSION;
-using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 
 namespace Primary.Rendering.D3D12
 {
@@ -23,7 +19,7 @@ namespace Primary.Rendering.D3D12
 
         private readonly int _individualHeapSize;
         private readonly int _incrementSize;
-        private readonly D3D12_DESCRIPTOR_HEAP_TYPE _heapType;
+        private readonly DescriptorHeapType _heapType;
 
         private readonly int _maxDescriptorOffset;
 
@@ -32,13 +28,13 @@ namespace Primary.Rendering.D3D12
         private int _heapIndex;
         private int _heapDescriptorOffset;
 
-        private readonly D3D12_CPU_DESCRIPTOR_HANDLE _nullDescriptor;
+        private readonly CpuDescriptorHandle _nullDescriptor;
 
-        private Dictionary<NRDResource, D3D12_CPU_DESCRIPTOR_HANDLE> _allocatedDescriptors;
+        private Dictionary<NRDResource, CpuDescriptorHandle> _allocatedDescriptors;
 
         private bool _disposedValue;
 
-        internal CpuDescriptorHeap(NRDDevice device, int individualHeapSize, D3D12_DESCRIPTOR_HEAP_TYPE type)
+        internal CpuDescriptorHeap(NRDDevice device, int individualHeapSize, DescriptorHeapType type)
         {
             _device = device;
 
@@ -53,7 +49,7 @@ namespace Primary.Rendering.D3D12
             _heapIndex = 0;
             _heapDescriptorOffset = 0;
 
-            _allocatedDescriptors = new Dictionary<NRDResource, D3D12_CPU_DESCRIPTOR_HANDLE>();
+            _allocatedDescriptors = new Dictionary<NRDResource, CpuDescriptorHandle>();
 
             AddNewHeapToList();
 
@@ -62,13 +58,13 @@ namespace Primary.Rendering.D3D12
 
                 switch (type)
                 {
-                    case D3D12_DESCRIPTOR_HEAP_TYPE_RTV:
+                    case DescriptorHeapType.Rtv:
                         {
-                            D3D12_RENDER_TARGET_VIEW_DESC desc = new D3D12_RENDER_TARGET_VIEW_DESC
+                            RenderTargetViewDesc desc = new RenderTargetViewDesc
                             {
-                                Format = DXGI_FORMAT_R8G8B8A8_UNORM,
-                                ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-                                Texture2D = new D3D12_TEX2D_RTV
+                                Format = Format.FormatR8G8B8A8Unorm,
+                                ViewDimension = RtvDimension.Texture2D,
+                                Texture2D = new Tex2DRtv
                                 {
                                     MipSlice = 0,
                                     PlaneSlice = 0
@@ -78,13 +74,13 @@ namespace Primary.Rendering.D3D12
                             _device.Device->CreateRenderTargetView(null, &desc, heap.StartHandle);
                             break;
                         }
-                    case D3D12_DESCRIPTOR_HEAP_TYPE_DSV:
+                    case DescriptorHeapType.Dsv:
                         {
-                            D3D12_DEPTH_STENCIL_VIEW_DESC desc = new D3D12_DEPTH_STENCIL_VIEW_DESC
+                            DepthStencilViewDesc desc = new DepthStencilViewDesc
                             {
-                                Format = DXGI_FORMAT_D32_FLOAT,
-                                ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D,
-                                Texture2D = new D3D12_TEX2D_DSV
+                                Format = Format.FormatD32Float,
+                                ViewDimension = DsvDimension.Texture2D,
+                                Texture2D = new Tex2DDsv
                                 {
                                     MipSlice = 0,
                                 }
@@ -106,7 +102,7 @@ namespace Primary.Rendering.D3D12
             {
                 foreach (HeapData heap in _heaps)
                 {
-                    heap.Heap.Pointer->Release();
+                    heap.Heap.Dispose();
                 }
                 _heaps.Clear();
 
@@ -136,12 +132,12 @@ namespace Primary.Rendering.D3D12
                 AddNewHeapToList();
         }
 
-        internal D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle(NRDResource resource)
+        internal CpuDescriptorHandle GetDescriptorHandle(NRDResource resource)
         {
             if (resource.IsNull)
                 return _nullDescriptor;
 
-            if (_allocatedDescriptors.TryGetValue(resource, out D3D12_CPU_DESCRIPTOR_HANDLE handle))
+            if (_allocatedDescriptors.TryGetValue(resource, out CpuDescriptorHandle handle))
                 return handle;
 
             if (_heapDescriptorOffset >= _maxDescriptorOffset)
@@ -153,7 +149,7 @@ namespace Primary.Rendering.D3D12
             }
 
             HeapData data = _heaps[_heapIndex];
-            handle = _heapDescriptorOffset > 0 ? new D3D12_CPU_DESCRIPTOR_HANDLE(data.StartHandle, _heapDescriptorOffset) : data.StartHandle;
+            handle = _heapDescriptorOffset > 0 ? new CpuDescriptorHandle((nuint)(data.StartHandle.Ptr + (ulong)_heapDescriptorOffset)) : data.StartHandle;
 
             _heapDescriptorOffset += _incrementSize;
 
@@ -162,17 +158,17 @@ namespace Primary.Rendering.D3D12
                 ResourceManager resources = _device.ResourceManager;
                 switch (_heapType)
                 {
-                    case D3D12_DESCRIPTOR_HEAP_TYPE_RTV:
+                    case DescriptorHeapType.Rtv:
                         {
                             D3D12RHITextureNative* native = (D3D12RHITextureNative*)resource.Native;
 
                             Debug.Assert(Flags.HasFlag(native->Base.Description.Usage, RHIResourceUsage.RenderTarget));
 
-                            D3D12_RENDER_TARGET_VIEW_DESC desc = new D3D12_RENDER_TARGET_VIEW_DESC
+                            RenderTargetViewDesc desc = new RenderTargetViewDesc
                             {
                                 Format = native->Base.Description.Format.ToRenderTargetFormat(),
-                                ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-                                Texture2D = new D3D12_TEX2D_RTV
+                                ViewDimension = RtvDimension.Texture2D,
+                                Texture2D = new Tex2DRtv
                                 {
                                     MipSlice = 0,
                                     PlaneSlice = 0
@@ -182,17 +178,17 @@ namespace Primary.Rendering.D3D12
                             _device.Device->CreateRenderTargetView((ID3D12Resource*)resources.GetResource(resource), &desc, handle);
                             break;
                         }
-                    case D3D12_DESCRIPTOR_HEAP_TYPE_DSV:
+                    case DescriptorHeapType.Dsv:
                         {
                             D3D12RHITextureNative* native = (D3D12RHITextureNative*)resource.Native;
 
                             Debug.Assert(Flags.HasFlag(native->Base.Description.Usage, RHIResourceUsage.RenderTarget));
 
-                            D3D12_DEPTH_STENCIL_VIEW_DESC desc = new D3D12_DEPTH_STENCIL_VIEW_DESC
+                            DepthStencilViewDesc desc = new DepthStencilViewDesc
                             {
                                 Format = native->Base.Description.Format.ToDepthStencilFormat(),
-                                ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D,
-                                Texture2D = new D3D12_TEX2D_DSV
+                                ViewDimension = DsvDimension.Texture2D,
+                                Texture2D = new Tex2DDsv
                                 {
                                     MipSlice = 0,
                                 }
@@ -208,18 +204,18 @@ namespace Primary.Rendering.D3D12
                 ResourceManager resources = _device.ResourceManager;
                 switch (_heapType)
                 {
-                    case D3D12_DESCRIPTOR_HEAP_TYPE_RTV:
+                    case DescriptorHeapType.Rtv:
                         {
                             FrameGraphTexture texture = resources.FindFGTexture(resource);
 
                             Debug.Assert(texture.Index >= 0);
                             Debug.Assert(Flags.HasFlag(texture.Description.Usage, FGTextureUsage.RenderTarget));
 
-                            D3D12_RENDER_TARGET_VIEW_DESC desc = new D3D12_RENDER_TARGET_VIEW_DESC
+                            RenderTargetViewDesc desc = new RenderTargetViewDesc
                             {
                                 Format = texture.Description.Format.ToRenderTargetFormat(),
-                                ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-                                Texture2D = new D3D12_TEX2D_RTV
+                                ViewDimension = RtvDimension.Texture2D,
+                                Texture2D = new Tex2DRtv
                                 {
                                     MipSlice = 0,
                                     PlaneSlice = 0
@@ -229,18 +225,18 @@ namespace Primary.Rendering.D3D12
                             _device.Device->CreateRenderTargetView((ID3D12Resource*)resources.GetResource(resource), &desc, handle);
                             break;
                         }
-                    case D3D12_DESCRIPTOR_HEAP_TYPE_DSV:
+                    case DescriptorHeapType.Dsv:
                         {
                             FrameGraphTexture texture = resources.FindFGTexture(resource);
 
                             Debug.Assert(texture.Index >= 0);
                             Debug.Assert(Flags.HasFlag(texture.Description.Usage, FGTextureUsage.DepthStencil));
 
-                            D3D12_DEPTH_STENCIL_VIEW_DESC desc = new D3D12_DEPTH_STENCIL_VIEW_DESC
+                            DepthStencilViewDesc desc = new DepthStencilViewDesc
                             {
                                 Format = texture.Description.Format.ToDepthStencilFormat(),
-                                ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D,
-                                Texture2D = new D3D12_TEX2D_DSV
+                                ViewDimension = DsvDimension.Texture2D,
+                                Texture2D = new Tex2DDsv
                                 {
                                     MipSlice = 0,
                                 }
@@ -256,10 +252,10 @@ namespace Primary.Rendering.D3D12
             return handle;
         }
 
-        internal D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandleForSwapChain(ref D3D12RHISwapChainNative native, ref D3D12RHISwapChainBuffer currentBuffer)
+        internal CpuDescriptorHandle GetDescriptorHandleForSwapChain(ref D3D12RHISwapChainNative native, ref D3D12RHISwapChainBuffer currentBuffer)
         {
             NRDResource localResource = new NRDResource { Native = Unsafe.AsPointer(ref currentBuffer) };
-            if (_allocatedDescriptors.TryGetValue(localResource, out D3D12_CPU_DESCRIPTOR_HANDLE handle))
+            if (_allocatedDescriptors.TryGetValue(localResource, out CpuDescriptorHandle handle))
                 return handle;
 
             if (_heapDescriptorOffset >= _maxDescriptorOffset)
@@ -271,22 +267,22 @@ namespace Primary.Rendering.D3D12
             }
 
             HeapData data = _heaps[_heapIndex];
-            handle = _heapDescriptorOffset > 0 ? new D3D12_CPU_DESCRIPTOR_HANDLE(data.StartHandle, _heapDescriptorOffset) : data.StartHandle;
+            handle = _heapDescriptorOffset > 0 ? new CpuDescriptorHandle((nuint)(data.StartHandle.Ptr + (ulong)_heapDescriptorOffset)) : data.StartHandle;
 
             _heapDescriptorOffset += _incrementSize;
 
-            D3D12_RENDER_TARGET_VIEW_DESC desc = new D3D12_RENDER_TARGET_VIEW_DESC
+            RenderTargetViewDesc desc = new RenderTargetViewDesc
             {
                 Format = native.Base.Description.BackBufferFormat.ToTextureFormat(),
-                ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-                Texture2D = new D3D12_TEX2D_RTV
+                ViewDimension = RtvDimension.Texture2D,
+                Texture2D = new Tex2DRtv
                 {
                     MipSlice = 0,
                     PlaneSlice = 0
                 }
             };
 
-            _device.Device->CreateRenderTargetView((ID3D12Resource*)currentBuffer.Resource.Get(), &desc, handle);
+            _device.Device->CreateRenderTargetView(currentBuffer.Resource, &desc, handle);
 
             _allocatedDescriptors[localResource] = handle;
             return handle;
@@ -294,29 +290,29 @@ namespace Primary.Rendering.D3D12
 
         private void AddNewHeapToList()
         {
-            D3D12_DESCRIPTOR_HEAP_DESC desc = new D3D12_DESCRIPTOR_HEAP_DESC
+            DescriptorHeapDesc desc = new DescriptorHeapDesc
             {
                 Type = _heapType,
                 NumDescriptors = (uint)_individualHeapSize,
-                Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+                Flags = DescriptorHeapFlags.None,
                 NodeMask = 0
             };
 
-            ID3D12DescriptorHeap* heap = null;
-            HRESULT ret = _device.Device->CreateDescriptorHeap(&desc, UuidOf.Get<ID3D12DescriptorHeap>(), (void**)&heap);
+            ComPtr<ID3D12DescriptorHeap> descriptorHeap = null;
+            HResult ret = _device.Device->CreateDescriptorHeap(&desc, out descriptorHeap);
 
             //TODO: proper error messages and handling
-            if (ret.FAILED)
+            if (ret.IsFailure)
             {
                 _device.RHIDevice.FlushPendingMessages();
                 throw new NotImplementedException("No error handling yet");
             }
 
-            _heaps.Add(new HeapData(heap, heap->GetCPUDescriptorHandleForHeapStart()));
+            _heaps.Add(new HeapData(descriptorHeap, descriptorHeap.GetCPUDescriptorHandleForHeapStart()));
         }
 
-        internal D3D12_CPU_DESCRIPTOR_HANDLE NullDescriptor => _nullDescriptor;
+        internal CpuDescriptorHandle NullDescriptor => _nullDescriptor;
 
-        private readonly record struct HeapData(Ptr<ID3D12DescriptorHeap> Heap, D3D12_CPU_DESCRIPTOR_HANDLE StartHandle);
+        private readonly record struct HeapData(ComPtr<ID3D12DescriptorHeap> Heap, CpuDescriptorHandle StartHandle);
     }
 }

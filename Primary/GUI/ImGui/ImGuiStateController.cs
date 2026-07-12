@@ -356,7 +356,7 @@ namespace Primary.GUI.ImGui
 
         public float CalculateItemWidth()
         {
-            return MathF.Min(GetAvailableSpace().X, 40.0f);
+            return MathF.Min(GetAvailableSpace().X, 100.0f);
         }
 
         public Vector2 CalculateItemSize(Vector2 targetSize, float width, float height)
@@ -394,8 +394,10 @@ namespace Primary.GUI.ImGui
 
             if (_currentWindow.FlowDirection == ImGuiFlowDirection.Vertical)
             {
+                float paddingAmount = _currentWindow.IndentLevel > 0 ? _currentWindow.IndentLevel * 8.0f : 0.0f;
+
                 _currentWindow.PrevCursorPos = new Vector2(_currentWindow.CursorPos.X + size.X + _context.Style.InnerItemPadding.X, line);
-                _currentWindow.CursorPos = new Vector2(_currentWindow.Position.X + _context.Style.WindowPadding.X, line + size.Y + _context.Style.ItemPadding.Y);
+                _currentWindow.CursorPos = new Vector2(_currentWindow.Position.X + _context.Style.WindowPadding.X + paddingAmount, line + size.Y + _context.Style.ItemPadding.Y);
                 _currentWindow.MaxCursorPos = Vector2.Max(_currentWindow.MaxCursorPos, new Vector2(_currentWindow.PrevCursorPos.X, _currentWindow.CursorPos.Y - _context.Style.ItemPadding.Y));
             }
             else if (_currentWindow.FlowDirection == ImGuiFlowDirection.Horizontal)
@@ -441,6 +443,9 @@ namespace Primary.GUI.ImGui
 
             if (currWindow != null)
             {
+                if (currWindow.WindowFlags.HasFlags(ImGuiWindowFlags.NoInput))
+                    return true;
+
                 if (Flags.HasFlag(currWindow.WindowFlags, ImGuiWindowFlags.Child))
                 {
                     do
@@ -456,7 +461,7 @@ namespace Primary.GUI.ImGui
             {
                 ImGuiWindowState windowState = _windowStates[i];
 
-                if (Flags.HasFlag(windowState.WindowFlags, ImGuiWindowFlags.Child))
+                if (Flags.HasEither(windowState.WindowFlags, ImGuiWindowFlags.Child | ImGuiWindowFlags.NoInput))
                     continue;
                 if (windowState.Layer < currLayer || windowState == currWindow)
                     break;

@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <FileVersion>1.0.637.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +17,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Editor.Interop\Editor.Interop.csproj" />
     <ProjectReference Include="..\..\Primary\Primary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Visual\Passes\" />
   </ItemGroup>
 
 </Project>

@@ -15,9 +15,5 @@ namespace Primary.RHI
         public RHIException(string? message, Exception? innerException) : base(message, innerException)
         {
         }
-
-        protected RHIException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-        }
     }
 }

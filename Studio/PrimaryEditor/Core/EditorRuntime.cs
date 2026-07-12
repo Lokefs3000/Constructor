@@ -1,18 +1,30 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using EditorUI;
+using EditorUI.Demo;
 using EditorUI.Diagnostics.ImGui;
 using EditorUI.Dock;
+using EditorUI.Serialization.Value;
 using Primary;
+using Primary.Assets;
+using Primary.Common;
 using Primary.GUI.ImGui;
+using Primary.Input;
 using Primary.Mathematics;
+using Primary.Windowing;
 using PrimaryEditor.Assets;
 using PrimaryEditor.Assets.Filesystem;
+using PrimaryEditor.Inspector;
 using PrimaryEditor.Project;
+using PrimaryEditor.Reflection;
 using PrimaryEditor.Rendering;
 using PrimaryEditor.Startup;
+using PrimaryEditor.UI;
+using PrimaryEditor.UI.Serialization;
 using PrimaryEditor.Windows;
 
 namespace PrimaryEditor.Core
@@ -27,16 +39,33 @@ namespace PrimaryEditor.Core
 
         // after engine init
         private UIManager _uiManager;
+        private UIBridge _uiBridge;
+        private EditorRenderingManager _editorRenderingManager;
+        private AssemblyTypeLoader _typeLoader;
+        private InspectorManager _inspectorManager;
 
         private bool _disposedValue;
 
         internal EditorRuntime(ReadOnlySpan<string> args) : base(args)
         {
             _uiManager = new UIManager();
+            _uiBridge = new UIBridge(this);
+            _editorRenderingManager = new EditorRenderingManager();
+            _typeLoader = new AssemblyTypeLoader();
+            _inspectorManager = new InspectorManager();
+
+            _assetPipeline!.RegisterCustomAssets(_splash!);
+
+            _typeLoader.AddCallback<ValueConverterAttribute>(_uiManager.ValueSerializer.LoadConverterFromType);
+            _typeLoader.AddCallback<UIWidgetAttribute>(_uiManager.ReflectionManager.WidgetDatabase.LoadWidgetFromType);
+
+            _typeLoader.ScanAssemblyForTypes(typeof(EditorRuntime).Assembly);
+            _typeLoader.ScanAssemblyForTypes(typeof(UIManager).Assembly);
         }
 
         public override void Dispose()
         {
+            _editorRenderingManager.Dispose();
             _uiManager.Dispose();
 
             _splash?.Dispose();
@@ -47,16 +76,43 @@ namespace PrimaryEditor.Core
         internal void Run()
         {
             RenderingManager.SetNewRenderPath(new EditorRenderPath());
-            RenderingManager.RenderPassManager.AddRenderPass<ImGuiRenderPass>();
 
             ImGuiManager.AddDrawer(new HierchyExplorer());
             ImGuiManager.AddDrawer(new GuiStatistics());
             ImGuiManager.IsEnabled = true;
 
-            WindowDock dock = _uiManager.DockManager.CreateWindowDock(DockFlags.SingleWindow);
-            DockHost host = _uiManager.DockManager.CreateHostForDock(dock, true, new Rect(500, 400, 1336, 726));
+            EventManager.AddHandler(_uiManager.InputManager);
 
-            _uiManager.WindowManager.OpenWidgetWindow<EditorViewWindow>()?.TryDockInto(dock);
+            _uiManager.ValueSerializer.LoadConverterFromType(typeof(FontFamilyValueConverter), default!);
+
+            StylesheetAsset stylesheet = AssetManager.LoadAsset<StylesheetAsset>("Editor/UI/Stylesheets/Main.style").WaitIfNotLoaded();
+
+            Display centerDisplay = WindowManager.PrimaryDisplay;
+
+            WindowDock dock = _uiManager.DockManager.CreateWindowDock(DockFlags.SingleWindow);
+            WindowDock bottomDock = _uiManager.DockManager.CreateWindowDock(DockFlags.None);
+            WindowDock rightDock = _uiManager.DockManager.CreateWindowDock(DockFlags.None);
+
+            // WindowDock floatingDock1 = _uiManager.DockManager.CreateWindowDock(DockFlags.SingleWindow | DockFlags.NoDocking);
+
+            rightDock.TryDockInto(dock, DockingSide.Right);
+            bottomDock.TryDockInto(dock, DockingSide.Bottom);
+
+            rightDock.Space = 300;
+            bottomDock.Space = 230;
+
+            DockHost host = _uiManager.DockManager.CreateHostForDock(dock, true, new Rect(centerDisplay.FindCenter(new Int2(1336, 726)), new Int2(1336, 726)));
+            // DockHost floatingHost1 = _uiManager.DockManager.CreateHostForDock(floatingDock1, false, new Rect(300, 300, 800, 500));
+            
+            host.StylesheetProvider.AddStylesheet(stylesheet.Stylesheet!);
+            // floatingHost1.StylesheetProvider.AddStylesheet(stylesheet.Stylesheet!);
+
+            _uiManager.WindowManager.OpenWidgetWindow<SceneViewWindow>()?.TryDockInto(dock);
+            _uiManager.WindowManager.OpenWidgetWindow<ContentBrowserWindow>()?.TryDockInto(bottomDock);
+            _uiManager.WindowManager.OpenWidgetWindow<GCProfilerWindow>()?.TryDockInto(bottomDock);
+            _uiManager.WindowManager.OpenWidgetWindow<InspectorWindow>()?.TryDockInto(rightDock);
+
+            // _uiManager.WindowManager.OpenWidgetWindow<LayoutInspectorWindow>()?.TryDockInto(floatingDock1);
 
             {
                 _splash?.Dispose();
@@ -76,7 +132,9 @@ namespace PrimaryEditor.Core
 
             // editor only
             {
+                _editorRenderingManager.PrepareForFrame();
                 _assetPipeline.HandleUpdates();
+                _inspectorManager.UpdateContexts();
                 _uiManager.UpdateInternalData();
             }
 
@@ -125,6 +183,7 @@ namespace PrimaryEditor.Core
         public AssetPipeline AssetPipeline => _assetPipeline;
 
         public UIManager UIManager => _uiManager;
+        public InspectorManager InspectorManager => _inspectorManager;
 
         public static EditorRuntime Instance => Unsafe.As<EditorRuntime>(Engine.GlobalSingleton);
     }

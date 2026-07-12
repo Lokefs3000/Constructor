@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Primary.Collections.Display;
 
 namespace Primary.Collections
 {
+    [DebuggerTypeProxy(typeof(DynamicCircularBufferDebugView<>))]
     public sealed class DynamicCircularBuffer<T> : IEnumerable<T>, IReadOnlyCollection<T>
     {
         private T[] _array;

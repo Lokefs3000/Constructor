@@ -14,15 +14,34 @@ namespace Primary.Assets.Types
     public interface IAssetIdProvider
     {
         /// <summary>Thread-safe</summary>
-        public string? RetrievePathForId(AssetId assetId);
+        public bool TryGetPathForId(AssetId assetId, bool getLocalPath, [NotNullWhen(true)] out string? value);
+
         /// <summary>Thread-safe</summary>
-        public AssetId RetriveIdForPath(ReadOnlySpan<char> path);
+        public bool TryGetAnyPathForId(AssetId assetId, [NotNullWhen(true)] out string? value);
+
+        /// <summary>Thread-safe</summary>
+        public bool TryGetLocalAndAssetPathsForId(AssetId assetId, [NotNullWhen(true)] out string? localPath, [MaybeNullWhen(true)] out string? assetPath);
+
+        /// <summary>Thread-safe</summary>
+        public bool TryLookupIdForPath(ReadOnlySpan<char> path, [NotNullWhen(true)] out AssetId value);
+
+        /// <summary>Thread-safe</summary>
+        public bool IsIdValid(AssetId assetId);
+
+        /// <summary>Thread-safe</summary>
+        public bool DoesPathHaveLookup(ReadOnlySpan<char> path);
+
+        /// <inheritdoc cref="TryGetPathForId(AssetId, bool, out string?)" />
+        public bool TryGetLocalPathForId(AssetId assetId, [NotNullWhen(true)] out string? value) => TryGetPathForId(assetId, true, out value);
+
+        /// <inheritdoc cref="TryGetPathForId(AssetId, bool, out string?)" />
+        public bool TryGetAssetPathForId(AssetId assetId, [NotNullWhen(true)] out string? value) => TryGetPathForId(assetId, false, out value);
 
         public static readonly AssetId Invalid = new AssetId(Guid.Empty);
     }
 
     [JsonConverter(typeof(AssetIdJsonConverter)), TomlConverter(typeof(AssetIdTomlConverter))]
-    public readonly record struct AssetId : IEquatable<AssetId>, IComparable<AssetId>, IFormattable, IComparisonOperators<AssetId, AssetId, bool>, IEqualityOperators<AssetId, AssetId, bool>
+    public readonly record struct AssetId : IEquatable<AssetId>, IComparable<AssetId>, IFormattable, ISpanFormattable, IUtf8SpanFormattable, IComparisonOperators<AssetId, AssetId, bool>, IEqualityOperators<AssetId, AssetId, bool>
     {
         // assume little endian architecture
         private readonly ulong _high;
@@ -43,6 +62,15 @@ namespace Primary.Assets.Types
         public string ToString([StringSyntax(StringSyntaxAttribute.GuidFormat)] string? format) => ToString(format, CultureInfo.InvariantCulture);
         public string ToString(IFormatProvider? formatProvider) => ToString("N", formatProvider);
         public string ToString([StringSyntax(StringSyntaxAttribute.GuidFormat)] string? format, IFormatProvider? formatProvider) => Unsafe.BitCast<AssetId, Guid>(this).ToString(format, formatProvider);
+
+        public bool TryFormat(Span<char> destination, out int charsWritten) => Unsafe.BitCast<AssetId, Guid>(this).TryFormat(destination, out charsWritten, "N");
+        public bool TryFormat(Span<byte> utf8Destination, out int bytesWritten) => Unsafe.BitCast<AssetId, Guid>(this).TryFormat(utf8Destination, out bytesWritten, "N");
+
+        public bool TryFormat(Span<char> destination, out int charsWritten, [StringSyntax(StringSyntaxAttribute.GuidFormat)] ReadOnlySpan<char> format) => Unsafe.BitCast<AssetId, Guid>(this).TryFormat(destination, out charsWritten, format);
+        public bool TryFormat(Span<byte> utf8Destination, out int bytesWritten, [StringSyntax(StringSyntaxAttribute.GuidFormat)] ReadOnlySpan<char> format) => Unsafe.BitCast<AssetId, Guid>(this).TryFormat(utf8Destination, out bytesWritten, format);
+
+        bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, [StringSyntax(StringSyntaxAttribute.GuidFormat)] ReadOnlySpan<char> format, IFormatProvider? provider) => Unsafe.BitCast<AssetId, Guid>(this).TryFormat(destination, out charsWritten, format);
+        bool IUtf8SpanFormattable.TryFormat(Span<byte> utf8Destination, out int bytesWritten, [StringSyntax(StringSyntaxAttribute.GuidFormat)] ReadOnlySpan<char> format, IFormatProvider? provider) => Unsafe.BitCast<AssetId, Guid>(this).TryFormat(utf8Destination, out bytesWritten, format);
 
         public bool Equals(AssetId other)
         {

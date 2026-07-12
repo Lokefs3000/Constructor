@@ -7,8 +7,10 @@ namespace PrimaryEditor.Assets.Importers
 {
     public interface IAssetImporter
     {
-        public void ImportFile(AssetPipeline pipeline, AssetId id, Stream inputStream, Stream outputStream, string localPath, string localOutputPath);
+        public void ImportFile(AssetPipeline pipeline, AssetId id, Stream inputStream, Stream outputStream, string localPath, string localOutputPath, bool isTrialImport);
         public void PreloadFile(AssetPipeline pipeline, AssetId id);
         public bool ValidateFile(AssetPipeline pipeline, AssetId id, string localPath);
+
+        public string UniqueId { get; }
     }
 }

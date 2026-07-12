@@ -2,11 +2,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using Primary.Collections.ReadOnly.Display;
 
 namespace Primary.Collections.ReadOnly
 {
+    [DebuggerTypeProxy(typeof(ROHashSetDisplay<>))]
+    [DebuggerDisplay("Count = {Count}")]
     public readonly record struct ROHashSet<T> : IEquatable<ROHashSet<T>>, ISet<T>, IReadOnlySet<T>, IImmutableSet<T>
     {
         private readonly HashSet<T> _set;

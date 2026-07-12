@@ -1,0 +1,21 @@
+<Widget Size="1.0 0 1.0 0">
+    <Stylesheet Path="Editor/UI/Stylesheets/ContentBrowser.style" />
+    <Stylesheet Path="Editor/UI/Stylesheets/Main.style" />
+
+    <LayoutFrame Class="toolbar">
+        
+    </LayoutFrame>
+    <Widget Class="background" Position="0.0 0 0.0 29" Size="0.2 0 1.0 -29">
+        <TreeView Id="directory-tree" Size="1.0 0 1.0 0">
+            <TreeNodeStylist />
+            <TreeNodeStylist Id="is-hovered" Class="stylist-treenode-hovered" />
+            <TreeNodeStylist Id="is-selected" Class="stylist-treenode-selected" />
+        </TreeView>
+    </Widget>
+    <Widget Class="background" Position="0.2 1 0.0 29" Size="0.8 -1 1.0 -29">
+        <LayoutFrame Id="content-toolbar" Class="toolbar">
+        
+        </LayoutFrame>
+        <GridView Id="content-grid" Position="0.0 0 0.0 29" Size="1.0 0 1.0 -29" ItemSize="64 86" />
+    </Widget>
+</Widget>

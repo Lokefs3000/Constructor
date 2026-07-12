@@ -1,0 +1,10 @@
+@use "Editor/UI/Stylesheets/Globals.style";
+
+.root-values {
+    scrollbars: Vertical;
+    vertical-scrollbar: Always;
+}
+
+.value-list {
+    item-padding: 2;
+}

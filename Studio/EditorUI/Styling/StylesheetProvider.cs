@@ -7,81 +7,102 @@ using System.Runtime.InteropServices;
 using System.Text;
 using CommunityToolkit.Diagnostics;
 using CommunityToolkit.HighPerformance;
+using EditorUI.Reflection;
 using EditorUI.Serialization;
+using Primary.Collections;
 using Primary.Collections.ReadOnly;
 using Primary.Rendering.Assets;
 using Primary.Utility;
 
 namespace EditorUI.Styling
 {
-    public sealed class StylesheetProvider
+    public sealed class StylesheetProvider : IDisposable
     {
         private readonly ValueSerializer _valueSerializer;
 
         private List<Stylesheet> _stylesheets;
-
-        private Dictionary<ClassKey, ClassList> _styleClasses;
         private Dictionary<ClassStyleKey, LazyStyleValue> _styleValues;
 
         private HashSet<ClassKey> _invalidClasses;
+
+        private bool _hasChangedStylesheets;
+
+        private bool _disposedValue;
 
         internal StylesheetProvider(ValueSerializer valueSerializer)
         {
             _valueSerializer = valueSerializer;
 
             _stylesheets = new List<Stylesheet>();
-
-            _styleClasses = new Dictionary<ClassKey, ClassList>();
             _styleValues = new Dictionary<ClassStyleKey, LazyStyleValue>();
 
             _invalidClasses = new HashSet<ClassKey>();
+
+            _hasChangedStylesheets = false;
+
+            UIManager.Instance.StyleManager.RegisterProvider(this);
+        }
+
+        private void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                    UIManager.Instance.StyleManager.UnregisterProvider(this);
+                }
+
+                _disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        internal void OnStylesUpdated()
+        {
+            _hasChangedStylesheets = false;
+            _invalidClasses.Clear();
+        }
+
+        internal void TryReplaceStylesheet(string sourceName, Stylesheet newStylesheet)
+        {
+            int index = _stylesheets.FindIndex((x) => x.SourceName == sourceName);
+            if (index != -1)
+            {
+                _stylesheets[index] = newStylesheet;
+                _styleValues.Clear();
+
+                _hasChangedStylesheets = true;
+            }
         }
 
         public void AddStylesheet(Stylesheet stylesheet)
         {
             if (_stylesheets.AddUnique(stylesheet))
             {
-                foreach (var (key, stylesheetClass) in stylesheet.Classes)
-                {
-                    ref ClassList classes = ref CollectionsMarshal.GetValueRefOrAddDefault(_styleClasses, key, out bool exists);
-                    if (!exists)
-                    {
-                        classes = new ClassList([stylesheetClass], 1);
-                    }
-                    else
-                    {
-                        classes.AddAtBack(stylesheetClass);
-                    }
-
-                    _invalidClasses.Add(key);
-                }
-
                 InvalidateAllFromClasses(stylesheet);
+                _hasChangedStylesheets = true;
             }
         }
 
         public void RemoveStylesheet(Stylesheet stylesheet)
         {
-            if (_stylesheets.Remove(stylesheet))
-            {
-                foreach (var (key, stylesheetClass) in stylesheet.Classes)
-                {
-                    ref ClassList classes = ref CollectionsMarshal.GetValueRefOrNullRef(_styleClasses, key);
-                    if (!Unsafe.IsNullRef(in classes))
-                    {
-                        classes.RemoveClass(stylesheetClass);
-                        _invalidClasses.Add(key);
-                    }
-                }
-            }
+            _stylesheets.Remove(stylesheet);
+            _styleValues.Clear();
+
+            _hasChangedStylesheets = true;
         }
 
         public void ClearStylesheets()
         {
             _stylesheets.Clear();
-
-            _styleClasses.Clear();
             _styleValues.Clear();
+
+            _hasChangedStylesheets = true;
         }
 
         public bool TryFocusStylesheet(Stylesheet stylesheet)
@@ -94,20 +115,7 @@ namespace EditorUI.Styling
                     _stylesheets.RemoveAt(index);
                     _stylesheets.Add(stylesheet);
 
-                    foreach (var (key, stylesheetClass) in stylesheet.Classes)
-                    {
-                        ref ClassList classes = ref CollectionsMarshal.GetValueRefOrAddDefault(_styleClasses, key, out bool exists);
-                        if (!exists)
-                        {
-                            classes = new ClassList([stylesheetClass], 1);
-                        }
-                        else
-                        {
-                            classes.FocusClass(stylesheetClass);
-                        }
-
-                        _invalidClasses.Add(key);
-                    }
+                    _hasChangedStylesheets = true;
                 }
 
                 return true;
@@ -161,11 +169,11 @@ namespace EditorUI.Styling
 
             for (int i = _stylesheets.Count - 1; i >= 0; --i)
             {
-                if (key.Class.TryGetStyleValue(key.Key, out string? value))
+                if (key.Class.TryGetStyleValueIndex(key.Key, key.TriggerMask, out string? value))
                 {
                     if (_valueSerializer.TryDeserialize(type, value, out object? boxedValue, out Exception? exception))
                     {
-                        styleValue = new LazyStyleValue(value, i);
+                        styleValue = new LazyStyleValue(boxedValue, i);
                         return true;
                     }
                     else
@@ -181,25 +189,17 @@ namespace EditorUI.Styling
             return false;
         }
 
-        public bool TryGetClasses(ClassKey key, [NotNullWhen(true)] out ArraySegment<StylesheetClass> stylesheetClass)
-        {
-            if (_styleClasses.TryGetValue(key, out ClassList classList))
-            {
-                stylesheetClass = new ArraySegment<StylesheetClass>(classList.Classes, 0, classList.Length);
-                return true;
-            }
-
-            stylesheetClass = ArraySegment<StylesheetClass>.Empty;
-            return false;
-        }
-
         public bool TryGetClassValue(ClassStyleKey styleKey, Type type, out object? value)
         {
             value = default;
-
-            ref LazyStyleValue styleValue = ref CollectionsMarshal.GetValueRefOrNullRef(_styleValues, styleKey);
-            if (Unsafe.IsNullRef(in styleValue))
+            if (!styleKey.Class.TryGetTriggerIndex(styleKey.Key, (ushort)styleKey.TriggerMask, out int triggerIndex))
                 return false;
+
+            styleKey = new ClassStyleKey(styleKey.Class, styleKey.Key, (ushort)triggerIndex);
+
+            ref LazyStyleValue styleValue = ref CollectionsMarshal.GetValueRefOrAddDefault(_styleValues, styleKey, out bool exists);
+            if (!exists)
+                styleValue = new LazyStyleValue(null, LazyStyleValue.SourceIndexUninitialized);
 
             switch (styleValue.SourceIndex)
             {
@@ -222,64 +222,46 @@ namespace EditorUI.Styling
             }
         }
 
-        public ROList<Stylesheet> Stylesheets => _stylesheets;
-
-        private record struct ClassList
+        public bool TryGetClassValue(ClassStyleKey styleKey, PropertyData propertyData, out object? value)
         {
-            public StylesheetClass[] Classes;
-            public int Length;
+            value = default;
+            if (!styleKey.Class.TryGetTriggerIndex(styleKey.Key, (ushort)styleKey.TriggerMask, out int triggerIndex))
+                return false;
 
-            public ClassList(StylesheetClass[] classes, int length)
-            {
-                Classes = classes;
-                Length = length;
-            }
+            styleKey = new ClassStyleKey(styleKey.Class, styleKey.Key, triggerIndex);
 
-            public void AddAtBack(StylesheetClass @class)
-            {
-                if (Classes.Length == Length)
-                    Array.Resize(ref Classes, Classes.Length * 2);
-                Classes[Length++] = @class;
-            }
+            ref LazyStyleValue styleValue = ref CollectionsMarshal.GetValueRefOrAddDefault(_styleValues, styleKey, out bool exists);
+            if (!exists)
+                styleValue = new LazyStyleValue(null, LazyStyleValue.SourceIndexUninitialized);
 
-            public void RemoveClass(StylesheetClass @class)
+            switch (styleValue.SourceIndex)
             {
-                int index = Array.IndexOf(Classes, @class);
-                if (index != -1)
-                {
-                    if (Length == 1)
+                case LazyStyleValue.SourceIndexUninitialized:
                     {
-                        Classes[0] = null!;
+                        foreach (Type type in propertyData.PropertyTypes)
+                        {
+                            if (TryResolveStyleValue(styleKey, type, ref styleValue))
+                                goto default;
+                        }
+
+                        styleValue = new LazyStyleValue(null, LazyStyleValue.SourceIndexBad);
+                        return false;
                     }
-                    else if (index == Length - 1)
+                case LazyStyleValue.SourceIndexBad:
                     {
-                        Classes[Length - 1] = null!;
+                        return false;
                     }
-                    else
+                default:
                     {
-                        Array.Copy(Classes, index + 1, Classes, index, Length - index);
-                        Classes[Length - 1] = null!;
+                        value = styleValue.Value;
+                        return true;
                     }
-
-                    --Length;
-                }
-            }
-
-            public void FocusClass(StylesheetClass @class)
-            {
-                int index = Array.IndexOf(Classes, @class);
-
-                if (index == -1)
-                {
-                    AddAtBack(@class);
-                }
-                else if (index < Length - 1)
-                {
-                    Array.Copy(Classes, index + 1, Classes, index, Length - index - 1);
-                    Classes[Length - 1] = @class;
-                }
             }
         }
+
+        public ROList<Stylesheet> Stylesheets => _stylesheets;
+
+        public bool HasChangedStylesheets => _hasChangedStylesheets;
     }
 
     internal readonly record struct LazyStyleValue(object? Value, int SourceIndex)

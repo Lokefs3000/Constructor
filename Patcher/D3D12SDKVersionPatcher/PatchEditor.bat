@@ -1,6 +1,6 @@
 @echo off
 
-set "AgilitySDKVer=618"
+set "AgilitySDKVer=619"
 
 @echo Patching executable.. (ver:%AgilitySDKVer%)
 @call "..\..\..\..\..\Patcher\D3D12SDKVersionPatcher\D3D12SDKVersionPatcher.exe" "%1.exe" "%AgilitySDKVer%" ".\\D3D12\\"

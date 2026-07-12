@@ -15,23 +15,16 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
+using Primary.Windowing;
 
 using static Primary.Interop.PIX;
 
-using static TerraFX.Interop.DirectX.D3D_PRIMITIVE_TOPOLOGY;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
-using static TerraFX.Interop.DirectX.D3D12_COMMAND_LIST_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_COMMAND_LIST_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_DESCRIPTOR_HEAP_TYPE;
-using static TerraFX.Interop.DirectX.DXGI_FORMAT;
-using static TerraFX.Interop.DirectX.D3D12_CLEAR_FLAGS;
-
 using D3D12MemAlloc = Interop.D3D12MemAlloc;
-using Primary.Windowing;
+using Silk.NET.DXGI;
+using Silk.NET.Direct3D12;
+using Silk.NET.Core.Native;
+using Silk.NET.Maths;
+using Vortice.Direct3D;
 
 namespace Primary.Rendering.D3D12
 {
@@ -116,10 +109,10 @@ namespace Primary.Rendering.D3D12
             _resourceUploader = new ResourceUploader(this);
             _barrierManager = new BarrierManager(this);
 
-            _rtvHeap = new CpuDescriptorHeap(this, 128, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-            _dsvHeap = new CpuDescriptorHeap(this, 256, D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+            _rtvHeap = new CpuDescriptorHeap(this, 128, DescriptorHeapType.Rtv);
+            _dsvHeap = new CpuDescriptorHeap(this, 256, DescriptorHeapType.Dsv);
 
-            _gpuHeap = new GpuDescriptorHeap(this, 2048, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            _gpuHeap = new GpuDescriptorHeap(this, 2048, DescriptorHeapType.CbvSrvUav);
             _samplerHeap = new SamplerDescriptorHeap(this, 2048);
 
             _directFence = new QueueFence(this);
@@ -232,10 +225,10 @@ namespace Primary.Rendering.D3D12
             {
                 using (new ProfilingScope("DeviceUpload"))
                 {
-                    CmdListData listData = GetCommandListData(D3D12_COMMAND_LIST_TYPE_DIRECT);
-                    d3d12.UploadPendingData(listData.Cmds);
+                    CmdListData listData = GetCommandListData(CommandListType.Direct);
+                    d3d12.UploadPendingData(ref listData.Cmds.Get());
 
-                    ExecuteCommandListData(D3D12_COMMAND_LIST_TYPE_DIRECT, listData);
+                    ExecuteCommandListData(CommandListType.Direct, listData);
                 }
             }
 
@@ -280,7 +273,7 @@ namespace Primary.Rendering.D3D12
                         int passIndex = Unsafe.ReadUnaligned<TimelineRasterEvent>(eventPtr.ToPointer()).PassIndex;
                         CommandRecorder recorder = recorders.GetRecorderForPass(passIndex)!;
 
-                        D3D12_COMMAND_LIST_TYPE listType = GetListTypeForEvent(eventType);
+                        CommandListType listType = GetListTypeForEvent(eventType);
                         _freeRunningQueues |= (byte)(1 << (int)eventType);
 
                         if (lastEventType != eventType && currentList.HasValue)
@@ -289,7 +282,7 @@ namespace Primary.Rendering.D3D12
                             {
                                 if (lastEventType == TimelineEventType.Raster)
                                     TransitionSwapChains(currentList.Value);
-                                _barrierManager.TransitionToCompatible(currentList.Value.Cmds, listType, recorder);
+                                _barrierManager.TransitionToCompatible(ref currentList.Value.Cmds.Get(), listType, recorder);
                             }
 
                             ExecuteCommandListData(GetListTypeForEvent(lastEventType), currentList.Value);
@@ -303,10 +296,10 @@ namespace Primary.Rendering.D3D12
                         {
                             {
                                 SetHeapBundle bundle = new SetHeapBundle(_gpuHeap.GetActiveHeapOrCreateNew(), _samplerHeap.GetActiveHeapOrCreateNew());
-                                cmds.Cmds->SetDescriptorHeaps(2, (ID3D12DescriptorHeap**)&bundle);
+                                cmds.Cmds.SetDescriptorHeaps(2, (ID3D12DescriptorHeap**)&bundle);
                             }
 
-                            if (listType == D3D12_COMMAND_LIST_TYPE_DIRECT)
+                            if (listType == CommandListType.Direct)
                                 RestoreGraphicsCmdState(cmds.Cmds);
 
                             pixEventDepth = 0;
@@ -316,7 +309,7 @@ namespace Primary.Rendering.D3D12
                         if (_hasPixAvailable)
                         {
                             uint nameColor = (uint)(currentPassName.GetDjb2HashCode() | 0xff000000);
-                            PIXBeginEventOnCommandList((nint)cmds.Cmds, nameColor, currentPassName);
+                            PIXBeginEventOnCommandList((nint)Unsafe.AsPointer(ref cmds.Cmds.Get()), nameColor, currentPassName);
                         }
 
                         previousPassIndex = passIndex;
@@ -340,7 +333,7 @@ namespace Primary.Rendering.D3D12
                                             byteOffset += Unsafe.SizeOf<CmdUploadBuffer>();
 
                                             _resourceUploader.UploadBuffer(
-                                                cmds.Cmds,
+                                                ref cmds.Cmds.Get(),
                                                 resources,
                                                 cmd.UploadIndex,
                                                 cmd.DataPointer,
@@ -355,7 +348,7 @@ namespace Primary.Rendering.D3D12
                                             byteOffset += Unsafe.SizeOf<CmdUploadTexture>();
 
                                             _resourceUploader.UploadTexture(
-                                                cmds.Cmds,
+                                                ref cmds.Cmds.Get(),
                                                 resources,
                                                 cmd.UploadIndex,
                                                 cmd.Box,
@@ -377,11 +370,11 @@ namespace Primary.Rendering.D3D12
                                             NRDResource destinationResource = ResourceUtility.AsNRDResource(cmd.Destination);
                                             ID3D12Resource* destinationNative = (ID3D12Resource*)_resourceManager.GetResource(destinationResource);
 
-                                            _barrierManager.AddBufferBarrier(sourceNative, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_SOURCE);
-                                            _barrierManager.AddBufferBarrier(destinationNative, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_DEST);
-                                            _barrierManager.FlushBarriers(cmds.Cmds, BarrierFlushTypes.Buffer);
+                                            _barrierManager.AddBufferBarrier(sourceNative, BarrierSync.Copy, BarrierAccess.CopySource);
+                                            _barrierManager.AddBufferBarrier(destinationNative, BarrierSync.Copy, BarrierAccess.CopyDest);
+                                            _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Buffer);
 
-                                            cmds.Cmds->CopyBufferRegion(destinationNative, cmd.DestinationOffset, sourceNative, cmd.SourceOffset, cmd.NumBytes);
+                                            cmds.Cmds.CopyBufferRegion(destinationNative, cmd.DestinationOffset, sourceNative, cmd.SourceOffset, cmd.NumBytes);
 
                                             break;
                                         }
@@ -393,26 +386,26 @@ namespace Primary.Rendering.D3D12
                                             NRDResource sourceResource = ResourceUtility.AsNRDResource(cmd.Source.Resource);
                                             ID3D12Resource* sourceNative = (ID3D12Resource*)_resourceManager.GetResource(sourceResource);
 
-                                            D3D12_PLACED_SUBRESOURCE_FOOTPRINT sourcePlacedFootprint;
-                                            D3D12_TEXTURE_COPY_LOCATION sourceCopyLocation;
+                                            PlacedSubresourceFootprint sourcePlacedFootprint;
+                                            TextureCopyLocation sourceCopyLocation;
 
                                             NRDResource destinationResource = ResourceUtility.AsNRDResource(cmd.Destination.Resource);
                                             ID3D12Resource* destinationNative = (ID3D12Resource*)_resourceManager.GetResource(destinationResource);
 
-                                            D3D12_PLACED_SUBRESOURCE_FOOTPRINT destinationPlacedFootprint;
-                                            D3D12_TEXTURE_COPY_LOCATION destinationCopyLocation;
+                                            PlacedSubresourceFootprint destinationPlacedFootprint;
+                                            TextureCopyLocation destinationCopyLocation;
 
                                             if (cmd.Source.Type == CmdDataTextureSourceType.SubresourceIndex)
                                             {
-                                                sourceCopyLocation = new D3D12_TEXTURE_COPY_LOCATION(sourceNative, cmd.Source.SubresourceIndex);
+                                                sourceCopyLocation = new TextureCopyLocation(sourceNative, type: TextureCopyType.SubresourceIndex, subresourceIndex: cmd.Source.SubresourceIndex);
                                             }
                                             else
                                             {
                                                 ref CmdDataTextureFootprint footprint = ref cmd.Source.Footprint;
-                                                sourcePlacedFootprint = new D3D12_PLACED_SUBRESOURCE_FOOTPRINT
+                                                sourcePlacedFootprint = new PlacedSubresourceFootprint
                                                 {
                                                     Offset = footprint.Offset,
-                                                    Footprint = new D3D12_SUBRESOURCE_FOOTPRINT
+                                                    Footprint = new SubresourceFootprint
                                                     {
                                                         Format = footprint.Format.ToTextureFormat(),
 
@@ -423,20 +416,20 @@ namespace Primary.Rendering.D3D12
                                                         RowPitch = footprint.RowPitch
                                                     }
                                                 };
-                                                sourceCopyLocation = new D3D12_TEXTURE_COPY_LOCATION(sourceNative, &sourcePlacedFootprint);
+                                                sourceCopyLocation = new TextureCopyLocation(sourceNative, type: TextureCopyType.PlacedFootprint, placedFootprint: sourcePlacedFootprint);
                                             }
 
                                             if (cmd.Destination.Type == CmdDataTextureSourceType.SubresourceIndex)
                                             {
-                                                destinationCopyLocation = new D3D12_TEXTURE_COPY_LOCATION(destinationNative, cmd.Destination.SubresourceIndex);
+                                                destinationCopyLocation = new TextureCopyLocation(destinationNative, type: TextureCopyType.SubresourceIndex, subresourceIndex: cmd.Destination.SubresourceIndex);
                                             }
                                             else
                                             {
                                                 ref CmdDataTextureFootprint footprint = ref cmd.Destination.Footprint;
-                                                destinationPlacedFootprint = new D3D12_PLACED_SUBRESOURCE_FOOTPRINT
+                                                destinationPlacedFootprint = new PlacedSubresourceFootprint
                                                 {
                                                     Offset = footprint.Offset,
-                                                    Footprint = new D3D12_SUBRESOURCE_FOOTPRINT
+                                                    Footprint = new SubresourceFootprint
                                                     {
                                                         Format = footprint.Format.ToTextureFormat(),
 
@@ -447,14 +440,14 @@ namespace Primary.Rendering.D3D12
                                                         RowPitch = footprint.RowPitch
                                                     }
                                                 };
-                                                destinationCopyLocation = new D3D12_TEXTURE_COPY_LOCATION(destinationNative, &destinationPlacedFootprint);
+                                                destinationCopyLocation = new TextureCopyLocation(destinationNative, type: TextureCopyType.PlacedFootprint, placedFootprint: destinationPlacedFootprint);
                                             }
 
-                                            D3D12_BOX box = default;
+                                            Box box = default;
                                             if (cmd.SourceBox.HasValue)
                                             {
                                                 FGBox val = cmd.SourceBox.Value;
-                                                box = new D3D12_BOX(val.X, val.Y, val.Z, val.Width, val.Height, val.Depth);
+                                                box = new Box((uint)val.X, (uint)val.Y, (uint)val.Z, (uint)val.Width, (uint)val.Height, (uint)val.Depth);
                                             }
 
                                             {
@@ -463,24 +456,24 @@ namespace Primary.Rendering.D3D12
                                                 if (destinationResource.Id == NRDResourceId.Texture && ResourceUtility.DoesTextureNeedInit(destinationResource, _resourceManager))
                                                     _resourceManager.EnsureInitialized(destinationResource);
 
-                                                _resourceManager.FlushPendingInits(cmds.Cmds);
+                                                _resourceManager.FlushPendingInits(ref cmds.Cmds.Get());
                                             }
 
                                             {
                                                 if (sourceResource.Id == NRDResourceId.Buffer)
-                                                    _barrierManager.AddBufferBarrier(sourceNative, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_SOURCE);
+                                                    _barrierManager.AddBufferBarrier(sourceNative, BarrierSync.Copy, BarrierAccess.CopySource);
                                                 else
-                                                    _barrierManager.AddTextureBarrier(sourceNative, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_SOURCE, D3D12_BARRIER_LAYOUT_COPY_SOURCE);
+                                                    _barrierManager.AddTextureBarrier(sourceNative, BarrierSync.Copy, BarrierAccess.CopySource, BarrierLayout.CopySource);
 
                                                 if (destinationResource.Id == NRDResourceId.Buffer)
-                                                    _barrierManager.AddBufferBarrier(destinationResource, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_DEST);
+                                                    _barrierManager.AddBufferBarrier(destinationResource, BarrierSync.Copy, BarrierAccess.CopyDest);
                                                 else
-                                                    _barrierManager.AddTextureBarrier(destinationResource, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_DEST, D3D12_BARRIER_LAYOUT_COPY_DEST);
+                                                    _barrierManager.AddTextureBarrier(destinationResource, BarrierSync.Copy, BarrierAccess.CopyDest, BarrierLayout.CopyDest);
                                             }
 
-                                            _barrierManager.FlushBarriers(cmds.Cmds, BarrierFlushTypes.Buffer | BarrierFlushTypes.Texture);
+                                            _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Buffer | BarrierFlushTypes.Texture);
 
-                                            cmds.Cmds->CopyTextureRegion(&destinationCopyLocation, cmd.DstX, cmd.DstY, cmd.DstZ, &sourceCopyLocation, cmd.SourceBox.HasValue ? &box : null);
+                                            cmds.Cmds.CopyTextureRegion(&destinationCopyLocation, cmd.DstX, cmd.DstY, cmd.DstZ, &sourceCopyLocation, cmd.SourceBox.HasValue ? &box : null);
 
                                             break;
                                         }
@@ -489,31 +482,31 @@ namespace Primary.Rendering.D3D12
                                             CmdSetPipeline cmd = recorder.GetCommandAtOffset<CmdSetPipeline>(byteOffset);
                                             byteOffset += Unsafe.SizeOf<CmdSetPipeline>();
 
-                                            if (listType == D3D12_COMMAND_LIST_TYPE_DIRECT)
+                                            if (listType == CommandListType.Direct)
                                             {
                                                 D3D12RHIGraphicsPipeline pipeline = Unsafe.As<D3D12RHIGraphicsPipeline>(resources.GetPipelineFromIndex(cmd.Index))!;
 
-                                                ID3D12PipelineState* pipelineState = pipeline.GetPipelineState(_state.RasterState);
+                                                ID3D12PipelineState* pipelineState = (ID3D12PipelineState*)Unsafe.AsPointer(ref pipeline.GetPipelineState(_state.RasterState));
                                                 if (pipelineState == null)
                                                     throw new NullReferenceException();
 
-                                                cmds.Cmds->SetPipelineState(pipelineState);
-                                                cmds.Cmds->SetGraphicsRootSignature(pipeline.RootSignature.Get());
+                                                cmds.Cmds.SetPipelineState(pipelineState);
+                                                cmds.Cmds.SetGraphicsRootSignature((ID3D12RootSignature*)Unsafe.AsPointer(ref pipeline.RootSignature.Get()));
 
-                                                cmds.Cmds->IASetPrimitiveTopology(pipeline.Description.PrimitiveTopologyType switch
+                                                cmds.Cmds.IASetPrimitiveTopology(pipeline.Description.PrimitiveTopologyType switch
                                                 {
-                                                    RHIPrimitiveTopologyType.Triangle => D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
-                                                    RHIPrimitiveTopologyType.Line => D3D_PRIMITIVE_TOPOLOGY_LINELIST,
-                                                    RHIPrimitiveTopologyType.Point => D3D_PRIMITIVE_TOPOLOGY_POINTLIST,
+                                                    RHIPrimitiveTopologyType.Triangle => D3DPrimitiveTopology.D3DPrimitiveTopologyTrianglelist,
+                                                    RHIPrimitiveTopologyType.Line => D3DPrimitiveTopology.D3DPrimitiveTopologyLinelist,
+                                                    RHIPrimitiveTopologyType.Point => D3DPrimitiveTopology.D3DPrimitiveTopologyPointlist,
                                                     _ => throw new NotImplementedException(),
                                                 });
                                             }
-                                            else if (listType == D3D12_COMMAND_LIST_TYPE_COMPUTE)
+                                            else if (listType == CommandListType.Compute)
                                             {
                                                 D3D12RHIComputePipeline pipeline = Unsafe.As<D3D12RHIComputePipeline>(resources.GetPipelineFromIndex(cmd.Index))!;
 
-                                                cmds.Cmds->SetPipelineState(pipeline.PipelineState.Get());
-                                                cmds.Cmds->SetComputeRootSignature(pipeline.RootSignature.Get());
+                                                cmds.Cmds.SetPipelineState(ref pipeline.PipelineState.Get());
+                                                cmds.Cmds.SetComputeRootSignature(ref pipeline.RootSignature.Get());
                                             }
 
                                             break;
@@ -594,12 +587,12 @@ namespace Primary.Rendering.D3D12
 
                                                     if (resource.Id == NRDResourceId.Buffer)
                                                     {
-                                                        BarrierManager.GetShaderBufferBarriers(resource, _resourceManager, cmd.Stages, cmd.Flags, out D3D12_BARRIER_SYNC sync, out D3D12_BARRIER_ACCESS access);
+                                                        BarrierManager.GetShaderBufferBarriers(resource, _resourceManager, cmd.Stages, cmd.Flags, out BarrierSync sync, out BarrierAccess access);
                                                         _barrierManager.AddBufferBarrier(resource, sync, access);
                                                     }
                                                     else
                                                     {
-                                                        BarrierManager.GetShaderTextureBarriers(resource, _resourceManager, cmd.Stages, cmd.Flags, out D3D12_BARRIER_SYNC sync, out D3D12_BARRIER_ACCESS access, out D3D12_BARRIER_LAYOUT layout);
+                                                        BarrierManager.GetShaderTextureBarriers(resource, _resourceManager, cmd.Stages, cmd.Flags, out BarrierSync sync, out BarrierAccess access, out BarrierLayout layout);
                                                         _barrierManager.AddTextureBarrier(resource, sync, access, layout);
                                                     }
 
@@ -627,32 +620,32 @@ namespace Primary.Rendering.D3D12
                                         }
                                     case RecCommandType.CommitResources:
                                         {
-                                            if (listType == D3D12_COMMAND_LIST_TYPE_DIRECT)
+                                            if (listType == CommandListType.Direct)
                                             {
                                                 if (Flags.HasFlag(_state.HeaderFlags, ShHeaderFlags.HeaderIsBuffer))
                                                 {
                                                     if (_state.ConstantsSize > 0)
-                                                        cmds.Cmds->SetGraphicsRoot32BitConstants(0, (uint)(_state.ConstantsSize / sizeof(uint)), _state.ConstantsData.ToPointer(), 0);
+                                                        cmds.Cmds.SetGraphicsRoot32BitConstants(0, (uint)(_state.ConstantsSize / sizeof(uint)), _state.ConstantsData.ToPointer(), 0);
                                                     if (_state.ResourceSize > 0)
                                                         throw new NotImplementedException();
                                                 }
                                                 else
                                                 {
-                                                    cmds.Cmds->SetGraphicsRoot32BitConstants(0, (uint)(_state.ResourceSize / sizeof(uint)), _state.ResourceData.ToPointer(), 0);
+                                                    cmds.Cmds.SetGraphicsRoot32BitConstants(0, (uint)(_state.ResourceSize / sizeof(uint)), _state.ResourceData.ToPointer(), 0);
                                                 }
                                             }
-                                            else if (listType == D3D12_COMMAND_LIST_TYPE_COMPUTE)
+                                            else if (listType == CommandListType.Compute)
                                             {
                                                 if (Flags.HasFlag(_state.HeaderFlags, ShHeaderFlags.HeaderIsBuffer))
                                                 {
                                                     if (_state.ConstantsSize > 0)
-                                                        cmds.Cmds->SetComputeRoot32BitConstants(0, (uint)(_state.ConstantsSize / sizeof(uint)), _state.ConstantsData.ToPointer(), 0);
+                                                        cmds.Cmds.SetComputeRoot32BitConstants(0, (uint)(_state.ConstantsSize / sizeof(uint)), _state.ConstantsData.ToPointer(), 0);
                                                     if (_state.ResourceSize > 0)
                                                         throw new NotImplementedException();
                                                 }
                                                 else
                                                 {
-                                                    cmds.Cmds->SetComputeRoot32BitConstants(0, (uint)(_state.ResourceSize / sizeof(uint)), _state.ResourceData.ToPointer(), 0);
+                                                    cmds.Cmds.SetComputeRoot32BitConstants(0, (uint)(_state.ResourceSize / sizeof(uint)), _state.ResourceData.ToPointer(), 0);
                                                 }
                                             }
 
@@ -669,7 +662,7 @@ namespace Primary.Rendering.D3D12
                                             {
                                                 _state.RenderTargets[cmd.Slot] = _rtvHeap.NullDescriptor;
                                                 if (cmd.Slot != 0 || !hasSwapChainRt)
-                                                    _state.RasterState.RTVFormats[cmd.Slot] = DXGI_FORMAT_UNKNOWN;
+                                                    _state.RasterState.RTVFormats[cmd.Slot] = Format.FormatUnknown;
                                             }
                                             else
                                             {
@@ -677,7 +670,7 @@ namespace Primary.Rendering.D3D12
                                                 _state.RenderTargets[cmd.Slot] = _rtvHeap.GetDescriptorHandle(resource);
                                                 _state.RasterState.RTVFormats[cmd.Slot] = ResourceUtility.GetTextureFormat(resource, _resourceManager).ToRenderTargetFormat();
 
-                                                _barrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+                                                _barrierManager.AddTextureBarrier(resource, BarrierSync.RenderTarget, BarrierAccess.RenderTarget, BarrierLayout.RenderTarget);
                                                 _resourceManager.EnsureInitialized(resource);
 
                                                 if (cmd.Slot == 0)
@@ -698,16 +691,16 @@ namespace Primary.Rendering.D3D12
 
                                                 if (!cmd.DeferSetState)
                                                 {
-                                                    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = _state.DepthStencil;
+                                                    CpuDescriptorHandle dsvHandle = _state.DepthStencil;
 
-                                                    _barrierManager.FlushBarriers(cmds.Cmds, BarrierFlushTypes.Texture);
-                                                    fixed (D3D12_CPU_DESCRIPTOR_HANDLE* ptr = _state.RenderTargets.Span)
+                                                    _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Texture);
+                                                    fixed (CpuDescriptorHandle* ptr = _state.RenderTargets.Span)
                                                     {
-                                                        cmds.Cmds->OMSetRenderTargets(
+                                                        cmds.Cmds.OMSetRenderTargets(
                                                             (uint)_state.RenderTargets.Count,
                                                             ptr,
                                                             false,
-                                                            _state.RasterState.DSVFormat != DXGI_FORMAT_UNKNOWN ? &dsvHandle : null);
+                                                            _state.RasterState.DSVFormat != Format.FormatUnknown ? &dsvHandle : null);
                                                     }
                                                 }
                                             }
@@ -719,41 +712,43 @@ namespace Primary.Rendering.D3D12
                                             CmdSetDepthStencil cmd = recorder.GetCommandAtOffset<CmdSetDepthStencil>(byteOffset);
                                             byteOffset += Unsafe.SizeOf<CmdSetDepthStencil>();
 
-                                            NRDResource resource = ResourceUtility.AsNRDResource(cmd.Texture);
-                                            if (resource.IsNull)
+                                            if (!hasSwapChainRt)
                                             {
-                                                _state.RasterState.DSVFormat = DXGI_FORMAT_UNKNOWN;
-
-                                                fixed (D3D12_CPU_DESCRIPTOR_HANDLE* ptr = _state.RenderTargets.Span)
+                                                NRDResource resource = ResourceUtility.AsNRDResource(cmd.Texture);
+                                                if (resource.IsNull)
                                                 {
-                                                    cmds.Cmds->OMSetRenderTargets(
-                                                        (uint)_state.RenderTargets.Count,
-                                                        ptr,
-                                                        false,
-                                                        null);
+                                                    _state.RasterState.DSVFormat = Format.FormatUnknown;
+
+                                                    fixed (CpuDescriptorHandle* ptr = _state.RenderTargets.Span)
+                                                    {
+                                                        cmds.Cmds.OMSetRenderTargets(
+                                                            (uint)_state.RenderTargets.Count,
+                                                            ptr,
+                                                            false,
+                                                            (CpuDescriptorHandle*)null);
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    _state.DepthStencil = _dsvHeap.GetDescriptorHandle(resource);
+                                                    _state.RasterState.DSVFormat = ResourceUtility.GetTextureFormat(resource, _resourceManager).ToDepthStencilFormat();
+                                                    //TODO: Add fallback for no depth and stencil writes to *_READ instead of always *_WRITE
+                                                    _barrierManager.AddTextureBarrier(resource, BarrierSync.DepthStencil, BarrierAccess.DepthStencilWrite, BarrierLayout.DepthStencilWrite);
+                                                    _resourceManager.EnsureInitialized(resource);
+
+                                                    CpuDescriptorHandle dsvHandle = _state.DepthStencil;
+
+                                                    _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Texture);
+                                                    fixed (CpuDescriptorHandle* ptr = _state.RenderTargets.Span)
+                                                    {
+                                                        cmds.Cmds.OMSetRenderTargets(
+                                                            (uint)_state.RenderTargets.Count,
+                                                            ptr,
+                                                            false,
+                                                            &dsvHandle);
+                                                    }
                                                 }
                                             }
-                                            else
-                                            {
-                                                _state.DepthStencil = _dsvHeap.GetDescriptorHandle(resource);
-                                                _state.RasterState.DSVFormat = ResourceUtility.GetTextureFormat(resource, _resourceManager).ToDepthStencilFormat();
-                                                //TODO: Add fallback for no depth and stencil writes to *_READ instead of always *_WRITE
-                                                _barrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
-                                                _resourceManager.EnsureInitialized(resource);
-
-                                                D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = _state.DepthStencil;
-
-                                                _barrierManager.FlushBarriers(cmds.Cmds, BarrierFlushTypes.Texture);
-                                                fixed (D3D12_CPU_DESCRIPTOR_HANDLE* ptr = _state.RenderTargets.Span)
-                                                {
-                                                    cmds.Cmds->OMSetRenderTargets(
-                                                        (uint)_state.RenderTargets.Count,
-                                                        ptr,
-                                                        false,
-                                                        &dsvHandle);
-                                                }
-                                            }
-                                            
                                             
                                             break;
                                         }
@@ -764,16 +759,16 @@ namespace Primary.Rendering.D3D12
 
                                             NRDResource resource = ResourceUtility.AsNRDResource(cmd.Texture);
 
-                                            _barrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
-                                            _barrierManager.FlushBarriers(cmds.Cmds, BarrierFlushTypes.Texture);
+                                            _barrierManager.AddTextureBarrier(resource, BarrierSync.RenderTarget, BarrierAccess.RenderTarget, BarrierLayout.RenderTarget);
+                                            _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Texture);
 
-                                            RECT rect = default;
-                                            RECT* ptr = null;
+                                            Box2D<int> rect = default;
+                                            Box2D<int>* ptr = null;
 
                                             if (cmd.Rect.HasValue)
                                             {
                                                 FGRect val = cmd.Rect.Value;
-                                                rect = new RECT(val.Left, val.Top, val.Right, val.Bottom);
+                                                rect = new Box2D<int>(val.Left, val.Top, val.Right, val.Bottom);
 
                                                 ptr = &rect;
                                             }
@@ -781,12 +776,12 @@ namespace Primary.Rendering.D3D12
                                             if (cmd.Color.HasValue)
                                             {
                                                 Color color = cmd.Color.Value;
-                                                cmds.Cmds->ClearRenderTargetView(_rtvHeap.GetDescriptorHandle(resource), (float*)&color, cmd.Rect.HasValue ? 1u : 0, ptr);
+                                                cmds.Cmds.ClearRenderTargetView(_rtvHeap.GetDescriptorHandle(resource), (float*)&color, cmd.Rect.HasValue ? 1u : 0, ptr);
                                             }
                                             else
                                             {
                                                 Color color = new Color(0.0f);
-                                                cmds.Cmds->ClearRenderTargetView(_rtvHeap.GetDescriptorHandle(resource), (float*)&color, cmd.Rect.HasValue ? 1u : 0, ptr);
+                                                cmds.Cmds.ClearRenderTargetView(_rtvHeap.GetDescriptorHandle(resource), (float*)&color, cmd.Rect.HasValue ? 1u : 0, ptr);
                                             }
 
                                             _resourceManager.SetAsInitialized(resource);
@@ -800,31 +795,31 @@ namespace Primary.Rendering.D3D12
 
                                             NRDResource resource = ResourceUtility.AsNRDResource(cmd.Texture);
 
-                                            _barrierManager.AddTextureBarrier(resource, D3D12_BARRIER_SYNC_DEPTH_STENCIL, D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE, D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE);
-                                            _barrierManager.FlushBarriers(cmds.Cmds, BarrierFlushTypes.Texture);
+                                            _barrierManager.AddTextureBarrier(resource, BarrierSync.DepthStencil, BarrierAccess.DepthStencilWrite, BarrierLayout.DepthStencilWrite);
+                                            _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Texture);
 
-                                            RECT rect = default;
-                                            RECT* ptr = null;
+                                            Box2D<int> rect = default;
+                                            Box2D<int>* ptr = null;
 
                                             if (cmd.Rect.HasValue)
                                             {
                                                 FGRect val = cmd.Rect.Value;
-                                                rect = new RECT(val.Left, val.Top, val.Right, val.Bottom);
+                                                rect = new Box2D<int>(val.Left, val.Top, val.Right, val.Bottom);
 
                                                 ptr = &rect;
                                             }
 
-                                            D3D12_CLEAR_FLAGS flags = (D3D12_CLEAR_FLAGS)cmd.ClearFlags;
+                                            ClearFlags flags = (ClearFlags)cmd.ClearFlags;
 
                                             float depthVal = cmd.Depth.GetValueOrDefault(1.0f);
                                             byte stencilVal = cmd.Stencil.GetValueOrDefault(0xff);
 
                                             if (cmd.ClearFlags != FGClearFlags.DepthStencil && !_resourceManager.IsInitialized(resource))
                                             {
-                                                flags = D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL;
+                                                flags = ClearFlags.Depth | ClearFlags.Stencil;
                                             }
 
-                                            cmds.Cmds->ClearDepthStencilView(_dsvHeap.GetDescriptorHandle(resource), flags, depthVal, stencilVal, cmd.Rect.HasValue ? 1u : 0, ptr);
+                                            cmds.Cmds.ClearDepthStencilView(_dsvHeap.GetDescriptorHandle(resource), flags, depthVal, stencilVal, cmd.Rect.HasValue ? 1u : 0, ptr);
 
                                             _resourceManager.SetAsInitialized(resource);
 
@@ -835,7 +830,7 @@ namespace Primary.Rendering.D3D12
                                             CmdSetViewport cmd = recorder.GetCommandAtOffset<CmdSetViewport>(byteOffset);
                                             byteOffset += Unsafe.SizeOf<CmdSetViewport>();
 
-                                            _state.Viewports[cmd.Slot] = new D3D12_VIEWPORT(cmd.Viewport.TopLeftX, cmd.Viewport.TopLeftY, cmd.Viewport.Width, cmd.Viewport.Height, cmd.Viewport.MinDepth, cmd.Viewport.MaxDepth);
+                                            _state.Viewports[cmd.Slot] = new Viewport(cmd.Viewport.TopLeftX, cmd.Viewport.TopLeftY, cmd.Viewport.Width, cmd.Viewport.Height, cmd.Viewport.MinDepth, cmd.Viewport.MaxDepth);
 
                                             break;
                                         }
@@ -845,9 +840,9 @@ namespace Primary.Rendering.D3D12
                                             byteOffset += Unsafe.SizeOf<CmdCommitViewports>();
 
                                             _state.Viewports.Count = cmd.ActiveCount;
-                                            fixed (D3D12_VIEWPORT* ptr = _state.Viewports.Span)
+                                            fixed (Viewport* ptr = _state.Viewports.Span)
                                             {
-                                                cmds.Cmds->RSSetViewports(cmd.ActiveCount, ptr);
+                                                cmds.Cmds.RSSetViewports(cmd.ActiveCount, ptr);
                                             }
                                             break;
                                         }
@@ -856,7 +851,7 @@ namespace Primary.Rendering.D3D12
                                             CmdSetScissor cmd = recorder.GetCommandAtOffset<CmdSetScissor>(byteOffset);
                                             byteOffset += Unsafe.SizeOf<CmdSetScissor>();
 
-                                            _state.Scissors[cmd.Slot] = new RECT(cmd.Scissor.Left, cmd.Scissor.Top, cmd.Scissor.Right, cmd.Scissor.Bottom);
+                                            _state.Scissors[cmd.Slot] = new Box2D<int>(cmd.Scissor.Left, cmd.Scissor.Top, cmd.Scissor.Right, cmd.Scissor.Bottom);
 
                                             break;
                                         }
@@ -866,9 +861,9 @@ namespace Primary.Rendering.D3D12
                                             byteOffset += Unsafe.SizeOf<CmdCommitScissors>();
 
                                             _state.Scissors.Count = cmd.ActiveCount;
-                                            fixed (RECT* ptr = _state.Scissors.Span)
+                                            fixed (Box2D<int>* ptr = _state.Scissors.Span)
                                             {
-                                                cmds.Cmds->RSSetScissorRects(cmd.ActiveCount, ptr);
+                                                cmds.Cmds.RSSetScissorRects(cmd.ActiveCount, ptr);
                                             }
                                             break;
                                         }
@@ -877,7 +872,7 @@ namespace Primary.Rendering.D3D12
                                             CmdSetStencilRef cmd = recorder.GetCommandAtOffset<CmdSetStencilRef>(byteOffset);
                                             byteOffset += Unsafe.SizeOf<CmdSetStencilRef>();
 
-                                            cmds.Cmds->OMSetStencilRef(cmd.StencilRef);
+                                            cmds.Cmds.OMSetStencilRef(cmd.StencilRef);
 
                                             break;
                                         }
@@ -888,21 +883,21 @@ namespace Primary.Rendering.D3D12
 
                                             if (cmd.Resource.IsNull)
                                             {
-                                                cmds.Cmds->IASetVertexBuffers(0, 0, null);
+                                                cmds.Cmds.IASetVertexBuffers(0, 0, (VertexBufferView*)null);
                                             }
                                             else
                                             {
                                                 NRDResource resource = ResourceUtility.AsNRDResource(cmd.Resource);
                                                 ID3D12Resource* native = (ID3D12Resource*)_resourceManager.GetResource(resource);
 
-                                                D3D12_VERTEX_BUFFER_VIEW vbv = new D3D12_VERTEX_BUFFER_VIEW
+                                                VertexBufferView vbv = new VertexBufferView
                                                 {
                                                     BufferLocation = native->GetGPUVirtualAddress(),
                                                     SizeInBytes = cmd.BufferSize,
                                                     StrideInBytes = cmd.Stride,
                                                 };
 
-                                                cmds.Cmds->IASetVertexBuffers(0, 1, &vbv);
+                                                cmds.Cmds.IASetVertexBuffers(0, 1, &vbv);
                                             }
 
                                             break;
@@ -914,26 +909,26 @@ namespace Primary.Rendering.D3D12
 
                                             if (cmd.Resource.IsNull)
                                             {
-                                                cmds.Cmds->IASetIndexBuffer(null);
+                                                cmds.Cmds.IASetIndexBuffer((IndexBufferView*)null);
                                             }
                                             else
                                             {
                                                 NRDResource resource = ResourceUtility.AsNRDResource(cmd.Resource);
                                                 ID3D12Resource* native = (ID3D12Resource*)_resourceManager.GetResource(resource);
 
-                                                D3D12_INDEX_BUFFER_VIEW ibv = new D3D12_INDEX_BUFFER_VIEW
+                                                IndexBufferView ibv = new IndexBufferView
                                                 {
                                                     BufferLocation = native->GetGPUVirtualAddress(),
                                                     SizeInBytes = cmd.BufferSize,
                                                     Format = cmd.Stride switch
                                                     {
-                                                        2 => DXGI_FORMAT_R16_UINT,
-                                                        4 => DXGI_FORMAT_R32_UINT,
+                                                        2 => Format.FormatR16Uint,
+                                                        4 => Format.FormatR32Uint,
                                                         _ => throw new NotImplementedException(),
                                                     }
                                                 };
 
-                                                cmds.Cmds->IASetIndexBuffer(&ibv);
+                                                cmds.Cmds.IASetIndexBuffer(&ibv);
                                             }
 
                                             break;
@@ -943,10 +938,10 @@ namespace Primary.Rendering.D3D12
                                             CmdDrawInstanced cmd = recorder.GetCommandAtOffset<CmdDrawInstanced>(byteOffset);
                                             byteOffset += Unsafe.SizeOf<CmdDrawInstanced>();
 
-                                            _resourceManager.FlushPendingInits(cmds.Cmds);
-                                            _barrierManager.FlushBarriers(cmds.Cmds, BarrierFlushTypes.Buffer | BarrierFlushTypes.Texture);
+                                            _resourceManager.FlushPendingInits(ref cmds.Cmds.Get());
+                                            _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Buffer | BarrierFlushTypes.Texture);
 
-                                            cmds.Cmds->DrawInstanced(cmd.VertexCount, cmd.InstanceCount, cmd.StartVertex, cmd.StartInstance);
+                                            cmds.Cmds.DrawInstanced(cmd.VertexCount, cmd.InstanceCount, cmd.StartVertex, cmd.StartInstance);
 
                                             break;
                                         }
@@ -955,10 +950,10 @@ namespace Primary.Rendering.D3D12
                                             CmdDrawIndexedInstanced cmd = recorder.GetCommandAtOffset<CmdDrawIndexedInstanced>(byteOffset);
                                             byteOffset += Unsafe.SizeOf<CmdDrawIndexedInstanced>();
 
-                                            _resourceManager.FlushPendingInits(cmds.Cmds);
-                                            _barrierManager.FlushBarriers(cmds.Cmds, BarrierFlushTypes.Buffer | BarrierFlushTypes.Texture);
+                                            _resourceManager.FlushPendingInits(ref cmds.Cmds.Get());
+                                            _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Buffer | BarrierFlushTypes.Texture);
 
-                                            cmds.Cmds->DrawIndexedInstanced(cmd.IndexCount, cmd.InstanceCount, cmd.StartIndex, cmd.BaseVertex, cmd.StartInstance);
+                                            cmds.Cmds.DrawIndexedInstanced(cmd.IndexCount, cmd.InstanceCount, cmd.StartIndex, cmd.BaseVertex, cmd.StartInstance);
 
                                             break;
                                         }
@@ -979,14 +974,14 @@ namespace Primary.Rendering.D3D12
                                                 int activeIndex = native->ActiveBufferIndex;//(int)swapChain.SwapChain.Get()->GetCurrentBackBufferIndex();
                                                 ref D3D12RHISwapChainBuffer currentBuffer = ref native->Buffers[activeIndex];
 
-                                                if (!_barrierManager.HasResourceState((ID3D12Resource*)currentBuffer.Resource.Get()))
-                                                    _barrierManager.SetResourceState((ID3D12Resource*)currentBuffer.Resource.Get(), new NRDResourceState(FGResourceId.Texture, null, currentBuffer.BarrierSync, currentBuffer.BarrierAccess, currentBuffer.BarrierLayout));
-                                                _barrierManager.AddTextureBarrier((ID3D12Resource*)currentBuffer.Resource.Get(), D3D12_BARRIER_SYNC_RENDER_TARGET, D3D12_BARRIER_ACCESS_RENDER_TARGET, D3D12_BARRIER_LAYOUT_RENDER_TARGET);
+                                                if (!_barrierManager.HasResourceState(ref currentBuffer.Resource.Get()))
+                                                    _barrierManager.SetResourceState(ref currentBuffer.Resource.Get(), new NRDResourceState(FGResourceId.Texture, null, currentBuffer.BarrierSync, currentBuffer.BarrierAccess, currentBuffer.BarrierLayout));
+                                                _barrierManager.AddTextureBarrier(ref currentBuffer.Resource.Get(), BarrierSync.RenderTarget, BarrierAccess.RenderTarget, BarrierLayout.RenderTarget);
 
-                                                D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = _rtvHeap.GetDescriptorHandleForSwapChain(ref Unsafe.AsRef<D3D12RHISwapChainNative>(native), ref currentBuffer);
-                                                cmds.Cmds->OMSetRenderTargets(1, &rtvHandle, false, null);
+                                                CpuDescriptorHandle rtvHandle = _rtvHeap.GetDescriptorHandleForSwapChain(ref Unsafe.AsRef<D3D12RHISwapChainNative>(native), ref currentBuffer);
+                                                cmds.Cmds.OMSetRenderTargets(1, &rtvHandle, false, (CpuDescriptorHandle*)null);
 
-                                                _state.RasterState.DSVFormat = DXGI_FORMAT_UNKNOWN;
+                                                _state.RasterState.DSVFormat = Format.FormatUnknown;
 
                                                 _state.RasterState.RTVFormats.e0 = native->Base.Description.BackBufferFormat.ToRenderTargetFormat();
                                                 _state.RasterState.RTVFormats.Count = 1;
@@ -1006,10 +1001,10 @@ namespace Primary.Rendering.D3D12
                                             CmdDispatch cmd = recorder.GetCommandAtOffset<CmdDispatch>(byteOffset);
                                             byteOffset += Unsafe.SizeOf<CmdDispatch>();
 
-                                            _resourceManager.FlushPendingInits(cmds.Cmds);
-                                            _barrierManager.FlushBarriers(cmds.Cmds, BarrierFlushTypes.Buffer | BarrierFlushTypes.Texture);
+                                            _resourceManager.FlushPendingInits(ref cmds.Cmds.Get());
+                                            _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Buffer | BarrierFlushTypes.Texture);
 
-                                            cmds.Cmds->Dispatch(cmd.ThreadGroupSizeX, cmd.ThreadGroupSizeY, cmd.ThreadGroupSizeZ);
+                                            cmds.Cmds.Dispatch(cmd.ThreadGroupSizeX, cmd.ThreadGroupSizeY, cmd.ThreadGroupSizeZ);
 
                                             break;
                                         }
@@ -1027,7 +1022,7 @@ namespace Primary.Rendering.D3D12
 
                                             if (_hasPixAvailable)
                                             {
-                                                PIXBeginEventOnCommandList((nint)cmds.Cmds, cmd.Color, (byte*)recorder.GetPointerAtOffset(byteOffset));
+                                                PIXBeginEventOnCommandList((nint)Unsafe.AsPointer(ref cmds.Cmds.Get()), cmd.Color, (byte*)recorder.GetPointerAtOffset(byteOffset));
                                                 ++pixEventDepth;
                                             }
 
@@ -1040,7 +1035,7 @@ namespace Primary.Rendering.D3D12
 
                                             if (_hasPixAvailable && pixEventDepth > 0)
                                             {
-                                                PIXEndEventOnCommandList((nint)cmds.Cmds);
+                                                PIXEndEventOnCommandList((nint)Unsafe.AsPointer(ref cmds.Cmds.Get()));
                                                 --pixEventDepth;
                                             }
 
@@ -1058,7 +1053,7 @@ namespace Primary.Rendering.D3D12
 
                                             if (_hasPixAvailable)
                                             {
-                                                PIXSetMarkerOnCommandList((nint)cmds.Cmds, cmd.Color, (byte*)recorder.GetPointerAtOffset(byteOffset));
+                                                PIXSetMarkerOnCommandList((nint)Unsafe.AsPointer(ref cmds.Cmds.Get()), cmd.Color, (byte*)recorder.GetPointerAtOffset(byteOffset));
                                                 ++pixEventDepth;
                                             }
 
@@ -1077,7 +1072,7 @@ namespace Primary.Rendering.D3D12
                         }
 
                         if (_hasPixAvailable)
-                            PIXEndEventOnCommandList((nint)cmds.Cmds);
+                            PIXEndEventOnCommandList((nint)Unsafe.AsPointer(ref cmds.Cmds.Get()));
                     }
                 }
 
@@ -1097,6 +1092,8 @@ namespace Primary.Rendering.D3D12
                 {
                     @internal.Present();
                 }
+
+                d3d12.CompositionDevice?.CommitSurfaces();
             }
 
             using (new ProfilingScope("Signal"))
@@ -1124,24 +1121,24 @@ namespace Primary.Rendering.D3D12
                 int activeIndex = native->ActiveBufferIndex;//(int)swapChain.SwapChain.Get()->GetCurrentBackBufferIndex();
                 ref D3D12RHISwapChainBuffer currentBuffer = ref native->Buffers[activeIndex];
 
-                _barrierManager.AddTextureBarrier((ID3D12Resource*)currentBuffer.Resource.Get(), D3D12_BARRIER_SYNC_DRAW, D3D12_BARRIER_ACCESS_COMMON, D3D12_BARRIER_LAYOUT_PRESENT);
+                _barrierManager.AddTextureBarrier(ref currentBuffer.Resource.Get(), BarrierSync.Draw, BarrierAccess.Common, BarrierLayout.Present);
 
-                currentBuffer.BarrierSync = D3D12_BARRIER_SYNC_DRAW;
-                currentBuffer.BarrierAccess = D3D12_BARRIER_ACCESS_COMMON;
-                currentBuffer.BarrierLayout = D3D12_BARRIER_LAYOUT_PRESENT;
+                currentBuffer.BarrierSync = BarrierSync.Draw;
+                currentBuffer.BarrierAccess = BarrierAccess.Common;
+                currentBuffer.BarrierLayout = BarrierLayout.Present;
             }
 
-            _barrierManager.FlushBarriers(cmds.Cmds, BarrierFlushTypes.Texture);
+            _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Texture);
             _activeSwapChains.Clear();
         }
 
         private void RestoreGraphicsCmdState(ID3D12GraphicsCommandList10* cmdList)
         {
-            if (_state.RenderTargets.Count > 0 || _state.DepthStencil != _dsvHeap.NullDescriptor)
+            if (_state.RenderTargets.Count > 0 || _state.DepthStencil.Ptr != _dsvHeap.NullDescriptor.Ptr)
             {
-                D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = _state.DepthStencil;
+                CpuDescriptorHandle dsvHandle = _state.DepthStencil;
 
-                fixed (D3D12_CPU_DESCRIPTOR_HANDLE* ptr = _state.RenderTargets.Span)
+                fixed (CpuDescriptorHandle* ptr = _state.RenderTargets.Span)
                 {
                     cmdList->OMSetRenderTargets(
                         (uint)_state.RenderTargets.Count,
@@ -1153,7 +1150,7 @@ namespace Primary.Rendering.D3D12
 
             if (_state.Viewports.Count > 0)
             {
-                fixed (D3D12_VIEWPORT* ptr = _state.Viewports.Span)
+                fixed (Viewport* ptr = _state.Viewports.Span)
                 {
                     cmdList->RSSetViewports((uint)_state.Viewports.Count, ptr);
                 }
@@ -1161,7 +1158,7 @@ namespace Primary.Rendering.D3D12
 
             if (_state.Scissors.Count > 0)
             {
-                fixed (RECT* ptr = _state.Scissors.Span)
+                fixed (Box2D<int>* ptr = _state.Scissors.Span)
                 {
                     cmdList->RSSetScissorRects((uint)_state.Scissors.Count, ptr);
                 }
@@ -1170,8 +1167,8 @@ namespace Primary.Rendering.D3D12
 
         public NRDResourceInfo QueryResourceInfo(FrameGraphResource resource)
         {
-            D3D12_RESOURCE_DESC1 desc = ResourceManager.GetResourceDescription(resource);
-            D3D12_RESOURCE_ALLOCATION_INFO allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);
+            ResourceDesc1 desc = ResourceManager.GetResourceDescription(this, resource);
+            ResourceAllocationInfo allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);
 
             if (resource.ResourceId == FGResourceId.Buffer && Flags.HasFlag(resource.BufferDesc.Usage, FGBufferUsage.ConstantBuffer))
             {
@@ -1184,8 +1181,8 @@ namespace Primary.Rendering.D3D12
 
         public NRDResourceInfo QueryBufferInfo(FrameGraphBuffer buffer, int offset, int size)
         {
-            D3D12_RESOURCE_DESC1 desc = ResourceManager.GetBufferDescription(size);
-            D3D12_RESOURCE_ALLOCATION_INFO allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);
+            ResourceDesc1 desc = ResourceManager.GetBufferDescription(this, size);
+            ResourceAllocationInfo allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);
 
             if (Flags.HasFlag(buffer.Description.Usage, FGBufferUsage.ConstantBuffer))
             {
@@ -1198,48 +1195,48 @@ namespace Primary.Rendering.D3D12
 
         public NRDResourceInfo QueryTextureInfo(FrameGraphTexture texture, int offset, int size)
         {
-            D3D12_RESOURCE_DESC1 desc = ResourceManager.GetBufferDescription(size);
-            D3D12_RESOURCE_ALLOCATION_INFO allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);
+            ResourceDesc1 desc = ResourceManager.GetBufferDescription(this, size);
+            ResourceAllocationInfo allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);
 
             return new NRDResourceInfo((int)allocInfo.SizeInBytes, (int)allocInfo.Alignment);
         }
 
-        private CmdListData GetCommandListData(D3D12_COMMAND_LIST_TYPE listType)
+        private CmdListData GetCommandListData(CommandListType listType)
         {
             int idx = listType switch
             {
-                D3D12_COMMAND_LIST_TYPE_DIRECT => 0,
-                D3D12_COMMAND_LIST_TYPE_COPY => 1,
-                D3D12_COMMAND_LIST_TYPE_COMPUTE => 2,
+                CommandListType.Direct => 0,
+                CommandListType.Copy => 1,
+                CommandListType.Compute => 2,
                 _ => throw new NotImplementedException(),
             };
 
             Queue<CmdListData> queue = _drawCycle ? _allocatorQueue1[idx] : _allocatorQueue2[idx];
             if (!queue.TryDequeue(out CmdListData data))
             {
-                ID3D12GraphicsCommandList10* ptr = null;
-                HRESULT hr = _device->CreateCommandList1(0, listType, D3D12_COMMAND_LIST_FLAG_NONE, UuidOf.Get<ID3D12GraphicsCommandList10>(), (void**)&ptr);
+                ComPtr<ID3D12GraphicsCommandList10> cmds = new ComPtr<ID3D12GraphicsCommandList10>();
+                HResult hr = _device->CreateCommandList1(0, listType, CommandListFlags.None, out cmds);
 
-                if (hr.FAILED)
+                if (hr.IsFailure)
                 {
                     _gd.FlushPendingMessages();
                     throw new NotImplementedException("Add error message");
                 }
 
-                ID3D12CommandAllocator* ptr2 = null;
-                hr = _device->CreateCommandAllocator(listType, UuidOf.Get<ID3D12CommandAllocator>(), (void**)&ptr2);
+                ComPtr<ID3D12CommandAllocator> allocator = null;
+                hr = _device->CreateCommandAllocator(listType, out allocator);
 
-                if (hr.FAILED)
+                if (hr.IsFailure)
                 {
                     _gd.FlushPendingMessages();
                     throw new NotImplementedException("Add error message");
                 }
 
-                data = new CmdListData(ptr, ptr2);
+                data = new CmdListData(cmds, allocator);
             }
 
-            data.Allocator->Reset();
-            data.Cmds->Reset(data.Allocator, null);
+            data.Allocator.Reset();
+            data.Cmds.Reset(ref data.Allocator.Get(), null);
 
             //if (_hasPixAvailable)
             //    PIXBeginEventOnCommandList((nint)data.Cmds, 0xff808080, "NoName");
@@ -1247,15 +1244,15 @@ namespace Primary.Rendering.D3D12
             return data;
         }
 
-        private void ExecuteCommandListData(D3D12_COMMAND_LIST_TYPE listType, CmdListData data)
+        private void ExecuteCommandListData(CommandListType listType, CmdListData data)
         {
-            data.Cmds->Close();
+            data.Cmds.Close();
 
             int idx = listType switch
             {
-                D3D12_COMMAND_LIST_TYPE_DIRECT => 0,
-                D3D12_COMMAND_LIST_TYPE_COPY => 1,
-                D3D12_COMMAND_LIST_TYPE_COMPUTE => 2,
+                CommandListType.Direct => 0,
+                CommandListType.Copy => 1,
+                CommandListType.Compute => 2,
                 _ => throw new NotImplementedException(),
             };
 
@@ -1265,16 +1262,16 @@ namespace Primary.Rendering.D3D12
             ID3D12GraphicsCommandList10* ptr = data.Cmds;
             switch (listType)
             {
-                case D3D12_COMMAND_LIST_TYPE_DIRECT: _graphicsQueue->ExecuteCommandLists(1, (ID3D12CommandList**)&ptr); break;
-                case D3D12_COMMAND_LIST_TYPE_COMPUTE: _computeQueue->ExecuteCommandLists(1, (ID3D12CommandList**)&ptr); break;
-                case D3D12_COMMAND_LIST_TYPE_COPY: _copyQueue->ExecuteCommandLists(1, (ID3D12CommandList**)&ptr); break;
+                case CommandListType.Direct: _graphicsQueue->ExecuteCommandLists(1, (ID3D12CommandList**)&ptr); break;
+                case CommandListType.Compute: _computeQueue->ExecuteCommandLists(1, (ID3D12CommandList**)&ptr); break;
+                case CommandListType.Copy: _copyQueue->ExecuteCommandLists(1, (ID3D12CommandList**)&ptr); break;
             }
         }
 
-        private static D3D12_COMMAND_LIST_TYPE GetListTypeForEvent(TimelineEventType queue) => queue switch
+        private static CommandListType GetListTypeForEvent(TimelineEventType queue) => queue switch
         {
-            TimelineEventType.Raster => D3D12_COMMAND_LIST_TYPE_DIRECT,
-            TimelineEventType.Compute => D3D12_COMMAND_LIST_TYPE_COMPUTE,
+            TimelineEventType.Raster => CommandListType.Direct,
+            TimelineEventType.Compute => CommandListType.Compute,
             _ => throw new NotImplementedException(),
         };
 
@@ -1300,16 +1297,13 @@ namespace Primary.Rendering.D3D12
 
         private static readonly SamplerDesc s_defaultSamplerDesc = new SamplerDesc(new RHISamplerDescription());
 
-        private readonly record struct CmdListData(Ptr<ID3D12GraphicsCommandList10> CmdListPtr, Ptr<ID3D12CommandAllocator> AllocatorPtr) : IDisposable
+        private readonly record struct CmdListData(ComPtr<ID3D12GraphicsCommandList10> Cmds, ComPtr<ID3D12CommandAllocator> Allocator) : IDisposable
         {
             public void Dispose()
             {
-                CmdListPtr.Pointer->Release();
-                AllocatorPtr.Pointer->Release();
+                Cmds.Dispose();
+                Allocator.Dispose();
             }
-
-            internal ID3D12GraphicsCommandList10* Cmds => CmdListPtr.Pointer;
-            internal ID3D12CommandAllocator* Allocator => AllocatorPtr.Pointer;
         }
 
         private readonly record struct SetHeapBundle(Ptr<ID3D12DescriptorHeap> RTVHeap, Ptr<ID3D12DescriptorHeap> SamplerHeap);

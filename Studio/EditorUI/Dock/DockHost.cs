@@ -1,18 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Numerics;
 using CommunityToolkit.Diagnostics;
+using EditorUI.Input;
+using EditorUI.Statistics;
+using EditorUI.Styling;
 using EditorUI.Visual;
+using EditorUI.Windowing;
 using Primary.Collections.ReadOnly;
-using Primary.Common;
 using Primary.Mathematics;
 using Primary.Windowing;
 
+using WindowManager = Primary.Windowing.WindowManager;
+
 namespace EditorUI.Dock
 {
-    public sealed class DockHost : IDisposable
+    public sealed class DockHost : ISingleStyledObject, IDisposable, IInputDispatcher
     {
         private readonly DockManager _dockManager;
+        private readonly StylesheetProvider _stylesheetProvider;
 
         private readonly Window _ownedWindow;
         private readonly bool _isPerpetual;
@@ -20,17 +24,26 @@ namespace EditorUI.Dock
         private DockBase? _rootDock;
         private HashSet<DockBase> _docks;
 
+        private VisualStatistics _visualStats;
+
         private bool _disposedValue;
 
         internal DockHost(DockManager dockManager, bool isPerpetual)
         {
             _dockManager = dockManager;
+            _stylesheetProvider = new StylesheetProvider(UIManager.Instance.ValueSerializer);
 
             _ownedWindow = WindowManager.Instance.CreateWindow("DockHost", new Int2(640, 360), CreateWindowFlags.Resizable | CreateWindowFlags.Hidden);
             _isPerpetual = isPerpetual;
 
             _rootDock = null;
             _docks = new HashSet<DockBase>();
+
+            _visualStats = new VisualStatistics();
+
+            _ownedWindow.WindowResized += OnWindowResize;
+
+            UIManager.Instance.InputManager.BindInputDispatcher(_ownedWindow, this);
         }
 
         private void Dispose(bool disposing)
@@ -39,7 +52,10 @@ namespace EditorUI.Dock
             {
                 if (disposing)
                 {
+                    UIManager.Instance.InputManager.UnbindInputDispatcher(_ownedWindow, this);
+                    _ownedWindow.WindowResized -= OnWindowResize;
                     _ownedWindow.Dispose();
+                    _stylesheetProvider.Dispose();
                 }
 
                 _disposedValue = true;
@@ -66,7 +82,7 @@ namespace EditorUI.Dock
             _ownedWindow.Show();
 
             if (rootDock.DockRect.Size != _ownedWindow.ClientSize)
-                rootDock.TryAddStateFlags(StateFlags.SelfInvalidLayout);
+                rootDock.AddStateFlags(StateFlags.SelfInvalidLayout);
         }
 
         internal void ClearData()
@@ -75,14 +91,22 @@ namespace EditorUI.Dock
             _docks.Clear();
         }
 
+        internal void UpdateData()
+        {
+            foreach (DockBase dock in _docks)
+            {
+                dock.UpdateData();
+            }
+        }
+
         internal void RecalculateLayout()
         {
             if (_rootDock != null)
             {
                 if (_ownedWindow.ClientSize != _rootDock.DockRect.Size)
-                    _rootDock.TryAddStateFlags(StateFlags.SelfInvalidLayout);
+                    _rootDock.AddStateFlags(StateFlags.SelfInvalidLayout);
 
-                if (_rootDock.StateFlags.HasFlags(StateFlags.InvalidLayout))
+                if (_rootDock.StateFlags.HasFlag(StateFlags.InvalidLayout))
                     RecursiveLayoutDocks(_rootDock, false);
             }
         }
@@ -100,9 +124,13 @@ namespace EditorUI.Dock
             StateFlags stateFlags = dock.StateFlags;
 
             ROList<DockBase> docks = dock.Docks;
-            if (forceChildLayout || stateFlags.HasFlags(StateFlags.ThisLayout))
+            if (forceChildLayout || stateFlags.HasFlag(StateFlags.ThisLayout))
             {
-                Rect layoutRect = dock.Parent?.DockRect ?? new Rect(_ownedWindow.ClientSize);
+                Rect layoutRect;
+                if (dock == _rootDock)
+                    layoutRect = new Rect(_ownedWindow.ClientSize);
+                else
+                    layoutRect = dock.DockRect;
 
                 foreach (DockBase childDock in docks)
                 {
@@ -113,25 +141,35 @@ namespace EditorUI.Dock
                     {
                         case DockingSide.Left:
                             {
+                                space = Math.Min(space, layoutRect.Width - WindowDock.TabHeight);
+
                                 dockRect = new Rect(layoutRect.Position, new Int2(space, layoutRect.Height));
                                 layoutRect.X += space;
+                                layoutRect.Width -= space;
                                 break;
                             }
                         case DockingSide.Right:
                             {
-                                dockRect = new Rect(new Int2(layoutRect.X - space, layoutRect.Y), layoutRect.Maximum);
+                                space = Math.Min(space, layoutRect.Width - WindowDock.TabHeight);
+
+                                dockRect = new Rect(new Int2(layoutRect.X + layoutRect.Width - space, layoutRect.Y), new Int2(space, layoutRect.Height));
                                 layoutRect.Width -= space;
                                 break;
                             }
                         case DockingSide.Top:
                             {
+                                space = Math.Min(space, layoutRect.Height - WindowDock.TabHeight);
+
                                 dockRect = new Rect(layoutRect.Position, new Int2(layoutRect.Width, space));
                                 layoutRect.Y += space;
+                                layoutRect.Height -= space;
                                 break;
                             }
                         case DockingSide.Bottom:
                             {
-                                dockRect = new Rect(new Int2(layoutRect.X, layoutRect.Y - space), layoutRect.Maximum);
+                                space = Math.Min(space, layoutRect.Height - WindowDock.TabHeight);
+
+                                dockRect = new Rect(new Int2(layoutRect.X, layoutRect.Y + layoutRect.Height - space), new Int2(layoutRect.Width, space));
                                 layoutRect.Height -= space;
                                 break;
                             }
@@ -145,21 +183,27 @@ namespace EditorUI.Dock
                     dock.RecalculateLayout(layoutRect);
             }
 
-            forceChildLayout = stateFlags.HasFlags(StateFlags.ThisLayout);
+            forceChildLayout = stateFlags.HasFlag(StateFlags.ThisLayout);
             foreach (DockBase childDock in docks)
             {
-                if (forceChildLayout || childDock.StateFlags.HasFlags(StateFlags.InvalidLayout))
+                if (forceChildLayout || childDock.StateFlags.HasFlag(StateFlags.InvalidLayout))
                     RecursiveLayoutDocks(childDock, forceChildLayout);
             }
 
-            dock.TryRemoveStateFlags(StateFlags.SelfInvalidLayout);
+            dock.RemoveStateFlags(StateFlags.SelfInvalidLayout);
+
+            foreach (WindowBase window in dock.Windows)
+            {
+                if (window is WidgetWindow widgetWindow)
+                    widgetWindow.RootWidget.AddStateFlags(StateFlags.SelfInvalidLayout);
+            }
         }
 
         private void RecursivePaintDocks(DockBase dock, ref readonly PainterContext painter)
         {
             foreach (DockBase childDock in dock.Docks)
             {
-                RecursivePaintDocks(dock, in painter);
+                RecursivePaintDocks(childDock, in painter);
             }
 
             dock.PaintVisual(in painter);
@@ -212,7 +256,45 @@ namespace EditorUI.Dock
             _ownedWindow.TakeFocus();
         }
 
+        public InputDispatcherRoot GetInteractable(Vector2 point)
+        {
+            if (_rootDock == null)
+                return InputDispatcherRoot.Null;
+
+            return SearchDocks(_rootDock, point.AsInt2());
+
+            static InputDispatcherRoot SearchDocks(DockBase dockBase, Int2 point)
+            {
+                if (point >= dockBase.DockRect.Position && point <= dockBase.DockRect.Maximum)
+                {
+                    if (dockBase.WindowRect.Position.Y > point.Y)
+                        return new InputDispatcherRoot(dockBase as IInteractable, -dockBase.DockRect.Position.AsVector2());
+                    return new InputDispatcherRoot(dockBase.CurrentWindow?.RootWidget, -dockBase.WindowRect.Position.AsVector2());
+                }
+
+                foreach (DockBase childDocks in dockBase.Docks)
+                {
+                    InputDispatcherRoot ret = SearchDocks(childDocks, point);
+                    if (ret.Interactable != null)
+                    {
+                        return ret;
+                    }
+                }
+
+                return InputDispatcherRoot.Null;
+            }
+        }
+
+        private void OnWindowResize(Int2 newSize)
+        {
+            if (_rootDock != null && _rootDock.DockRect.Size != newSize)
+            {
+                _rootDock.AddStateFlags(StateFlags.SelfInvalidLayout);
+            }
+        }
+
         public Window OwnedWindow => _ownedWindow;
+        Window IInputDispatcher.Window => _ownedWindow;
 
         public Rect HostRect => new Rect(Int2.Zero, _ownedWindow.ClientSize);
 
@@ -222,5 +304,14 @@ namespace EditorUI.Dock
         public DockBase? RootDock => _rootDock;
 
         public StateFlags RootStateFlags => _rootDock?.StateFlags ?? StateFlags.None;
+
+        public VisualStatistics VisualStatistics { get => _visualStats; internal set => _visualStats = value; }
+
+        public StylesheetProvider StylesheetProvider => _stylesheetProvider;
+
+        StyledObject? ISingleStyledObject.StyledObject => _rootDock;
+
+        StylesheetProvider ISingleStyledObject.StylesheetProvider => _stylesheetProvider;
+        bool ISingleStyledObject.GetAllProperties => false;
     }
 }

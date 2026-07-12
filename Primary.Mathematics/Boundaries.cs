@@ -41,14 +41,12 @@ namespace Primary.Mathematics
 
         public bool IsIntersecting(Boundaries boundaries)
         {
-            Vector128<float> a = AsVector128();
-            if (Sse.IsSupported) //TODO: VALIDATE IF THIS IS INLINED CORRECTLY
-                a = Sse.Shuffle(a, a, s_intersectShuffle);
-            else
-                throw new NotImplementedException(); //TODO: add fallback for no SIMD support
+            Vector128<float> a = Vector128.Xor(AsVector128(), Vector128.Create(0.0f, 0.0f, -0.0f, -0.0f));
+            Vector128<float> b = Vector128.Xor(boundaries.AsVector128(), Vector128.Create(-0.0f, -0.0f, 0.0f, 0.0f));
 
-            Vector128<float> b = -boundaries.AsVector128();
-            return Vector128.LessThanOrEqualAll(b, a);
+            b = Vector128.Shuffle(b, Vector128.Create(2, 3, 0, 1));
+
+            return Vector128.LessThanAll(a, b);
         }
 
         public bool Equals(Boundaries other)
@@ -80,6 +78,14 @@ namespace Primary.Mathematics
             return new Boundaries(minMaxVector + growVector);
         }
 
+        public static Boundaries Grow(Boundaries boundaries, Vector4 amount)
+        {
+            Vector128<float> growVector = new Boundaries(new Vector4(-amount.X, -amount.Y, amount.Z, amount.W)).AsVector128();
+            Vector128<float> minMaxVector = boundaries.AsVector128();
+
+            return new Boundaries(minMaxVector + growVector);
+        }
+
         public static Boundaries Offset(Boundaries boundaries, Vector2 offset)
         {
             return new Boundaries(Vector128.Add(boundaries.AsVector128(), Vector128.Create(offset.X, offset.Y, offset.X, offset.Y)));
@@ -87,13 +93,10 @@ namespace Primary.Mathematics
 
         public static Boundaries Union(Boundaries a, Boundaries b)
         {
-            Vector128<float> aVector = new Boundaries(a.Minimum, -a.Maximum).AsVector128();
-            Vector128<float> bVector = new Boundaries(b.Minimum, -b.Maximum).AsVector128();
+            Vector128<float> aVector = a.AsVector128() * Vector128.Create(1.0f, 1.0f, -1.0f, -1.0f); ;
+            Vector128<float> bVector = b.AsVector128() * Vector128.Create(1.0f, 1.0f, -1.0f, -1.0f); ;
 
-            Boundaries bounds = new Boundaries(Vector128.Min(aVector, bVector));
-            bounds.Maximum = -bounds.Maximum;
-
-            return bounds;
+            return Unsafe.BitCast<Vector128<float>, Boundaries>(Vector128.Min(aVector, bVector) * Vector128.Create(1.0f, 1.0f, -1.0f, -1.0f));
         }
 
         public static Vector2 OnEdge(Boundaries b, Vector2 p)
@@ -105,6 +108,11 @@ namespace Primary.Mathematics
         {
             //TODO: Vectorize to use Vector128 instead of 2 Vector2s
             return new Boundaries(Vector2.Max(a.Minimum, b.Minimum), Vector2.Min(a.Maximum, b.Maximum));
+        }
+
+        public static Vector2 Contain(Boundaries boundaries, Vector2 position)
+        {
+            return Vector2.Min(Vector2.Max(position, boundaries.Minimum), boundaries.Maximum);
         }
 
         public Vector2 Size => Maximum - Minimum;

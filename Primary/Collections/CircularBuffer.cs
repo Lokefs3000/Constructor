@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Primary.Collections.Display;
 
 namespace Primary.Collections
 {
+    [DebuggerTypeProxy(typeof(CircularBufferDebugView<>))]
     public sealed class CircularBuffer<T> : IEnumerable<T>, IReadOnlyCollection<T>
     {
         private T[] _array;
@@ -225,7 +228,7 @@ namespace Primary.Collections
                 _buffer = buffer;
 
                 _version = buffer._version;
-                _index = buffer._end;
+                _index = buffer._start;
 
                 _current = default;
             }
@@ -255,7 +258,7 @@ namespace Primary.Collections
 
                 _current = _buffer._array[_index++];
 
-                if ((_index = (_index % _buffer._array.Length)) == _buffer._end)
+                if ((_index %= _buffer._array.Length) == _buffer._end)
                 {
                     _index = -1;
                 }

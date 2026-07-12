@@ -13,7 +13,7 @@ namespace Primary.Memory.Native
             _threads = new ConcurrentDictionary<int, ThreadScope>();
         }
 
-        private static ThreadScope GetThreadScope() => _threads.GetOrAdd(Thread.CurrentThread.ManagedThreadId, (_) => new ThreadScope());
+        private static ThreadScope GetThreadScope() => _threads.GetOrAdd(Environment.CurrentManagedThreadId, (_) => new ThreadScope());
 
         public static MemoryScope PushScope()
         {

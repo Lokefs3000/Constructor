@@ -1,10 +1,11 @@
-﻿using Primary;
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Threading.Channels;
+using Primary;
 using Primary.Assets;
 using Primary.Assets.Types;
 using Silk.NET.Assimp;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Editor.Processors.Texture
 {
@@ -28,8 +29,7 @@ namespace Editor.Processors.Texture
 
             for (int i = 0; i < faceIds.Length; i++)
             {
-                string? filePath = idProvider.RetrievePathForId(faceIds[i]);
-                if (filePath == null)
+                if (!idProvider.TryGetLocalPathForId(faceIds[i], out string? filePath))
                 {
                     throw new Exception($"Failed to get path for id: {faceIds[i]}");
                 }

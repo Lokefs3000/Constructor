@@ -30,6 +30,7 @@ namespace Primary.GUI.ImGui
         public Vector2 MaxCursorPos { get; set; }
 
         public int IndentLevel { get; set; }
+        public int TreeDepth { get; set; }
 
         public Vector2 Scroll { get; set; }
 
@@ -80,6 +81,7 @@ namespace Primary.GUI.ImGui
             MaxCursorPos = Vector2.Zero;
 
             IndentLevel = 0;
+            TreeDepth = 0;
 
             LastItemId = 0;
             LastItemRect = Boundaries.Zero;
@@ -103,6 +105,8 @@ namespace Primary.GUI.ImGui
 
         NoResize = 1 << 6,
         NoMove = 1 << 7,
+
+        NoInput = 1 << 9,
 
         Tooltip = (1 << 0) | AlwaysOnTop | AlwaysResize,
         Child = 1 << 8

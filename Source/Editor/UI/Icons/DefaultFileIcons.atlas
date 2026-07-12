@@ -1,0 +1,71 @@
+texture = "Editor/UI/Icons/DefaultFileIcons.png"
+
+[[sprites]]
+name = "FolderClosed"
+offset = [0, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "FolderOpen"
+offset = [32, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "FileDefault"
+offset = [64, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "FileText"
+offset = [96, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "FileTexture"
+offset = [128, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "FileShader"
+offset = [160, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "FileComputeShader"
+offset = [192, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "FileTextureAtlas"
+offset = [224, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "FileModel"
+offset = [256, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "FileMaterial"
+offset = [288, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Material"
+offset = [320, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Model"
+offset = [352, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Scene"
+offset = [384, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Error"
+offset = [316, 0]
+size = [16, 16]

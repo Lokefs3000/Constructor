@@ -66,6 +66,7 @@ namespace Editor.Interop.Ed
             public byte Stride;
 
             public byte* Pixels;
+            public byte Effort;
         }
 
         [StructLayout(LayoutKind.Sequential, Pack = 1)]

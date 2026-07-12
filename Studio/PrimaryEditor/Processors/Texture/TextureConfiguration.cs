@@ -1,11 +1,12 @@
-﻿using Primary.Assets.Loaders;
-using Primary.Assets.Types;
-using Primary.Common;
-using Primary.Serialization.Toml;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json.Serialization;
+using Primary.Assets.Loaders;
+using Primary.Assets.Types;
+using Primary.Common;
+using Primary.Serialization.Toml;
+using PrimaryEditor.Assets.Utility;
 using Tomlyn;
 using Tomlyn.Serialization;
 
@@ -21,6 +22,7 @@ namespace Editor.Processors.Texture
     //[TomlSerializable(typeof(CubemapConfiguration))]
     //public partial class TextureTomlContext : TomlSerializerContext
     //{
+
     public sealed class TextureSwizzleConverter : TomlConverter<TextureSwizzle>
     {
         public override TextureSwizzle Read(TomlReader reader)
@@ -160,6 +162,7 @@ namespace Editor.Processors.Texture
 
         public struct CompsiteChannel(TextureCompositeChannel sourceChannel)
         {
+            [TomlConverter(typeof(EarlyAssetIdTomlConverter))]
             public AssetId Asset { get; set; } = AssetId.Invalid;
             public TextureCompositeChannel Source { get; set; } = sourceChannel;
             public bool Invert { get; set; } = false;
@@ -181,13 +184,13 @@ namespace Editor.Processors.Texture
 
         public struct Composited()
         {
-            [TomlRequired] public AssetId PositiveX { get; set; }
-            [TomlRequired] public AssetId PositiveY { get; set; }
-            [TomlRequired] public AssetId PositiveZ { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId PositiveX { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId PositiveY { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId PositiveZ { get; set; }
 
-            [TomlRequired] public AssetId NegativeX { get; set; }
-            [TomlRequired] public AssetId NegativeY { get; set; }
-            [TomlRequired] public AssetId NegativeZ { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId NegativeX { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId NegativeY { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId NegativeZ { get; set; }
         }
     }
 

@@ -28,7 +28,7 @@ namespace Primary.Assets.Loaders
             return new ShaderAsset(materialData);
         }
 
-        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
+        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, string localPath, BundleReader? bundleToReadFrom)
         {
             if (asset is not ShaderAsset shader)
                 throw new ArgumentException(nameof(asset));
@@ -740,7 +740,7 @@ namespace Primary.Assets.Loaders
                     };
 
                     RHIDevice device = RHIDevice.Instance ?? throw new NullReferenceException();
-                    graphicsPipeline = device.CreateGraphicsPipeline(pipelineDescription, pipelineBytecode, sourcePath);
+                    graphicsPipeline = device.CreateGraphicsPipeline(pipelineDescription, pipelineBytecode, localPath);
 
                     static RHIGPStencilFace ConvertFace(SBCDepthStencilFace face) => new RHIGPStencilFace
                     {
@@ -838,7 +838,7 @@ namespace Primary.Assets.Loaders
                 {
                     shaderData.UpdateAssetFailed(shader);
 
-                    EngLog.Assets.Error("[a:{path}]: " + message, [sourcePath, .. args]);
+                    EngLog.Assets.Error("[a:{path}]: " + message, [localPath, .. args]);
                     throw new Exception("Unexpected error");
                 }
             }

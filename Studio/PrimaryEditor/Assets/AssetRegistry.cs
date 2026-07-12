@@ -10,150 +10,110 @@ using Primary.Collections;
 using Primary.Common;
 using PrimaryEditor.Assets.Serialization;
 using PrimaryEditor.Project;
+using TerraFX.Interop.Windows;
 
 namespace PrimaryEditor.Assets
 {
     public sealed class AssetRegistry : IAssetIdProvider
     {
-        private ConcurrentDictionary<string, AssetId> _pathToIdDict;
-        private ConcurrentDictionary<AssetId, string> _idToPathDict;
+        private ConcurrentDictionary<AssetId, AssetRegistryData> _registeredAssets;
 
-        private ConcurrentDictionary<string, AssetId>.AlternateLookup<ReadOnlySpan<char>> _pathToIdDictAlt;
+        private ConcurrentDictionary<string, AssetId> _assetIdLookupDict;
+        private ConcurrentDictionary<string, AssetId>.AlternateLookup<ReadOnlySpan<char>> _assetIdLookupDictAlt;
 
         internal AssetRegistry()
         {
-            _pathToIdDict = new ConcurrentDictionary<string, AssetId>();
-            _idToPathDict = new ConcurrentDictionary<AssetId, string>();
+            _registeredAssets = new ConcurrentDictionary<AssetId, AssetRegistryData>();
 
-            _pathToIdDictAlt = _pathToIdDict.GetAlternateLookup<ReadOnlySpan<char>>();
+            _assetIdLookupDict = new ConcurrentDictionary<string, AssetId>();
+            _assetIdLookupDictAlt = _assetIdLookupDict.GetAlternateLookup<ReadOnlySpan<char>>();
         }
 
-        internal void LoadRegistryFromDisk()
+        internal void SetupFileWithinRegistryWithId(AssetId id, string localPath, string? assetPath)
         {
-            if (File.Exists(s_registryFile))
+            _registeredAssets[id] = new AssetRegistryData(localPath, assetPath);
+            _assetIdLookupDict[localPath] = id;
+        }
+
+        internal AssetId SetupFileWithinRegistry(string localPath, string? assetPath)
+        {
+            return _assetIdLookupDict.GetOrAdd(localPath, ValueFactory, assetPath);
+
+            AssetId ValueFactory(string localPath, string? assetPath)
             {
-                AssetRegistryJson json;
-                try
-                {
-                    json = JsonSerializer.Deserialize(File.ReadAllText(s_registryFile), AssetRegistryJsonContext.Default.AssetRegistryJson)!;
-                }
-                catch (Exception ex)
-                {
-                    EdLog.Assets.Error(ex, "Failed to read asset registry from disk!");
-                    throw;
-                }
+                AssetId id = (AssetId)Guid.CreateVersion7();
 
-                if (json.Version != AssetRegistryJson.FileVersion)
-                {
-                    EdLog.Assets.Error("Incorrect asset registry version '{v}'", json.Version);
-                    throw new Exception();
-                }
-
-                foreach (AssetIdDataJson data in json.Assets)
-                {
-                    if (_pathToIdDict.ContainsKey(data.Path) || _idToPathDict.ContainsKey(data.Id))
-                    {
-                        EdLog.Assets.Warning("Duplicate asset id or path '{i}' '{p}'", data.Id, data.Path);
-                        continue;
-                    }
-
-                    _pathToIdDict.TryAdd(data.Path, data.Id);
-                    _idToPathDict.TryAdd(data.Id, data.Path);
-                }
+                _registeredAssets[id] = new AssetRegistryData(localPath, assetPath);
+                return id;
             }
         }
 
-        internal void SaveRegistryToDisk()
+        internal void RemoveAssetPath(AssetId id)
         {
-            AssetRegistryJson data = new AssetRegistryJson();
-
-            using RentedList<AssetIdDataJson> assets = new RentedList<AssetIdDataJson>();
-            foreach (var (path, id) in _pathToIdDict)
+            if (_registeredAssets.TryGetValue(id, out AssetRegistryData registryData))
             {
-                assets.Add(new AssetIdDataJson
-                {
-                    Path = path,
-                    Id = id
-                });
-            }
-
-            data.Assets = [.. assets];
-
-            try
-            {
-                File.WriteAllText(s_registryFile, JsonSerializer.Serialize(data, AssetRegistryJsonContext.Default.AssetRegistryJson));
-            }
-            catch (Exception ex)
-            {
-                EdLog.Assets.Error(ex, "Failed to read file remappings from disk!");
-                throw;
+                AssetRegistryData newRegistryData = new AssetRegistryData(registryData.LocalPath, null);
+                _registeredAssets.TryUpdate(id, newRegistryData, registryData);
             }
         }
 
-        internal void MoveFileWithinRegistry(string localPath, string newLocalPath)
+        internal void UpdateLocalPath(string localPath, string newLocalPath)
         {
-            if (_pathToIdDict.TryGetValue(localPath, out AssetId id))
+            if (_assetIdLookupDict.TryGetValue(localPath, out AssetId id) && _registeredAssets.TryGetValue(id, out AssetRegistryData registryData))
             {
-                _pathToIdDict.TryRemove(localPath, out _);
+                _assetIdLookupDict.TryRemove(localPath, out _);
 
-                _pathToIdDict.TryAdd(newLocalPath, id);
-                _idToPathDict[id] = newLocalPath;
+                _assetIdLookupDict.TryAdd(newLocalPath, id);
+                _registeredAssets[id] = new AssetRegistryData(newLocalPath, registryData.AssetPath);
             }
         }
 
-        private static AssetId GenerateId()
+        public bool TryGetPathForId(AssetId assetId, bool getLocalPath, [NotNullWhen(true)] out string? value)
         {
-            return new AssetId(Guid.CreateVersion7());
-        }
-
-        public AssetId GetOrRegisterIdFor(ReadOnlySpan<char> path)
-        {
-            if (!_pathToIdDictAlt.TryGetValue(path, out AssetId id))
+            if (_registeredAssets.TryGetValue(assetId, out AssetRegistryData registryData))
             {
-                string pathStr = path.ToString();
-                id = _pathToIdDict.GetOrAdd(pathStr, New, GenerateId());
-
-                AssetId New(string path, AssetId id)
-                {
-                    if (!_idToPathDict.TryAdd(id, path))
-                    {
-                        EdLog.Assets.Error("Failed to add new id to 'Id->Path' dictionary");
-                    }
-
-                    return id;
-                }
+                value = getLocalPath ? registryData.LocalPath : registryData.AssetPath;
+                return value != null;
             }
 
-            return id;
+            value = null;
+            return false;
         }
 
-        public bool HasIdForPath(ReadOnlySpan<char> path)
+        public bool TryGetAnyPathForId(AssetId assetId, [NotNullWhen(true)] out string? value)
         {
-            return _pathToIdDictAlt.ContainsKey(path);
+            if (_registeredAssets.TryGetValue(assetId, out AssetRegistryData registryData))
+            {
+                value = registryData.AssetPath ?? registryData.LocalPath;
+                return true;
+            }
+
+            value = null;
+            return false;
         }
 
-        public bool IsIdValid(AssetId id)
+        public bool TryGetLocalAndAssetPathsForId(AssetId assetId, [NotNullWhen(true)] out string? localPath, [MaybeNullWhen(true)] out string? assetPath)
         {
-            return _idToPathDict.ContainsKey(id);
+            if (_registeredAssets.TryGetValue(assetId, out AssetRegistryData registryData))
+            {
+                localPath = registryData.LocalPath;
+                assetPath = registryData.AssetPath;
+                return true;
+            }
+
+            localPath = null;
+            assetPath = null;
+            return false;
         }
 
-        public bool TryGetIdFromPath(ReadOnlySpan<char> filePath, [NotNullWhen(true)] out AssetId value)
-        {
-            return _pathToIdDictAlt.TryGetValue(filePath, out value);
-        }
+        public bool TryLookupIdForPath(ReadOnlySpan<char> path, [NotNullWhen(true)] out AssetId value) => _assetIdLookupDictAlt.TryGetValue(path, out value);
 
-        #region Id Provider
-        public AssetId RetriveIdForPath(ReadOnlySpan<char> path)
-        {
-            return _pathToIdDictAlt.TryGetValue(path, out AssetId value) ? value : AssetId.Invalid;
-        }
+        public bool IsIdValid(AssetId assetId) => _registeredAssets.ContainsKey(assetId);
+        public bool DoesPathHaveLookup(ReadOnlySpan<char> path) => _assetIdLookupDictAlt.ContainsKey(path);
 
-        public string? RetrievePathForId(AssetId assetId)
-        {
-            return _idToPathDict.TryGetValue(assetId, out string? value) ? value : null;
-        }
-        #endregion
+        public bool TryGetLocalPathForId(AssetId assetId, [NotNullWhen(true)] out string? value) => TryGetPathForId(assetId, true, out value);
+        public bool TryGetAssetPathForId(AssetId assetId, [NotNullWhen(true)] out string? value) => TryGetPathForId(assetId, false, out value);
 
-        private static string s_registryFile => Path.Combine(ProjectData.Instance.Paths.RootFolder, "Assets.json");
+        private readonly record struct AssetRegistryData(string LocalPath, string? AssetPath);
     }
 }

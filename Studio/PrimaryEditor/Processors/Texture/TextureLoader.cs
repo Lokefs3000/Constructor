@@ -1,9 +1,10 @@
-﻿using Primary;
-using Primary.Assets;
-using Primary.Assets.Types;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Channels;
+using Primary;
+using Primary.Assets;
+using Primary.Assets.Types;
 
 namespace Editor.Processors.Texture
 {
@@ -13,8 +14,7 @@ namespace Editor.Processors.Texture
         {
             IAssetIdProvider idProvider = texture.IdProvider!;
 
-            string? filePath = idProvider.RetrievePathForId(texture.DefaultId);
-            if (filePath == null)
+            if (!idProvider.TryGetLocalPathForId(texture.DefaultId, out string? filePath))
             {
                 throw new Exception($"Failed to get path for id: {texture.DefaultId}");
             }

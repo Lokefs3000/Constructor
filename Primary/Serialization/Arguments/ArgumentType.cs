@@ -13,6 +13,7 @@ namespace Primary.Serialization.Arguments
         Null = 0,
         Integer,
         Number,
-        String
+        String,
+        Boolean
     }
 }

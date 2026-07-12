@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "InteropGenerator": {
+      "commandName": "Project"
+    },
+    "D3D12MemAlloc": {
+      "commandName": "Project",
+      "commandLineArgs": "-i \"D:\\D3D12MemoryAllocator\\include\" -o \"D:\\source\\repos\\Constructor\\Interop.D3D12MemAlloc\\\""
+    }
+  }
+}

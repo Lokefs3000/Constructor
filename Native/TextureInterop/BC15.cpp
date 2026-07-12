@@ -35,13 +35,13 @@ static void EncodeGeneric(ImageBitmap* bitmap, ImageOutput* output, EncoderType 
 			{
 				case EncoderType::BC1:
 				{
-					rgbcx::encode_bc1(8, currBlock8++, &pixels[0].m_c[0], true, true);
+					rgbcx::encode_bc1(bitmap->Effort, currBlock8++, &pixels[0].m_c[0], true, true);
 
 					break;
 				}
 				case EncoderType::BC3:
 				{
-					rgbcx::encode_bc3(8, currBlock16++, &pixels[0].m_c[0]);
+					rgbcx::encode_bc3(bitmap->Effort, currBlock16++, &pixels[0].m_c[0]);
 
 					break;
 				}

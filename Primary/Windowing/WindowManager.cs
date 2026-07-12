@@ -9,6 +9,9 @@ namespace Primary.Windowing
     public class WindowManager : IDisposable, IEventHandler
     {
         private Window? _primaryWindow;
+        private Window? _activeWindow;
+
+        private Display _primaryDisplay;
 
         private Dictionary<uint, Window> _windows;
         private Dictionary<uint, Display> _displays;
@@ -20,6 +23,7 @@ namespace Primary.Windowing
             s_instance = this;
 
             _primaryWindow = null;
+            _activeWindow = null;
 
             _windows = new Dictionary<uint, Window>();
             _displays = new Dictionary<uint, Display>();
@@ -34,8 +38,13 @@ namespace Primary.Windowing
                     {
                         Display display = new Display(id);
                         _displays.Add((uint)id, display);
+
+                        if (display.IsPrimary)
+                            _primaryDisplay = display;
                     }
                 }
+
+                _primaryDisplay ??= _displays.First().Value;
             }
 
             Engine.GlobalSingleton.EventManager.AddHandler(this);
@@ -80,6 +89,17 @@ namespace Primary.Windowing
                 case SDL_EVENT_DISPLAY_REMOVED:
                     {
                         _displays.Remove((uint)@event.display.displayID);
+
+                        _primaryDisplay = null!;
+                        foreach (var (id, display) in _displays)
+                        {
+                            display.UpdateCachedData();
+
+                            if (display.IsPrimary)
+                                _primaryDisplay = display;
+                        }
+
+                        _primaryDisplay ??= _displays.First().Value;
                         break;
                     }
                 case SDL_EVENT_DISPLAY_MOVED:
@@ -92,6 +112,30 @@ namespace Primary.Windowing
                     {
                         if (_displays.TryGetValue((uint)@event.display.displayID, out Display? display))
                             display.FetchBoundaries(true);
+                        break;
+                    }
+                case SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED:
+                    {
+                        if (_displays.TryGetValue((uint)@event.display.displayID, out Display? display))
+                        {
+                            display.UpdateCachedData();
+
+                            if (display.IsPrimary)
+                                _primaryDisplay = display;
+                        }
+                        break;
+                    }
+
+                case SDL_EVENT_WINDOW_FOCUS_GAINED:
+                    {
+                        if (_windows.TryGetValue((uint)@event.window.windowID, out Window? window))
+                            _activeWindow = window;
+                        break;
+                    }
+                case SDL_EVENT_WINDOW_FOCUS_LOST:
+                    {
+                        if (_windows.TryGetValue((uint)@event.window.windowID, out Window? window) && _activeWindow == window)
+                            _activeWindow = null;
                         break;
                     }
             }
@@ -107,16 +151,17 @@ namespace Primary.Windowing
             return window;
         }
 
-        public void DestroyWindow(Window window)
+        // Called from the windows Dispose method
+        internal void DestroyWindow(Window window)
         {
             WindowDestroyed?.Invoke(window);
 
             _windows.Remove(window.WindowId);
 
-            window.Dispose();
-
             if (_primaryWindow == window)
                 _primaryWindow = _windows.Count > 0 ? _windows.Values.GetEnumerator().Current : null;
+            if (_activeWindow == window)
+                _activeWindow = null;
         }
 
         public Window? FindWindow(uint id)
@@ -147,6 +192,9 @@ namespace Primary.Windowing
         }
 
         public Window? PrimaryWindow { get => _primaryWindow; set => _primaryWindow = value; }
+        public Window? ActiveWindow => _activeWindow;
+
+        public Display PrimaryDisplay => _primaryDisplay;
 
         public Dictionary<uint, Window> Windows => _windows;
         public Dictionary<uint, Display> Displays => _displays;

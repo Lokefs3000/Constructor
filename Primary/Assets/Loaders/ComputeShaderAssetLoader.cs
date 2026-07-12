@@ -36,7 +36,7 @@ namespace Primary.Assets.Loaders
             return new ComputeShaderAsset(shaderData);
         }
 
-        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
+        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, string localPath, BundleReader? bundleToReadFrom)
         {
             if (asset is not ComputeShaderAsset shader)
                 throw new ArgumentException(nameof(asset));
@@ -630,7 +630,7 @@ namespace Primary.Assets.Loaders
                 {
                     shaderData.UpdateAssetFailed(shader);
 
-                    EngLog.Assets.Error("[a:{path}]: " + message, [sourcePath, .. args]);
+                    EngLog.Assets.Error("[a:{path}]: " + message, [localPath, .. args]);
                     throw new Exception("Unexpected error");
                 }
             }

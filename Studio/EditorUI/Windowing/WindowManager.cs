@@ -89,5 +89,6 @@ namespace EditorUI.Windowing
         }
 
         public ROList<WindowBase> Windows => _trackedWindows;
+        public WindowBase? CurrentWindowFocus => _currentWindowFocus;
     }
 }

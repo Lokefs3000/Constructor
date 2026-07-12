@@ -7,11 +7,10 @@ using Primary.Mathematics;
 using Primary.Rendering;
 using SDL;
 using System.Diagnostics;
+using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.Intrinsics;
-using TerraFX.Interop.Windows;
-using TerraFX.Interop.WinRT;
+using System.Runtime.InteropServices;
 
 namespace Primary.GUI.ImGui
 {
@@ -59,6 +58,9 @@ namespace Primary.GUI.ImGui
             s_context.Style.Finish();
         }
 
+        #region Demo
+        public static void ShowStyleEditor() => ImGuiStyleEditor.Show();
+        #endregion
         #region Utility
         public static Vector2 CalculateTextSize(ReadOnlySpan<char> text)
         {
@@ -109,13 +111,19 @@ namespace Primary.GUI.ImGui
         {
             ImGuiWindowState? windowState = s_context!.StateController.CurrentWindow;
             if (windowState != null)
+            {
                 ++windowState.IndentLevel;
+                windowState.CursorPos = new Vector2(windowState.CursorPos.X + 8.0f, windowState.CursorPos.Y);
+            }
         }
         public static void Unindent()
         {
             ImGuiWindowState? windowState = s_context!.StateController.CurrentWindow;
             if (windowState != null && windowState.IndentLevel > 0)
+            {
                 --windowState.IndentLevel;
+                windowState.CursorPos = new Vector2(windowState.CursorPos.X - 8.0f, windowState.CursorPos.Y);
+            }
         }
 
         public static bool IsLastItemHeld() => s_context!.StateController.IsLastItemHeld();
@@ -614,7 +622,7 @@ namespace Primary.GUI.ImGui
             {
                 ReadOnlySpan<char> writer = s_context!.StateController.TextState.AsSpan();
 
-                window.DrawList.DrawRect(frameBb.Minimum+ Vector2.One, frameBb.Maximum, 0xfff5922a);
+                window.DrawList.DrawRect(frameBb.Minimum + Vector2.One, frameBb.Maximum, 0xfff5922a);
                 window.DrawList.DrawText(frameBb.Minimum + s_context!.Style.FramePadding, writer, 0xffffffff);
 
                 ImGuiTextState textState = s_context!.StateController.TextState;
@@ -696,6 +704,225 @@ namespace Primary.GUI.ImGui
 
             return changed;
         }
+
+        public static bool InputVector2(ReadOnlySpan<char> text, ref Vector2 v)
+        {
+            return InputScalarVector(text, MemoryMarshal.CreateSpan(ref v.X, 2));
+        }
+
+        public static bool DragScalar<T>(ReadOnlySpan<char> text, ref T value) where T : unmanaged, IFormattable, INumber<T> => DragScalar(text, ref value, Vector2.Zero);
+        public static bool DragScalar<T>(ReadOnlySpan<char> text, ref T value, Vector2 size) where T : unmanaged, IFormattable, INumber<T>
+        {
+            ImGuiWindowState? window = s_context!.StateController.CurrentWindow;
+
+            if (window == null)
+                return false;
+
+            ImGuiStyle style = s_context.Style;
+
+            int id = GetId(text);
+            bool changed = false;
+
+            Vector2 labelSize = CalculateTextSize(text);
+
+            Vector2 frameSize = s_context!.StateController.CalculateItemSize(size, s_context!.StateController.CalculateItemWidth(), labelSize.Y + s_context!.Style.FramePadding.Y * 2.0f);
+            float frameOffset = (labelSize.X > 0.0f ? s_context!.Style.InnerItemPadding.X + labelSize.X : 0.0f);
+
+            Vector2 fullSize = new Vector2(frameSize.X + (labelSize.X > 0.0f ? s_context!.Style.InnerItemPadding.X + labelSize.X : 0.0f), frameSize.Y);
+
+            Boundaries fullBb = new Boundaries(window.CursorPos, window.CursorPos + fullSize);
+            Boundaries frameBb = new Boundaries(window.CursorPos + new Vector2(frameOffset, 0.0f), window.CursorPos + new Vector2(frameOffset, 0.0f) + frameSize);
+            
+            window.DrawList.DrawText(fullBb.Minimum, text, 0xffffffff);
+            
+            Span<char> formatted = stackalloc char[16];
+            if (!value.TryFormat(formatted, out int charsWritten, "G", CultureInfo.InvariantCulture))
+            {
+                PopId();
+                return false;
+            }
+
+            Vector2 valueSize = CalculateTextSize(formatted[..charsWritten]);
+
+            var state = s_context!.StateController.ButtonBehaviour(id, frameBb);
+
+            uint frameColor = style.FrameBg.ABGR;
+            if (state.Held)
+                frameColor = style.FrameActiveBg.ABGR;
+            else if (state.Hovered)
+                frameColor = style.FrameHoveredBg.ABGR;
+
+            var dragState = s_context.StateController.HandleItemDrag(id, new Vector2(0.0f, 0.0f));
+            if (dragState.IsDragging)
+            {
+                float delta = dragState.Position.X;
+            }
+
+            window.DrawList.DrawFilledRect(frameBb.Minimum, frameBb.Maximum, frameColor);
+            window.DrawList.DrawText(frameBb.Center - valueSize * 0.5f, formatted[..charsWritten]);
+
+            s_context.StateController.AddItemSize(fullSize);
+            s_context.StateController.AddItemId(id, frameBb);
+
+            return changed;
+        }
+
+        public static bool DragVector2(ReadOnlySpan<char> text, ref Vector2 v)
+        {
+            return DragScalarVector(text, MemoryMarshal.CreateSpan(ref v.X, 2));
+        }
+
+        public static (bool IsNodeOpen, bool IsLabelPressed) TreeNode(ReadOnlySpan<char> text, TreeNodeFlags flags = TreeNodeFlags.None)
+        {
+            ImGuiWindowState? window = s_context!.StateController.CurrentWindow;
+
+            if (window == null)
+                return (false, false);
+
+            ImGuiStyle style = s_context.Style;
+
+            PushId(text);
+
+            int arrowId = GetId(0);
+            int labelId = GetId(1);
+
+            Boundaries arrowBb = new Boundaries(window.CursorPos, window.CursorPos + new Vector2(ImGuiFont.FontVisualHeight));
+            Boundaries labelBb = new Boundaries(new Vector2(window.CursorPos.X + ImGuiFont.FontVisualHeight + style.InnerItemPadding.X, window.CursorPos.Y), new Vector2(AvailableSize.X, arrowBb.Maximum.Y));
+
+            var arrowState = ButtonBehaviour(arrowId, arrowBb);
+            var labelState = ButtonBehaviour(labelId, labelBb);
+
+            if (arrowState.Held || arrowState.Hovered)
+                window.DrawList.DrawFilledRect(arrowBb.Minimum, arrowBb.Maximum, arrowState.Held ? style.FrameActiveBg.ABGR : style.FrameHoveredBg.ABGR);
+            
+            if (labelState.Held || labelState.Hovered)
+                window.DrawList.DrawFilledRect(labelBb.Minimum, labelBb.Maximum, labelState.Held ? style.FrameActiveBg.ABGR : style.FrameHoveredBg.ABGR);
+
+            window.DrawList.DrawFilledTriangle(arrowBb.Minimum, new Vector2(float.Lerp(arrowBb.Minimum.X, arrowBb.Maximum.X, 0.5f), arrowBb.Maximum.Y), new Vector2(arrowBb.Maximum.X, arrowBb.Minimum.Y));
+            window.DrawList.DrawText(labelBb.Minimum, text, style.Text.ABGR);
+
+            ++window.TreeDepth;
+            Indent();
+
+            return (true, labelState.Pressed);
+        }
+
+        public static void TreePop()
+        {
+            ImGuiWindowState? window = s_context!.StateController.CurrentWindow;
+
+            if (window == null)
+                return;
+
+            if (window.TreeDepth > 0)
+                --window.TreeDepth;
+            else
+                EngLog.ImGui.Error("Cannot pop the tree stack because it is empty");
+
+            Unindent();
+        }
+
+        #region Internal
+        private static bool InputScalarVector<T>(ReadOnlySpan<char> text, Span<T> values) where T : unmanaged, IFormattable, INumber<T>
+        {
+            ImGuiWindowState? window = s_context!.StateController.CurrentWindow;
+
+            if (window == null)
+                return false;
+
+            ImGuiStyle style = s_context.Style;
+
+            int id = GetId(text);
+            bool changed = false;
+
+            PushId(id);
+
+            Vector2 labelSize = CalculateTextSize(text);
+
+            window.DrawList.DrawText(window.CursorPos, text, 0xffffffff);
+            window.CursorPos += new Vector2(labelSize.X + style.InnerItemPadding.X, 0.0f);
+
+            Span<char> formatted = stackalloc char[10];
+
+            int elementCount = values.Length;
+            for (int i = 0; i < elementCount; ++i)
+            {
+                PushId(i);
+
+                if (!values[i].TryFormat(formatted, out int charsWritten, "G", CultureInfo.InvariantCulture))
+                {
+                    PopId();
+                    continue;
+                }
+
+                ReadOnlySpan<char> temp = formatted[..charsWritten];
+                if (InputString([], ref temp))
+                {
+                    if (T.TryParse(temp, CultureInfo.InvariantCulture, out T result))
+                    {
+                        if (result != values[i])
+                        {
+                            values[i] = result;
+                            changed = true;
+                        }
+                    }
+                }
+
+                if (i < elementCount - 1)
+                {
+                    SameLine();
+                }
+
+                PopId();
+            }
+
+            PopId();
+
+            return changed;
+        }
+
+        private static bool DragScalarVector<T>(ReadOnlySpan<char> text, Span<T> values) where T : unmanaged, IFormattable, INumber<T>
+        {
+            ImGuiWindowState? window = s_context!.StateController.CurrentWindow;
+
+            if (window == null)
+                return false;
+
+            ImGuiStyle style = s_context.Style;
+
+            int id = GetId(text);
+            bool changed = false;
+
+            PushId(id);
+
+            Vector2 labelSize = CalculateTextSize(text);
+
+            window.DrawList.DrawText(window.CursorPos, text, 0xffffffff);
+            window.CursorPos += new Vector2(labelSize.X + style.InnerItemPadding.X, 0.0f);
+
+            int elementCount = values.Length;
+            for (int i = 0; i < elementCount; ++i)
+            {
+                PushId(i);
+
+                if (DragScalar([], ref values[i]))
+                {
+                    changed = true;
+                }
+
+                if (i < elementCount - 1)
+                {
+                    SameLine();
+                }
+
+                PopId();
+            }
+
+            PopId();
+
+            return changed;
+        }
+        #endregion
         #endregion
         #region Getters
         public static ImGuiWindowState? CurrentWindow => s_context!.StateController.CurrentWindow;
@@ -707,5 +934,12 @@ namespace Primary.GUI.ImGui
         #endregion
 
         public static ImGuiContext? CurrentContext => s_context;
+    }
+
+    public enum TreeNodeFlags : byte
+    {
+        None = 0,
+
+        Leaf = 1 << 0
     }
 }

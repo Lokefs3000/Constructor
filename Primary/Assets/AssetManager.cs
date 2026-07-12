@@ -1,15 +1,15 @@
-﻿using Primary.Assets.Loaders;
+﻿using System.Collections.Concurrent;
+using System.Collections.Frozen;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using Primary.Assets.Loaders;
 using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
 using Primary.Profiling;
 using Primary.Threading;
 using Primary.Timing;
-using System.Collections.Concurrent;
-using System.Collections.Frozen;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using TerraFX.Interop.Windows;
 
 namespace Primary.Assets
@@ -145,8 +145,7 @@ namespace Primary.Assets
                     return;
                 }
 
-                string? realisedPath = _assetIdProvider.RetrievePathForId(assetId);
-                if (realisedPath == null)
+                if (!_assetIdProvider.TryGetLocalAndAssetPathsForId(assetId, out string? localPath, out string? assetPath))
                 {
                     EngLog.Assets.Error("No reloadable asset found in filesystem with id: {id}", assetId);
                     return;
@@ -163,7 +162,7 @@ namespace Primary.Assets
                     asset.AssetData.SetAssetInternalName(newName);
                 asset.AssetData.SetAssetInternalStatus(ResourceStatus.Running);
 
-                ValueTask task = _scheduler.Schedule(loader, assetId, (IAssetDefinition)assetRef, asset.AssetData, realisedPath, true);
+                ValueTask task = _scheduler.Schedule(loader, assetId, (IAssetDefinition)assetRef, asset.AssetData, assetPath ?? localPath, localPath, true);
 
                 if (synchronous)
                 {
@@ -241,7 +240,7 @@ namespace Primary.Assets
         }
 
         /// <summary>Thread-safe</summary>
-        private object LoadAssetImpl(Type type, ReadOnlySpan<char> sourcePath, AssetId id, bool synchronous, BundleReader? bundleToReadFrom)
+        private object LoadAssetImpl(Type type, string sourcePath, string? assetPath, AssetId id, bool synchronous, BundleReader? bundleToReadFrom)
         {
             using Lock.Scope lockScope = _loadLock.EnterScope();
 
@@ -265,7 +264,7 @@ namespace Primary.Assets
                 ref readonly IAssetLoader loader = ref _loaders.GetValueRefOrNullRef(type);
                 if (Unsafe.IsNullRef(in loader))
                 {
-                    EngLog.Assets.Error("[a:{p}] No asset loader for type: {n}", sourcePath.ToString(), type.Name);
+                    EngLog.Assets.Error("[a:{p}] No asset loader for type: {n}", sourcePath, type.Name);
                     return CreateBadAsset(type, id);
                 }
 
@@ -275,10 +274,10 @@ namespace Primary.Assets
                 LoadedAsset newAsset = new LoadedAsset(assetDef, assetData);
                 _loadedAssets[id] = newAsset;
 
-                assetData.SetAssetInternalName(Path.GetFileNameWithoutExtension(sourcePath).ToString());
+                assetData.SetAssetInternalName(Path.GetFileNameWithoutExtension(sourcePath));
                 assetData.SetAssetInternalStatus(ResourceStatus.Running);
 
-                ValueTask task = _scheduler.Schedule(loader, id, assetDef, assetData, sourcePath.ToString(), false);
+                ValueTask task = _scheduler.Schedule(loader, id, assetDef, assetData, assetPath ?? sourcePath, sourcePath, false);
 
                 if (synchronous)
                 {
@@ -300,14 +299,14 @@ namespace Primary.Assets
                 return @this.CreateBadAsset<T>(AssetId.Invalid);
             }
 
-            AssetId id = @this._assetIdProvider.RetriveIdForPath(sourcePath);
-            if (id.IsInvalid)
+            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out AssetId id))
             {
                 EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
                 return @this.CreateBadAsset<T>(AssetId.Invalid);
             }
 
-            return (T)@this.LoadAssetImpl(typeof(T), sourcePath, id, synchronous, null);
+            @this._assetIdProvider.TryGetAssetPathForId(id, out string? assetPath);
+            return (T)@this.LoadAssetImpl(typeof(T), sourcePath.ToString(), assetPath, id, synchronous, null);
         }
 
         /// <summary>Thread-safe</summary>
@@ -326,14 +325,13 @@ namespace Primary.Assets
                 return @this.CreateBadAsset<T>(AssetId.Invalid);
             }
 
-            string? realisedPath = @this._assetIdProvider.RetrievePathForId(assetId);
-            if (realisedPath == null)
+            if (!@this._assetIdProvider.TryGetLocalAndAssetPathsForId(assetId, out string? localPath, out string? assetPath))
             {
                 EngLog.Assets.Error("[a:{id}]: No asset found in filesystem", assetId);
                 return @this.CreateBadAsset<T>(assetId);
             }
 
-            return (T)@this.LoadAssetImpl(typeof(T), realisedPath, assetId, synchronous, null);
+            return (T)@this.LoadAssetImpl(typeof(T), localPath, assetPath, assetId, synchronous, null);
         }
 
         /// <summary>Thread-safe</summary>
@@ -357,14 +355,13 @@ namespace Primary.Assets
                 return @this.CreateBadAsset(type, AssetId.Invalid);
             }
 
-            string? realisedPath = @this._assetIdProvider.RetrievePathForId(assetId);
-            if (realisedPath == null)
+            if (!@this._assetIdProvider.TryGetLocalAndAssetPathsForId(assetId, out string? localPath, out string? assetPath))
             {
                 EngLog.Assets.Error("[a:{id}]: No asset found in filesystem", assetId);
                 return @this.CreateBadAsset(type, assetId);
             }
 
-            return @this.LoadAssetImpl(type, realisedPath, assetId, synchronous, null);
+            return @this.LoadAssetImpl(type, localPath, assetPath, assetId, synchronous, null);
         }
 
         /// <summary>Thread-safe</summary>
@@ -388,21 +385,20 @@ namespace Primary.Assets
                 return @this.CreateBadAsset(type, AssetId.Invalid);
             }
 
-            AssetId assetId = @this._assetIdProvider.RetriveIdForPath(sourcePath);
-            if (assetId.IsInvalid)
+            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out AssetId assetId))
             {
                 EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
                 return @this.CreateBadAsset(type, AssetId.Invalid);
             }
 
-            string? realisedPath = @this._assetIdProvider.RetrievePathForId(assetId);
-            if (realisedPath == null)
+            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out AssetId id))
             {
-                EngLog.Assets.Error("[a:{id}]: No asset found in filesystem", assetId);
-                return @this.CreateBadAsset(type, assetId);
+                EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
+                return @this.CreateBadAsset(type, AssetId.Invalid);
             }
 
-            return @this.LoadAssetImpl(type, realisedPath, assetId, synchronous, null);
+            @this._assetIdProvider.TryGetAssetPathForId(id, out string? assetPath);
+            return @this.LoadAssetImpl(type, sourcePath.ToString(), assetPath, assetId, synchronous, null);
         }
 
         /// <summary>Thread-safe</summary>
@@ -423,8 +419,7 @@ namespace Primary.Assets
                 return;
             }
 
-            AssetId id = @this._assetIdProvider.RetriveIdForPath(sourcePath);
-            if (id.IsInvalid)
+            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out AssetId id))
             {
                 EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
                 return;
@@ -449,8 +444,7 @@ namespace Primary.Assets
                 return;
             }
 
-            AssetId id = @this._assetIdProvider.RetriveIdForPath(sourcePath);
-            if (id.IsInvalid)
+            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out AssetId id))
             {
                 EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
                 return;

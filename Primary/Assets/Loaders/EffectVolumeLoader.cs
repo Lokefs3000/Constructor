@@ -21,7 +21,7 @@ namespace Primary.Assets.Loaders
             return new PostProcessingVolumeAsset(volumeData);
         }
 
-        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
+        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, string localPath, BundleReader? bundleToReadFrom)
         {
             if (asset is not PostProcessingVolumeAsset effectVolume)
                 throw new ArgumentException(nameof(asset));

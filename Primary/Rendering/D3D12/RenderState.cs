@@ -1,26 +1,23 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
 using Primary.RHI.Direct3D12;
-using System;
-using System.Collections.Generic;
+using Silk.NET.Direct3D12;
+using Silk.NET.Maths;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using System.Text;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
 
 namespace Primary.Rendering.D3D12
 {
     [SupportedOSPlatform("windows")]
     internal sealed class RenderState : IDisposable
     {
-        public DynamicArray<D3D12_CPU_DESCRIPTOR_HANDLE> RenderTargets;
-        public D3D12_CPU_DESCRIPTOR_HANDLE DepthStencil;
+        public DynamicArray<CpuDescriptorHandle> RenderTargets;
+        public CpuDescriptorHandle DepthStencil;
 
-        public DynamicArray<D3D12_VIEWPORT> Viewports;
-        public DynamicArray<RECT> Scissors;
+        public DynamicArray<Viewport> Viewports;
+        public DynamicArray<Box2D<int>> Scissors;
 
         public D3D12RasterState RasterState;
 
@@ -36,11 +33,11 @@ namespace Primary.Rendering.D3D12
 
         internal RenderState()
         {
-            RenderTargets = new DynamicArray<D3D12_CPU_DESCRIPTOR_HANDLE>(8);
-            DepthStencil = D3D12_CPU_DESCRIPTOR_HANDLE.DEFAULT;
+            RenderTargets = new DynamicArray<CpuDescriptorHandle>(8);
+            DepthStencil = new CpuDescriptorHandle();
 
-            Viewports = new DynamicArray<D3D12_VIEWPORT>(8);
-            Scissors = new DynamicArray<RECT>(8);
+            Viewports = new DynamicArray<Viewport>(8);
+            Scissors = new DynamicArray<Box2D<int>>(8);
 
             RasterState = default;
 

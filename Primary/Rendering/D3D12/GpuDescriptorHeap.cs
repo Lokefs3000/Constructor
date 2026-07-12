@@ -4,17 +4,12 @@ using Primary.RHI;
 using Primary.RHI.Direct3D12;
 using Primary.Utility;
 using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
-
-using static TerraFX.Interop.DirectX.D3D12_BUFFER_SRV_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_DESCRIPTOR_HEAP_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_SRV_DIMENSION;
-using static TerraFX.Interop.DirectX.DXGI_FORMAT;
-using static TerraFX.Interop.DirectX.D3D12_UAV_DIMENSION;
-using static TerraFX.Interop.DirectX.D3D12_BUFFER_UAV_FLAGS;
 using System.Diagnostics;
 using Primary.Rendering.Assets;
+using Silk.NET.Direct3D12;
+using Silk.NET.Core.Native;
+using Silk.NET.DXGI;
+using System.Runtime.CompilerServices;
 
 namespace Primary.Rendering.D3D12
 {
@@ -26,7 +21,7 @@ namespace Primary.Rendering.D3D12
         private readonly int _descriptorHandleSize;
         private readonly int _descriptorHeapSize;
 
-        private readonly D3D12_DESCRIPTOR_HEAP_TYPE _heapType;
+        private readonly DescriptorHeapType _heapType;
 
         private AverageAnalyser<int> _averageDescriptorUse;
         private int _descriptorsUsedThisFrame;
@@ -39,7 +34,7 @@ namespace Primary.Rendering.D3D12
 
         private bool _disposedValue;
 
-        internal GpuDescriptorHeap(NRDDevice device, int heapSize, D3D12_DESCRIPTOR_HEAP_TYPE heapType)
+        internal GpuDescriptorHeap(NRDDevice device, int heapSize, DescriptorHeapType heapType)
         {
             _device = device;
 
@@ -68,7 +63,7 @@ namespace Primary.Rendering.D3D12
                 }
 
                 foreach (HeapData heap in _activeHeaps)
-                    heap.Heap.Pointer->Release();
+                    heap.Heap.Dispose();
                 _activeHeaps.Clear();
 
                 _disposedValue = true;
@@ -128,7 +123,7 @@ namespace Primary.Rendering.D3D12
 
             ID3D12Resource* res = (ID3D12Resource*)_device.ResourceManager.GetResource(resource);
 
-            D3D12_CPU_DESCRIPTOR_HANDLE dstDescriptor = new D3D12_CPU_DESCRIPTOR_HANDLE(heap.StartHandle, _activeHeapOffset);
+            CpuDescriptorHandle dstDescriptor = new CpuDescriptorHandle((nuint)(heap.StartHandle.Ptr + (ulong)_activeHeapOffset));
 
             switch (resource.Id)
             {
@@ -136,19 +131,19 @@ namespace Primary.Rendering.D3D12
                     {
                         if (bindAsUnorderedAccess)
                         {
-                            D3D12_UNORDERED_ACCESS_VIEW_DESC desc;
+                            UnorderedAccessViewDesc desc;
 
                             if (resource.IsExternal)
                             {
                                 RHITextureDescription texDesc = ((D3D12RHITextureNative*)resource.Native)->Base.Description;
 
-                                desc = new D3D12_UNORDERED_ACCESS_VIEW_DESC
+                                desc = new UnorderedAccessViewDesc
                                 {
                                     ViewDimension = texDesc.Dimension switch
                                     {
-                                        RHIDimension.Texture1D => D3D12_UAV_DIMENSION_TEXTURE1D,
-                                        RHIDimension.Texture2D => D3D12_UAV_DIMENSION_TEXTURE2D,
-                                        RHIDimension.Texture3D => D3D12_UAV_DIMENSION_TEXTURE3D,
+                                        RHIDimension.Texture1D => UavDimension.Texture1D,
+                                        RHIDimension.Texture2D => UavDimension.Texture2D,
+                                        RHIDimension.Texture3D => UavDimension.Texture3D,
                                         _ => throw new NotImplementedException(),
                                     },
                                     Format = texDesc.Format.ToResourceViewFormat(),
@@ -159,13 +154,13 @@ namespace Primary.Rendering.D3D12
                                 FrameGraphTexture fg = _device.ResourceManager.FindFGTexture(resource);
                                 ref readonly FrameGraphTextureDesc texDesc = ref fg.Description;
 
-                                desc = new D3D12_UNORDERED_ACCESS_VIEW_DESC
+                                desc = new UnorderedAccessViewDesc
                                 {
                                     ViewDimension = texDesc.Dimension switch
                                     {
-                                        FGTextureDimension._1D => D3D12_UAV_DIMENSION_TEXTURE1D,
-                                        FGTextureDimension._2D => D3D12_UAV_DIMENSION_TEXTURE2D,
-                                        FGTextureDimension._3D => D3D12_UAV_DIMENSION_TEXTURE3D,
+                                        FGTextureDimension._1D => UavDimension.Texture1D,
+                                        FGTextureDimension._2D => UavDimension.Texture2D,
+                                        FGTextureDimension._3D => UavDimension.Texture3D,
                                         _ => throw new NotImplementedException(),
                                     },
                                     Format = texDesc.Format.ToResourceViewFormat(),
@@ -174,26 +169,26 @@ namespace Primary.Rendering.D3D12
 
                             switch (desc.ViewDimension)
                             {
-                                case D3D12_UAV_DIMENSION_TEXTURE1D:
+                                case UavDimension.Texture1D:
                                     {
-                                        desc.Texture1D = new D3D12_TEX1D_UAV
+                                        desc.Texture1D = new Tex1DUav
                                         {
                                             MipSlice = 0
                                         };
                                         break;
                                     }
-                                case D3D12_UAV_DIMENSION_TEXTURE2D:
+                                case UavDimension.Texture2D:
                                     {
-                                        desc.Texture2D = new D3D12_TEX2D_UAV
+                                        desc.Texture2D = new Tex2DUav
                                         {
                                             MipSlice = 0,
                                             PlaneSlice = 0,
                                         };
                                         break;
                                     }
-                                case D3D12_UAV_DIMENSION_TEXTURE3D:
+                                case UavDimension.Texture3D:
                                     {
-                                        desc.Texture3D = new D3D12_TEX3D_UAV
+                                        desc.Texture3D = new Tex3DUav
                                         {
                                             MipSlice = 0,
                                             FirstWSlice = 0,
@@ -207,7 +202,7 @@ namespace Primary.Rendering.D3D12
                         }
                         else
                         {
-                            D3D12_SHADER_RESOURCE_VIEW_DESC desc;
+                            ShaderResourceViewDesc desc;
 
                             if (resource.IsExternal)
                             {
@@ -225,14 +220,14 @@ namespace Primary.Rendering.D3D12
                                         format = texDesc.Format;
                                 }
 
-                                desc = new D3D12_SHADER_RESOURCE_VIEW_DESC
+                                desc = new ShaderResourceViewDesc
                                 {
                                     ViewDimension = texDesc.Dimension switch
                                     {
-                                        RHIDimension.Texture1D => D3D12_SRV_DIMENSION_TEXTURE1D,
-                                        RHIDimension.Texture2D => D3D12_SRV_DIMENSION_TEXTURE2D,
-                                        RHIDimension.Texture3D => D3D12_SRV_DIMENSION_TEXTURE3D,
-                                        RHIDimension.TextureCube => D3D12_SRV_DIMENSION_TEXTURECUBE,
+                                        RHIDimension.Texture1D => SrvDimension.Texture1D,
+                                        RHIDimension.Texture2D => SrvDimension.Texture2D,
+                                        RHIDimension.Texture3D => SrvDimension.Texture3D,
+                                        RHIDimension.TextureCube => SrvDimension.Texturecube,
                                         _ => throw new NotImplementedException(),
                                     },
                                     Format = format.ToTextureFormat(),
@@ -256,14 +251,14 @@ namespace Primary.Rendering.D3D12
                                         format = texDesc.Format;
                                 }
 
-                                desc = new D3D12_SHADER_RESOURCE_VIEW_DESC
+                                desc = new ShaderResourceViewDesc
                                 {
                                     ViewDimension = texDesc.Dimension switch
                                     {
-                                        FGTextureDimension._1D => D3D12_SRV_DIMENSION_TEXTURE1D,
-                                        FGTextureDimension._2D => D3D12_SRV_DIMENSION_TEXTURE2D,
-                                        FGTextureDimension._3D => D3D12_SRV_DIMENSION_TEXTURE3D,
-                                        FGTextureDimension.Cube => D3D12_SRV_DIMENSION_TEXTURECUBE,
+                                        FGTextureDimension._1D => SrvDimension.Texture1D,
+                                        FGTextureDimension._2D => SrvDimension.Texture2D,
+                                        FGTextureDimension._3D => SrvDimension.Texture3D,
+                                        FGTextureDimension.Cube => SrvDimension.Texturecube,
                                         _ => throw new NotImplementedException(),
                                     },
                                     Format = format.ToTextureFormat(),
@@ -273,9 +268,9 @@ namespace Primary.Rendering.D3D12
 
                             switch (desc.ViewDimension)
                             {
-                                case D3D12_SRV_DIMENSION_TEXTURE1D:
+                                case SrvDimension.Texture1D:
                                     {
-                                        desc.Texture1D = new D3D12_TEX1D_SRV
+                                        desc.Texture1D = new Tex1DSrv
                                         {
                                             MostDetailedMip = 0,
                                             MipLevels = 0xffffffff,
@@ -283,9 +278,9 @@ namespace Primary.Rendering.D3D12
                                         };
                                         break;
                                     }
-                                case D3D12_SRV_DIMENSION_TEXTURE2D:
+                                case SrvDimension.Texture2D:
                                     {
-                                        desc.Texture2D = new D3D12_TEX2D_SRV
+                                        desc.Texture2D = new Tex2DSrv
                                         {
                                             MostDetailedMip = 0,
                                             PlaneSlice = intent == PropertyBindIntent.AsStencil ? 1u : 0,
@@ -294,9 +289,9 @@ namespace Primary.Rendering.D3D12
                                         };
                                         break;
                                     }
-                                case D3D12_SRV_DIMENSION_TEXTURE3D:
+                                case SrvDimension.Texture3D:
                                     {
-                                        desc.Texture3D = new D3D12_TEX3D_SRV
+                                        desc.Texture3D = new Tex3DSrv
                                         {
                                             MostDetailedMip = 0,
                                             MipLevels = 0xffffffff,
@@ -304,9 +299,9 @@ namespace Primary.Rendering.D3D12
                                         };
                                         break;
                                     }
-                                case D3D12_SRV_DIMENSION_TEXTURECUBE:
+                                case SrvDimension.Texturecube:
                                     {
-                                        desc.TextureCube = new D3D12_TEXCUBE_SRV
+                                        desc.TextureCube = new TexcubeSrv
                                         {
                                             MostDetailedMip = 0,
                                             MipLevels = 0xffffffff,
@@ -331,7 +326,7 @@ namespace Primary.Rendering.D3D12
                             {
                                 Debug.Assert(!bindAsUnorderedAccess);
 
-                                D3D12_CONSTANT_BUFFER_VIEW_DESC desc = new D3D12_CONSTANT_BUFFER_VIEW_DESC
+                                ConstantBufferViewDesc desc = new ConstantBufferViewDesc
                                 {
                                     BufferLocation = res->GetGPUVirtualAddress(),
                                     SizeInBytes = bufDesc.Width
@@ -343,30 +338,30 @@ namespace Primary.Rendering.D3D12
                             {
                                 if (bindAsUnorderedAccess)
                                 {
-                                    D3D12_UNORDERED_ACCESS_VIEW_DESC desc = new D3D12_UNORDERED_ACCESS_VIEW_DESC
+                                    UnorderedAccessViewDesc desc = new UnorderedAccessViewDesc
                                     {
-                                        ViewDimension = D3D12_UAV_DIMENSION_BUFFER,
-                                        Format = DXGI_FORMAT_UNKNOWN,
+                                        ViewDimension = UavDimension.Buffer,
+                                        Format = Format.FormatUnknown,
                                     };
 
                                     if (bufDesc.Mode == RHIBufferMode.Raw)
                                     {
-                                        desc.Buffer = new D3D12_BUFFER_UAV
+                                        desc.Buffer = new BufferUav
                                         {
                                             FirstElement = bufDesc.FirstElement,
                                             NumElements = bufDesc.ElementCount > 0 ? (uint)bufDesc.ElementCount : bufDesc.Width,
                                             StructureByteStride = 1,
-                                            Flags = D3D12_BUFFER_UAV_FLAG_RAW
+                                            Flags = BufferUavFlags.Raw
                                         };
                                     }
                                     else
                                     {
-                                        desc.Buffer = new D3D12_BUFFER_UAV
+                                        desc.Buffer = new BufferUav
                                         {
                                             FirstElement = bufDesc.FirstElement,
                                             NumElements = (uint)(bufDesc.Width / bufDesc.Stride),
                                             StructureByteStride = (uint)bufDesc.Stride,
-                                            Flags = D3D12_BUFFER_UAV_FLAG_NONE
+                                            Flags = BufferUavFlags.None
                                         };
                                     }
 
@@ -374,31 +369,31 @@ namespace Primary.Rendering.D3D12
                                 }
                                 else
                                 {
-                                    D3D12_SHADER_RESOURCE_VIEW_DESC desc = new D3D12_SHADER_RESOURCE_VIEW_DESC
+                                    ShaderResourceViewDesc desc = new ShaderResourceViewDesc
                                     {
-                                        ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
-                                        Format = DXGI_FORMAT_UNKNOWN,
+                                        ViewDimension = SrvDimension.Buffer,
+                                        Format = Format.FormatUnknown,
                                         Shader4ComponentMapping = DefaultShader4ComponentMapping,
                                     };
 
                                     if (bufDesc.Mode == RHIBufferMode.Raw)
                                     {
-                                        desc.Buffer = new D3D12_BUFFER_SRV
+                                        desc.Buffer = new BufferSrv
                                         {
                                             FirstElement = bufDesc.FirstElement,
                                             NumElements = bufDesc.ElementCount > 0 ? (uint)bufDesc.ElementCount : bufDesc.Width,
                                             StructureByteStride = 1,
-                                            Flags = D3D12_BUFFER_SRV_FLAG_RAW
+                                            Flags = BufferSrvFlags.Raw
                                         };
                                     }
                                     else
                                     {
-                                        desc.Buffer = new D3D12_BUFFER_SRV
+                                        desc.Buffer = new BufferSrv
                                         {
                                             FirstElement = bufDesc.FirstElement,
                                             NumElements = (uint)(bufDesc.Width / bufDesc.Stride),
                                             StructureByteStride = (uint)bufDesc.Stride,
-                                            Flags = D3D12_BUFFER_SRV_FLAG_NONE
+                                            Flags = BufferSrvFlags.None
                                         };
                                     }
 
@@ -415,7 +410,7 @@ namespace Primary.Rendering.D3D12
                             {
                                 Debug.Assert(!bindAsUnorderedAccess);
 
-                                D3D12_CONSTANT_BUFFER_VIEW_DESC desc = new D3D12_CONSTANT_BUFFER_VIEW_DESC
+                                ConstantBufferViewDesc desc = new ConstantBufferViewDesc
                                 {
                                     BufferLocation = res->GetGPUVirtualAddress(),
                                     SizeInBytes = bufDesc.Width
@@ -427,37 +422,37 @@ namespace Primary.Rendering.D3D12
                             {
                                 if (bindAsUnorderedAccess)
                                 {
-                                    D3D12_UNORDERED_ACCESS_VIEW_DESC desc = new D3D12_UNORDERED_ACCESS_VIEW_DESC
+                                    UnorderedAccessViewDesc desc = new UnorderedAccessViewDesc
                                     {
-                                        ViewDimension = D3D12_UAV_DIMENSION_BUFFER,
-                                        Format = DXGI_FORMAT_UNKNOWN,
+                                        ViewDimension = UavDimension.Buffer,
+                                        Format = Format.FormatUnknown,
                                     };
 
-                                    desc.Buffer = new D3D12_BUFFER_UAV
+                                    desc.Buffer = new BufferUav
                                     {
                                         FirstElement = 0,
                                         NumElements = (uint)(bufDesc.Width / bufDesc.Stride),
                                         StructureByteStride = (uint)bufDesc.Stride,
-                                        Flags = D3D12_BUFFER_UAV_FLAG_NONE
+                                        Flags = BufferUavFlags.None
                                     };
 
                                     _device.Device->CreateUnorderedAccessView(res, null, &desc, dstDescriptor);
                                 }
                                 else
                                 {
-                                    D3D12_SHADER_RESOURCE_VIEW_DESC desc = new D3D12_SHADER_RESOURCE_VIEW_DESC
+                                    ShaderResourceViewDesc desc = new ShaderResourceViewDesc
                                     {
-                                        ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
-                                        Format = DXGI_FORMAT_UNKNOWN,
+                                        ViewDimension = SrvDimension.Buffer,
+                                        Format = Format.FormatUnknown,
                                         Shader4ComponentMapping = DefaultShader4ComponentMapping,
                                     };
 
-                                    desc.Buffer = new D3D12_BUFFER_SRV
+                                    desc.Buffer = new BufferSrv
                                     {
                                         FirstElement = 0,
                                         NumElements = (uint)(bufDesc.Width / bufDesc.Stride),
                                         StructureByteStride = (uint)bufDesc.Stride,
-                                        Flags = D3D12_BUFFER_SRV_FLAG_NONE
+                                        Flags = BufferSrvFlags.None
                                     };
 
                                     _device.Device->CreateShaderResourceView(res, &desc, dstDescriptor);
@@ -467,37 +462,37 @@ namespace Primary.Rendering.D3D12
                             {
                                 if (bindAsUnorderedAccess)
                                 {
-                                    D3D12_UNORDERED_ACCESS_VIEW_DESC desc = new D3D12_UNORDERED_ACCESS_VIEW_DESC
+                                    UnorderedAccessViewDesc desc = new UnorderedAccessViewDesc
                                     {
-                                        ViewDimension = D3D12_UAV_DIMENSION_BUFFER,
-                                        Format = DXGI_FORMAT_R32_TYPELESS,
+                                        ViewDimension = UavDimension.Buffer,
+                                        Format = Format.FormatR32Typeless,
                                     };
 
-                                    desc.Buffer = new D3D12_BUFFER_UAV
+                                    desc.Buffer = new BufferUav
                                     {
                                         FirstElement = 0,
                                         NumElements = bufDesc.Width / sizeof(uint),
                                         StructureByteStride = 0,
-                                        Flags = D3D12_BUFFER_UAV_FLAG_RAW
+                                        Flags = BufferUavFlags.Raw
                                     };
 
                                     _device.Device->CreateUnorderedAccessView(res, null, &desc, dstDescriptor);
                                 }
                                 else
                                 {
-                                    D3D12_SHADER_RESOURCE_VIEW_DESC desc = new D3D12_SHADER_RESOURCE_VIEW_DESC
+                                    ShaderResourceViewDesc desc = new ShaderResourceViewDesc
                                     {
-                                        ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
-                                        Format = DXGI_FORMAT_R32_TYPELESS,
+                                        ViewDimension = SrvDimension.Buffer,
+                                        Format = Format.FormatR32Typeless,
                                         Shader4ComponentMapping = DefaultShader4ComponentMapping,
                                     };
 
-                                    desc.Buffer = new D3D12_BUFFER_SRV
+                                    desc.Buffer = new BufferSrv
                                     {
                                         FirstElement = 0,
                                         NumElements = bufDesc.Width / sizeof(uint),
                                         StructureByteStride = 0,
-                                        Flags = D3D12_BUFFER_SRV_FLAG_RAW
+                                        Flags = BufferSrvFlags.Raw
                                     };
 
                                     _device.Device->CreateShaderResourceView(res, &desc, dstDescriptor);
@@ -517,36 +512,45 @@ namespace Primary.Rendering.D3D12
 
         private void AddNewHeapToList()
         {
-            D3D12_DESCRIPTOR_HEAP_DESC desc = new D3D12_DESCRIPTOR_HEAP_DESC
+            DescriptorHeapDesc desc = new DescriptorHeapDesc
             {
                 Type = _heapType,
                 NumDescriptors = (uint)_descriptorHeapSize,
-                Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+                Flags = DescriptorHeapFlags.ShaderVisible,
                 NodeMask = 0
             };
 
-            ID3D12DescriptorHeap* temp = null;
-            HRESULT hr = _device.Device->CreateDescriptorHeap(&desc, UuidOf.Get<ID3D12DescriptorHeap>(), (void**)&temp);
+            ComPtr<ID3D12DescriptorHeap> descriptorHeap = new ComPtr<ID3D12DescriptorHeap>();
+            HResult hr = _device.Device->CreateDescriptorHeap(&desc, out descriptorHeap);
 
-            if (hr.FAILED)
+            if (hr.IsFailure)
             {
                 _device.RHIDevice.FlushPendingMessages();
                 throw new NotImplementedException("Add error message");
             }
 
-            _activeHeaps.Add(new HeapData(temp, temp->GetCPUDescriptorHandleForHeapStart()));
+            _activeHeaps.Add(new HeapData(descriptorHeap, descriptorHeap.GetCPUDescriptorHandleForHeapStart()));
         }
 
         internal ID3D12DescriptorHeap* GetActiveHeapOrCreateNew()
         {
             if (_activeHeapIndex < _activeHeaps.Count)
-                return _activeHeaps[_activeHeapIndex].Heap.Pointer;
+                return (ID3D12DescriptorHeap*)Unsafe.AsPointer(ref _activeHeaps[_activeHeapIndex].Heap.Get());
 
             AddNewHeapToList();
-            return _activeHeaps[_activeHeapIndex].Heap.Pointer;
+            return (ID3D12DescriptorHeap*)Unsafe.AsPointer(ref _activeHeaps[_activeHeapIndex].Heap.Get());
         }
 
-        internal ID3D12DescriptorHeap* CurrentActiveHeap => _activeHeapIndex < _activeHeaps.Count ? _activeHeaps[_activeHeapIndex].Heap.Pointer : null;
+        internal ref ID3D12DescriptorHeap CurrentActiveHeap
+        { 
+            get
+            {
+                if (_activeHeapIndex < _activeHeaps.Count)
+                    return ref _activeHeaps[_activeHeapIndex].Heap.Get();
+                else
+                    return ref Unsafe.NullRef<ID3D12DescriptorHeap>(); ;
+            }
+        }
 
         //https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_shader_component_mapping
 
@@ -565,7 +569,7 @@ namespace Primary.Rendering.D3D12
                     ShaderComponentMappingAlwaysSetBitAvoidingZeroMemMistakes));
         }
 
-        internal readonly record struct HeapData(Ptr<ID3D12DescriptorHeap> Heap, D3D12_CPU_DESCRIPTOR_HANDLE StartHandle);
+        internal readonly record struct HeapData(ComPtr<ID3D12DescriptorHeap> Heap, CpuDescriptorHandle StartHandle);
         private readonly record struct ResourceData(NRDResource Resource, bool IsUnorderedAccess, PropertyBindIntent Intent)
         {
             public override int GetHashCode() => HashCode.Combine(Resource, IsUnorderedAccess);

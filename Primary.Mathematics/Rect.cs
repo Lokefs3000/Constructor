@@ -90,6 +90,11 @@ namespace Primary.Mathematics
             return (rect.AsVector128() + Vector128.Create(x, y, -x, -y)).AsRect();
         }
 
+        public static Int2 Contain(Rect rect, Int2 position)
+        {
+            return Int2.Clamp(position, rect.Position, rect.Maximum);
+        }
+
         public static readonly Rect Zero = new Rect(0, 0, 0, 0);
         public static readonly Rect One = new Rect(0, 0, 1, 1);
     }

@@ -389,7 +389,8 @@ namespace Editor.Processors.Texture
                             Height = (uint)textureData.Height,
                             Stride = (byte)workingStride,
 
-                            Pixels = bitmapData.Pointer
+                            Pixels = bitmapData.Pointer,
+                            Effort = (byte)(handling.ImageFormat == TextureImageFormat.BC7 ? 3 : 6)
                         };
 
                         TexInterop.ImageOutput output = new TexInterop.ImageOutput
@@ -725,7 +726,7 @@ namespace Editor.Processors.Texture
                     sum = Vector128.Sqrt(Vector128<float>.One - sum * sum) * KaiserAlpha;
                     sum = Vector128.Create(MathUtil.BesselI0(sum[0]), MathUtil.BesselI0(sum[1]), MathUtil.BesselI0(sum[2]), MathUtil.BesselI0(sum[3])) * KaiserBessel;
 
-                    outputData[dstX + dstYSlice] = sum;
+                    outputData[dstX + dstYSlice] = Vector128<float>.One - sum;
                 }
             }
         }

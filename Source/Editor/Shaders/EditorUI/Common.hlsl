@@ -8,7 +8,7 @@ struct VsInput
     float2 UV2      : TEXCOORD1;
     float4 Tint     : COLOR;
 
-    nointerpolation uint Depth : TEXCOORD2;
+    // nointerpolation uint Depth : TEXCOORD2;
     nointerpolation uint DataOffset : TEXCOORD3;
 };
 
@@ -24,9 +24,15 @@ struct DefaultPsInput
     nointerpolation uint DataOffset : TEXCOORD2;
 };
 
+struct PsOutput
+{
+    float4 Color : SV_Target;
+    // float Depth : SV_Depth;
+};
+
 struct GlobalData
 {
-    float3x2 Model;
+    float4x4 Model;
 };
 
 struct SharedData

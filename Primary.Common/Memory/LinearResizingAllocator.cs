@@ -91,6 +91,6 @@ namespace Primary.Common.Memory
         }
 
         public nint Pointer => (nint)_block;
-        public int CurrentOffset => _offset;
+        public int CurrentOffset { get => _offset; set => _offset = value; }
     }
 }

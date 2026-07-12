@@ -11,6 +11,7 @@ namespace Primary.Windowing
     public unsafe sealed class Display
     {
         private readonly SDL_DisplayID _id;
+        private readonly SDL_PropertiesID _properties;
         private readonly string? _name;
 
         private bool _isPrimary;
@@ -23,12 +24,12 @@ namespace Primary.Windowing
         internal Display(SDL_DisplayID id)
         {
             _id = id;
+            _properties = SDL_GetDisplayProperties(id);
             _name = SDL_GetDisplayName(id);
 
             _isPrimary = SDL_GetPrimaryDisplay() == id;
             
-            SDL_PropertiesID props = SDL_GetDisplayProperties(id);
-            _hasHdrEnabled = SDL_GetBooleanProperty(props, SDL_PROP_DISPLAY_HDR_ENABLED_BOOLEAN, false);
+            _hasHdrEnabled = SDL_GetBooleanProperty(_properties, SDL_PROP_DISPLAY_HDR_ENABLED_BOOLEAN, false);
 
             fixed (Rect* ptr = &_boundaries)
                 SDL_GetDisplayBounds(id, (SDL_Rect*)ptr);
@@ -46,6 +47,17 @@ namespace Primary.Windowing
 
             fixed (Rect* ptr = &_usableBoundaries)
                 SDL_GetDisplayBounds(_id, (SDL_Rect*)ptr);
+        }
+
+        internal void UpdateCachedData()
+        {
+            _isPrimary = SDL_GetPrimaryDisplay() == _id;
+            _hasHdrEnabled = SDL_GetBooleanProperty(_properties, SDL_PROP_DISPLAY_HDR_ENABLED_BOOLEAN, false);
+        }
+
+        public Int2 FindCenter(Int2 size)
+        {
+            return _usableBoundaries.Position + _usableBoundaries.Size / 2 - size / 2;
         }
 
         public uint Id => (uint)_id;

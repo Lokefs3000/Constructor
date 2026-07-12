@@ -7,7 +7,7 @@ using Primary.Collections.ReadOnly;
 
 namespace EditorUI.Styling
 {
-    public readonly record struct StylesheetContext(WidgetCachedData CachedData, StylesheetProvider Stylesheets, ROList<StylesheetClass> ClassList)
+    public readonly record struct StylesheetContext(WidgetCachedData CachedData, StylesheetProvider Stylesheets, ROList<StylesheetClass> ClassList, bool GetAllProperties)
     {
         public ClassListEnumerable GetClassList(ROList<string> classList)
         {
@@ -16,6 +16,8 @@ namespace EditorUI.Styling
 
         public PropertyEnumerable GetProperties(ushort triggerMask, ushort refTriggerMask)
         {
+            if (GetAllProperties)
+                refTriggerMask |= ReturnAll;
             return new PropertyEnumerable(CachedData, triggerMask, refTriggerMask);
         }
 

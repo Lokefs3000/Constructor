@@ -3,20 +3,13 @@ using Primary.Rendering.Resources;
 using Primary.Rendering.Structures;
 using Primary.RHI;
 using Primary.RHI.Direct3D12;
-using System;
+using Silk.NET.Core.Native;
+using Silk.NET.Direct3D12;
+using Silk.NET.DXGI;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
-using static TerraFX.Interop.DirectX.D3D12_HEAP_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_DIMENSION;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_TEXTURE_LAYOUT;
-using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 using D3D12MemAlloc = Interop.D3D12MemAlloc;
 
 namespace Primary.Rendering.D3D12
@@ -27,7 +20,7 @@ namespace Primary.Rendering.D3D12
         private readonly NRDDevice _device;
 
         private D3D12MemAlloc.Allocation* _uploadAllocation;
-        private ID3D12Resource2* _uploadResource;
+        private ComPtr<ID3D12Resource2> _uploadResource;
 
         private int _uploadResourceSize;
         private bool _needsNewBarrier;
@@ -61,8 +54,12 @@ namespace Primary.Rendering.D3D12
                     // TODO: dispose managed state (managed objects)
                 }
 
-                if (_uploadResource != null)
-                    _uploadResource->Release();
+                if (!Unsafe.IsNullRef(in _uploadResource))
+                {
+                    _uploadResource.Dispose();
+                    _uploadResource = default;
+                }
+
                 if (_uploadAllocation != null)
                     _uploadAllocation->Base.Release();
 
@@ -91,10 +88,10 @@ namespace Primary.Rendering.D3D12
                 _uploadResourceSize = resources.MinUploadSize;
 
                 if (_mappedResourcePtr != nint.Zero)
-                    _uploadResource->Unmap(0, null);
+                    _uploadResource.Unmap(0, (Silk.NET.Direct3D12.Range*)null);
 
-                if (_uploadResource != null)
-                    _uploadResource->Release();
+                if (!Unsafe.IsNullRef(in _uploadResource))
+                    _uploadResource.Dispose();
                 if (_uploadAllocation != null)
                     _uploadAllocation->Base.Release();
                 
@@ -104,22 +101,22 @@ namespace Primary.Rendering.D3D12
 
                 D3D12MemAlloc.ALLOCATION_DESC allocDesc = new D3D12MemAlloc.ALLOCATION_DESC
                 {
-                    HeapType = D3D12_HEAP_TYPE_UPLOAD,
+                    HeapType = HeapType.Upload,
                 };
 
-                D3D12_RESOURCE_DESC1 resDesc = new D3D12_RESOURCE_DESC1
+                ResourceDesc1 resDesc = new ResourceDesc1
                 {
-                    Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+                    Dimension = ResourceDimension.Buffer,
                     Alignment = 0,
                     Width = (ulong)_uploadResourceSize,
                     Height = 1,
                     DepthOrArraySize = 1,
                     MipLevels = 1,
-                    Format = DXGI_FORMAT_UNKNOWN,
-                    SampleDesc = new DXGI_SAMPLE_DESC { Count = 1, Quality = 0 },
-                    Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-                    Flags = D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT,
-                    SamplerFeedbackMipRegion = new D3D12_MIP_REGION
+                    Format = Format.FormatUnknown,
+                    SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
+                    Layout = TextureLayout.LayoutRowMajor,
+                    Flags = Unsafe.As<D3D12RHIDevice>(_device.RHIDevice).Setup.UseTightAlignment ? ResourceFlags.UseTightAlignment : ResourceFlags.None,
+                    SamplerFeedbackMipRegion = new MipRegion
                     {
                         Width = 0,
                         Height = 0,
@@ -128,25 +125,25 @@ namespace Primary.Rendering.D3D12
                 };
 
                 D3D12MemAlloc.Allocation* ptr1 = null;
-                ID3D12Resource2* ptr2 = null;
+                ComPtr<ID3D12Resource2> resource = new ComPtr<ID3D12Resource2>();
 
-                HRESULT r = D3D12MemAlloc.Allocator.CreateResource3(_device.Allocator, &allocDesc, &resDesc, D3D12_BARRIER_LAYOUT_UNDEFINED, null, 0, null, &ptr1, UuidOf.Get<ID3D12Resource2>(), (void**)&ptr2);
+                HResult r = D3D12MemAlloc.Allocator.CreateResource3(_device.Allocator, &allocDesc, &resDesc, BarrierLayout.Undefined, null, 0, null, &ptr1, SilkMarshal.GuidPtrOf<ID3D12Resource2>(), (void**)resource.GetAddressOf());
 
-                if (r.FAILED)
+                if (r.IsFailure)
                 {
                     _device.RHIDevice.FlushPendingMessages();
                     throw new NotImplementedException("Add error message");
                 }
 
-                ResourceUtility.SetResourceNameStack((ID3D12Resource*)ptr2, "NRDUploadBuffer");
+                ResourceHelper.SetResourceName(ref resource.Get(), "NRDUploadBuffer");
 
                 _uploadAllocation = ptr1;
-                _uploadResource = ptr2;
+                _uploadResource = resource;
 
                 void* mapPtr = null;
-                r = _uploadResource->Map(0, null, &mapPtr);
+                r = _uploadResource.Map(0, (Silk.NET.Direct3D12.Range*)null, &mapPtr);
 
-                if (r.FAILED)
+                if (r.IsFailure)
                 {
                     _device.RHIDevice.FlushPendingMessages();
                     throw new NotImplementedException("Add error message");
@@ -157,11 +154,11 @@ namespace Primary.Rendering.D3D12
             }
         }
 
-        internal void UploadBuffer(ID3D12GraphicsCommandList10* cmdList, FrameGraphResources resources, int index, nint dataPtr, int dataSize, int dataOffset)
+        internal void UploadBuffer(ref ID3D12GraphicsCommandList10 cmdList, FrameGraphResources resources, int index, nint dataPtr, int dataSize, int dataOffset)
         {
             if (_needsNewBarrier)
             {
-                _device.BarrierManager.AddBufferBarrier((ID3D12Resource*)_uploadResource, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_SOURCE);
+                _device.BarrierManager.AddBufferBarrier(ref _uploadResource.Get(), BarrierSync.Copy, BarrierAccess.CopySource);
                 _needsNewBarrier = false;
             }
 
@@ -172,27 +169,27 @@ namespace Primary.Rendering.D3D12
 
             if (buffer.IsExternal)
             {
-                _device.BarrierManager.AddBufferBarrier(buffer, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_DEST);
-                _device.BarrierManager.FlushBarriers(cmdList, BarrierFlushTypes.Buffer);
+                _device.BarrierManager.AddBufferBarrier(buffer, BarrierSync.Copy, BarrierAccess.CopyDest);
+                _device.BarrierManager.FlushBarriers(ref cmdList, BarrierFlushTypes.Buffer);
 
-                cmdList->CopyBufferRegion((ID3D12Resource*)buffer.GetNativeResource(_device.ResourceManager), (ulong)dataOffset, (ID3D12Resource*)_uploadResource, (ulong)upload.BufferOffset, (ulong)dataSize);
+                cmdList.CopyBufferRegion((ID3D12Resource*)buffer.GetNativeResource(_device.ResourceManager), (ulong)dataOffset, (ID3D12Resource*)Unsafe.AsPointer(ref _uploadResource.Get()), (ulong)upload.BufferOffset, (ulong)dataSize);
             }
             else
             {
-                _device.BarrierManager.AddBufferBarrier(buffer, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_DEST);
-                _device.BarrierManager.FlushBarriers(cmdList, BarrierFlushTypes.Buffer);
+                _device.BarrierManager.AddBufferBarrier(buffer, BarrierSync.Copy, BarrierAccess.CopyDest);
+                _device.BarrierManager.FlushBarriers(ref cmdList, BarrierFlushTypes.Buffer);
 
                 ID3D12Resource* resource = (ID3D12Resource*)_device.ResourceManager.GetResource(buffer);
 
-                cmdList->CopyBufferRegion(resource, (ulong)dataOffset, (ID3D12Resource*)_uploadResource, (ulong)upload.BufferOffset, (ulong)dataSize);
+                cmdList.CopyBufferRegion(resource, (ulong)dataOffset, (ID3D12Resource*)Unsafe.AsPointer(ref _uploadResource.Get()), (ulong)upload.BufferOffset, (ulong)dataSize);
             }
         }
 
-        internal void UploadTexture(ID3D12GraphicsCommandList10* cmdList, FrameGraphResources resources, int index, FGBox? box, uint subresource, nint dataPtr, int dataSize, int dataRowPitch)
+        internal void UploadTexture(ref ID3D12GraphicsCommandList10 cmdList, FrameGraphResources resources, int index, FGBox? box, uint subresource, nint dataPtr, int dataSize, int dataRowPitch)
         {
             if (_needsNewBarrier)
             {
-                _device.BarrierManager.AddBufferBarrier((ID3D12Resource*)_uploadResource, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_SOURCE);
+                _device.BarrierManager.AddBufferBarrier(ref _uploadResource.Get(), BarrierSync.Copy, BarrierAccess.CopySource);
                 _needsNewBarrier = false;
             }
 
@@ -238,15 +235,15 @@ namespace Primary.Rendering.D3D12
                 dataRowPitch = alignedRowPitch;
             }
 
-            _device.BarrierManager.AddTextureBarrier(texture, D3D12_BARRIER_SYNC_COPY, D3D12_BARRIER_ACCESS_COPY_DEST, D3D12_BARRIER_LAYOUT_COPY_DEST, new D3D12_BARRIER_SUBRESOURCE_RANGE(subresource));
-            _device.BarrierManager.FlushBarriers(cmdList, BarrierFlushTypes.Texture);
+            _device.BarrierManager.AddTextureBarrier(texture, BarrierSync.Copy, BarrierAccess.CopyDest, BarrierLayout.CopyDest, new BarrierSubresourceRange(subresource));
+            _device.BarrierManager.FlushBarriers(ref cmdList, BarrierFlushTypes.Texture);
 
             ID3D12Resource* resource = (ID3D12Resource*)_device.ResourceManager.GetResource(texture);
 
-            D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = new D3D12_PLACED_SUBRESOURCE_FOOTPRINT
+            PlacedSubresourceFootprint srcFootprint = new PlacedSubresourceFootprint
             {
                 Offset = (ulong)upload.BufferOffset,
-                Footprint = new D3D12_SUBRESOURCE_FOOTPRINT
+                Footprint = new SubresourceFootprint
                 {
                     Format = (texture.IsExternal ? ((D3D12RHITextureNative*)texture.Native)->Base.Description.Format : _device.ResourceManager.FindFGTexture(texture).Description.Format).ToTextureFormat(),
                     Width = (uint)destBox.Width,
@@ -256,12 +253,12 @@ namespace Primary.Rendering.D3D12
                 }
             };
 
-            D3D12_TEXTURE_COPY_LOCATION destLoc = new D3D12_TEXTURE_COPY_LOCATION(resource);
-            D3D12_TEXTURE_COPY_LOCATION srcLoc = new D3D12_TEXTURE_COPY_LOCATION((ID3D12Resource*)_uploadResource, &srcFootprint);
+            TextureCopyLocation destLoc = new TextureCopyLocation(resource, type: TextureCopyType.SubresourceIndex, subresourceIndex: 0);
+            TextureCopyLocation srcLoc = new TextureCopyLocation((ID3D12Resource*)Unsafe.AsPointer(ref _uploadResource.Get()), type: TextureCopyType.PlacedFootprint, placedFootprint: srcFootprint);
 
-            D3D12_BOX srcBox = new D3D12_BOX(0, 0, 0, destBox.Width, destBox.Height, destBox.Depth);
+            Box srcBox = new Box(0, 0, 0, (uint)destBox.Width, (uint)destBox.Height, (uint)destBox.Depth);
 
-            cmdList->CopyTextureRegion(&destLoc, (uint)destBox.X, (uint)destBox.Y, (uint)destBox.Z, &srcLoc, &srcBox);
+            cmdList.CopyTextureRegion(&destLoc, (uint)destBox.X, (uint)destBox.Y, (uint)destBox.Z, &srcLoc, &srcBox);
         }
 
         private readonly record struct DeferredUploadData(int index, nint DataPtr, int DataSize, int BufferOffset);

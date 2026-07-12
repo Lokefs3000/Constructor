@@ -23,14 +23,17 @@ namespace EditorUI.Reflection.Dynamic
 
         internal PropertyMethods EmitMethods(PropertyInfo propertyInfo, FieldInfo? fieldInfo)
         {
-            Delegate setDirect;
-            if (fieldInfo != null)
+            Delegate? setDirect = null;
+            if (propertyInfo.SetMethod != null)
             {
-                setDirect = CreateSetFieldDirect(fieldInfo);
-            }
-            else
-            {
-                setDirect = CreateSetPropertyDirect(propertyInfo);
+                if (fieldInfo != null)
+                {
+                    setDirect = CreateSetFieldDirect(fieldInfo);
+                }
+                else
+                {
+                    setDirect = CreateSetPropertyDirect(propertyInfo);
+                }
             }
 
             return new PropertyMethods(setDirect);

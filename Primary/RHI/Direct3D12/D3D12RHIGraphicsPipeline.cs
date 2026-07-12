@@ -1,23 +1,13 @@
-﻿using CommunityToolkit.HighPerformance;
-using Primary.Common;
+﻿using Primary.Common;
+using Primary.Memory.Native;
+using Silk.NET.Core.Native;
+using Silk.NET.Direct3D12;
+using Silk.NET.DXGI;
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
-
-using static TerraFX.Interop.DirectX.D3D12_CONSERVATIVE_RASTERIZATION_MODE;
-using static TerraFX.Interop.DirectX.D3D12_LOGIC_OP;
-using static TerraFX.Interop.DirectX.D3D12_PIPELINE_STATE_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_ROOT_DESCRIPTOR_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_ROOT_PARAMETER_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_ROOT_SIGNATURE_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_SAMPLER_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_SHADER_VISIBILITY;
-using static TerraFX.Interop.DirectX.DXGI_FORMAT;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -39,16 +29,16 @@ namespace Primary.RHI.Direct3D12
             _description = new RHIGraphicsPipelineDescription(description);
 
             {
-                D3D12_ROOT_PARAMETER1[] parameters = new D3D12_ROOT_PARAMETER1[2];
+                RootParameter1[] parameters = new RootParameter1[2];
 
                 int index = 0;
                 if ((!description.UseBufferForHeader && description.Header32BitConstants > 0) || (description.UseBufferForHeader && description.Expected32BitConstants > 0))
                 {
-                    parameters[index++] = new D3D12_ROOT_PARAMETER1
+                    parameters[index++] = new RootParameter1
                     {
-                        ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS,
-                        ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL,
-                        Constants = new D3D12_ROOT_CONSTANTS
+                        ParameterType = RootParameterType.Type32BitConstants,
+                        ShaderVisibility = ShaderVisibility.All,
+                        Constants = new RootConstants
                         {
                             ShaderRegister = 0,
                             RegisterSpace = 0,
@@ -59,27 +49,27 @@ namespace Primary.RHI.Direct3D12
 
                 if (description.UseBufferForHeader && description.Header32BitConstants > 0)
                 {
-                    parameters[index++] = new D3D12_ROOT_PARAMETER1
+                    parameters[index++] = new RootParameter1
                     {
-                        ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV,
-                        ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL,
-                        Descriptor = new D3D12_ROOT_DESCRIPTOR1
+                        ParameterType = RootParameterType.TypeCbv,
+                        ShaderVisibility = ShaderVisibility.All,
+                        Descriptor = new RootDescriptor1
                         {
                             ShaderRegister = 1,
                             RegisterSpace = 0,
-                            Flags = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC
+                            Flags = RootDescriptorFlags.DataStatic
                         }
                     };
                 }
 
-                D3D12_STATIC_SAMPLER_DESC1[] samplers = description.ImmutableSamplers.Length == 0 ?
-                    Array.Empty<D3D12_STATIC_SAMPLER_DESC1>() :
-                    new D3D12_STATIC_SAMPLER_DESC1[description.ImmutableSamplers.Length];
+                StaticSamplerDesc1[] samplers = description.ImmutableSamplers.Length == 0 ?
+                    Array.Empty<StaticSamplerDesc1>() :
+                    new StaticSamplerDesc1[description.ImmutableSamplers.Length];
 
                 for (int i = 0; i < samplers.Length; i++)
                 {
                     RHIGPImmutableSampler @is = description.ImmutableSamplers[i];
-                    samplers[i] = new D3D12_STATIC_SAMPLER_DESC1
+                    samplers[i] = new StaticSamplerDesc1
                     {
                         Filter = @is.MaxAnisotropy > 1 ?
                             ResourceHelper.EncodeAnisotropicFilter(@is.ReductionType) :
@@ -95,50 +85,50 @@ namespace Primary.RHI.Direct3D12
                         MaxLOD = @is.MaxLOD,
                         ShaderRegister = (uint)i,
                         RegisterSpace = 0,
-                        ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL,
-                        Flags = @is.Border >= RHISamplerBorder.OpaqueBlackUInt ? D3D12_SAMPLER_FLAG_UINT_BORDER_COLOR : D3D12_SAMPLER_FLAG_NONE
+                        ShaderVisibility = ShaderVisibility.All,
+                        Flags = @is.Border >= RHISamplerBorder.OpaqueBlackUInt ? SamplerFlags.UintBorderColor : SamplerFlags.None
                     };
                 }
 
-                fixed (D3D12_ROOT_PARAMETER1* ptr1 = parameters)
+                fixed (RootParameter1* ptr1 = parameters)
                 {
-                    fixed (D3D12_STATIC_SAMPLER_DESC1* ptr2 = samplers)
+                    fixed (StaticSamplerDesc1* ptr2 = samplers)
                     {
-                        D3D12_ROOT_SIGNATURE_DESC2 desc = new D3D12_ROOT_SIGNATURE_DESC2
+                        RootSignatureDesc2 desc = new RootSignatureDesc2
                         {
                             NumParameters = (uint)index,
-                            pParameters = ptr1,
+                            PParameters = ptr1,
                             NumStaticSamplers = (uint)samplers.Length,
-                            pStaticSamplers = ptr2,
+                            PStaticSamplers = ptr2,
                             Flags =
-                                D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-                                D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-                                D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
+                                RootSignatureFlags.AllowInputAssemblerInputLayout |
+                                RootSignatureFlags.CbvSrvUavHeapDirectlyIndexed |
+                                RootSignatureFlags.SamplerHeapDirectlyIndexed
                         };
 
-                        D3D12_VERSIONED_ROOT_SIGNATURE_DESC versionDesc = new D3D12_VERSIONED_ROOT_SIGNATURE_DESC(desc);
+                        VersionedRootSignatureDesc versionDesc = new VersionedRootSignatureDesc(version: D3DRootSignatureVersion.Version12, desc12: desc);
 
-                        ID3DBlob* blob = null;
-                        ID3DBlob* error = null;
+                        ID3D10Blob* blob = null;
+                        ID3D10Blob* error = null;
 
                         try
                         {
-                            HRESULT hr = DirectX.D3D12SerializeVersionedRootSignature(&versionDesc, &blob, &error);
+                            HResult hr = D3D12RHIDevice.D3D12.SerializeVersionedRootSignature(&versionDesc, &blob, &error);
                             if (error != null)
                             {
                                 string str = new string((sbyte*)error->GetBufferPointer(), 0, (int)error->GetBufferSize());
-                                throw new RHIException(str);
+                                throw new D3D12RHIException(str, hr.Value);
                             }
 
-                            if (hr.FAILED)
+                            if (hr.IsFailure)
                             {
-                                throw new RHIException($"Failed to serialize root signature blob: {hr}");
+                                throw new D3D12RHIException($"Failed to serialize root signature blob", hr.Value);
                             }
 
-                            hr = device.Device.Get()->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), UuidOf.Get<ID3D12RootSignature>(), (void**)_rootSignature.GetAddressOf());
-                            if (hr.FAILED)
+                            hr = device.Device.CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), out _rootSignature);
+                            if (hr.IsFailure)
                             {
-                                throw new RHIException($"Failed to create D3D12 root signature: {hr}");
+                                throw new D3D12RHIException($"Failed to create D3D12 root signature", hr.Value);
                             }
                         }
                         finally
@@ -163,18 +153,20 @@ namespace Primary.RHI.Direct3D12
             }
         }
 
-        public ID3D12PipelineState* GetPipelineState(D3D12RasterState rasterState)
+        public ref ID3D12PipelineState GetPipelineState(D3D12RasterState rasterState)
         {
             if (_createdPipelines.TryGetValue(rasterState, out ComPtr<ID3D12PipelineState> pipeline))
-                return pipeline.Get();
+                return ref pipeline.Get();
 
-            D3D12_INPUT_ELEMENT_DESC[] inputElements = _description.InputElements.Length == 0 ?
-                Array.Empty<D3D12_INPUT_ELEMENT_DESC>() :
-                new D3D12_INPUT_ELEMENT_DESC[_description.InputElements.Length];
+            InputElementDesc[] inputElements = _description.InputElements.Length == 0 ?
+                Array.Empty<InputElementDesc>() :
+                new InputElementDesc[_description.InputElements.Length];
 
-            Ptr<byte>[] elementNames = inputElements.Length == 0 ?
-                Array.Empty<Ptr<byte>>() :
-                new Ptr<byte>[inputElements.Length];
+            using MemoryScope memoryScope = ScopedMemory.PushScope();
+
+            ScopedPtr<byte>[] elementNames = inputElements.Length == 0 ?
+                Array.Empty<ScopedPtr<byte>>() :
+                new ScopedPtr<byte>[inputElements.Length];
 
             try
             {
@@ -183,17 +175,17 @@ namespace Primary.RHI.Direct3D12
                     RHIGPInputElement ie = _description.InputElements[i];
 
                     string semanticStr = ie.Semantic.ToString().ToUpper();
-                    byte* semanticStrPtr = (byte*)NativeMemory.Alloc((nuint)(semanticStr.Length + 1), sizeof(byte));
-
+                    ScopedPtr<byte> semanticStrPtr = ScopedMemory.Allocate((nuint)(semanticStr.Length + 1), sizeof(byte));
+              
                     for (int j = 0; j < semanticStr.Length; j++)
                         semanticStrPtr[j] = (byte)semanticStr[j];
                     semanticStrPtr[semanticStr.Length] = (byte)'\0';
 
                     elementNames[i] = semanticStrPtr;
 
-                    inputElements[i] = new D3D12_INPUT_ELEMENT_DESC
+                    inputElements[i] = new InputElementDesc
                     {
-                        SemanticName = (sbyte*)semanticStrPtr,
+                        SemanticName = semanticStrPtr.Pointer,
                         SemanticIndex = (uint)ie.SemanticIndex,
                         Format = ie.Format.ToFormat(),
                         InputSlot = (uint)ie.InputSlot,
@@ -203,18 +195,18 @@ namespace Primary.RHI.Direct3D12
                     };
                 }
 
-                fixed (D3D12_INPUT_ELEMENT_DESC* ptr = inputElements)
+                fixed (InputElementDesc* ptr = inputElements)
                 {
-                    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = new D3D12_GRAPHICS_PIPELINE_STATE_DESC
+                    GraphicsPipelineStateDesc desc = new GraphicsPipelineStateDesc
                     {
-                        pRootSignature = _rootSignature,
+                        PRootSignature = _rootSignature,
 
-                        BlendState = new D3D12_BLEND_DESC
+                        BlendState = new BlendDesc
                         {
                             AlphaToCoverageEnable = _description.Blend.AlphaToCoverageEnabled,
                             IndependentBlendEnable = _description.Blend.IndependentBlendEnabled
                         },
-                        RasterizerState = new D3D12_RASTERIZER_DESC
+                        RasterizerState = new RasterizerDesc
                         {
                             FillMode = _description.Rasterizer.Fill.ToFillMode(),
                             CullMode = _description.Rasterizer.Cull.ToCullMode(),
@@ -227,25 +219,25 @@ namespace Primary.RHI.Direct3D12
                             AntialiasedLineEnable = false,
                             ForcedSampleCount = 0,
                             ConservativeRaster = _description.Rasterizer.ConservativeRaster ?
-                                D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON :
-                                D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF
+                                ConservativeRasterizationMode.On :
+                                ConservativeRasterizationMode.Off
                         },
-                        DepthStencilState = new D3D12_DEPTH_STENCIL_DESC
+                        DepthStencilState = new DepthStencilDesc
                         {
-                            DepthEnable = _description.DepthStencil.DepthEnabled,
+                            DepthEnable = _description.DepthStencil.DepthEnabled && rasterState.DSVFormat != Format.FormatUnknown,
                             DepthWriteMask = _description.DepthStencil.DepthWriteMask.ToDepthWriteMask(),
                             DepthFunc = _description.DepthStencil.DepthFunction.ToComparisonFunc(),
                             StencilEnable = _description.DepthStencil.StencilEnabled,
                             StencilReadMask = _description.DepthStencil.StencilReadMask,
                             StencilWriteMask = _description.DepthStencil.StencilWriteMask,
-                            FrontFace = new D3D12_DEPTH_STENCILOP_DESC
+                            FrontFace = new DepthStencilopDesc
                             {
                                 StencilFailOp = _description.DepthStencil.FrontFace.FailOp.ToStencilOp(),
                                 StencilDepthFailOp = _description.DepthStencil.FrontFace.DepthFailOp.ToStencilOp(),
                                 StencilPassOp = _description.DepthStencil.FrontFace.PassOp.ToStencilOp(),
                                 StencilFunc = _description.DepthStencil.FrontFace.Function.ToComparisonFunc(),
                             },
-                            BackFace = new D3D12_DEPTH_STENCILOP_DESC
+                            BackFace = new DepthStencilopDesc
                             {
                                 StencilFailOp = _description.DepthStencil.BackFace.FailOp.ToStencilOp(),
                                 StencilDepthFailOp = _description.DepthStencil.BackFace.DepthFailOp.ToStencilOp(),
@@ -253,25 +245,25 @@ namespace Primary.RHI.Direct3D12
                                 StencilFunc = _description.DepthStencil.BackFace.Function.ToComparisonFunc(),
                             }
                         },
-                        InputLayout = new D3D12_INPUT_LAYOUT_DESC
+                        InputLayout = new InputLayoutDesc
                         {
-                            pInputElementDescs = ptr,
+                            PInputElementDescs = ptr,
                             NumElements = (uint)inputElements.Length
                         },
 
                         PrimitiveTopologyType = _description.PrimitiveTopologyType.ToPrimitiveTopologyType(),
 
-                        SampleDesc = new DXGI_SAMPLE_DESC { Count = 1, Quality = 0 },
+                        SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
                         SampleMask = uint.MaxValue,
 
-                        CachedPSO = new D3D12_CACHED_PIPELINE_STATE { CachedBlobSizeInBytes = 0, pCachedBlob = null },
-                        Flags = D3D12_PIPELINE_STATE_FLAG_NONE,
+                        CachedPSO = new CachedPipelineState { CachedBlobSizeInBytes = 0, PCachedBlob = null },
+                        Flags = PipelineStateFlags.None,
                     };
 
                     for (int i = 0; i < _description.Blend.RenderTargets.Length; i++)
                     {
                         RHIGPBlendRenderTarget rt = _description.Blend.RenderTargets[i];
-                        desc.BlendState.RenderTarget[i] = new D3D12_RENDER_TARGET_BLEND_DESC
+                        desc.BlendState.RenderTarget[i] = new RenderTargetBlendDesc
                         {
                             BlendEnable = rt.BlendEnabled,
                             LogicOpEnable = false,
@@ -281,7 +273,7 @@ namespace Primary.RHI.Direct3D12
                             SrcBlendAlpha = rt.SourceBlendAlpha.ToBlend(),
                             DestBlendAlpha = rt.DestinationBlendAlpha.ToBlend(),
                             BlendOpAlpha = rt.BlendOperationAlpha.ToBlendOp(),
-                            LogicOp = D3D12_LOGIC_OP_NOOP,
+                            LogicOp = LogicOp.Noop,
                             RenderTargetWriteMask = rt.WriteMask
                         };
                     }
@@ -289,45 +281,40 @@ namespace Primary.RHI.Direct3D12
                     desc.NumRenderTargets = (uint)rasterState.RTVFormats.Count;
                     desc.DSVFormat = rasterState.DSVFormat;
 
-                    NativeMemory.Copy(&rasterState.RTVFormats, &desc.RTVFormats.e0, (nuint)(Unsafe.SizeOf<DXGI_FORMAT>() * 8));
+                    NativeMemory.Copy(&rasterState.RTVFormats, &desc.RTVFormats.Element0, (nuint)(Unsafe.SizeOf<Format>() * 8));
 
                     using MemoryHandle vertexBc = _bytecode.Vertex.Pin();
-                    desc.VS = new D3D12_SHADER_BYTECODE
+                    desc.VS = new ShaderBytecode
                     {
-                        pShaderBytecode = vertexBc.Pointer,
+                        PShaderBytecode = vertexBc.Pointer,
                         BytecodeLength = (nuint)_bytecode.Vertex.Length
                     };
 
                     using MemoryHandle pixelBc = _bytecode.Pixel.Pin();
-                    desc.PS = new D3D12_SHADER_BYTECODE
+                    desc.PS = new ShaderBytecode
                     {
-                        pShaderBytecode = pixelBc.Pointer,
+                        PShaderBytecode = pixelBc.Pointer,
                         BytecodeLength = (nuint)_bytecode.Pixel.Length
                     };
 
-                    HRESULT hr = _device.Device.Get()->CreateGraphicsPipelineState(&desc, UuidOf.Get<ID3D12PipelineState>(), (void**)pipeline.GetAddressOf());
-                    if (hr.FAILED)
+                    HResult hr = _device.Device.CreateGraphicsPipelineState(&desc, out pipeline);
+                    if (hr.IsFailure)
                     {
                         _createdPipelines[rasterState] = null;
-                        return null;
+                        return ref Unsafe.NullRef<ID3D12PipelineState>();
                     }
 
                     if (_debugName != null)
                     {
-                        ResourceHelper.SetResourceName((ID3D12Resource2*)pipeline.Get(), $"{_debugName}-{rasterState.GetHashCode()}");
+                        ResourceHelper.SetResourceName(ref pipeline.Get(), $"{_debugName}-{rasterState.GetHashCode()}");
                     }
 
                     _createdPipelines[rasterState] = pipeline;
-                    return pipeline.Get();
+                    return ref pipeline.Get();
                 }
             }
             finally
             {
-                for (int i = 0; i < elementNames.Length; i++)
-                {
-                    if (!elementNames[i].IsNull)
-                        NativeMemory.Free(elementNames[i].Pointer);
-                }
             }
         }
 
@@ -342,10 +329,10 @@ namespace Primary.RHI.Direct3D12
                     _nativeRep = null;
 
                     foreach (var kvp in _createdPipelines)
-                        kvp.Value.Reset();
+                        kvp.Value.Dispose();
                     _createdPipelines.Clear();
 
-                    _rootSignature.Reset();
+                    _rootSignature.Dispose();
 
                     _device.ResourceTracker.Untrack(this);
                 });
@@ -358,14 +345,14 @@ namespace Primary.RHI.Direct3D12
         {
             if (debugName != null)
             {
-                if (_rootSignature.Get() != null)
+                if (!Unsafe.IsNullRef(in _rootSignature.Get()))
                 {
-                    ResourceHelper.SetResourceName((ID3D12Resource2*)_rootSignature.Get(), $"{debugName}-RootSig");
+                    ResourceHelper.SetResourceName(ref _rootSignature.Get(), $"{debugName}-RootSig");
                 }
 
                 foreach (var kvp in _createdPipelines)
                 {
-                    ResourceHelper.SetResourceName((ID3D12Resource2*)kvp.Value.Get(), $"{debugName}-{kvp.Key.GetHashCode()}");
+                    ResourceHelper.SetResourceName(ref kvp.Value.Get(), $"{debugName}-{kvp.Key.GetHashCode()}");
                 }
             }
         }
@@ -392,11 +379,11 @@ namespace Primary.RHI.Direct3D12
     public struct D3D12RasterState : IEquatable<D3D12RasterState>
     {
         public __RTVs RTVFormats;
-        public DXGI_FORMAT DSVFormat;
+        public Format DSVFormat;
 
         public D3D12RasterState()
         {
-            DSVFormat = DXGI_FORMAT_UNKNOWN;
+            DSVFormat = Format.FormatUnknown;
             RTVFormats = new __RTVs();
         }
 
@@ -411,30 +398,30 @@ namespace Primary.RHI.Direct3D12
 
         public struct __RTVs
         {
-            public DXGI_FORMAT e0;
-            public DXGI_FORMAT e1;
-            public DXGI_FORMAT e2;
-            public DXGI_FORMAT e3;
-            public DXGI_FORMAT e4;
-            public DXGI_FORMAT e5;
-            public DXGI_FORMAT e6;
-            public DXGI_FORMAT e7;
+            public Format e0;
+            public Format e1;
+            public Format e2;
+            public Format e3;
+            public Format e4;
+            public Format e5;
+            public Format e6;
+            public Format e7;
 
             public int Count;
 
             public __RTVs()
             {
-                e0 = DXGI_FORMAT_UNKNOWN;
-                e1 = DXGI_FORMAT_UNKNOWN;
-                e2 = DXGI_FORMAT_UNKNOWN;
-                e3 = DXGI_FORMAT_UNKNOWN;
-                e4 = DXGI_FORMAT_UNKNOWN;
-                e5 = DXGI_FORMAT_UNKNOWN;
-                e6 = DXGI_FORMAT_UNKNOWN;
-                e7 = DXGI_FORMAT_UNKNOWN;
+                e0 = Format.FormatUnknown;
+                e1 = Format.FormatUnknown;
+                e2 = Format.FormatUnknown;
+                e3 = Format.FormatUnknown;
+                e4 = Format.FormatUnknown;
+                e5 = Format.FormatUnknown;
+                e6 = Format.FormatUnknown;
+                e7 = Format.FormatUnknown;
             }
 
-            public DXGI_FORMAT this[int index]
+            public Format this[int index]
             {
                 get => Unsafe.Add(ref e0, index);
                 set => Unsafe.Add(ref e0, index) = value;

@@ -1,0 +1,7 @@
+asset_id = "019f320a9777732cb510bf116426892b"
+meta_version = 1
+
+is_compressed = false
+index_stride_mode = "Auto"
+use_half_precision_nodes = false
+use_half_precision_vertices = false

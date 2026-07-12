@@ -8,7 +8,8 @@ using CommunityToolkit.HighPerformance;
 using EditorUI.Assets;
 using EditorUI.Built;
 using EditorUI.Text;
-using EditorUI.Visual.Draw;
+using EditorUI.Utility;
+using EditorUI.Visual.Built;
 using Primary.Assets;
 using Primary.Mathematics;
 using Primary.RHI;
@@ -17,249 +18,124 @@ namespace EditorUI.Visual
 {
     public record struct PainterContext
     {
-        private readonly PainterData _data;
-        private readonly GradientManager _gradientManager;
+        private readonly Painter _data;
+        private int _translateStackSize;
+        private int _clipStackStack;
 
-        private int _clipStackSize;
-
-        internal PainterContext(PainterData data, GradientManager gradientManager)
+        internal PainterContext(Painter data)
         {
             _data = data;
-            _gradientManager = gradientManager;
 
-            _clipStackSize = 0;
+            _translateStackSize = 0;
+            _clipStackStack = 0;
         }
 
         public readonly void AddPoint(Vector2 point, Paint paint, float radius = 1.0f)
         {
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<PointsPaintCmd>() + Unsafe.SizeOf<Vector2>());
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new PointsPaintCmd
-            {
-                CmdType = PaintCmdType.Points,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                Radius = (Half)radius,
-                PointCount = 1
-            });
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReferenceAt(Unsafe.SizeOf<PointsPaintCmd>()), point);
+            _data.AddPoints(new ReadOnlySpan<Vector2>(ref point), paint, radius);
         }
 
         public readonly void AddPoints(ReadOnlySpan<Vector2> points, Paint paint, float radius = 1.0f)
         {
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<PointsPaintCmd>() + Unsafe.SizeOf<Vector2>());
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new PointsPaintCmd
-            {
-                CmdType = PaintCmdType.Points,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                Radius = (Half)radius,
-                PointCount = 1
-            });
-
-            points.CopyTo(MemoryMarshal.CreateSpan(ref Unsafe.As<byte, Vector2>(ref memory.DangerousGetReferenceAt(Unsafe.SizeOf<PointsPaintCmd>())), points.Length));
+            _data.AddPoints(points, paint, radius);
         }
 
         public readonly void AddLine(Vector2 from, Vector2 to, Paint paint, float thickness = 1.0f)
         {
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<LinesPaintCmd>() + Unsafe.SizeOf<Vector2>() * 2);
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new LinesPaintCmd
-            {
-                CmdType = PaintCmdType.Lines,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                Thickness = (Half)thickness,
-                PaintMode = LinePaintMode.List,
-                LineCount = 1
-            });
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReferenceAt(Unsafe.SizeOf<LinesPaintCmd>()), from);
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReferenceAt(Unsafe.SizeOf<LinesPaintCmd>() + Unsafe.SizeOf<Vector2>()), to);
+            Span<Vector2> temp = [from, to];
+            _data.AddLines(temp, paint, LinePaintMode.List, thickness);
         }
 
         public readonly void AddLines(ReadOnlySpan<Vector2> points, Paint paint, LinePaintMode paintMode = LinePaintMode.List, float thickness = 1.0f)
         {
-            if (points.Length < 2)
-                return;
-
-            if (paintMode == LinePaintMode.List)
-            {
-                if (points.Length % 2 != 0)
-                    points = points[..(points.Length - 1)];
-            }
-
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<LinesPaintCmd>() + points.Length);
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new LinesPaintCmd
-            {
-                CmdType = PaintCmdType.Lines,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                Thickness = (Half)thickness,
-                PaintMode = LinePaintMode.List,
-                LineCount = 1
-            });
-
-            points.CopyTo(MemoryMarshal.CreateSpan(ref Unsafe.As<byte, Vector2>(ref memory.DangerousGetReferenceAt(Unsafe.SizeOf<LinesPaintCmd>())), points.Length));
+            _data.AddLines(points, paint, paintMode, thickness);
         }
 
         public readonly void AddRectangle(Boundaries boundaries, Paint paint)
         {
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<RectanglePaintCmd>());
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new RectanglePaintCmd
-            {
-                CmdType = PaintCmdType.Rectangle,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                Rect = boundaries,
-                CornerRadiusTL = Half.NegativeOne
-            });
+            _data.AddRectangle(boundaries, paint, Vector4.NegativeZero);
         }
 
         public readonly void AddRectangle(Boundaries boundaries, Paint paint, Vector4 cornerRadius)
         {
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<RectanglePaintCmd>());
+            _data.AddRectangle(boundaries, paint, cornerRadius);
+        }
 
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new RectanglePaintCmd
-            {
-                CmdType = PaintCmdType.Rectangle,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                Rect = boundaries,
-                CornerRadiusTL = (Half)cornerRadius.X,
-                CornerRadiusTR = (Half)cornerRadius.Y,
-                CornerRadiusBL = (Half)cornerRadius.Z,
-                CornerRadiusBR = (Half)cornerRadius.W,
-            });
+        public readonly void AddQuad(Vector2 tl, Vector2 tr, Vector2 bl, Vector2 br, Paint paint)
+        {
+            _data.AddQuad(tl, tr, bl, br, paint);
         }
 
         public readonly void AddImage(Boundaries boundaries, TextureAsset image, Boundaries uvs, Paint paint)
         {
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<ImagePaintCmd>());
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new ImagePaintCmd
-            {
-                CmdType = PaintCmdType.Image,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                Rect = boundaries,
-
-                ImageIndex = _data.GetObjectIndex(image),
-                UVs = uvs
-            });
+            _data.AddImage(boundaries, uvs, paint, image);
         }
 
         public readonly void AddImage(Boundaries boundaries, RHITexture image, Boundaries uvs, Paint paint)
         {
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<ImagePaintCmd>());
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new ImagePaintCmd
-            {
-                CmdType = PaintCmdType.Image,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                Rect = boundaries,
-
-                ImageIndex = _data.GetObjectIndex(image),
-                UVs = uvs
-            });
+            _data.AddImage(boundaries, uvs, paint, image);
         }
 
-        public readonly void AddImage(Boundaries boundaries, Sprite image, Paint paint)
+        public readonly void AddImage(Boundaries boundaries, Sprite? image, Paint paint)
         {
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<ImagePaintCmd>());
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new ImagePaintCmd
+#if DEBUG
+            if (image == null)
             {
-                CmdType = PaintCmdType.Image,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                Rect = boundaries,
-
-                ImageIndex = _data.GetObjectIndex(image.Texture),
-                UVs = new Boundaries(image.UVMin, image.UVMax)
-            });
+                _data.AddImage(boundaries, new Boundaries(Vector2.Zero, Vector2.One), paint, AssetManager.Static.DebugTexError);
+                return;
+            }
+#else
+            if (image != null)
+#endif
+            _data.AddImage(boundaries, new Boundaries(image.UVMin, image.UVMax), paint, image.Texture);
         }
 
         public readonly void AddCircle(Vector2 center, float radius, Paint paint)
         {
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<CirclePaintCmd>());
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new CirclePaintCmd
-            {
-                CmdType = PaintCmdType.Circle,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                Radius = (Half)radius,
-                Center = center
-            });
+            _data.AddCircle(center, radius, paint);
         }
 
         public readonly void AddTriangle(Vector2 a, Vector2 b, Vector2 c, Paint paint, float cornerRadius = -1.0f)
         {
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<CirclePaintCmd>());
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new TrianglePaintCmd
-            {
-                CmdType = PaintCmdType.Triangle,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                CornerRadius = float.IsNegative(cornerRadius) ? Half.NegativeOne : (Half)cornerRadius,
-                A = a,
-                B = b,
-                C = c
-            });
         }
 
-        public readonly void AddText(Vector2 position, ReadOnlySpan<char> text, FontFamily fontFamily, Paint paint, TextBuilder builder)
+        public readonly void AddText(Vector2 position, TextShapingData shapingData, Vector2 maxExtents, Paint paint)
         {
-            if (text.IsEmpty)
-                return;
-
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<TextPaintCmd>() + text.Length);
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new TextPaintCmd
-            {
-                CmdType = PaintCmdType.Text,
-
-                Paint = BuiltPaint.Build(in paint, _gradientManager),
-                TextBuilder = BuiltTextBuilder.Build(in builder),
-                FontFamilyIndex = (ushort)_data.GetObjectIndex(fontFamily),
-                Position = position,
-                TextLength = text.Length
-            });
-
-            text.CopyTo(MemoryMarshal.CreateSpan(ref Unsafe.As<byte, char>(ref memory.DangerousGetReferenceAt(Unsafe.SizeOf<TextPaintCmd>())), text.Length));
+            _data.AddText(position, shapingData, paint, maxExtents);
         }
 
         public void PushClippingRect(Rect rect)
         {
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<PushClipRectCmd>());
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), new PushClipRectCmd
-            {
-                CmdType = PaintCmdType.PushClipRect,
-                Rect = rect
-            });
-
-            ++_clipStackSize;
+            _data.PushClip(rect);
+            ++_clipStackStack;
         }
 
-        public void PopClippingRect(Rect rect)
+        public void PopClippingRect()
         {
-            if (_clipStackSize == 0)
-                return;
-
-            Span<byte> memory = _data.AllocateSpace(Unsafe.SizeOf<PaintCmdType>());
-
-            Unsafe.WriteUnaligned(ref memory.DangerousGetReference(), PaintCmdType.PopClipRect);
-
-            --_clipStackSize;
+            if (_clipStackStack > 0)
+            {
+                _data.PopClip();
+                --_clipStackStack;
+            }
         }
+
+        public void PushTranslate(Vector2 translation)
+        {
+            _data.PushTranslate(translation);
+            ++_translateStackSize;
+        }
+
+        public void PopTranslate()
+        {
+            if (_translateStackSize > 0)
+            {
+                _data.PopTranslate();
+                --_translateStackSize;
+            }
+        }
+
+        internal readonly int TranslateStackSize => _translateStackSize;
+        internal readonly int ClipStackSize => _clipStackStack;
     }
 
     public enum LinePaintMode : byte

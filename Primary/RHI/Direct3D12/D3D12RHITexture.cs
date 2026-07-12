@@ -1,17 +1,11 @@
 ﻿using Primary.Common;
+using Silk.NET.Core.Native;
+using Silk.NET.Direct3D12;
+using Silk.NET.DXGI;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
 using static Interop.D3D12MemAlloc.ALLOCATION_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_ACCESS;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_LAYOUT;
-using static TerraFX.Interop.DirectX.D3D12_BARRIER_SYNC;
-using static TerraFX.Interop.DirectX.D3D12_HEAP_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_HEAP_TYPE;
-using static TerraFX.Interop.DirectX.D3D12_RESOURCE_FLAGS;
-using static TerraFX.Interop.DirectX.D3D12_TEXTURE_LAYOUT;
 using D3D12MA = Interop.D3D12MemAlloc;
 
 namespace Primary.RHI.Direct3D12
@@ -24,9 +18,9 @@ namespace Primary.RHI.Direct3D12
         private ComPtr<ID3D12Resource2> _resource;
         private D3D12MA.Allocation* _allocation;
 
-        private D3D12_BARRIER_SYNC _barrierSync;
-        private D3D12_BARRIER_ACCESS _barrierAccess;
-        private D3D12_BARRIER_LAYOUT _barrierLayout;
+        private BarrierSync _barrierSync;
+        private BarrierAccess _barrierAccess;
+        private BarrierLayout _barrierLayout;
 
         private D3D12RHITextureNative* _nativeRep;
 
@@ -36,7 +30,7 @@ namespace Primary.RHI.Direct3D12
             _description = description;
 
             {
-                D3D12_RESOURCE_DESC1 desc = new D3D12_RESOURCE_DESC1
+                ResourceDesc1 desc = new ResourceDesc1
                 {
                     Dimension = description.Dimension.ToResourceDimension(),
                     Alignment = 0,
@@ -45,43 +39,43 @@ namespace Primary.RHI.Direct3D12
                     DepthOrArraySize = (ushort)description.DepthOrArraySize,
                     MipLevels = (ushort)description.MipLevels,
                     Format = description.Format.ToTextureFormat(),
-                    SampleDesc = new DXGI_SAMPLE_DESC { Count = 1, Quality = 0 },
-                    Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN,
-                    Flags = D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT,
+                    SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
+                    Layout = TextureLayout.LayoutUnknown,
+                    Flags = device.Setup.UseTightAlignment ? ResourceFlags.UseTightAlignment : ResourceFlags.None,
                     SamplerFeedbackMipRegion = default
                 };
 
                 if (Flags.HasFlag(description.Usage, RHIResourceUsage.UnorderedAccess))
-                    desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+                    desc.Flags |= ResourceFlags.AllowUnorderedAccess;
 
                 if (Flags.HasFlag(description.Usage, RHIResourceUsage.RenderTarget))
-                    desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+                    desc.Flags |= ResourceFlags.AllowRenderTarget;
                 if (Flags.HasFlag(description.Usage, RHIResourceUsage.DepthStencil))
-                    desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+                    desc.Flags |= ResourceFlags.AllowDepthStencil;
 
                 D3D12MA.ALLOCATION_DESC alloc = new D3D12MA.ALLOCATION_DESC
                 {
                     Flags = ALLOCATION_FLAG_NONE,
-                    HeapType = D3D12_HEAP_TYPE_DEFAULT,
-                    ExtraHeapFlags = D3D12_HEAP_FLAG_NONE,
+                    HeapType = HeapType.Default,
+                    ExtraHeapFlags = HeapFlags.None,
                     CustomPool = null,
                     pPrivateData = null,
                 };
 
                 D3D12MA.Allocation* temp = null;
-                HRESULT hr = D3D12MA.Allocator.CreateResource3(device.Allocator, &alloc, &desc, D3D12_BARRIER_LAYOUT_UNDEFINED, null, 0, null, &temp, UuidOf.Get<ID3D12Resource2>(), (void**)_resource.GetAddressOf());
-                if (hr.FAILED)
+                HResult hr = D3D12MA.Allocator.CreateResource3(device.Allocator, &alloc, &desc, BarrierLayout.Undefined, null, 0, null, &temp, SilkMarshal.GuidPtrOf<ID3D12Resource2>(), (void**)_resource.GetAddressOf());
+                if (hr.IsFailure)
                 {
                     device.FlushPendingMessages();
-                    throw new RHIException($"Failed to create D3D12 resource: {hr}");
+                    throw new D3D12RHIException($"Failed to create D3D12 resource", hr.Value);
                 }
 
                 _allocation = temp;
             }
 
-            _barrierSync = D3D12_BARRIER_SYNC_ALL;
-            _barrierAccess = D3D12_BARRIER_ACCESS_NO_ACCESS;
-            _barrierLayout = D3D12_BARRIER_LAYOUT_UNDEFINED;
+            _barrierSync = BarrierSync.All;
+            _barrierAccess = BarrierAccess.NoAccess;
+            _barrierLayout = BarrierLayout.Undefined;
 
             {
                 _nativeRep = (D3D12RHITextureNative*)NativeMemory.Alloc((nuint)Unsafe.SizeOf<D3D12RHITextureNative>());
@@ -108,7 +102,7 @@ namespace Primary.RHI.Direct3D12
                         NativeMemory.Free(_nativeRep);
                     _nativeRep = null;
 
-                    _resource.Reset();
+                    _resource.Dispose();
                     if (_allocation != null)
                         _allocation->Base.Release();
                     _allocation = null;
@@ -123,9 +117,9 @@ namespace Primary.RHI.Direct3D12
 
         protected override void SetDebugName(string? debugName)
         {
-            if (_resource.Get() != null)
+            if (!Unsafe.IsNullRef(in _resource.Get()))
             {
-                ResourceHelper.SetResourceName(_resource, debugName);
+                ResourceHelper.SetResourceName(ref _resource.Get(), debugName);
             }
         }
 
@@ -149,9 +143,9 @@ namespace Primary.RHI.Direct3D12
         public ID3D12Resource2* Resource;
         public D3D12MA.Allocation* Memory;
 
-        public D3D12_BARRIER_SYNC BarrierSync;
-        public D3D12_BARRIER_ACCESS BarrierAccess;
-        public D3D12_BARRIER_LAYOUT BarrierLayout;
+        public BarrierSync BarrierSync;
+        public BarrierAccess BarrierAccess;
+        public BarrierLayout BarrierLayout;
 
         public bool IsInitialized;
 

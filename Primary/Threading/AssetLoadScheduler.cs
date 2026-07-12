@@ -24,9 +24,9 @@ namespace Primary.Threading
             _running = new ConcurrentDictionary<AssetId, Task>();
         }
 
-        internal ValueTask Schedule(IAssetLoader loader, AssetId id, IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, bool isReloading)
+        internal ValueTask Schedule(IAssetLoader loader, AssetId id, IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, string localPath, bool isReloading)
         {
-            Task task = _running.GetOrAdd(id, CreateTask, new CreateTaskArgs(_timings, loader, id, asset, assetData, sourcePath, isReloading));
+            Task task = _running.GetOrAdd(id, CreateTask, new CreateTaskArgs(_timings, loader, id, asset, assetData, sourcePath, localPath, isReloading));
             if (task.IsCompleted)
             {
                 _running.TryRemove(id, out _);
@@ -44,19 +44,26 @@ namespace Primary.Threading
         {
             Action action = () =>
             {
-                using (args.Timings.StartTiming(args.Id))
+                try
                 {
-                    args.Loader.FactoryLoad(args.Asset, args.AssetData, args.SourcePath, null);
-                }
+                    using (args.Timings.StartTiming(args.Id))
+                    {
+                        args.Loader.FactoryLoad(args.Asset, args.AssetData, args.SourcePath, args.LocalPath, null);
+                    }
 
-                _running.TryRemove(id, out _);
-                _manager.RegisterAssetLoad(id, args.Asset, args.IsReloading);
+                    _running.TryRemove(id, out _);
+                    _manager.RegisterAssetLoad(id, args.Asset, args.IsReloading);
+                }
+                catch (Exception ex)
+                {
+                    EngLog.Assets.Error(ex, "Error occured loading asset '{path}'", args.SourcePath);
+                }
             };
 
             // TODO: FIX SO IT DOES NOT CRASH THE GPU WHEN LOADING SHADERS
             if (args.Asset is not ShaderAsset and not ComputeShaderAsset)
             {
-                Task task = Task.Factory.StartNew(action);
+                Task task = Task.Factory.StartNew(action, TaskCreationOptions.PreferFairness);
                 return task;
             }
             else
@@ -67,6 +74,6 @@ namespace Primary.Threading
             }
         }
 
-        private readonly record struct CreateTaskArgs(AssetLoadTimings Timings, IAssetLoader Loader, AssetId Id, IAssetDefinition Asset, IInternalAssetData AssetData, string SourcePath, bool IsReloading);
+        private readonly record struct CreateTaskArgs(AssetLoadTimings Timings, IAssetLoader Loader, AssetId Id, IAssetDefinition Asset, IInternalAssetData AssetData, string SourcePath, string LocalPath, bool IsReloading);
     }
 }

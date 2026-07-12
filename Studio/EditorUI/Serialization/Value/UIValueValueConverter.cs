@@ -17,10 +17,10 @@ namespace EditorUI.Serialization.Value
             var tokenizer = source.Tokenize(' ');
 
             tokenizer.MoveNext();
-            value.Relative = float.Parse(tokenizer.Current);
+            value.Relative = float.Parse(tokenizer.Current, CultureInfo.InvariantCulture);
 
             tokenizer.MoveNext();
-            value.Absolute = int.Parse(tokenizer.Current);
+            value.Absolute = int.Parse(tokenizer.Current, CultureInfo.InvariantCulture);
 
             return value;
         }

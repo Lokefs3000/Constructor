@@ -23,6 +23,7 @@ struct ImageBitmap
 	uint8_t Stride;
 
 	uint8_t* Pixels;
+	uint8_t Effort;
 };
 
 struct ImageOutput

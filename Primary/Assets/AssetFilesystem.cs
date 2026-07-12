@@ -112,25 +112,19 @@ namespace Primary.Assets
         public static string? ReadString(AssetId id)
         {
             AssetManager assets = Engine.GlobalSingleton.AssetManager;
-            string? path = assets.IdProvider.RetrievePathForId(id);
-
-            return path != null ? ReadString(path) : null;
+            return assets.IdProvider.TryGetAnyPathForId(id, out string? path) ? ReadString(path) : null;
         }
 
         public static Stream? OpenStream(AssetId id)
         {
             AssetManager assets = Engine.GlobalSingleton.AssetManager;
-            string? path = assets.IdProvider.RetrievePathForId(id);
-
-            return path != null ? OpenStream(path) : null;
+            return assets.IdProvider.TryGetAnyPathForId(id, out string? path) ? OpenStream(path) : null;
         }
 
         public static bool Exists(AssetId id)
         {
             AssetManager assets = Engine.GlobalSingleton.AssetManager;
-            string? path = assets.IdProvider.RetrievePathForId(id);
-
-            return path != null ? Exists(path) : false;
+            return assets.IdProvider.TryGetAnyPathForId(id, out string? path) ? Exists(path) : false;
         }
     }
 }

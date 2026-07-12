@@ -21,15 +21,16 @@ namespace EditorUI.Widgets
             _window = window;
         }
 
-        protected internal override void MeasureSelf(ref readonly LayoutContext context)
+        protected internal override MeasureReturnData MeasureSelf(ref readonly LayoutContext context)
         {
             _idealSize = _window?.WindowRect.Size.AsVector2() ?? Vector2.Zero;
+            return MeasureReturnData.Success;
         }
 
-        protected internal override ChildrenLayoutMode LayoutSelf(ref readonly LayoutContext context)
+        protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
         {
             _computedRect = new Boundaries(Vector2.Zero, _idealSize);
-            return ChildrenLayoutMode.None;
+            return LayoutReturnData.Success;
         }
 
         protected override void ChangeActiveParent(Widget? newParent)

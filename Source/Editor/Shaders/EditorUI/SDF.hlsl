@@ -33,6 +33,16 @@ float sdTriangle( in float2 p, in float2 p0, in float2 p1, in float2 p2 )
     return -sqrt(d.x)*sign(d.y);
 }
 
+float sdOrientedBox( in float2 p, in float2 a, in float2 b, float th )
+{
+    float l = length(b-a);
+    float2  d = (b-a)/l;
+    float2  q = (p-(a+b)*0.5);
+            q = mul(q,float2x2(d.x,-d.y,d.y,d.x));
+            q = abs(q)-float2(l,th)*0.5;
+    return length(max(q,0.0)) + min(max(q.x,q.y),0.0);    
+}
+
 float opOnion(float dist, float r)
 {
     return abs(dist) - r;

@@ -18,7 +18,17 @@ extern "C"
 		// borrowed from "rdo_bc_encoder.cpp:encode_texture()" in the "bc7enc_rdo" repo
 
 		ispc::bc7e_compress_block_params params{};
-		ispc::bc7e_compress_block_params_init_slow(&params, true);
+		switch (bitmap->Effort)
+		{
+			case 0: ispc::bc7e_compress_block_params_init_basic(&params, true); break;
+			case 1: ispc::bc7e_compress_block_params_init_ultrafast(&params, true); break;
+			case 2: ispc::bc7e_compress_block_params_init_veryfast(&params, true); break;
+			default:
+			case 3: ispc::bc7e_compress_block_params_init_fast(&params, true); break;
+			case 4: ispc::bc7e_compress_block_params_init_slow(&params, true); break;
+			case 5: ispc::bc7e_compress_block_params_init_veryslow(&params, true); break;
+			case 6: ispc::bc7e_compress_block_params_init_slowest(&params, true); break;
+		}
 
 		uint32_t bc7_mode_hist[8];
 		memset(bc7_mode_hist, 0, sizeof(bc7_mode_hist));

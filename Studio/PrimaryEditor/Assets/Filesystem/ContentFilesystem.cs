@@ -19,6 +19,7 @@ namespace PrimaryEditor.Assets.Filesystem
         private readonly string _namespaceKey;
 
         private readonly FileSystemWatcher _watcher;
+        private readonly FilesystemStructure _structure;
 
         private Lock _lock;
 
@@ -43,11 +44,12 @@ namespace PrimaryEditor.Assets.Filesystem
 
             _watcher = new FileSystemWatcher(workingDirectory)
             {
-                EnableRaisingEvents = true,
                 IncludeSubdirectories = true,
                 InternalBufferSize = ushort.MaxValue,
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
+                EnableRaisingEvents = true
             };
+            _structure = new FilesystemStructure(namespaceKey);
 
             _lock = new Lock();
 
@@ -198,49 +200,6 @@ namespace PrimaryEditor.Assets.Filesystem
             return null;
         }
 
-        private bool IsNewFileActuallyUnique(string localFilePath, string newLocalFilePath)
-        {
-            AssetId sourceId = _pipeline.AssetRegistry.RetriveIdForPath(localFilePath);
-            if (!sourceId.IsInvalid)
-            {
-                if (_pipeline.PhysicalFileRegistry.TryGetFileInfo(sourceId, out PhysicalFileInfo info))
-                {
-                    if (!TryGetFullPath(newLocalFilePath, out string? newFullPath))
-                    {
-                        EdLog.Assets.Warning("Failed to determine if file is unique because the full path could not be retrived '{p}'");
-
-                        // show popup to try and validate what happened
-                        throw new Exception();
-                    }
-
-                    using Stream? stream = FileUtility.TryWaitOpenNoThrow(newFullPath, FileMode.Open, FileAccess.Read, FileShare.Read, maxTries: 4, timeoutMs: 50);
-                    if (stream == null)
-                    {
-                        // show popup to try and validate what happened
-                        throw new Exception();
-                    }
-
-                    if (info.FileSize != stream.Length)
-                        return true;
-
-                    FileChecksum checksum = _pipeline.PhysicalFileRegistry.CreateChecksumFrom(stream);
-                    if (!checksum.Equals(info.Checksum))
-                    {
-                        _pipeline.PhysicalFileRegistry.TryRegisterFile(sourceId, File.GetLastWriteTime(newFullPath), stream.Length, checksum);
-                        return true;
-                    }
-
-                    return false;
-                }
-            }
-            else
-            {
-                EdLog.Assets.Debug("File '{p}' must be unique since it has no prior id registered", newLocalFilePath);
-            }
-
-            return true;
-        }
-
         private void OnFileChangedCallback(object sender, FileSystemEventArgs e)
         {
             if (Directory.Exists(e.FullPath))
@@ -254,35 +213,15 @@ namespace PrimaryEditor.Assets.Filesystem
                 return;
             }
 
-            AssetId id = _pipeline.AssetRegistry.GetOrRegisterIdFor(localPath);
-            if (_pipeline.PhysicalFileRegistry.TryGetFileInfo(id, out PhysicalFileInfo fileInfo))
-            {
-                if (File.GetLastWriteTime(e.FullPath) > fileInfo.LastModifiedTime)
-                {
-                    using var lockScope = _lock.EnterScope();
-
-                    DateTime now = DateTime.Now;
-                    for (int i = 0; i < _timedFileEvents.Count; i++)
-                    {
-                        TimedFileEvent fileEvent = _timedFileEvents[i];
-                        if (fileEvent.Timeout >= now && fileEvent.EventData.EventType == FileEventType.Changed && fileEvent.EventData.LocalFilePath == localPath)
-                        {
-                            return;
-                        }
-                    }
-
-                    _timedFileEvents.PushBack(new TimedFileEvent(now + TimeoutDuration, new FileEvent(localPath, null, FileEventType.Changed)));
-                }
-            }
-            else
-            {
-                // no file info means that this file is waiting to be added from somewhere else
-                return;
-            }
+            using var lockScope = _lock.EnterScope();
+            _timedFileEvents.PushBack(new TimedFileEvent(DateTime.Now + TimeoutDuration, new FileEvent(localPath, null, FileEventType.Changed)));
         }
 
         private void OnFileRenamedCallback(object sender, RenamedEventArgs e)
         {
+            if (e.FullPath.EndsWith(".assetdat"))
+                return;
+
             if (!TryGetLocalPath(e.FullPath, out string? localPath))
             {
                 EdLog.Assets.Warning("Failed to handle file renamed callback because no local path was found for '{p}'", e.FullPath);
@@ -301,6 +240,9 @@ namespace PrimaryEditor.Assets.Filesystem
 
         private void OnFileCreatedCallback(object sender, FileSystemEventArgs e)
         {
+            if (e.FullPath.EndsWith(".assetdat"))
+                return;
+
             if (!TryGetLocalPath(e.FullPath, out string? localPath))
             {
                 EdLog.Assets.Warning("Failed to handle created file callback because no local path was found for '{p}'", e.FullPath);
@@ -317,27 +259,14 @@ namespace PrimaryEditor.Assets.Filesystem
             DateTime now = DateTime.Now;
 
             using var lockScope = _lock.EnterScope();
-
-            for (int i = 0; i < _timedFileEvents.Count; i++)
-            {
-                TimedFileEvent fileEvent = _timedFileEvents[i];
-                if (fileEvent.Timeout >= now && fileEvent.EventData.EventType == FileEventType.Deleted)
-                {
-                    if (!IsNewFileActuallyUnique(fileEvent.EventData.LocalFilePath, eventData.LocalFilePath))
-                    {
-                        _timedFileEvents[i] = new TimedFileEvent(fileEvent.Timeout, new FileEvent(fileEvent.EventData.LocalFilePath, eventData.LocalFilePath, FileEventType.Moved));
-                        return;
-                    }
-                }
-            }
-
-            if (_timedFileEvents.IsEmpty)
-                _oldestEvent = now + TimeoutDuration;
-            _timedFileEvents.PushBack(new TimedFileEvent(now + TimeoutDuration, eventData));
+            _timedFileEvents.PushBack(new TimedFileEvent(DateTime.Now + TimeoutDuration, eventData));
         }
 
         private void OnFileDeletedCallback(object sender, FileSystemEventArgs e)
         {
+            if (e.FullPath.EndsWith(".assetdat"))
+                return;
+
             if (!TryGetLocalPath(e.FullPath, out string? localPath))
             {
                 EdLog.Assets.Warning("Failed to handle deleted file callback because no local path was found for '{p}'", e.FullPath);
@@ -353,22 +282,6 @@ namespace PrimaryEditor.Assets.Filesystem
             DateTime now = DateTime.Now;
 
             using var lockScope = _lock.EnterScope();
-
-            for (int i = 0; i < _timedFileEvents.Count; i++)
-            {
-                TimedFileEvent fileEvent = _timedFileEvents[i];
-                if (fileEvent.Timeout >= now && fileEvent.EventData.EventType == FileEventType.Created)
-                {
-                    if (!IsNewFileActuallyUnique(eventData.LocalFilePath, fileEvent.EventData.LocalFilePath))
-                    {
-                        _timedFileEvents[i] = new TimedFileEvent(fileEvent.Timeout, new FileEvent(eventData.LocalFilePath, fileEvent.EventData.LocalFilePath, FileEventType.Moved));
-                        return;
-                    }
-                }
-            }
-
-            if (_timedFileEvents.IsEmpty)
-                _oldestEvent = now + TimeoutDuration;
             _timedFileEvents.PushBack(new TimedFileEvent(now + TimeoutDuration, eventData));
         }
 
@@ -403,6 +316,8 @@ namespace PrimaryEditor.Assets.Filesystem
 
         public override string WorkingDirectory => _workingDirectory;
         public override string NamespaceKey => _namespaceKey;
+
+        public FilesystemStructure Structure => _structure;
 
         public bool AreFileUpdatesAvailable => !_timedFileEvents.IsEmpty && _oldestEvent < DateTime.Now;
 

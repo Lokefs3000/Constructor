@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Primary.Assets.Types;
 using Primary.Collections;
+using Primary.Common;
 using PrimaryEditor.Assets.Serialization;
 using PrimaryEditor.Project;
 
@@ -23,56 +24,67 @@ namespace PrimaryEditor.Assets
         {
             if (File.Exists(s_registryFile))
             {
-                AssocationsJson json;
-                try
+                using Stream? inputStream = FileUtility.TryWaitOpenNoThrow(s_registryFile, FileMode.Open, FileAccess.Read, FileShare.Read);
+                if (inputStream == null)
                 {
-                    json = JsonSerializer.Deserialize(File.ReadAllText(s_registryFile), AssocationsJsonContext.Default.AssocationsJson)!;
-                }
-                catch (Exception ex)
-                {
-                    EdLog.Assets.Error(ex, "Failed to read assocations from disk!");
+                    EdLog.Assets.Error("Failed to open file stream '{f}' for reading registry data", s_registryFile);
+                    FileUtility.TryDelete(s_registryFile);
                     return;
                 }
 
-                if (json.Version != PhysicalFileJson.FileVersion)
-                {
-                    EdLog.Assets.Error("Incorrect assocations version '{v}'", json.Version);
-                    return;
-                }
+                using DataReader serializer = new DataReader(inputStream);
 
-                foreach (var (key, value) in json.Assocations)
+                if (serializer.ReadVersionHeader() != CurrentVersion)
+                    throw new Exception("Invalid version in registry data");
+
+                using RentedList<AssetId> dependencies = new RentedList<AssetId>();
+                while (!serializer.IsAtEndOfStream)
                 {
-                    MakeAssociations(key, value);
+                    AssetId assetId = (AssetId)serializer.ReadGuid()!.Value;
+
+                    dependencies.Clear();
+                    while (serializer.LeadingByte != '\n')
+                    {
+                        dependencies.Add((AssetId)serializer.ReadGuid()!.Value);
+                    }
+
+                    serializer.ReadNewLine();
+
+                    MakeAssociations(assetId, dependencies.AsSpan());
                 }
             }
         }
 
         internal void SaveAssociationsToDisk()
         {
-            AssocationsJson data = new AssocationsJson();
-
-            using RentedList<KeyValuePair<AssetId, AssetId[]>> assocations = new RentedList<KeyValuePair<AssetId, AssetId[]>>();
-            foreach (var (key, value) in _assocations)
+            using Stream? outputStream = FileUtility.TryWaitOpenNoThrow(s_registryFile, FileMode.Create, FileAccess.Write, FileShare.None);
+            if (outputStream == null)
             {
-                using (value.Lock.EnterScope())
+                EdLog.Assets.Error("Failed to open file stream '{f}' for writing registry data", s_registryFile);
+                FileUtility.TryDelete(s_registryFile);
+                return;
+            }
+
+            using DataWriter serializer = new DataWriter(outputStream);
+
+            serializer.WriteVersionHeader(CurrentVersion);
+
+            foreach (var (id, data) in _assocations)
+            {
+                using (data.Lock.EnterScope())
                 {
-                    if (value.Dependencies.Count == 0)
-                        continue;
+                    if (data.Dependencies.Count > 0)
+                    {
+                        serializer.WriteValue(id);
 
-                    assocations.Add(new KeyValuePair<AssetId, AssetId[]>(key, [.. value.Dependencies]));
+                        foreach (AssetId dependency in data.Dependencies)
+                        {
+                            serializer.WriteValue(dependency);
+                        }
+
+                        serializer.FinishLine();
+                    }
                 }
-            }
-
-            data.Assocations = assocations.ToArray();
-
-            try
-            {
-                File.WriteAllText(s_registryFile, JsonSerializer.Serialize(data, AssocationsJsonContext.Default.AssocationsJson));
-            }
-            catch (Exception ex)
-            {
-                EdLog.Assets.Error(ex, "Failed to read file remappings from disk!");
-                throw;
             }
         }
 
@@ -222,7 +234,8 @@ namespace PrimaryEditor.Assets
             return default;
         }
 
-        private static string s_registryFile => Path.Combine(ProjectData.Instance.Paths.LibrarySavedFolder, "Assocations.json");
+        private static string s_registryFile => Path.Combine(ProjectData.Instance.Paths.LibrarySavedFolder, "AssociatedFiles.dat");
+        private const int CurrentVersion = 1;
     }
 
     public readonly record struct AssociationData(Lock Lock, HashSet<AssetId> Dependencies, HashSet<AssetId> Dependents);

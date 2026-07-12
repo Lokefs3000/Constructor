@@ -1,32 +1,26 @@
 ﻿using System.Runtime.Versioning;
-using TerraFX.Interop.DirectX;
-using TerraFX.Interop.Windows;
-
-using static TerraFX.Interop.DirectX.D3D12_FENCE_FLAGS;
+using Silk.NET.Core.Native;
+using Silk.NET.Direct3D12;
 
 namespace Primary.Rendering.D3D12
 {
     [SupportedOSPlatform("windows")]
     internal unsafe sealed class QueueFence : IDisposable
     {
-        private ID3D12Fence* _frameFence;
+        private ComPtr<ID3D12Fence> _frameFence;
         private ulong _frameFenceValue;
         private ManualResetEventSlim _frameWaitEvent;
         private bool disposedValue;
 
         internal QueueFence(NRDDevice device)
         {
-            ID3D12Fence* ptr = null;
-
-            HRESULT hr = device.Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, UuidOf.Get<ID3D12Fence>(), (void**)&ptr);
-
-            if (hr.FAILED)
+            HResult hr = device.Device->CreateFence(0, FenceFlags.None, out _frameFence);
+            if (hr.IsFailure)
             {
                 device.RHIDevice.FlushPendingMessages();
                 throw new NotImplementedException("Add error message");
             }
 
-            _frameFence = ptr;
             _frameFenceValue = 0;
             _frameWaitEvent = new ManualResetEventSlim(false);
         }
@@ -42,8 +36,7 @@ namespace Primary.Rendering.D3D12
                     _frameWaitEvent.Dispose();
                 }
 
-                if (_frameFence != null)
-                    _frameFence->Release();
+                _frameFence.Dispose();
 
                 disposedValue = true;
             }
@@ -67,9 +60,9 @@ namespace Primary.Rendering.D3D12
 
         internal void Wait()
         {
-            if (_frameFence->GetCompletedValue() < _frameFenceValue)
+            if (_frameFence.GetCompletedValue() < _frameFenceValue)
             {
-                _frameFence->SetEventOnCompletion(_frameFenceValue, HANDLE.NULL);
+                _frameFence.SetEventOnCompletion(_frameFenceValue, null);
             }
         }
     }

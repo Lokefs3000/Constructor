@@ -50,7 +50,7 @@ namespace Primary.Rendering
 
         public RenderingManager()
         {
-            _graphicsDevice = RHIDeviceFactory.CreateDefaultApi(new RHIDeviceDescription { EnableValidation = Engine.IsDebugBuild && !AppArguments.HasArgument("--r-nodebug") }, EngLog.RHI);
+            _graphicsDevice = RHIDeviceFactory.CreateDefaultApi(new RHIDeviceDescription { EnableValidation = Engine.IsDebugBuild && !AppArguments.HasArgument("rhi-nodebug") }, EngLog.RHI);
 
             _debugManager = new DebugManager();
             _octreeManager = new OctreeManager();

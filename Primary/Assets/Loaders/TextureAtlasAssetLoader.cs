@@ -26,7 +26,7 @@ namespace Primary.Assets.Loaders
             return new TextureAtlasAsset(textureAtlas);
         }
 
-        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
+        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, string localPath, BundleReader? bundleToReadFrom)
         {
             if (asset is not TextureAtlasAsset textureAtlas)
                 throw new ArgumentException(null, nameof(asset));
@@ -69,7 +69,7 @@ namespace Primary.Assets.Loaders
             catch (Exception ex)
             {
                 textureAtlasData.UpdateAssetFailed(textureAtlas);
-                EngLog.Assets.Error(ex, "Failed to load texture atlas: {name}", sourcePath);
+                EngLog.Assets.Error(ex, "Failed to load texture atlas: {name}", localPath);
             }
         }
     }

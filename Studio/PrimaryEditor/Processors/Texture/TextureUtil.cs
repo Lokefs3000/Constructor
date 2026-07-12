@@ -56,7 +56,7 @@ namespace Editor.Processors.Texture
 
                                 throw new Exception($"Failed to load png: {filePath} because: {str}");
                             }
-
+      
                             ScopedPtr<Vector128<float>> pixelData = ScopedMemory.Allocate<Vector128<float>>(64, bitmap.Width * bitmap.Height);
 
                             int count = (int)(bitmap.Width * bitmap.Height);

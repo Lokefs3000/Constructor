@@ -1,0 +1,26 @@
+texture = "Editor/UI/Icons/ContextMenu/ContextMenuIcons.png"
+
+[[sprites]]
+name = "Cut"
+offset = [0, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Copy"
+offset = [32, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Paste"
+offset = [64, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Delete"
+offset = [96, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Rename"
+offset = [128, 0]
+size = [32, 32]

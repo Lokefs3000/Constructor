@@ -100,6 +100,12 @@ struct MSDF_EdgeData
 	msdfgen::Point2* Points;
 };
 
+struct MSDF_KernData
+{
+	int X;
+	int Y;
+};
+
 #pragma pack(pop)
 
 //#define ConvertToPoint2(p) msdfgen::Point2(p.FixedX / (double)SzFontPoint::DecimalPlaces, p.FixedY / (double)SzFontPoint::DecimalPlaces)
@@ -287,6 +293,26 @@ extern "C"
 		*lineHeight = (face->Face->ascender - face->Face->descender);
 		*underlineY = -face->Face->underline_position;
 		*fontHeight = face->Face->height;
+	}
+
+	__declspec(dllexport) bool MSDF_GetKerning(MSDF_FontFace* face, uint32_t left, uint32_t right, MSDF_KernData* kernData)
+	{
+		uint32_t leftGlyph = FT_Get_Char_Index(face->Face, left);
+		uint32_t rightGlyph = FT_Get_Char_Index(face->Face, right);
+
+		if (leftGlyph == 0 || rightGlyph == 0)
+		{
+			return false;
+		}
+
+		FT_Vector vector;
+		if (FT_Get_Kerning(face->Face, leftGlyph, rightGlyph, FT_KERNING_UNSCALED, &vector))
+		{
+			return false;
+		}
+
+		*kernData = MSDF_KernData{ vector.x, vector.y };
+		return true;
 	}
 
 	__declspec(dllexport) FT_MM_Var* MSDF_GetVarFontData(MSDF_FontFace* face, MSDF_VarFontMetrics* metrics)

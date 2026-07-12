@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Pooling;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Primary.GUI.ImGui
@@ -80,10 +81,11 @@ namespace Primary.GUI.ImGui
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct ImGuiVertex
+    public record struct ImGuiVertex(ImGuiVector2 Position, ImGuiVector2 UV, uint Color);
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public record struct ImGuiVector2(float X, float Y)
     {
-        public Vector2 Position;
-        public Vector2 UV;
-        public uint Color;
+        public static implicit operator ImGuiVector2(Vector2 vector) => Unsafe.ReadUnaligned<ImGuiVector2>(ref Unsafe.As<Vector2, byte>(ref vector));
     }
 }

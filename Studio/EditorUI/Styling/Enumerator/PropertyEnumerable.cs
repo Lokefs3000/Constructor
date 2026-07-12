@@ -8,32 +8,38 @@ using Primary.Common;
 
 namespace EditorUI.Styling.Enumerator
 {
-    public readonly record struct PropertyEnumerable(WidgetCachedData CachedData, ushort TriggerMask, ushort RefTriggerMask) : IEnumerable<StyleKey>
+    public readonly record struct PropertyEnumerable(WidgetCachedData CachedData, ushort TriggerMask, ushort RefTriggerMask) : IEnumerable<StylePropertyData>
     {
         public Enumerator GetEnumerator() => new Enumerator(CachedData, TriggerMask, RefTriggerMask);
 
-        IEnumerator<StyleKey> IEnumerable<StyleKey>.GetEnumerator() => GetEnumerator();
+        IEnumerator<StylePropertyData> IEnumerable<StylePropertyData>.GetEnumerator() => GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-        public record struct Enumerator : IEnumerator<StyleKey>
+        public record struct Enumerator : IEnumerator<StylePropertyData>
         {
             private readonly WidgetCachedData _cachedData;
-            private readonly int _mask;
+
+            private readonly int _currentMask;
+            private readonly int _referenceMask;
 
             private readonly bool _returnAll;
 
             private int _index;
+            private ushort _triggerMask;
 
-            private StyleKey _value;
+            private StylePropertyData _value;
 
             public Enumerator(WidgetCachedData cachedData, ushort triggerMask, ushort refTriggerMask)
             {
                 _cachedData = cachedData;
-                _mask = triggerMask | refTriggerMask;
 
-                _returnAll = Flags.HasFlag(triggerMask, StylesheetContext.ReturnAll);
+                _currentMask = triggerMask;
+                _referenceMask = refTriggerMask;
+
+                _returnAll = Flags.HasFlag(refTriggerMask, StylesheetContext.ReturnAll);
 
                 _index = cachedData.Properties.IsEmpty ? -1 : 0;
+                _triggerMask = triggerMask;
 
                 _value = default;
             }
@@ -56,9 +62,11 @@ namespace EditorUI.Styling.Enumerator
                 while (_index < _cachedData.Properties.Length)
                 {
                     PropertyData propertyData = _cachedData.Properties[_index++];
-                    if (!propertyData.Flags.HasFlags(PropertyDataFlags.IsEditable) && (_returnAll || (_mask == 0 ? propertyData.TriggerMask == 0 : Flags.HasEither(propertyData.TriggerMask, _mask))))
+
+                    if (propertyData.Methods.SetDirect != null && !propertyData.Flags.HasFlag(PropertyDataFlags.IsEditable)/* &&
+                        (_returnAll || (_mask == 0 ? propertyData.TriggerMask == -1 : Flags.HasEither(propertyData.TriggerMask, _mask)))*/)
                     {
-                        _value = new StyleKey(propertyData.Name, propertyData.TriggerMask);
+                        _value = new StylePropertyData(propertyData.Name, propertyData.StyleFriendlyName, _triggerMask);
 
                         if (_index == _cachedData.Properties.Length)
                             _index = -1;
@@ -79,8 +87,13 @@ namespace EditorUI.Styling.Enumerator
                 _value = default;
             }
 
-            public readonly StyleKey Current => _value;
+            public readonly StylePropertyData Current => _value;
             readonly object IEnumerator.Current => Current;
         }
+    }
+
+    public readonly record struct StylePropertyData(string PropertyName, string StyleName, ushort TriggerMask)
+    {
+        public StyleKey AsStyleKey() => new StyleKey(StyleName);
     }
 }

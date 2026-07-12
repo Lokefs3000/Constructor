@@ -1,11 +1,15 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using Primary.Collections.ReadOnly.Display;
 
 namespace Primary.Collections.ReadOnly
 {
+    [DebuggerTypeProxy(typeof(RODynamicCircularBufferDisplay<>))]
+    [DebuggerDisplay("Count = {Count}")]
     public readonly record struct RODynamicCircularBuffer<T> : IEnumerable<T>, IReadOnlyCollection<T>
     {
         private readonly DynamicCircularBuffer<T> _array;

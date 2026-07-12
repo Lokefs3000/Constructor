@@ -11,24 +11,15 @@ namespace EditorUI.Assets
 {
     public sealed class FontFamily : IDisposable
     {
-        private readonly ImmutableArray<FontStyleData?> _styleDatas;
-        private readonly ImmutableArray<FontGlyphContext?> _glyphContexts;
+        private ImmutableArray<FontStyleData?> _styleDatas;
+        private ImmutableArray<FontGlyphContext?> _glyphContexts;
 
         private readonly FontFamilySetup _setup;
 
         private bool _disposedValue;
 
-        internal FontFamily(ImmutableArray<FontStyleData?> styleDatas, ImmutableArray<FontGlyphContext?> glyphContexts, FontFamilySetup setup)
+        internal FontFamily(FontFamilySetup setup)
         {
-            Debug.Assert(styleDatas.Length == StyleDataLength);
-            Debug.Assert(glyphContexts.Length == styleDatas.Length / StylesPerGlyphContext);
-
-            Guard.IsNotNull(styleDatas[(int)FontWeight.Normal]);
-            Guard.IsNotNull(glyphContexts[(int)FontStyle.Normal]);
-
-            _styleDatas = styleDatas;
-            _glyphContexts = glyphContexts;
-
             _setup = setup;
         }
 
@@ -38,9 +29,14 @@ namespace EditorUI.Assets
             {
                 if (disposing)
                 {
+                    FontRenderer fontRenderer = UIManager.Instance.FontRenderer;
                     foreach (FontStyleData? styleData in _styleDatas)
                     {
-                        styleData?.Dispose();
+                        if (styleData != null)
+                        {
+                            fontRenderer.CancelFontStyleRender(styleData);
+                            styleData.Dispose();
+                        }
                     }
 
                     foreach (FontGlyphContext? glyphContext in _glyphContexts)
@@ -59,12 +55,27 @@ namespace EditorUI.Assets
             GC.SuppressFinalize(this);
         }
 
+        internal void SetInternalData(ImmutableArray<FontStyleData?> styleDatas, ImmutableArray<FontGlyphContext?> glyphContexts)
+        {
+            Debug.Assert(styleDatas.Length == StyleDataLength);
+            Debug.Assert(glyphContexts.Length == styleDatas.Length / StylesPerGlyphContext);
+
+            Guard.IsNotNull(styleDatas[(int)FontWeight.Normal]);
+            Guard.IsNotNull(glyphContexts[(int)FontStyle.Normal]);
+
+            _styleDatas = styleDatas;
+            _glyphContexts = glyphContexts;
+        }
+
+        public FontStyleData GetFontStyle(FontStyle style, FontWeight weight) => _styleDatas[(int)style * 9 + (int)weight] ?? _styleDatas[(int)FontWeight.Normal]!;
         internal FontGlyphContext GetGlyphContext(FontStyle style) => _glyphContexts[(int)style] ?? _glyphContexts[0]!;
 
         public FontFamilySetup Setup => _setup;
 
         internal const int StyleDataLength = 9 * 2; // weights * styles
         internal const int StylesPerGlyphContext = 9; // weights * styles
+
+        internal const int WeightCount = 9;
     }
 
     public readonly record struct FontFamilySetup(int MinScale, double PxRange, double MiterLimit, int PaddingX, int PaddingY);

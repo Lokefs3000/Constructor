@@ -26,6 +26,7 @@ namespace Primary.Profiling
 
         private CircularBuffer<TrackedGCMarker> _markers;
         private HashSet<TrackedGCHandle> _handles;
+        private List<TrackedGCSegment> _segments;
 
         private EventStartData _lastGcStartData;
         private long _lastGcTimestamp;
@@ -48,6 +49,7 @@ namespace Primary.Profiling
 
             _markers = new CircularBuffer<TrackedGCMarker>(MaxTrackedMarkerCount);
             _handles = new HashSet<TrackedGCHandle>();
+            _segments = new List<TrackedGCSegment>();
 
             _lastGcStartData = default;
             _lastGcTimestamp = -1;
@@ -105,7 +107,7 @@ namespace Primary.Profiling
                                     fullTime += span;
                                 }
 
-                                _markers.PushBack(new TrackedGCMarker((byte)_lastGcStartData.Depth, _lastGcStartData.Reason, _lastGcStartData.Type, (int)fullTime.Ticks, Time.FrameIndex));
+                                _markers.PushBack(new TrackedGCMarker((byte)_lastGcStartData.Depth, _lastGcStartData.Reason, _lastGcStartData.Type, Stopwatch.GetTimestamp() - fullTime.Ticks, (int)fullTime.Ticks, Time.FrameIndex));
                             }
                             else
                                 EngLog.Core.Warning("Recieved GC {ev1} event before any start {ev2}", EventType.End, EventType.Start);
@@ -124,6 +126,33 @@ namespace Primary.Profiling
                             _handles.Remove(new TrackedGCHandle(updateData.SetGCHandleData.HandleId, default));
                             break;
                         }
+                    case EventType.CreateSegment:
+                        {
+                            int targetIndex = 0;
+                            for (; targetIndex < _segments.Count; ++targetIndex)
+                            {
+                                if (_segments[targetIndex].Address > updateData.CreateSegment.Address)
+                                {
+                                    break;
+                                }
+                            }
+
+                            _segments.Insert(targetIndex, new TrackedGCSegment(updateData.CreateSegment.Address, updateData.CreateSegment.Size, updateData.CreateSegment.Type));
+                            break;
+                        }
+                    case EventType.FreeSegment:
+                        {
+                            for (int i = 0; i < _segments.Count; ++i)
+                            {
+                                if (_segments[i].Address == updateData.FreeSegment.Address)
+                                {
+                                    _segments.RemoveAt(i);
+                                    break;
+                                }
+                            }
+
+                            break;
+                        }
                 }
             }
         }
@@ -134,7 +163,8 @@ namespace Primary.Profiling
         public long CurrentMemoryUsage => _currentMemoryUsage;
 
         public ROCircularBuffer<TrackedGCMarker> Markers => _markers;
-        public IReadOnlySet<TrackedGCHandle> Handles => _handles;
+        public ROHashSet<TrackedGCHandle> Handles => _handles;
+        public ROList<TrackedGCSegment> Segments => _segments;
 
         public const int MaxTrackedMarkerCount = 30;
 
@@ -164,9 +194,10 @@ namespace Primary.Profiling
                     if (eventData.Payload == null || eventData.PayloadNames == null)
                         return;
 
-                    const int ExpectedValues = 3;
+                    const int ExpectedValues = 4;
                     int assignedValues = 0;
 
+                    int count = 0;
                     int depth = 0;
                     GCMarkerReason reason = GCMarkerReason.Empty;
                     GCMarkerType type = GCMarkerType.Background;
@@ -179,7 +210,13 @@ namespace Primary.Profiling
                         if (payloadName == null || payloadValue == null)
                             continue;
 
-                        if (payloadName == "Depth")
+                        if (payloadName == "Count")
+                        {
+                            count = (int)(uint)payloadValue;
+                            if (++assignedValues == ExpectedValues)
+                                break;
+                        }
+                        else if (payloadName == "Depth")
                         {
                             depth = (int)(uint)payloadValue;
                             if (++assignedValues == ExpectedValues)
@@ -200,11 +237,36 @@ namespace Primary.Profiling
                     }
                     
                     if (assignedValues == ExpectedValues)
-                        _profiler.AddNewEvent(new EventStartData(depth, reason, type, GC.GetTotalPauseDuration()));
+                        _profiler.AddNewEvent(new EventStartData(count, depth, reason, type));
                 }
                 else if (eventData.EventId == GCEnd_V1)
                 {
-                    _profiler.AddNewEvent(new EventEndData(GC.GetTotalPauseDuration()));
+                    if (eventData.Payload == null || eventData.PayloadNames == null)
+                        return;
+
+                    const int ExpectedValues = 1;
+                    int assignedValues = 0;
+
+                    int count = 0;
+
+                    for (int i = 0; i < eventData.Payload.Count; i++)
+                    {
+                        string? payloadName = eventData.PayloadNames[i];
+                        object? payloadValue = eventData.Payload[i];
+
+                        if (payloadName == null || payloadValue == null)
+                            continue;
+
+                        if (payloadName == "Count")
+                        {
+                            count = (int)(uint)payloadValue;
+                            if (++assignedValues == ExpectedValues)
+                                break;
+                        }
+                    }
+
+                    if (assignedValues == ExpectedValues)
+                        _profiler.AddNewEvent(new EventEndData(count, GC.GetTotalPauseDuration()));
                 }
                 else if (eventData.EventId == GCFinalizersBegin_V1)
                 {
@@ -279,12 +341,86 @@ namespace Primary.Profiling
                     if (assignedValues == ExpectedValues)
                         _profiler.AddNewEvent(new EventDestroyGCHandleData(handleId));
                 }
+                else if (eventData.EventId == GCCreateSegment_V1)
+                {
+                    if (eventData.Payload == null || eventData.PayloadNames == null)
+                        return;
+
+                    const int ExpectedValues = 3;
+                    int assignedValues = 0;
+
+                    nuint address = 0;
+                    ulong size = 0;
+                    GCSegmentType segmentType = 0;
+
+                    for (int i = 0; i < eventData.Payload.Count; i++)
+                    {
+                        string? payloadName = eventData.PayloadNames[i];
+                        object? payloadValue = eventData.Payload[i];
+
+                        if (payloadName == null || payloadValue == null)
+                            continue;
+
+                        if (payloadName == "Address")
+                        {
+                            address = (nuint)(ulong)payloadValue;
+                            if (++assignedValues == ExpectedValues)
+                                break;
+                        }
+                        else if (payloadName == "Size")
+                        {
+                            size = (ulong)payloadValue;
+                            if (++assignedValues == ExpectedValues)
+                                break;
+                        }
+                        else if (payloadName == "Type")
+                        {
+                            segmentType = (GCSegmentType)(uint)payloadValue;
+                            if (++assignedValues == ExpectedValues)
+                                break;
+                        }
+                    }
+
+                    if (assignedValues == ExpectedValues)
+                        _profiler.AddNewEvent(new EventCreateSegment(address, size, segmentType));
+                }
+                else if (eventData.EventId == GCFreeSegment_V1)
+                {
+                    if (eventData.Payload == null || eventData.PayloadNames == null)
+                        return;
+
+                    const int ExpectedValues = 1;
+                    int assignedValues = 0;
+
+                    nuint address = 0;
+
+                    for (int i = 0; i < eventData.Payload.Count; i++)
+                    {
+                        string? payloadName = eventData.PayloadNames[i];
+                        object? payloadValue = eventData.Payload[i];
+
+                        if (payloadName == null || payloadValue == null)
+                            continue;
+
+                        if (payloadName == "Address")
+                        {
+                            address = (nuint)(ulong)payloadValue;
+                            if (++assignedValues == ExpectedValues)
+                                break;
+                        }
+                    }
+
+                    if (assignedValues == ExpectedValues)
+                        _profiler.AddNewEvent(new EventFreeSegment(address));
+                }
             }
 
             private const int GCKeyword = 0x0000001;
 
             private const int GCStart_V2 = 1;
             private const int GCEnd_V1 = 2;
+            private const int GCCreateSegment_V1 = 5;
+            private const int GCFreeSegment_V1 = 6;
             private const int GCFinalizersBegin_V1 = 14;
             private const int GCFinalizersEnd_V1 = 13;
             private const int SetGCHandle = 30;
@@ -300,6 +436,8 @@ namespace Primary.Profiling
             [FieldOffset(9)] public readonly EventEndData EndData;
             [FieldOffset(9)] public readonly EventSetGCHandleData SetGCHandleData;
             [FieldOffset(9)] public readonly EventDestroyGCHandleData DestroyGCHandleData;
+            [FieldOffset(9)] public readonly EventCreateSegment CreateSegment;
+            [FieldOffset(9)] public readonly EventFreeSegment FreeSegment;
 
             public EventUpdateData(EventType type)
             {
@@ -335,17 +473,35 @@ namespace Primary.Profiling
                 DestroyGCHandleData = destroyGCHandleData;
             }
 
+            public EventUpdateData(EventCreateSegment createSegment)
+            {
+                Type = EventType.CreateSegment;
+                Timestamp = Stopwatch.GetTimestamp();
+                CreateSegment = createSegment;
+            }
+
+            public EventUpdateData(EventFreeSegment freeSegment)
+            {
+                Type = EventType.FreeSegment;
+                Timestamp = Stopwatch.GetTimestamp();
+                FreeSegment = freeSegment;
+            }
+
             public static implicit operator EventUpdateData(EventType type) => new EventUpdateData(type);
             public static implicit operator EventUpdateData(EventStartData startData) => new EventUpdateData(startData);
             public static implicit operator EventUpdateData(EventEndData endData) => new EventUpdateData(endData);
             public static implicit operator EventUpdateData(EventSetGCHandleData setGCHandleData) => new EventUpdateData(setGCHandleData);
             public static implicit operator EventUpdateData(EventDestroyGCHandleData destroyGCHandleData) => new EventUpdateData(destroyGCHandleData);
+            public static implicit operator EventUpdateData(EventCreateSegment createSegment) => new EventUpdateData(createSegment);
+            public static implicit operator EventUpdateData(EventFreeSegment freeSegment) => new EventUpdateData(freeSegment);
         }
 
-        private readonly record struct EventStartData(int Depth, GCMarkerReason Reason, GCMarkerType Type, TimeSpan StartTime);
-        private readonly record struct EventEndData(TimeSpan EndTime);
+        private readonly record struct EventStartData(int Count, int Depth, GCMarkerReason Reason, GCMarkerType Type);
+        private readonly record struct EventEndData(int Count, TimeSpan EndTime);
         private readonly record struct EventSetGCHandleData(nint HandleId, GCHandleType Type);
         private readonly record struct EventDestroyGCHandleData(nint HandleId);
+        private readonly record struct EventCreateSegment(nuint Address, ulong Size, GCSegmentType Type);
+        private readonly record struct EventFreeSegment(nuint Address);
 
         private enum EventType : byte
         {
@@ -354,14 +510,20 @@ namespace Primary.Profiling
             FinalizersBegin,
             FinalizersEnd,
             SetGCHandle,
-            DestroyGCHandle
+            DestroyGCHandle,
+            CreateSegment,
+            FreeSegment
         }
     }
 
-    public readonly record struct TrackedGCMarker(byte Generation, GCMarkerReason Reason, GCMarkerType Type, long Duration, int FrameIndex);
+    public readonly record struct TrackedGCMarker(byte Generation, GCMarkerReason Reason, GCMarkerType Type, long Timestamp, long Duration, int FrameIndex);
     public readonly record struct TrackedGCHandle(nint HandleId, GCHandleType Type)
     {
         public override int GetHashCode() => HandleId.GetHashCode();
+    }
+    public readonly record struct TrackedGCSegment(nuint Address, ulong Size, GCSegmentType SegmentType)
+    {
+        public override int GetHashCode() => Address.GetHashCode();
     }
 
     // https://learn.microsoft.com/en-us/dotnet/fundamentals/diagnostics/runtime-garbage-collection-events
@@ -382,5 +544,12 @@ namespace Primary.Profiling
         Background = 0x1,
         BlockingOutside = 0x0,
         BlockingDuring = 0x2
+    }
+
+    public enum GCSegmentType : byte
+    {
+        SmallObjectHeap = 0x0,
+        LargeObjectHeap = 0x1,
+        ReadOnlyHeap = 0x2
     }
 }

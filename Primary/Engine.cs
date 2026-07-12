@@ -14,6 +14,7 @@ using Primary.GUI.ImGui;
 using Primary.Scripting;
 using Primary.Windowing;
 using Primary.Logging;
+using System.Diagnostics;
 
 namespace Primary
 {
@@ -42,6 +43,8 @@ namespace Primary
 
         public Engine(ReadOnlySpan<string> args)
         {
+            Debug.WriteLine("I'm a debug (^u^)!");
+
             s_instance = this;
 
             AppArguments.Parse(args);

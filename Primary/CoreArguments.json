@@ -4,6 +4,26 @@
             "name": "r-force-swapchain-8bit",
             "shorthand": null,
             "type": null
+        },
+        {
+            "name": "d3d12-no-tight-alignment",
+            "shorthand": null,
+            "type": null
+        },
+        {
+            "name": "no-logbook",
+            "shorthand": null,
+            "type": null
+        },
+        {
+            "name": "logbook-max-size",
+            "shorthand": null,
+            "type": "Integer"
+        },
+        {
+            "name": "rhi-nodebug",
+            "shorthand": null,
+            "type": null
         }
     ],
     "includes": []

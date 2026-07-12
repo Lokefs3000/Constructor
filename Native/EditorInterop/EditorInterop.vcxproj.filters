@@ -18,15 +18,6 @@
     <ClCompile Include="SPIRVInterop.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="BCInterop.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="bc7enc_rdo\bc7enc.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="bc7enc_rdo\rgbcx.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="MSDFGenInterop.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -176,18 +167,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bc7enc_rdo\bc7enc.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="bc7enc_rdo\rgbcx.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="bc7enc_rdo\rgbcx_table4.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="bc7enc_rdo\rgbcx_table4_small.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="msdfgen\core\arithmetics.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

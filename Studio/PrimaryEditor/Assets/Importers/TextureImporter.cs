@@ -11,6 +11,7 @@ using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Serialization.Toml;
 using PrimaryEditor.Assets.Exceptions;
+using PrimaryEditor.Assets.Utility;
 using TerraFX.Interop.Windows;
 using Tomlyn;
 
@@ -18,12 +19,9 @@ namespace PrimaryEditor.Assets.Importers
 {
     internal sealed class TextureImporter : IAssetImporter
     {
-        public void ImportFile(AssetPipeline pipeline, AssetId id, Stream inputStream, Stream outputStream, string localPath, string localOutputPath)
+        public void ImportFile(AssetPipeline pipeline, AssetId id, Stream inputStream, Stream outputStream, string localPath, string localOutputPath, bool isTrialImport)
         {
             pipeline.FilesystemManager.SetFileRemap(localPath, null);
-
-            string? configFile = null;
-            bool isLocal = false;
 
             bool isDefaultConfig = false;
 
@@ -58,7 +56,7 @@ namespace PrimaryEditor.Assets.Importers
                 AssetId[] additionalSources = new AssetId[int.PopCount((int)composite.CompositeInfo.Channels)];
                 for (int i = 0, j = 0; i < 4; i++)
                 {
-                    if (composite.CompositeInfo.Channels.HasFlags((TextureCompositeChannel)(1 << i)))
+                    if (composite.CompositeInfo.Channels.HasFlag((TextureCompositeChannel)(1 << i)))
                     {
                         CompositeConfiguration.CompsiteChannel channel = i switch
                         {
@@ -134,11 +132,11 @@ namespace PrimaryEditor.Assets.Importers
             }
             else
             {
-                configFile = pipeline.Configuration.GetFilePathOrLocal(localPath, "Texture", out isLocal);
+                string? configFile = pipeline.Configuration.GetLocalConfigPath(localPath);
                 if (configFile == null)
                 {
-                    // EdLog.Assets.Error("[{file}]: No configuration file found for texture", localPath);
-                    throw new AssetImportException();
+                    pipeline.ReportImportAsIgnored(id, this);
+                    throw new AssetIgnoredException();
                 }
 
                 string? sourceText = FilesystemManager.ReadAllText(configFile);
@@ -154,6 +152,9 @@ namespace PrimaryEditor.Assets.Importers
                 }
                 catch (TomlException ex)
                 {
+                    if (isTrialImport)
+                        throw new AssetIgnoredException();
+
                     EdLog.Assets.Error(ex, "[{file}]: Error occured parsing texture configuration", localPath);
                     throw new AssetImportException();
                 }
@@ -221,15 +222,7 @@ namespace PrimaryEditor.Assets.Importers
 
             if (isDefaultConfig)
             {
-                if (configFile != null && isLocal)
-                {
-                    AssetId configFileId = pipeline.AssetRegistry.GetOrRegisterIdFor(configFile);
-                    pipeline.Associator.MakeAssociation(id, configFileId);
-                }
-                else
-                {
-                    pipeline.Associator.ClearAssociations(id);
-                }
+                pipeline.Associator.ClearAssociations(id);
             }
 
             pipeline.FilesystemManager.SetFileRemap(localPath, localOutputPath);
@@ -259,16 +252,6 @@ namespace PrimaryEditor.Assets.Importers
             }
             else
             {
-                string? configFile = pipeline.Configuration.GetFilePathOrLocal(localPath, "Texture", out bool _);
-                if (configFile == null)
-                    return false;
-
-                string? sourceFile = FilesystemManager.ReadAllText(configFile);
-                if (sourceFile == null)
-                    return false;
-                if (!TomlSerializer.TryDeserialize<TextureConfiguration>(sourceFile, out _, s_tomlOptions))
-                    return false;
-
                 using Stream? stream = FilesystemManager.OpenStream(localPath);
 
                 if (stream == null || stream.Length < Unsafe.SizeOf<TextureHeader>())
@@ -286,6 +269,8 @@ namespace PrimaryEditor.Assets.Importers
                 return true;
             }
         }
+
+        public string UniqueId => "texture";
 
         private static TextureFormat GetFormatToFileEquivalent(TextureImageFormat format) => format switch
         {
@@ -315,7 +300,7 @@ namespace PrimaryEditor.Assets.Importers
         private static readonly TomlSerializerOptions s_tomlOptions = new TomlSerializerOptions
         {
             Converters = [
-                new AssetIdTomlConverter(),
+                new EarlyAssetIdTomlConverter(),
                 new ColorTomlConverter(),
                 new TextureSwizzleConverter()
                 ],

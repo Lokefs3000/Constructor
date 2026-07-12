@@ -15,14 +15,18 @@ namespace EditorUI.Reflection.Cache
         private readonly FrozenDictionary<string, PropertyData> _properties;
         private readonly ImmutableArray<PropertyData> _propertyArray;
 
+        private readonly FrozenDictionary<string, MethodInfo> _callbackMethods;
+
         private readonly ConstructorInfo? _constructor;
 
-        internal WidgetCachedData(Type widgetType, FrozenDictionary<string, PropertyData> properties, ConstructorInfo? constructor)
+        internal WidgetCachedData(Type widgetType, FrozenDictionary<string, PropertyData> properties, FrozenDictionary<string, MethodInfo> callbackMethods, ConstructorInfo? constructor)
         {
             _widgetType = widgetType;
 
             _properties = properties;
             _propertyArray = [.. properties.Values];
+
+            _callbackMethods = callbackMethods;
 
             _constructor = constructor;
         }
@@ -32,6 +36,15 @@ namespace EditorUI.Reflection.Cache
             return _properties.TryGetValue(name, out propertyData);
         }
 
+        public bool TryGetCallbackMethod(string name, [NotNullWhen(true)] out MethodInfo? value)
+        {
+            return _callbackMethods.TryGetValue(name, out value);
+        }
+
         public ImmutableArray<PropertyData> Properties => _propertyArray;
+
+        public ConstructorInfo? Constructor => _constructor;
     }
+
+    public delegate void StyleCallbackDelegate(object target);
 }

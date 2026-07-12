@@ -4,12 +4,12 @@
 DefaultPsInput VertexMain(VsInput input)
 {
     DefaultPsInput output = {
-        float4(mul(transpose(cbGlobalData.Model), float3(input.Position, 1.0)), input.Depth * 0.0001, 1.0),
+        mul(cbGlobalData.Model, float4(input.Position, 0.0, 1.0)),
         input.UV,
         input.UV2,
         input.Tint,
 
-        input.Position,
+        input.Position - input.UV2,
 
         input.DataOffset
     };
@@ -21,18 +21,48 @@ struct RectangleShaderData
 {
     SharedData Shared;
     uint16_t2 BoxSize;
+    uint16_t __pad0;
     float16_t4 CornerRadii;
 }
 
 [pixel]
-float4 PixelMain(DefaultPsInput input) : SV_Target
+PsOutput PixelMain(DefaultPsInput input) : SV_Target
 {
-    RectangleShaderData shaderData = baDataBuffer.Load<RectangleShaderData>(0);
-    return float4(baDataBuffer.Load(9) == 0, 0, 0, 1);
+    RectangleShaderData shaderData = baDataBuffer.Load<RectangleShaderData>(input.DataOffset);
+    SharedData sharedData = shaderData.Shared;
+  
+    float2 fragPos = input.FragPos;
 
-    if (shaderData.CornerRadii.x <= 0.0f)
-        return input.Color;
+    if (sign(shaderData.CornerRadii.x) < 0)
+    {
+        if (sharedData.StrokeWidth > 0)
+        {
+            float outer = sdBox(fragPos, shaderData.BoxSize * 0.5);
+            float inner = sdBox(fragPos, shaderData.BoxSize * 0.5 - sharedData.StrokeWidth);
 
-    float sdf = sdRoundedBox(input.FragPos, shaderData.BoxSize, shaderData.CornerRadii);
-    return float4(input.Color.rgb, input.Color.a * SmoothSDF(sdf));
+            float diff = opSubtraction(inner, outer);
+
+            PsOutput output = { lerp(input.Color, sharedData.StrokeColor, clamp(-sign(diff), 0.0, 1.0))/*, input.Position.z*/ };
+            return output;
+        }
+
+        PsOutput output = { input.Color/*, input.Position.z*/ };
+        return output;
+    }
+
+    if (sharedData.StrokeWidth > 0)
+    {
+        float outer = sdRoundedBox(fragPos, shaderData.BoxSize * 0.5, shaderData.CornerRadii);
+        float inner = sdRoundedBox(fragPos, shaderData.BoxSize * 0.5 - sharedData.StrokeWidth, shaderData.CornerRadii);
+
+        float diff = opSubtraction(inner, outer);
+
+        float4 color = lerp(input.Color, sharedData.StrokeColor, clamp(SmoothSDF(diff), 0.0, 1.0));
+        PsOutput output = { float4(color.rgb, color.a * SmoothSDF(outer))/*, input.Position.z*/ };
+        return output;
+    }
+
+    float sdf = sdRoundedBox(fragPos, shaderData.BoxSize * 0.5, shaderData.CornerRadii);
+    PsOutput output = { float4(input.Color.rgb, input.Color.a * SmoothSDF(sdf))/*, input.Position.z*/ };
+    return output;
 }
