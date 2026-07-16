@@ -45,11 +45,6 @@ namespace PrimaryEditor.Windows
             _debugRenderer = null;
         }
 
-        protected override void PaintOverlay(ref readonly PainterContext painter)
-        {
-            // _debugRenderer?.Visualize(in painter, RootWidget);
-        }
-
         public override void UpdateData()
         {
             _graphContentView.Update();

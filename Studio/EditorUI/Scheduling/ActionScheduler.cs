@@ -19,19 +19,19 @@ namespace EditorUI.Scheduling
             if (_actions.Count > 0)
             {
                 using RentedArray<ScheduledAction> actions = RentedArray<ScheduledAction>.Rent(_actions.Count);
+                
                 _actions.CopyTo(actions.Span);
+                _actions.Clear();
 
                 actions.Span.Sort(static (x, y) => y.Priority.CompareTo(x.Priority));
 
-                foreach (ScheduledAction action in _actions)
+                foreach (ScheduledAction action in actions)
                 {
                     if (action.Key != null)
                         ((Action<object, object?>)action.Action)(action.Key, action.UserData);
                     else
                         ((Action<object?>)action.Action)(action.UserData);
                 }
-
-                _actions.Clear();
             }
         }
 

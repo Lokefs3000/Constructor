@@ -26,7 +26,6 @@ namespace PrimaryEditor.Windows.UIDesigner
             TextureAtlasAsset widgetTypesAtlas = AssetManager.LoadAsset<TextureAtlasAsset>("Editor/UI/Icons/ContextMenu/UIDesignerWidgets.atlas").WaitIfNotLoaded();
 
             _viewportContextMenu = new ContextMenu();
-            _viewportContextMenu.StylesheetProvider.AddStylesheet(AssetManager.LoadAsset<StylesheetAsset>("Editor/UI/Stylesheets/Main.style").WaitIfNotLoaded().Stylesheet!);
             PopupMenuMenu addMenu = _viewportContextMenu.AddMenu("add", "Add");
             _viewportContextMenu.AddSeparator();
             _viewportContextMenu.AddAction("cut", "Cut", genericAtlas.TryFindSpriteOrNull("Cut"));

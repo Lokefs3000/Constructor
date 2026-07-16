@@ -30,8 +30,8 @@ namespace PrimaryEditor.Windows.ContentBrowser
             Text = info.Name;
 
             TextureAtlasAsset textureAtlas = AssetManager.LoadAsset<TextureAtlasAsset>("Editor/UI/Icons/DefaultFileIcons.atlas").WaitIfNotLoaded();
-            _folderClosedIcon = textureAtlas.TryFindSpriteOrNull("FolderClosed");
-            _folderOpenIcon = textureAtlas.TryFindSpriteOrNull("FolderOpen");
+            _folderClosedIcon = textureAtlas.TryFindSpriteOrNull("FolderClosed20");
+            _folderOpenIcon = textureAtlas.TryFindSpriteOrNull("FolderOpen20");
         }
 
         protected override void PaintSelf(ref readonly PainterContext painter, Vector2 availableSize)
@@ -46,14 +46,14 @@ namespace PrimaryEditor.Windows.ContentBrowser
             painter.PopTranslate();
         }
 
-        public override void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public override bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
             if (inputEvent.EventType == UIInputEventType.MouseDown && inputEvent.Mouse.Button == MouseButton.Left && !InputSystem.Keyboard.KeyModifiers.HasAny(KeyModifier.Control))
             {
                 _window.ScopeToDirectory(_localPath);
             }
 
-            base.HandleEventSelf(in inputEvent);
+            return base.HandleEventSelf(in inputEvent);
         }
 
         public string LocalPath => _localPath;

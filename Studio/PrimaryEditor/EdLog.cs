@@ -8,6 +8,7 @@ namespace PrimaryEditor
 {
     internal static class EdLog
     {
+        internal static readonly ILogger Testing = CreateLogger();
         internal static readonly ILogger Assets = CreateLogger();
         internal static readonly ILogger Reflection = CreateLogger();
         internal static readonly ILogger Inspector = CreateLogger();

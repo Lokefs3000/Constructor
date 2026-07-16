@@ -254,6 +254,121 @@ namespace Primary
             return defaultValue;
         }
 
+        public static bool TrySetValue<T>(string arg, T value) where T : notnull
+        {
+            if (_argumentFormats == null)
+                DeserializeArguments();
+
+            if (_argumentFormats!.TryGetValue($"--{arg}", out ArgumentFormat? format))
+            {
+                switch (format.Type.Literal)
+                {
+                    case ArgumentTypeLiteral.Null: return false;
+                    case ArgumentTypeLiteral.Integer:
+                        {
+                            if (format.Type.IsArray && typeof(T).IsArray)
+                            {
+                                if (typeof(T).GetElementType() == typeof(long))
+                                {
+                                    _arguments[arg] = value;
+                                    return true;
+                                }
+                            }
+                            else
+                            {
+                                if (typeof(T) == typeof(long))
+                                {
+                                    _arguments[arg] = value;
+                                    return true;
+                                }    
+                            }
+                            break;
+                        }
+                    case ArgumentTypeLiteral.Number:
+                        {
+                            if (typeof(T).IsArray)
+                            {
+                                if (format.Type.IsArray && typeof(T).GetElementType() == typeof(double))
+                                {
+                                    _arguments[arg] = value;
+                                    return true;
+                                }
+                            }
+                            else
+                            {
+                                if (typeof(T) == typeof(double))
+                                {
+                                    _arguments[arg] = value;
+                                    return true;
+                                }
+                            }
+                            break;
+                        }
+                    case ArgumentTypeLiteral.String:
+                        {
+                            if (typeof(T).IsArray)
+                            {
+                                if (format.Type.IsArray && typeof(T).GetElementType() == typeof(string))
+                                {
+                                    _arguments[arg] = value;
+                                    return true;
+                                }
+                            }
+                            else
+                            {
+                                if (typeof(T) == typeof(string))
+                                {
+                                    _arguments[arg] = value;
+                                    return true;
+                                }
+                            }
+                            break;
+                        }
+                    case ArgumentTypeLiteral.Boolean:
+                        {
+                            if (typeof(T).IsArray)
+                            {
+                                if (format.Type.IsArray && typeof(T).GetElementType() == typeof(bool))
+                                {
+                                    _arguments[arg] = value;
+                                    return true;
+                                }
+                            }
+                            else
+                            {
+                                if (typeof(T) == typeof(bool))
+                                {
+                                    _arguments[arg] = value;
+                                    return true;
+                                }
+                            }
+                            break;
+                        }
+                }
+            }
+
+            return false;
+        }
+
+        public static bool TryAddValue(string arg)
+        {
+            if (_argumentFormats == null)
+                DeserializeArguments();
+
+            if (_argumentFormats!.TryGetValue(arg, out ArgumentFormat? format))
+            {
+                if (format.Type.Literal == ArgumentTypeLiteral.Null)
+                {
+                    _arguments[arg] = s_defaultObject;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static bool TryRemoveArgument(string arg) => _arguments.Remove(arg);
+
         private static readonly object s_defaultObject = new object();
 
         private readonly record struct ArgumentSpec(bool AllowMultiple, bool HasValue);

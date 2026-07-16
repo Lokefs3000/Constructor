@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Text;
 using EditorUI.Dock;
+using EditorUI.Visual;
 using EditorUI.Visual.Built;
 using EditorUI.Windowing;
 using Primary.Common;
@@ -10,6 +11,7 @@ using Primary.GUI.ImGui;
 using Primary.Input;
 using Primary.Mathematics;
 using Primary.Timing;
+using Primary.Windowing;
 
 namespace EditorUI.Diagnostics.ImGui
 {
@@ -44,21 +46,24 @@ namespace EditorUI.Diagnostics.ImGui
             IMGUI.Text($"Input focus: {manager.InputManager.HoveredInteractable?.GetType().Name ?? "null"}");
             windowState.CursorPos += new Vector2(0.0f, 11.0f);
 
-            foreach (var (paintData, window) in manager.VisualManager.PendingPaints)
+            foreach (ActivePaintBuild paintBuild in manager.VisualManager.ActivePaintBuilds)
             {
                 DockHost? dockHost = null;
                 foreach (DockHost activeDockHost in manager.DockManager.DockHosts)
                 {
-                    if (activeDockHost.OwnedWindow == window)
+                    if (activeDockHost.OwnedWindow == paintBuild.Window)
                     {
                         dockHost = activeDockHost;
                         break;
                     }
                 }
 
+                Window window = paintBuild.Window;
+                Painter paintData = paintBuild.Painter;
+
                 IMGUI.Text($"{window.WindowTitle} (0x{window.WindowId:x4})");
                 IMGUI.Indent();
-                IMGUI.Text($"Mesh: vtx:{paintData.MeshBuilder.Vertices.Length} idx:{paintData.MeshBuilder.Indices.Length}");
+                IMGUI.Text($"Mesh: vtx:{paintData.MeshBuilder.Vertices.Length} idx:{paintData.MeshBuilder.Indices.Length} jobs:{paintData.MeshBuilder.StartedJobsCount}");
                 IMGUI.Text($"Data: {paintData.MeshBuilder.DataBuffer.Length}b");
                 IMGUI.Text($"Segments: {paintData.MeshBuilder.Segments.Count}");
                 IMGUI.Text($"Paint: cmds:{paintData.CommandCount} objs:{paintData.ObjectList.Count} clips:{paintData.ScissorList.Count}");

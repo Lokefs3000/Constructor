@@ -47,7 +47,7 @@ namespace PrimaryEditor.Windows.Inspector
             if (!_groups.TryPop(out WidgetGroup? result))
                 result = new WidgetGroup(_window);
 
-            result.SetupGroupForHash(group.UniqueHash);
+            result.SetupGroupForHash(group);
             result.AddGroup(group);
 
             return result;

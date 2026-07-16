@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using PrimaryEditor.Inspector.Caching;
+using PrimaryEditor.Inspector.Pooling;
 using PrimaryEditor.Inspector.Reflection;
+using PrimaryEditor.Inspector.Views;
 
 namespace PrimaryEditor.Inspector
 {
@@ -11,6 +13,9 @@ namespace PrimaryEditor.Inspector
     {
         private readonly ValueSourceGenerator _valueSourceGenerator;
         private readonly DescriptionCache _descriptionCache;
+        private readonly ViewManager _viewManager;
+
+        private readonly InspectorWidgetPool _inspectorWidgetPool;
 
         private readonly EnumValueCache _enumValueCache;
 
@@ -21,6 +26,9 @@ namespace PrimaryEditor.Inspector
         {
             _valueSourceGenerator = new ValueSourceGenerator();
             _descriptionCache = new DescriptionCache(_valueSourceGenerator);
+            _viewManager = new ViewManager();
+
+            _inspectorWidgetPool = new InspectorWidgetPool();
 
             _enumValueCache = new EnumValueCache();
 
@@ -57,6 +65,9 @@ namespace PrimaryEditor.Inspector
 
         public ValueSourceGenerator ValueSourceGenerator => _valueSourceGenerator;
         public DescriptionCache DescriptionCache => _descriptionCache;
+        public ViewManager ViewManager => _viewManager;
+
+        public InspectorWidgetPool InspectorWidgetPool => _inspectorWidgetPool;
 
         public EnumValueCache EnumValueCache => _enumValueCache;
 

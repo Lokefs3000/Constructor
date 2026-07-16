@@ -67,5 +67,15 @@ size = [32, 32]
 
 [[sprites]]
 name = "Error"
-offset = [316, 0]
+offset = [480, 0]
 size = [16, 16]
+
+[[sprites]]
+name = "FolderClosed20"
+offset = [432, 0]
+size = [20, 20]
+
+[[sprites]]
+name = "FolderOpen20"
+offset = [452, 0]
+size = [20, 20]

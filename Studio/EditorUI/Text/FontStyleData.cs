@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
@@ -27,8 +28,10 @@ namespace EditorUI.Text
 
         private readonly FontGlyphAtlas _glyphAtlas;
 
-        private Dictionary<char, FontGlyph> _glyphs;
-        private Dictionary<KerningKey, Vector2?> _kerning;
+        private readonly Lock _lock;
+
+        private ConcurrentDictionary<char, FontGlyph> _glyphs;
+        private ConcurrentDictionary<KerningKey, Vector2?> _kerning;
 
         private List<FontGlyphAtlasData> _glyphsInAtlas;
         private HashSet<UnrenderedGlyph> _unrenderedGlyphs;
@@ -51,8 +54,10 @@ namespace EditorUI.Text
 
             _glyphAtlas = new FontGlyphAtlas(fontTextureFactory, new Int2(family.Setup.PaddingX, family.Setup.PaddingY));
 
-            _glyphs = new Dictionary<char, FontGlyph>();
-            _kerning = new Dictionary<KerningKey, Vector2?>();
+            _lock = new Lock();
+
+            _glyphs = new ConcurrentDictionary<char, FontGlyph>();
+            _kerning = new ConcurrentDictionary<KerningKey, Vector2?>();
 
             _glyphsInAtlas = new List<FontGlyphAtlasData>();
             _unrenderedGlyphs = new HashSet<UnrenderedGlyph>();
@@ -108,7 +113,7 @@ namespace EditorUI.Text
             MSDF_ShapedGlyph* shapedGlyph = _family.GetGlyphContext(_style).ShapeNewGlyph(_weight, codepoint);
             if (shapedGlyph == null)
             {
-                if (!_hasRenderedInvalidGlyph)
+                if (!Volatile.Read(ref _hasRenderedInvalidGlyph))
                 {
                     _hasRenderedInvalidGlyph = true;
                     _invalidGlyph = RenderNewGlyph('\uffff');
@@ -124,9 +129,12 @@ namespace EditorUI.Text
             MSDFInterop.ScaleGlyph(shapedGlyph, _metrics.UnitsPerEm);
             MSDFInterop.CalculateBox(shapedGlyph, _family.Setup.MinScale, _family.Setup.PxRange, _family.Setup.MiterLimit, _family.Setup.PaddingX, _family.Setup.PaddingY, &renderBox);
 
-            if (_unrenderedGlyphs.Count == 0)
-                UIManager.Instance.FontRenderer.RequestFontStyleRender(this);
-            _unrenderedGlyphs.Add(new UnrenderedGlyph(codepoint, shapedGlyph, renderBox));
+            using (_lock.EnterScope())
+            {
+                if (_unrenderedGlyphs.Count == 0)
+                    UIManager.Instance.FontRenderer.RequestFontStyleRender(this);
+                _unrenderedGlyphs.Add(new UnrenderedGlyph(codepoint, shapedGlyph, renderBox));
+            }
 
             double invBoxScale = 1.0 / _family.Setup.MinScale;
             double halfScale = invBoxScale * 0.5;
@@ -151,9 +159,9 @@ namespace EditorUI.Text
         }
 
         /// <summary>Not thread-safe</summary>
-        private Vector2? GetKerningData(char leftCodepoint, char rightCodepoint)
+        private Vector2? GetKerningData(KerningKey key)
         {
-            if (_family.GetGlyphContext(_style).TryGetKerningData(_weight, leftCodepoint, rightCodepoint, out Int2 kerning))
+            if (_family.GetGlyphContext(_style).TryGetKerningData(_weight, key.Left, key.Right, out Int2 kerning))
             {
                 return kerning.AsVector2() * _metrics.UnitsPerEm;
             }
@@ -177,18 +185,19 @@ namespace EditorUI.Text
                 FontGlyphAtlasData atlasData = glyphs[i];
                 _glyphsInAtlas.Add(atlasData);
 
-                ref FontGlyph glyph = ref Unsafe.NullRef<FontGlyph>();
+                FontGlyph glyph;
                 if (IsAsciiCodepoint(atlasData.Codepoint))
                 {
-                    glyph = ref _asciiGlyphs[atlasData.Codepoint - AsciiMinValue];
+                    glyph = _asciiGlyphs[atlasData.Codepoint - AsciiMinValue];
+                    _asciiGlyphs[atlasData.Codepoint - AsciiMinValue] =
+                        glyph = new FontGlyph(glyph.PlaneBounds, glyph.Dimensions, atlasData.AtlasRect.Size, atlasData.AtlasRect.AsBoundaries().AsVector4() * atlasSizeForMinMax, glyph.Advance, glyph.IsInvalid);
                 }
                 else
                 {
-                    glyph = ref CollectionsMarshal.GetValueRefOrNullRef(_glyphs, atlasData.Codepoint);
-                    Debug.Assert(!Unsafe.IsNullRef(in glyph));
+                    glyph = _glyphs[atlasData.Codepoint];
+                    _glyphs[atlasData.Codepoint] =
+                        glyph = new FontGlyph(glyph.PlaneBounds, glyph.Dimensions, atlasData.AtlasRect.Size, atlasData.AtlasRect.AsBoundaries().AsVector4() * atlasSizeForMinMax, glyph.Advance, glyph.IsInvalid);
                 }
-
-                glyph = new FontGlyph(glyph.PlaneBounds, glyph.Dimensions, atlasData.AtlasRect.Size, atlasData.AtlasRect.AsBoundaries().AsVector4() * atlasSizeForMinMax, glyph.Advance, glyph.IsInvalid);
 
                 //FIXME: comparing to '\uffff' always returns false for some odd reason
                 if (atlasData.Codepoint > 65534)
@@ -204,18 +213,20 @@ namespace EditorUI.Text
                 {
                     FontGlyphAtlasData atlasData = _glyphsInAtlas[i];
 
-                    ref FontGlyph glyph = ref Unsafe.NullRef<FontGlyph>();
+                    FontGlyph glyph;
                     if (IsAsciiCodepoint(atlasData.Codepoint))
                     {
-                        glyph = ref _asciiGlyphs[atlasData.Codepoint - AsciiMinValue];
+                        glyph = _asciiGlyphs[atlasData.Codepoint - AsciiMinValue];
+                        _asciiGlyphs[atlasData.Codepoint - AsciiMinValue] =
+                            glyph = new FontGlyph(glyph.PlaneBounds, glyph.Dimensions, atlasData.AtlasRect.Size, atlasData.AtlasRect.AsBoundaries().AsVector4() * atlasSizeForMinMax, glyph.Advance, glyph.IsInvalid); ;
+
                     }
                     else
                     {
-                        glyph = ref CollectionsMarshal.GetValueRefOrNullRef(_glyphs, atlasData.Codepoint);
-                        Debug.Assert(!Unsafe.IsNullRef(in glyph));
+                        glyph = _glyphs[atlasData.Codepoint];
+                        _glyphs[atlasData.Codepoint] =
+                            glyph = new FontGlyph(glyph.PlaneBounds, glyph.Dimensions, atlasData.AtlasRect.Size, atlasData.AtlasRect.AsBoundaries().AsVector4() * atlasSizeForMinMax, glyph.Advance, glyph.IsInvalid); ;
                     }
-
-                    glyph = new FontGlyph(glyph.PlaneBounds, glyph.Dimensions, atlasData.AtlasRect.Size, atlasData.AtlasRect.AsBoundaries().AsVector4() * atlasSizeForMinMax, glyph.Advance, glyph.IsInvalid);
 
                     //FIXME: comparing to '\uffff' always returns false for some odd reason
                     if (atlasData.Codepoint > 65534)
@@ -227,7 +238,7 @@ namespace EditorUI.Text
         }
 
         /// <summary>Not thread-safe</summary>
-        public ref readonly FontGlyph FindGlyph(char codepoint)
+        public FontGlyph FindGlyph(char codepoint)
         {
             if (IsAsciiCodepoint(codepoint))
             {
@@ -238,31 +249,26 @@ namespace EditorUI.Text
                     glyph = RenderNewGlyph(codepoint);
 
                 if (glyph.IsInvalid)
-                    return ref _invalidGlyph;
+                    return _invalidGlyph;
                 else
-                    return ref glyph;
+                    return glyph;
             }
             else
             {
-                ref FontGlyph glyph = ref CollectionsMarshal.GetValueRefOrAddDefault(_glyphs, codepoint, out bool exists);
-                if (!exists)
-                    glyph = RenderNewGlyph(codepoint);
-
+                FontGlyph glyph = _glyphs.GetOrAdd(codepoint, RenderNewGlyph);
                 if (glyph.IsInvalid)
-                    return ref _invalidGlyph;
+                    return _invalidGlyph;
                 else
-                    return ref glyph;
+                    return glyph;
             }
         }
 
         /// <summary>Not thread-safe</summary>
-        public ref readonly Vector2 GetKerning(char leftCodepoint, char rightCodepoint)
+        public Vector2 GetKerning(char leftCodepoint, char rightCodepoint, out bool exists)
         {
-            ref Vector2? kerning = ref CollectionsMarshal.GetValueRefOrAddDefault(_kerning, new KerningKey(leftCodepoint, rightCodepoint), out bool exist);
-            if (!exist)
-                kerning = GetKerningData(leftCodepoint, rightCodepoint);
-
-            return ref kerning.DangerousGetValueOrNullReference();
+            Vector2? kerning = _kerning.GetOrAdd(new KerningKey(leftCodepoint, rightCodepoint), GetKerningData);
+            exists = kerning.HasValue;
+            return kerning.Value;
         }
 
         public FontFamily Family => _family;

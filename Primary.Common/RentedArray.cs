@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using System.Buffers;
 using System.Collections;
+using System.Runtime.CompilerServices;
 
 namespace Primary.Common
 {
@@ -16,6 +17,7 @@ namespace Primary.Common
             _pool = pool;
             _count = count;
             _array = pool.Rent(count);
+            _returnClear = RuntimeHelpers.IsReferenceOrContainsReferences<T>() || clearOnReturn;
         }
 
         internal RentedArray(int count, bool clearOnReturn = false) : this(count, ArrayPool<T>.Shared, clearOnReturn) { }

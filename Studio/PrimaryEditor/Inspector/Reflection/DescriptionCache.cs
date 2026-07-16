@@ -43,12 +43,12 @@ namespace PrimaryEditor.Inspector.Reflection
                     {
                         if (TryGetDescription(fieldType, out InspectorDescription? valueDesc))
                         {
-                            values.Add(new DescriptionValue(valueDesc, fieldType, valueSource));
+                            values.Add(new DescriptionValue(valueDesc, fieldType, valueSource, field.Name));
                         }
                     }
                     else
                     {
-                        values.Add(new DescriptionValue(null, fieldType, valueSource));
+                        values.Add(new DescriptionValue(null, fieldType, valueSource, field.Name));
                     }
                 }
             }

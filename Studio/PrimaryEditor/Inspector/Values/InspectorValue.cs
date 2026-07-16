@@ -11,16 +11,18 @@ namespace PrimaryEditor.Inspector.Values
     {
         protected readonly IInspectorObject? _parentObject;
         protected readonly InspectorValueSource _valueSource;
+        protected readonly string _name;
 
         protected T? _value;
         protected bool _hasModifiedValue;
 
         protected int _uniqueHash;
 
-        internal InspectorValue(IInspectorObject? parentObject, InspectorValueSource valueSource)
+        internal InspectorValue(IInspectorObject? parentObject, InspectorValueSource valueSource, string name)
         {
             _parentObject = parentObject;
             _valueSource = valueSource;
+            _name = name;
 
             _value = default;
             _hasModifiedValue = false;
@@ -64,10 +66,28 @@ namespace PrimaryEditor.Inspector.Values
             _hasModifiedValue = true;
         }
 
+        public void SetValueType<T1>(T1 value) where T1 : unmanaged
+        {
+            if (!typeof(T).IsValueType)
+                throw new InvalidOperationException();
+
+            _value = Unsafe.As<T1, T>(ref value);
+            _hasModifiedValue = true;
+        }
+
+        public void SetObject<T1>(T1? value) where T1 : class
+        {
+            if (!typeof(T).IsClass)
+                throw new InvalidOperationException();
+
+            _value = Unsafe.As<T1?, T?>(ref value);
+            _hasModifiedValue = true;
+        }
 
         public Type TargetType => typeof(T);
         public IInspectorValue? OwningValue => _parentObject;
 
+        public string Name => _name;
         public string TargetName => _valueSource.LocalName;
         public string FullTargetName => _valueSource.TargetName;
 

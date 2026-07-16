@@ -40,8 +40,8 @@ namespace EditorUI.Text
 
             bool isRichTextEnabled = textBuilder.AllowRichText;
 
-            ref readonly FontGlyph lastGlyph = ref Unsafe.NullRef<FontGlyph>();
-            ref readonly FontGlyph glyphAtLastWord = ref Unsafe.NullRef<FontGlyph>();
+            FontGlyph? lastGlyph = null;
+            FontGlyph? glyphAtLastWord = null;
 
             int currentLineStartIndex = 0;
 
@@ -68,14 +68,17 @@ namespace EditorUI.Text
                 {
                     case '\n':
                         {
-                            if (!Unsafe.IsNullRef(in lastGlyph))
-                                currentWidth -= (lastGlyph.Advance - lastGlyph.Dimensions.X) * fontSize;
+                            if (lastGlyph.HasValue)
+                            {
+                                ref FontGlyph lastGlyphRef = ref lastGlyph.DangerousGetValueOrNullReference();
+                                currentWidth -= (lastGlyphRef.Advance - lastGlyphRef.Dimensions.X) * fontSize;
+                            }
 
                             shapingData.AddLetters(buffer[currentLineStartIndex..i]);
-                            BreakCurrentLine(shapingData, i, new Vector2(currentWidth, Math.Max(tallestGlyphInLine, tallestGlyphInCurrentWord)), currentSectionLineOffset + lineVerticalOffsets.X, currentLeftOffset, (bakedVisual ??= visual.Bake()));
+                            BreakCurrentLine(shapingData, i, new Vector2(currentWidth, Math.Max(tallestGlyphInLine, tallestGlyphInCurrentWord)), currentSectionLineOffset + lineVerticalOffsets.X, currentLeftOffset, (bakedVisual ??= visual.Bake()), glyphsWithActualVisual);
                             ResetState();
 
-                            lastGlyph = ref Unsafe.NullRef<FontGlyph>();
+                            lastGlyph = null;
                             currentLineStartIndex = i + 1;
                             break;
                         }
@@ -90,7 +93,7 @@ namespace EditorUI.Text
                                 if (i > previousIndex)
                                 {
                                     shapingData.AddLetters(buffer[currentLineStartIndex..previousIndex]);
-                                    shapingData.AddSection(currentLeftOffset, (bakedVisual ??= visual.Bake()));
+                                    shapingData.AddSection(currentLeftOffset, (bakedVisual ??= visual.Bake()), glyphsWithActualVisual);
 
                                     currentLineStartIndex = i + 1;
                                 }
@@ -143,8 +146,10 @@ namespace EditorUI.Text
 
                             if (!char.IsControl(letter))
                             {
-                                lastGlyph = ref visual.StyleData.FindGlyph(letter);
-                                float nextWidth = currentWidth + lastGlyph.Advance * visual.PixelSize;
+                                lastGlyph = visual.StyleData.FindGlyph(letter);
+                                ref FontGlyph lastGlyphRef = ref lastGlyph.DangerousGetValueOrNullReference();
+
+                                float nextWidth = currentWidth + lastGlyphRef.Advance * visual.PixelSize;
 
                                 ++glyphsWithActualVisual;
 
@@ -154,7 +159,7 @@ namespace EditorUI.Text
                                     widthAtWordStart = currentWidth;
                                     tallestGlyphAtWordStart = tallestGlyphInLine;
                                     tallestGlyphInCurrentWord = 0.0f;
-                                    glyphAtLastWord = ref lastGlyph;
+                                    glyphAtLastWord = lastGlyph;
                                 }
 
                                 switch (textBuilder.WrapMode)
@@ -164,7 +169,7 @@ namespace EditorUI.Text
                                             if (nextWidth <= textBuilder.WrapWidth)
                                                 break;
 
-                                            ref readonly FontGlyph ellipsisGlyph = ref visual.StyleData.FindGlyph('…');
+                                            FontGlyph ellipsisGlyph = visual.StyleData.FindGlyph('…');
                                             float glyphWidth = ellipsisGlyph.Dimensions.X * visual.PixelSize;
 
                                             for (int j = i; j >= 0; --j)
@@ -177,7 +182,7 @@ namespace EditorUI.Text
 
                                                     tallestGlyphInCurrentWord = Math.Max(tallestGlyphInCurrentWord, ellipsisGlyph.Dimensions.Y * visual.PixelSize);
 
-                                                    BreakCurrentLine(shapingData, j + 1, new Vector2(nextWidth, Math.Max(tallestGlyphInLine, tallestGlyphInCurrentWord)), currentSectionLineOffset + lineVerticalOffsets.Y, currentLeftOffset, (bakedVisual ??= visual.Bake()));
+                                                    BreakCurrentLine(shapingData, j + 1, new Vector2(nextWidth, Math.Max(tallestGlyphInLine, tallestGlyphInCurrentWord)), currentSectionLineOffset + lineVerticalOffsets.Y, currentLeftOffset, (bakedVisual ??= visual.Bake()), glyphsWithActualVisual);
                                                     break;
                                                 }
 
@@ -196,17 +201,20 @@ namespace EditorUI.Text
                                             if (nextWidth <= textBuilder.WrapWidth)
                                                 break;
 
-                                            if (!Unsafe.IsNullRef(in lastGlyph))
-                                                currentWidth -= (lastGlyph.Advance - lastGlyph.Dimensions.X) * visual.PixelSize;
+                                            if (lastGlyph.HasValue)
+                                            {
+                                                lastGlyphRef = ref lastGlyph.DangerousGetValueOrNullReference();
+                                                currentWidth -= (lastGlyphRef.Advance - lastGlyphRef.Dimensions.X) * fontSize;
+                                            }
 
                                             if (wordBufferStartIndex == -1)
                                             {
                                                 shapingData.AddLetters(buffer[currentLineStartIndex..i]);
-                                                BreakCurrentLine(shapingData, i - 1, new Vector2(currentWidth, Math.Max(tallestGlyphInLine, tallestGlyphInCurrentWord)), currentSectionLineOffset + lineVerticalOffsets.Y, currentLeftOffset, (bakedVisual ??= visual.Bake()));
+                                                BreakCurrentLine(shapingData, i - 1, new Vector2(currentWidth, Math.Max(tallestGlyphInLine, tallestGlyphInCurrentWord)), currentSectionLineOffset + lineVerticalOffsets.Y, currentLeftOffset, (bakedVisual ??= visual.Bake()), glyphsWithActualVisual);
                                                 ResetState();
 
                                                 nextWidth -= currentWidth;
-                                                lastGlyph = ref Unsafe.NullRef<FontGlyph>();
+                                                lastGlyph = null;
 
                                                 tallestGlyphInCurrentWord = 0.0f;
                                                 tallestGlyphInLine = 0.0f;
@@ -217,11 +225,13 @@ namespace EditorUI.Text
                                                 if (wordBufferStartIndex <= currentLineStartIndex)
                                                 {
                                                     shapingData.AddLetters(buffer[currentLineStartIndex..i]);
-                                                    BreakCurrentLine(shapingData, i - 1, new Vector2(currentWidth, Math.Max(tallestGlyphInLine, tallestGlyphInCurrentWord)), currentSectionLineOffset + lineVerticalOffsets.Y, currentLeftOffset, (bakedVisual ??= visual.Bake()));
+                                                    BreakCurrentLine(shapingData, i - 1, new Vector2(currentWidth, Math.Max(tallestGlyphInLine, tallestGlyphInCurrentWord)), currentSectionLineOffset + lineVerticalOffsets.Y, currentLeftOffset, (bakedVisual ??= visual.Bake()), glyphsWithActualVisual);
                                                     ResetState();
 
-                                                    nextWidth = lastGlyph.Advance * visual.PixelSize;
-                                                    lastGlyph = ref Unsafe.NullRef<FontGlyph>();
+                                                    lastGlyphRef = ref lastGlyph.DangerousGetValueOrNullReference();
+
+                                                    nextWidth = lastGlyphRef.Advance * visual.PixelSize;
+                                                    lastGlyph = null;
 
                                                     currentLineStartIndex = i;
 
@@ -234,17 +244,20 @@ namespace EditorUI.Text
                                                 else
                                                 {
                                                     float currentWordWidth = nextWidth - widthAtWordStart;
-                                                    if (!Unsafe.IsNullRef(in glyphAtLastWord))
-                                                        widthAtWordStart -= (glyphAtLastWord.Advance - glyphAtLastWord.Dimensions.X) * visual.PixelSize;
+                                                    if (glyphAtLastWord.HasValue)
+                                                    {
+                                                        ref FontGlyph glyphAtLastWordRef = ref glyphAtLastWord.DangerousGetValueOrNullReference();
+                                                        widthAtWordStart -= (glyphAtLastWordRef.Advance - glyphAtLastWordRef.Dimensions.X) * visual.PixelSize;
+                                                    }
 
                                                     shapingData.AddLetters(buffer[currentLineStartIndex..wordBufferStartIndex]);
-                                                    BreakCurrentLine(shapingData, wordBufferStartIndex - 1, new Vector2(widthAtWordStart, tallestGlyphAtWordStart), currentSectionLineOffset + lineVerticalOffsets.Y, currentLeftOffset, (bakedVisual ??= visual.Bake()));
+                                                    BreakCurrentLine(shapingData, wordBufferStartIndex - 1, new Vector2(widthAtWordStart, tallestGlyphAtWordStart), currentSectionLineOffset + lineVerticalOffsets.Y, currentLeftOffset, (bakedVisual ??= visual.Bake()), glyphsWithActualVisual);
 
                                                     currentLineStartIndex = wordBufferStartIndex;
 
                                                     ResetState();
 
-                                                    lastGlyph = ref Unsafe.NullRef<FontGlyph>();
+                                                    lastGlyph = null;
 
                                                     widthAtWordStart = 0.0f;
                                                     nextWidth = currentWordWidth;
@@ -258,12 +271,12 @@ namespace EditorUI.Text
                                 }
 
                                 currentWidth = nextWidth;
-                                if (!Unsafe.IsNullRef(in lastGlyph))
-                                    tallestGlyphInLine = Math.Max(tallestGlyphInLine, lastGlyph.Dimensions.Y * fontSize);
+                                if (lastGlyph.HasValue && !Unsafe.IsNullRef(in lastGlyphRef))
+                                    tallestGlyphInLine = Math.Max(tallestGlyphInLine, lastGlyphRef.Dimensions.Y * fontSize);
                             }
                             else
                             {
-                                lastGlyph = ref Unsafe.NullRef<FontGlyph>();
+                                lastGlyph = null;
                             }
 
                             break;
@@ -272,14 +285,17 @@ namespace EditorUI.Text
             }
 
             {
-                if (!Unsafe.IsNullRef(in lastGlyph))
-                    currentWidth -= (lastGlyph.Advance - lastGlyph.Dimensions.X) * visual.PixelSize;
+                if (lastGlyph.HasValue)
+                {
+                    ref FontGlyph lastGlyphRef = ref lastGlyph.DangerousGetValueOrNullReference();
+                    currentWidth -= (lastGlyphRef.Advance - lastGlyphRef.Dimensions.X) * fontSize;
+                }
 
                 tallestGlyphInLine = Math.Max(tallestGlyphInLine, tallestGlyphInCurrentWord);
 
                 shapingData.AddLetters(buffer[currentLineStartIndex..buffer.Length]);
                 shapingData.SetRenderData(glyphsWithActualVisual);
-                BreakCurrentLine(shapingData, buffer.Length, new Vector2(currentWidth, tallestGlyphInLine), currentSectionLineOffset + lineVerticalOffsets.X, currentLeftOffset, (bakedVisual ??= visual.Bake()));
+                BreakCurrentLine(shapingData, buffer.Length, new Vector2(currentWidth, tallestGlyphInLine), currentSectionLineOffset + lineVerticalOffsets.X, currentLeftOffset, (bakedVisual ??= visual.Bake()), glyphsWithActualVisual);
                 ResetState();
             }
 
@@ -302,9 +318,9 @@ namespace EditorUI.Text
             }
         }
 
-        private void BreakCurrentLine(TextShapingData shapingData, int index, Vector2 lineSize, float yOffset, float currentLeftOffset, TextShapingVisual visual)
+        private void BreakCurrentLine(TextShapingData shapingData, int index, Vector2 lineSize, float yOffset, float currentLeftOffset, TextShapingVisual visual, int glyphsWithActualVisual)
         {
-            shapingData.AddSection(currentLeftOffset, visual);
+            shapingData.AddSection(currentLeftOffset, visual, glyphsWithActualVisual);
             shapingData.AddLine(lineSize, yOffset);
         }
 

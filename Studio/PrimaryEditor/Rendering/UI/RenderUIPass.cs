@@ -181,6 +181,10 @@ namespace EditorUI.Visual.Passes
                     if (indexCount == 0)
                         continue;
 
+                    Rect scissorRect = passData.Painter.ScissorList[segment.ClipIndex];
+                    if (Int2.LessThanOrEqualAny(scissorRect.Size, Int2.Zero))
+                        continue;
+
                     switch (segment.CmdType)
                     {
                         case PaintCmdType.Points:
@@ -239,7 +243,7 @@ namespace EditorUI.Visual.Passes
                             }
                     }
 
-                    cmd.SetScissor(0, new FGRect(passData.Painter.ScissorList[segment.ClipIndex]));
+                    cmd.SetScissor(0, new FGRect(scissorRect));
                     cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc((uint)indexCount, StartIndexLocation: (uint)segment.IndexStart));
                 }
             }

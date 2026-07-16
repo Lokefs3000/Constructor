@@ -82,19 +82,23 @@ namespace EditorUI.Widgets
             base.DestroySelf();
         }
 
-        protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
+        protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
         {
+            base.MeasureSelf(in context);
+
+            Vector2 lastViewSize = _viewSize;
             _maxNodeDepth = _childNodes.Count == 0 ? 0 : _childNodes.Max(static (x) => x.MaxNodeDepth);
             _viewSize = new Vector2(_maxNodeDepth * _indentSize + _nodeHeight, _childNodes.Sum(static (x) => x.ShownNodeCount) * _nodeHeight);
 
-            return base.LayoutSelf(in context);
+            return lastViewSize != _viewSize ? MeasureStatus.DontCheckChanges : MeasureStatus.Success;
         }
 
-        protected internal override void FinalizeSelf(ref readonly LayoutContext context)
+        protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
         {
-            base.FinalizeSelf(in context);
+            base.LayoutSelf(in context);
 
-            _internalFullWidth = Math.Max(_maxNodeDepth * _indentSize + _nodeHeight, _insetIdealSize.X - _nodeHeight - 2.0f);
+            _internalFullWidth = Math.Max(_maxNodeDepth * _indentSize + _nodeHeight, _layoutState.ContentSize.X - _nodeHeight - 2.0f);
+            return LayoutReturnData.Success;
         }
 
         protected internal override void PaintSelf(ref PainterContext painter)
@@ -189,8 +193,11 @@ namespace EditorUI.Widgets
             _nodeStack.Clear();
         }
 
-        public override void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public override bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
+            if (base.HandleEventSelf(in inputEvent))
+                return true;
+
             if (inputEvent.EventType == UIInputEventType.MouseDown)
             {
                 Vector2 point = inputEvent.Mouse.Position + new Vector2(-_scrollPosition.X, _scrollPosition.Y) - _computedRect.Minimum;
@@ -212,6 +219,8 @@ namespace EditorUI.Widgets
                                 treeNode.Expand();
                         }
                     }
+
+                    return true;
                 }
             }
             else if (inputEvent.EventType == UIInputEventType.KeyDown)
@@ -284,9 +293,11 @@ namespace EditorUI.Widgets
                         _activeNode = null;
                     }
                 }
+
+                return true;
             }
 
-            base.HandleEventSelf(in inputEvent);
+            return false;
         }
 
         internal void AddNodeToList(BaseTreeNode treeNode)
@@ -508,14 +519,14 @@ namespace EditorUI.Widgets
             }
             else if (_scrollPosition.Y + _viewSize.Y < yPosition)
             {
-                _scrollPosition.Y = Math.Min(yPosition - _viewSize.Y - 6.0f, _insetIdealSize.Y - _viewSize.Y);
+                _scrollPosition.Y = Math.Min(yPosition - _viewSize.Y - 6.0f, _layoutState.ContentSize.Y - _viewSize.Y);
             }
         }
 
         private IndexRange GetShownNodeRange()
         {
             int start = (int)MathF.Floor(_scrollPosition.Y / _nodeHeight);
-            return new IndexRange(start, start + (int)MathF.Ceiling(_idealSize.Y / _nodeHeight));
+            return new IndexRange(start, start + (int)MathF.Ceiling(_layoutState.ContentSize.Y / _nodeHeight));
         }
 
         private (BaseTreeNode? treeNode, int position) GetTreeNodeAt(float y)
@@ -635,10 +646,10 @@ namespace EditorUI.Widgets
             if (treeNode != null)
             {
                 point -= new Vector2(2.0f, (position - 1) * _nodeHeight - _scrollPosition.Y);
-                
+
                 float arrowStartX = treeNode.NodeDepth * _nodeHeight;
                 float nodeStartX = arrowStartX + _nodeHeight;
-                
+
                 return (point.X >= nodeStartX && (treeNode.Shape?.Intersects(point) ?? true)) ? treeNode : baseInteractable;
             }
 
@@ -664,7 +675,7 @@ namespace EditorUI.Widgets
         [Styled(nameof(_activeStrokeColor))] public UIColor ActiveStrokeColor { get => _activeStrokeColor; set => SetStyledField(value); }
         [Styled(nameof(_activeCornerRadius))] public Vector4 ActiveCornerRadius { get => _activeCornerRadius; set => SetStyledField(value); }
         #endregion
-    
+
         private record struct LineArrowBuffer
         {
             public Vector2 Point0;

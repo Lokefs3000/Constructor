@@ -77,12 +77,13 @@ namespace EditorUI.Widgets.Components
         {
             if (_direction == Scrollbars.Vertical)
             {
-                float size = Math.Max(_scrollView.InsetIdealSize.Y / _scrollView.ViewSize.Y, 0.2f);
-                float maxAmountScrollable = 1.0f - size;
-                float scroll = Math.Clamp(_scrollView.ScrollPosition.Y / (_scrollView.ViewSize.Y - _scrollView.InsetIdealSize.Y) * maxAmountScrollable, 0.0f, maxAmountScrollable);
+                float size = Math.Max(_scrollView.ContentSize.Y / _scrollView.ViewSize.Y, 0.2f);
 
                 if (size < 1.0f)
                 {
+                    float maxAmountScrollable = 1.0f - size;
+                    float scroll = Math.Clamp(_scrollView.ScrollPosition.Y / (_scrollView.ViewSize.Y - _scrollView.ContentSize.Y) * maxAmountScrollable, 0.0f, maxAmountScrollable);
+
                     if (!_isActive)
                     {
                         SetEditedField(true, nameof(_isActive));
@@ -110,7 +111,7 @@ namespace EditorUI.Widgets.Components
             }
         }
 
-        public void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
             switch (inputEvent.EventType)
             {
@@ -118,13 +119,13 @@ namespace EditorUI.Widgets.Components
                     {
                         _isHovered = true;
                         SetEditedField(true, nameof(IsHovered));
-                        break;
+                        return true;
                     }
                 case UIInputEventType.MouseLeave:
                     {
                         _isHovered = false;
                         SetEditedField(false, nameof(IsHovered));
-                        break;
+                        return true;
                     }
                 case UIInputEventType.MouseDown:
                     {
@@ -132,7 +133,9 @@ namespace EditorUI.Widgets.Components
                         {
                             _isHeld = true;
                             SetEditedField(true, nameof(IsHeld));
+                            return true;
                         }
+
                         break;
                     }
                 case UIInputEventType.MouseUp:
@@ -141,7 +144,9 @@ namespace EditorUI.Widgets.Components
                         {
                             _isHeld = false;
                             SetEditedField(false, nameof(IsHeld));
+                            return true;
                         }
+
                         break;
                     }
 
@@ -152,6 +157,8 @@ namespace EditorUI.Widgets.Components
                             _dragScrollStart = _direction == Scrollbars.Vertical ?
                                 _scrollView.ScrollPosition.Y :
                                 _scrollView.ScrollPosition.X;
+
+                            return true;
                         }
 
                         break;
@@ -163,27 +170,38 @@ namespace EditorUI.Widgets.Components
                         {
                             if (_direction == Scrollbars.Vertical)
                             {
-                                float size = _scrollView.InsetIdealSize.Y / _scrollView.ViewSize.Y;
-                                float amountWithDelta = Math.Clamp(inputEvent.Drag.Delta.Y / size + _dragScrollStart, 0.0f, _scrollView.ViewSize.Y - _scrollView.InsetIdealSize.Y);
-                                _scrollView.ScrollPosition = new Vector2(_scrollView.ScrollPosition.X, amountWithDelta);
+                                float size = _scrollView.ContentSize.Y / _scrollView.ViewSize.Y;
+                                if (size < 1.0f)
+                                {
+                                    float amountWithDelta = Math.Clamp(inputEvent.Drag.Delta.Y / size + _dragScrollStart, 0.0f, _scrollView.ViewSize.Y - _scrollView.ContentSize.Y);
+                                    _scrollView.ScrollPosition = new Vector2(_scrollView.ScrollPosition.X, amountWithDelta);
+                                }
                             }
                             else
                             {
-                                float size = _scrollView.InsetIdealSize.X / _scrollView.ViewSize.X;
-                                float amountWithDelta = Math.Clamp(inputEvent.Drag.Delta.X / size + _dragScrollStart, 0.0f, _scrollView.ViewSize.X - _scrollView.InsetIdealSize.X);
-                                _scrollView.ScrollPosition = new Vector2(amountWithDelta, _scrollView.ScrollPosition.Y);
+                                float size = _scrollView.ContentSize.X / _scrollView.ViewSize.X;
+                                if (size < 1.0f)
+                                {
+                                    float amountWithDelta = Math.Clamp(inputEvent.Drag.Delta.X / size + _dragScrollStart, 0.0f, _scrollView.ViewSize.X - _scrollView.ContentSize.X);
+                                    _scrollView.ScrollPosition = new Vector2(amountWithDelta, _scrollView.ScrollPosition.Y);
+                                }
                             }
+
+                            return true;
                         }
 
                         break;
                     }
             }
+
+            return false;
         }
 
         public override void AddStateFlags(StateFlags flags)
         {
             _stateFlags |= flags;
-            _scrollView.AddStateFlags(flags & ~StateFlags.This);
+            if (_isEnabled)
+                _scrollView.AddStateFlags(flags & ~StateFlags.This);
         }
 
         public override void RemoveStateFlags(StateFlags flags)
@@ -207,7 +225,7 @@ namespace EditorUI.Widgets.Components
         public IInteractionShape? Shape => this;
         public WidgetInputState InputState => WidgetInputState.Sink;
 
-        public bool IsEnabled { get => _isEnabled; internal set { _wasPreviouslyEnabled = _isEnabled || _wasPreviouslyEnabled; _isEnabled = value; } }
+        public bool IsEnabled { get => _isEnabled; internal set { _wasPreviouslyEnabled = _isEnabled; _isEnabled = value; } }
         internal bool WasPreviouslyEnabled { get => _wasPreviouslyEnabled; set => _wasPreviouslyEnabled = value; }
 
         public float ComputedSize => _computedSize;

@@ -39,8 +39,8 @@ namespace EditorUI.Widgets
                 int startIndex = 0;
                 int endIndex = _items.Count - startIndex;
 
-                float activeRows = MathF.Ceiling(endIndex / MathF.Floor(_idealSize.X / itemSizeVector.X));
-                _viewSize = new Vector2(_idealSize.X, activeRows * itemSizeVector.Y);
+                float activeRows = MathF.Ceiling(endIndex / MathF.Floor(_layoutState.IdealSize.X / itemSizeVector.X));
+                _viewSize = new Vector2(_layoutState.IdealSize.X, activeRows * itemSizeVector.Y);
             }
             else
             {
@@ -58,7 +58,7 @@ namespace EditorUI.Widgets
             {
                 Vector2 itemSizeVector = _itemSize.AsVector2();
 
-                Int2 maxRowsAndColumns = Int2.Max(new Vector2(_insetIdealSize.X / itemSizeVector.X, _insetIdealSize.Y / itemSizeVector.Y + 0.5f).AsInt2(), Int2.One);
+                Int2 maxRowsAndColumns = Int2.Max(new Vector2(_layoutState.ContentSize.X / itemSizeVector.X, _layoutState.ContentSize.Y / itemSizeVector.Y + 0.5f).AsInt2(), Int2.One);
                 int maxItemsVisibleAtOnce = maxRowsAndColumns.X * maxRowsAndColumns.Y;
 
                 int startIndex = 0;
@@ -93,7 +93,7 @@ namespace EditorUI.Widgets
             {
                 Vector2 itemSizeVector = _itemSize.AsVector2();
 
-                Int2 maxRowsAndColumns = Int2.Max(new Vector2(_insetIdealSize.X / itemSizeVector.X, _insetIdealSize.Y / itemSizeVector.Y + 0.5f).AsInt2(), Int2.One);
+                Int2 maxRowsAndColumns = Int2.Max(new Vector2(_layoutState.ContentSize.X / itemSizeVector.X, _layoutState.ContentSize.Y / itemSizeVector.Y + 0.5f).AsInt2(), Int2.One);
                 int maxItemsVisibleAtOnce = maxRowsAndColumns.X * maxRowsAndColumns.Y;
 
                 point -= _computedRect.Minimum;
@@ -146,7 +146,7 @@ namespace EditorUI.Widgets
         public IInteractable GetInteractable(Vector2 point) => this;
 
         public abstract void OnPaint(GridView gridView, ref readonly PainterContext painter, Vector2 itemSize);
-        public abstract void HandleEventSelf(ref readonly UIInputEvent inputEvent);
+        public abstract bool HandleEventSelf(ref readonly UIInputEvent inputEvent);
 
         public IInteractionShape? Shape => null;
         public WidgetInputState InputState => WidgetInputState.Sink;

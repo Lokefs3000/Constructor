@@ -18,6 +18,7 @@ namespace EditorUI.Text
 
         private int _lastLineTextStart;
         private int _lastSectionTextStart;
+        private int _lastSectionVisualGlyphs;
 
         private List<TextShapingLine> _lines;
         private List<TextShapingSection> _sections;
@@ -34,6 +35,7 @@ namespace EditorUI.Text
 
             _lastSectionTextStart = 0;
             _lastLineTextStart = 0;
+            _lastSectionVisualGlyphs = 0;
 
             _lines = new List<TextShapingLine>();
             _sections = new List<TextShapingSection>();
@@ -50,6 +52,7 @@ namespace EditorUI.Text
 
             _lastSectionTextStart = 0;
             _lastLineTextStart = 0;
+            _lastSectionVisualGlyphs = 0;
 
             _lines.Clear();
             _sections.Clear();
@@ -117,13 +120,15 @@ namespace EditorUI.Text
             _lastLineTextStart = _textLength;
         }
 
-        internal void AddSection(float leftOffset, TextShapingVisual visual)
+        internal void AddSection(float leftOffset, TextShapingVisual visual, int currentVisualGlyphs)
         {
             if (_lastSectionTextStart == _textLength)
                 return;
 
-            _sections.Add(new TextShapingSection(_lines.Count, new IndexRange(_lastSectionTextStart, _textLength), leftOffset, visual));
+            _sections.Add(new TextShapingSection(_lines.Count, new IndexRange(_lastSectionTextStart, _textLength), leftOffset, visual, currentVisualGlyphs - _lastSectionVisualGlyphs));
+            
             _lastSectionTextStart = _textLength;
+            _lastSectionVisualGlyphs = currentVisualGlyphs;
         }
 
         public ReadOnlySpan<char> TextBuffer => _textBuffer.AsSpan(0, _textLength);
@@ -140,6 +145,6 @@ namespace EditorUI.Text
     }
 
     public readonly record struct TextShapingLine(Vector2 LineSize, float LineYOffset);
-    public readonly record struct TextShapingSection(int LinePosition, IndexRange TextRange, float LeftOffset, TextShapingVisual Visual);
+    public readonly record struct TextShapingSection(int LinePosition, IndexRange TextRange, float LeftOffset, TextShapingVisual Visual, int GlyphsWithActualVisual);
     public readonly record struct TextShapingVisual(BuiltPaint? Paint, float PixelSize, FontStyleData StyleData);
 }

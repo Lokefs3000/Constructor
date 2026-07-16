@@ -9,5 +9,6 @@ namespace EditorUI.Scheduling
         public const int Default = 0;
 
         public const int CloseWindow = -1;
+        public const int UpdateInput = -2;
     }
 }

@@ -188,7 +188,7 @@ namespace Primary.Collections
             return _array[_end];
         }
 
-        public bool TryGetFront([NotNullWhen(true)] out T? item)
+        public bool TryGetFront([NotNullWhen(true)] out T item)
         {
             if (_size > 0)
             {
@@ -200,7 +200,7 @@ namespace Primary.Collections
             return false;
         }
 
-        public bool TryGetBack([NotNullWhen(true)] out T? item)
+        public bool TryGetBack([NotNullWhen(true)] out T item)
         {
             if (_size > 0)
             {

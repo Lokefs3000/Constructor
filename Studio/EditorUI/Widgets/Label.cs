@@ -66,28 +66,28 @@ namespace EditorUI.Widgets
             base.DestroySelf();
         }
 
-        protected internal override MeasureReturnData MeasureSelf(ref readonly LayoutContext context)
+        protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
         {
             base.MeasureSelf(in context);
 
-            _hasBadShapingData = _hasBadShapingData || _lastIdealSize != _idealSize;
+            _hasBadShapingData = _hasBadShapingData || _lastIdealSize != _layoutState.IdealSize;
 
             // cannot decide wrapping dimensions if this has any kind of auto resize in the X direction
             if (_hasBadShapingData && _autoResize != AutoResizeMode.ResizeX && _autoResize != AutoResizeMode.ResizeXY)
             {
                 if (_fontFamily != null)
                 {
-                    if (Vector2.EqualsAny(_idealSize, Vector2.Zero))
+                    if (Vector2.EqualsAny(_layoutState.IdealSize, Vector2.Zero))
                     {
                         if (!_fontFamily.IsReadyToUse)
-                            return MeasureReturnData.MissingPendingData;
+                            return MeasureStatus.MissingPendingData;
 
                         SetIdealSizeFor(context.LayoutLock);
                     }
                     else
                     {
                         if (!_fontFamily.IsReadyToUse)
-                            return MeasureReturnData.MissingPendingData;
+                            return MeasureStatus.MissingPendingData;
 
                         SetIdealSizeFor(LayoutLockAxis.AxisXY);
                     }
@@ -96,23 +96,19 @@ namespace EditorUI.Widgets
                 _hasBadShapingData = false;
             }
 
-            return MeasureReturnData.Success;
+            return MeasureStatus.Success;
         }
 
         protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
         {
-            _lastIdealSize = _idealSize;
-            return base.LayoutSelf(in context);
-        }
-
-        protected internal override void FinalizeSelf(ref readonly LayoutContext context)
-        {
-            if (_hasBadShapingData)
+            if (_hasBadShapingData && _fontFamily != null && _fontFamily.IsReadyToUse)
             {
-                SetIdealSizeFor(context.LayoutLock);
+                SetIdealSizeFor(Parent?.SizeLockAxis ?? LayoutLockAxis.None);
                 _hasBadShapingData = false;
             }
 
+            _lastIdealSize = _layoutState.IdealSize;
+            return base.LayoutSelf(in context);
         }
 
         protected internal override void PaintSelf(ref PainterContext context)
@@ -132,7 +128,7 @@ namespace EditorUI.Widgets
                 if (_shapingData != null)
                 {
                     context.AddText(
-                        new Vector2(_computedRect.Minimum.X, _computedRect.Minimum.Y + _fontSize),
+                        new Vector2(_computedRect.Minimum.X, _computedRect.Maximum.Y),
                         _shapingData,
                         _computedRect.Size,
                         new Paint(_textColor));
@@ -146,15 +142,15 @@ namespace EditorUI.Widgets
             Guard.IsNotNull(_fontFamily);
 
             TextManager textManager = UIManager.Instance.TextManager;
-            TextBuilder textBuilder = new TextBuilder(_idealSize.X <= 0.0f ? float.PositiveInfinity : _idealSize.X, _wrapMode, _alignment, _allowRichText);
+            TextBuilder textBuilder = new TextBuilder(_layoutState.IdealSize.X <= 0.0f ? float.PositiveInfinity : _layoutState.IdealSize.X, _wrapMode, _alignment, _allowRichText);
 
             FontStyleData styleData = _fontFamily.Value!.GetFontStyle(_fontStyle, _fontWeight);
             textManager.GetOrShapeTextFor(this, ref _shapingData, _text, BuiltTextBuilder.Build(in textBuilder), styleData, _fontSize);
 
-            if (!lockAxis.HasFlags(LayoutLockAxis.AxisX) && !float.IsNegative(_idealSize.X) && _idealSize.X == 0.0f)
-                _idealSize.X = _shapingData.TotalSize.X;
-            if (!lockAxis.HasFlags(LayoutLockAxis.AxisY) && !float.IsNegative(_idealSize.Y) && _idealSize.Y == 0.0f)
-                _idealSize.Y = _shapingData.TotalSize.Y;
+            if (!lockAxis.HasFlags(LayoutLockAxis.AxisX) && !float.IsNegative(_layoutState.IdealSize.X) && _layoutState.IdealSize.X == 0.0f)
+                _layoutState.IdealSize.X = _layoutState.ContentSize.X = _shapingData.TotalSize.X;
+            if (!lockAxis.HasFlags(LayoutLockAxis.AxisY) && !float.IsNegative(_layoutState.IdealSize.Y) && _layoutState.IdealSize.Y == 0.0f)
+                _layoutState.IdealSize.Y = _layoutState.ContentSize.Y = _shapingData.TotalSize.Y;
         }
 
         [StyleUpdateCallback(nameof(FontFamily), nameof(FontStyle), nameof(FontWeight), nameof(FontSize), nameof(WrapMode),

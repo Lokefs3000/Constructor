@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using CommunityToolkit.Diagnostics;
+using Primary.Collections;
+using Primary.Editor;
 
 namespace PrimaryEditor.Inspector.Caching
 {
@@ -51,7 +54,21 @@ namespace PrimaryEditor.Inspector.Caching
                     throw new NotSupportedException(underlyingType.ToString());
                 }
 
-                valueData = new EnumValueData(underlyingType, underlyingTypeEnum, Enum.GetNames(type), [.. Enum.GetValuesAsUnderlyingType(type)]);
+                using RentedList<string> nameList = [.. Enum.GetNames(type)];
+                using RentedList<object> valueList = [.. Enum.GetValuesAsUnderlyingType(type)];
+
+                for (int i = 0; i < nameList.Count; ++i)
+                {
+                    if (type.GetField(nameList[i])!.GetCustomAttribute<InspectorHiddenAttribute>() != null)
+                    {
+                        nameList.RemoveAt(i);
+                        valueList.RemoveAt(i);
+
+                        --i;
+                    }
+                }
+
+                valueData = new EnumValueData(underlyingType, underlyingTypeEnum, [.. nameList], [.. valueList]);
             }
 
             return valueData;

@@ -13,6 +13,7 @@ using Primary.Input.Devices;
 using PrimaryEditor.Assets;
 using PrimaryEditor.Assets.Filesystem;
 using PrimaryEditor.Core;
+using PrimaryEditor.UI.Diagnostics;
 using PrimaryEditor.Windows.ContentBrowser;
 
 namespace PrimaryEditor.Windows
@@ -252,6 +253,8 @@ namespace PrimaryEditor.Windows
                     label.Parent = null;
                 }
             }
+
+            EditorRuntime.Instance.UIManager.InputManager.ForceInputUpdate();
         }
 
         private void CreateDefaultNodes()

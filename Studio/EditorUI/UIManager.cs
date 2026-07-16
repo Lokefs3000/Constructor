@@ -85,17 +85,17 @@ namespace EditorUI
 
         public void UpdateInternalData()
         {
-            _widgetManager.DestroyAllInQueue();
             _actionScheduler.FlushScheduledActions();
+            _widgetManager.DestroyAllInQueue();
 
             CheckDockHostsUpdateStates();
 
             _popupManager.Update();
             _styleManager.UpdateStylesForPending();
             _layoutManager.RecalculateAll();
-            _visualManager.RenderAll();
             _textManager.ClearPreviousTextData();
             _fontRenderer.RenderGlyphs();
+            _visualManager.RenderAll();
         }
 
         private void CheckDockHostsUpdateStates()

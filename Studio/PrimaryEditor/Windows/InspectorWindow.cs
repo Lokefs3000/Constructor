@@ -16,9 +16,6 @@ namespace PrimaryEditor.Windows
     public sealed class InspectorWindow : EditorWindow
     {
         private readonly GroupPool _groupPool;
-        private readonly WidgetPool _widgetPool;
-        private readonly PopulatorDatabase _populatorDatabase;
-
         private readonly Dictionary<int, WidgetGroup> _groups;
 
         private LayoutFrame? _valuesView;
@@ -26,9 +23,6 @@ namespace PrimaryEditor.Windows
         public InspectorWindow(WindowManager windowManager, ValueSerializer valueSerializer) : base(windowManager, valueSerializer)
         {
             _groupPool = new GroupPool(this);
-            _widgetPool = new WidgetPool(this);
-            _populatorDatabase = new PopulatorDatabase();
-
             _groups = new Dictionary<int, WidgetGroup>();
 
             InspectorManager inspector = EditorRuntime.Instance.InspectorManager;
@@ -45,13 +39,6 @@ namespace PrimaryEditor.Windows
         protected internal override void CleanupReloadSelf()
         {
             _valuesView = null;
-        }
-
-        protected override void PaintOverlay(ref readonly PainterContext painter)
-        {
-            base.PaintOverlay(in painter);
-
-            LayoutDebugRenderer.VisualizeStatic(in painter, RootWidget);
         }
 
         private void OnNewInspectionStart(InspectorContext context)
@@ -77,7 +64,5 @@ namespace PrimaryEditor.Windows
         }
 
         internal GroupPool GroupPool => _groupPool;
-        internal WidgetPool WidgetPool => _widgetPool;
-        internal PopulatorDatabase PopulatorDatabase => _populatorDatabase;
     }
 }

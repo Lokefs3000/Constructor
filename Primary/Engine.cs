@@ -40,6 +40,7 @@ namespace Primary
         private SystemManager _systemManager;
         private InputSystem _inputSystem;
         private ImGuiManager _imguiManager;
+        private JobScheduler _jobScheduler;
 
         public Engine(ReadOnlySpan<string> args)
         {
@@ -72,10 +73,12 @@ namespace Primary
             _systemManager = new SystemManager();
             _inputSystem = new InputSystem();
             _imguiManager = new ImGuiManager();
+            _jobScheduler = new JobScheduler();
         }
 
         public virtual void Dispose()
         {
+            _jobScheduler.Dispose();
             _imguiManager.Dispose();
             _assetManager.Dispose();
             _renderingManager.Dispose();
@@ -117,6 +120,7 @@ namespace Primary
         public ThreadHelper ThreadHelper => _threadHelper;
         public InputSystem InputSystem => _inputSystem;
         public ImGuiManager ImGuiManager => _imguiManager;
+        public JobScheduler JobScheduler => _jobScheduler;
 
         public static Engine GlobalSingleton => s_instance!;
 

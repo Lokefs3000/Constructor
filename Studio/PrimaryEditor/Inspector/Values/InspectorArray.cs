@@ -7,7 +7,7 @@ namespace PrimaryEditor.Inspector.Values
 {
     public class InspectorArray<TObject, T> : InspectorValue<TObject, T[]>, IInspectorObject, IInspectorArray
     {
-        internal InspectorArray(IInspectorObject? parentObject, InspectorValueSource valueSource) : base(parentObject, valueSource)
+        internal InspectorArray(IInspectorObject? parentObject, InspectorValueSource valueSource, string name) : base(parentObject, valueSource, name)
         {
         }
     }

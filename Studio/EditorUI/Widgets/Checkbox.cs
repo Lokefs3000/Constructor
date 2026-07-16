@@ -28,16 +28,16 @@ namespace EditorUI.Widgets
             _checkmarkThickness = 2.0f;
         }
 
-        protected internal override MeasureReturnData MeasureSelf(ref readonly LayoutContext context)
+        protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
         {
             base.MeasureSelf(in context);
 
-            if (_idealSize.X < _idealSize.Y)
-                _idealSize.Y = _idealSize.X;
+            if (_layoutState.IdealSize.X < _layoutState.IdealSize.Y)
+                _layoutState.IdealSize.Y = _layoutState.IdealSize.X;
             else
-                _idealSize.X = _idealSize.Y;
+                _layoutState.IdealSize.X = _layoutState.IdealSize.Y;
 
-            return MeasureReturnData.Success;
+            return MeasureStatus.Success;
         }
 
         protected internal override void PaintSelf(ref PainterContext context)
@@ -47,12 +47,12 @@ namespace EditorUI.Widgets
             if (_isChecked && _checkmarkThickness >= 1.0f && _checkmarkColor.IsVisible)
             {
                 float halfThickness = _checkmarkThickness * 0.5f;
-                Vector2 halfSize = _idealSize * 0.5f;
+                Vector2 halfSize = _layoutState.IdealSize * 0.5f;
 
                 CheckmarkLineBuffer lineBuffer = new CheckmarkLineBuffer
                 {
-                    Point0 = _computedRect.Minimum + new Vector2(_idealSize.X - halfThickness - 4.0f, halfThickness + 4.0f),
-                    Point1 = _computedRect.Minimum + new Vector2(halfSize.X, _idealSize.Y - halfThickness - 4.0f),
+                    Point0 = _computedRect.Minimum + new Vector2(_layoutState.IdealSize.X - halfThickness - 4.0f, halfThickness + 4.0f),
+                    Point1 = _computedRect.Minimum + new Vector2(halfSize.X, _layoutState.IdealSize.Y - halfThickness - 4.0f),
                     Point2 = _computedRect.Minimum + new Vector2(halfThickness + 3.0f, halfSize.Y)
                 };
 
@@ -60,14 +60,14 @@ namespace EditorUI.Widgets
             }
         }
 
-        public override void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public override bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
             if (inputEvent.EventType == UIInputEventType.MousePress && inputEvent.Mouse.Button == MouseButton.Left)
             {
                 IsChecked = !IsChecked;
             }
 
-            base.HandleEventSelf(in inputEvent);
+            return base.HandleEventSelf(in inputEvent);
         }
 
         #region Serializable

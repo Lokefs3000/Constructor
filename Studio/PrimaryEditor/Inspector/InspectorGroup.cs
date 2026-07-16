@@ -10,10 +10,12 @@ namespace PrimaryEditor.Inspector
 {
     public abstract class InspectorGroup
     {
+        private Type? _type;
         private List<IInspectorValue> _values;
 
         public InspectorGroup()
         {
+            _type = null;
             _values = new List<IInspectorValue>();
         }
 
@@ -23,21 +25,25 @@ namespace PrimaryEditor.Inspector
             {
                 InspectorManager inspector = EditorRuntime.Instance.InspectorManager;
 
+                _type = typeof(T);
+
                 _values.Clear();
                 if (inspector.DescriptionCache.TryGetDescription(typeof(T), out InspectorDescription? description))
                 {
                     InstantiateAll(description);
 
-                    void InstantiateAll(InspectorDescription description, IInspectorObject? parentObject = null)
+                    void InstantiateAll(InspectorDescription description, string? parentName = null, IInspectorObject? parentObject = null)
                     {
                         foreach (DescriptionValue value in description.Values)
                         {
-                            IInspectorValue inspectorValue = value.Instantiate(description.Type, parentObject);
+                            string valueName = parentName == null ? value.Name : $"{parentName}.{value.Name}";
+
+                            IInspectorValue inspectorValue = value.Instantiate(description.Type, parentObject, valueName);
                             _values.Add(inspectorValue);
 
                             if (value.Description != null)
                             {
-                                InstantiateAll(value.Description, (IInspectorObject)inspectorValue);
+                                InstantiateAll(value.Description, valueName, (IInspectorObject)inspectorValue);
                             }
                         }
                     }
@@ -88,6 +94,7 @@ namespace PrimaryEditor.Inspector
             }
         }
 
+        public Type Type => _type;
         public ROList<IInspectorValue> Values => _values;
 
         public abstract int UniqueHash { get; }

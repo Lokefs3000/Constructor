@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using Primary.Assets.Loaders;
 using Primary.Assets.Types;
 using Primary.Common;
+using Primary.Editor;
 using Primary.Serialization.Toml;
 using PrimaryEditor.Assets.Utility;
 using Tomlyn;
@@ -244,6 +245,7 @@ namespace Editor.Processors.Texture
         Grayscale,
         Normal,
         Specular,
+        [InspectorHidden]
         Cubemap
     }
 

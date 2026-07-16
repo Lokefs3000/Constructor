@@ -1,6 +1,9 @@
 ﻿using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 using CommunityToolkit.Diagnostics;
 using EditorUI.Common;
 using EditorUI.Input;
@@ -12,6 +15,7 @@ using EditorUI.Widgets.Stylists;
 using Primary;
 using Primary.Collections.ReadOnly;
 using Primary.Common;
+using Primary.Extensions;
 using Primary.Mathematics;
 using Primary.Utility;
 
@@ -48,10 +52,12 @@ namespace EditorUI.Widgets
         protected StrokePosition _strokePosition;
         protected ushort _strokeWidth;
 
-        // internal state
-        protected Vector2 _idealPosition;
-        protected Vector2 _idealSize;
-        protected Vector2 _viewSize;
+        // Internal state
+        protected WidgetLayoutState _layoutState;
+        protected LayoutLockAxis _positionLockAxis;
+        protected LayoutLockAxis _sizeLockAxis;
+
+        // This widgets rect in the window
         protected Boundaries _computedRect;
 
         protected StateFlags _stateFlags;
@@ -84,9 +90,10 @@ namespace EditorUI.Widgets
             _strokePosition = StrokePosition.Outside;
             _strokeWidth = 0;
 
-            _idealPosition = Vector2.Zero;
-            _idealSize = Vector2.Zero;
-            _viewSize = Vector2.Zero;
+            _layoutState = WidgetLayoutState.Zero;
+            _positionLockAxis = LayoutLockAxis.None;
+            _sizeLockAxis = LayoutLockAxis.None;
+
             _computedRect = Boundaries.Zero;
 
             _stateFlags = StateFlags.SelfInvalidLayout | StateFlags.SelfInvalidStyle;
@@ -113,44 +120,63 @@ namespace EditorUI.Widgets
             }
         }
 
-        protected internal virtual MeasureReturnData MeasureSelf(ref readonly LayoutContext context)
+        protected internal virtual MeasureStatus MeasureSelf(ref readonly LayoutContext context)
         {
             if (!context.LayoutLock.HasFlags(LayoutLockAxis.AxisX))
             {
                 if (_autoResize == AutoResizeMode.ResizeX || _autoResize == AutoResizeMode.ResizeXY)
-                    _idealSize.X = float.NegativeZero;
+                    _layoutState.IdealSize.X = float.NegativeZero;
                 else
-                    _idealSize.X = _size.X.Evaluate(context.ParentSize.X);
+                    _layoutState.IdealSize.X = _size.X.Evaluate(context.ParentSize.X);
             }
 
             if (!context.LayoutLock.HasFlags(LayoutLockAxis.AxisY))
             {
                 if (_autoResize == AutoResizeMode.ResizeY || _autoResize == AutoResizeMode.ResizeXY)
-                    _idealSize.Y = float.NegativeZero;
+                    _layoutState.IdealSize.Y = float.NegativeZero;
                 else
-                    _idealSize.Y = _size.Y.Evaluate(context.ParentSize.Y);
+                    _layoutState.IdealSize.Y = _size.Y.Evaluate(context.ParentSize.Y);
             }
 
-            return MeasureReturnData.Success;
+            _layoutState.ContentSize = _layoutState.IdealSize;
+            if (Vector4.GreaterThanAny(_padding, Vector4.Zero))
+                _layoutState.ContentSize -= _padding.GetLower() + _padding.GetUpper();
+
+            return MeasureStatus.Success;
         }
 
         protected internal virtual LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
         {
+            bool hasAnyMargin = Vector4.GreaterThanAny(_margin, Vector4.Zero);
+
             if (!context.LayoutLock.HasFlags(LayoutLockAxis.AxisX))
-                _idealPosition.X = _position.X.Evaluate(context.ParentSize.X);
+            {
+                _layoutState.IdealPosition.X = _position.X.Evaluate(context.ParentSize.X);
+                if (hasAnyMargin)
+                    _layoutState.IdealPosition.X += _margin.X;
+            }
+
             if (!context.LayoutLock.HasFlags(LayoutLockAxis.AxisY))
-                _idealPosition.Y = _position.Y.Evaluate(context.ParentSize.Y);
+            {
+                _layoutState.IdealPosition.Y = _position.Y.Evaluate(context.ParentSize.Y);
+                if (hasAnyMargin)
+                    _layoutState.IdealPosition.X += _margin.X;
+            }
 
             if (!_anchor.Equals(Vector2.Zero))
-                _idealPosition -= _anchor * _idealSize;
+                _layoutState.IdealPosition -= _anchor * _layoutState.IdealSize;
+
+            _layoutState.ContentPosition = _layoutState.IdealPosition;
+            if (_padding.X > 0.0f || _padding.Y > 0.0f)
+            {
+                _layoutState.ContentPosition.X += _padding.X;
+                _layoutState.ContentPosition.Y += _padding.Y;
+            }
+
             return LayoutReturnData.Success;
         }
 
-        protected internal virtual void PostLayoutSelf(ref readonly LayoutContext context)
-        {
-        }
-
-        protected internal virtual void FinalizeSelf(ref readonly LayoutContext context)
+        protected internal virtual void AfterComputedRectSelf()
         {
         }
 
@@ -166,7 +192,7 @@ namespace EditorUI.Widgets
             }
         }
 
-        public virtual void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public virtual bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
             switch (inputEvent.EventType)
             {
@@ -185,6 +211,8 @@ namespace EditorUI.Widgets
                 case UIInputEventType.KeyDown: OnKey?.Invoke(this, inputEvent.Key, true); break;
                 case UIInputEventType.KeyUp: OnKey?.Invoke(this, inputEvent.Key, false); break;
             }
+
+            return false;
         }
         #endregion
 
@@ -206,6 +234,7 @@ namespace EditorUI.Widgets
                 _parent = newParent;
 
                 AddStateFlags(StateFlags.SelfInvalidLayout | (_stateFlags & ~StateFlags.This));
+                UIManager.Instance.InputManager.ForceInputUpdate();
             }
         }
 
@@ -355,6 +384,30 @@ namespace EditorUI.Widgets
         #endregion
 
         #region Input
+        [StyleUpdateCallback(nameof(InputState))]
+        private void OnWidgetInputStateChanged()
+        {
+            if (!_isEnabled)
+                return;
+
+            switch (_inputState)
+            {
+                case WidgetInputState.Sink: UIManager.Instance.InputManager.ForceInputUpdate(); break;
+                case WidgetInputState.Passthrough: UIManager.Instance.InputManager.ForgetInteractable(this); break;
+                case WidgetInputState.Never: UIManager.Instance.InputManager.ForgetInteractable(this); break;
+                case WidgetInputState.Swallow: UIManager.Instance.InputManager.ForceInputUpdate(); break;
+            }
+        }
+
+        [StyleUpdateCallback(nameof(IsEnabled))]
+        private void OnWidgetEnableStateChanged()
+        {
+            if (_isEnabled)
+                UIManager.Instance.InputManager.ForceInputUpdate();
+            else
+                UIManager.Instance.InputManager.ForgetInteractable(this);
+        }
+
         public virtual IInteractable GetInteractable(Vector2 point) => this;
         #endregion
 
@@ -366,10 +419,18 @@ namespace EditorUI.Widgets
         public ROList<Widget> Children => _children ?? ROList<Widget>.Empty;
         public ROList<Stylist> Stylists => _stylists ?? ROList<Stylist>.Empty;
 
-        public Vector2 IdealSize { get => _idealSize; protected internal set => _idealSize = value; }
-        public Vector2 IdealPosition { get => _idealPosition; protected internal set => _idealPosition = value; }
-        public Vector2 ViewSize { get => _viewSize; protected internal set => _viewSize = value; }
+        public Vector2 IdealSize { get => _layoutState.IdealSize; protected internal set => _layoutState.IdealSize = value; }
+        public Vector2 IdealPosition { get => _layoutState.IdealPosition; protected internal set => _layoutState.IdealPosition = value; }
+
+        public Vector2 ContentPosition { get => _layoutState.ContentPosition; protected internal set => _layoutState.ContentPosition = value; }
+        public Vector2 ContentSize { get => _layoutState.ContentSize; protected internal set => _layoutState.ContentSize = value; }
+
+        public LayoutLockAxis PositionLockAxis { get => _positionLockAxis; protected internal set => _positionLockAxis = value; }
+        public LayoutLockAxis SizeLockAxis { get => _sizeLockAxis; protected internal set => _sizeLockAxis = value; }
+
         public Boundaries ComputedRect { get => _computedRect; protected internal set => _computedRect = value; }
+
+        internal ref WidgetLayoutState LayoutState => ref _layoutState;
 
         public override StateFlags StateFlags => _stateFlags;
 
@@ -429,8 +490,26 @@ namespace EditorUI.Widgets
         #region Serializable
         [Styled(nameof(_id), isEditable: true)] public string? Id { get => _id; set => SetEditedField(value); }
 
-        [Styled(nameof(_isEnabled), StateFlags.SelfInvalidLayout, true, true)] public bool IsEnabled { get => _isEnabled; set => SetEditedField(value); }
-        [Styled(nameof(_inputState), isEditable: true)] public WidgetInputState InputState { get => _inputState; set => SetEditedField(value); }
+        [Styled(nameof(_isEnabled), StateFlags.SelfInvalidLayout, true, true)]
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set
+            {
+                if (_isEnabled != value)
+                    SetEditedField(value);
+            }
+        }
+        [Styled(nameof(_inputState), isEditable: true)]
+        public WidgetInputState InputState
+        {
+            get => _inputState;
+            set
+            {
+                if (_inputState != value)
+                    SetEditedField(value);
+            }
+        }
 
         [Styled(nameof(_position), StateFlags.SelfInvalidLayout)] public UIValue2 Position { get => _position; set => SetStyledField(value); }
         [Styled(nameof(_size), StateFlags.SelfInvalidLayout)] public UIValue2 Size { get => _size; set => SetStyledField(value); }
@@ -451,9 +530,45 @@ namespace EditorUI.Widgets
         #endregion
     }
 
-    public readonly record struct LayoutBehaviour(bool AsGroup)
+    [StructLayout(LayoutKind.Explicit)]
+    public record struct WidgetLayoutState
     {
-        public static LayoutBehaviour Default => new LayoutBehaviour(false);
+        [FieldOffset(0)] internal Vector256<float> Vector;
+
+        [FieldOffset(sizeof(float) * 0)] internal Vector128<float> Position;
+        [FieldOffset(sizeof(float) * 4)] internal Vector128<float> Size;
+
+        [FieldOffset(sizeof(float) * 0)] public Vector2 IdealPosition;
+        [FieldOffset(sizeof(float) * 2)] public Vector2 ContentPosition;
+
+        [FieldOffset(sizeof(float) * 4)] public Vector2 IdealSize;
+        [FieldOffset(sizeof(float) * 6)] public Vector2 ContentSize;
+
+        public static WidgetLayoutState Zero => Vector256<float>.Zero;
+
+        public static implicit operator WidgetLayoutState(Vector256<float> vector) => Unsafe.BitCast<Vector256<float>, WidgetLayoutState>(vector);
+        public static implicit operator Vector256<float>(WidgetLayoutState layoutState) => Unsafe.BitCast<WidgetLayoutState, Vector256<float>>(layoutState);
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public record struct LayoutState
+    {
+        
+    }
+
+    public record struct LayoutGridState
+    {
+        
+    }
+
+    public readonly record struct LayoutBehaviour(bool AsGroup, bool ListenToChildren)
+    {
+        public LayoutBehaviour(LayoutBehaviour template) : this(template.AsGroup, template.ListenToChildren)
+        {
+        }
+
+        public static LayoutBehaviour Default => new LayoutBehaviour(false, false);
+        public static LayoutBehaviour Group => new LayoutBehaviour(true, false);
     }
 
     public delegate void WidgetEventHandler(Widget widget);
@@ -464,10 +579,17 @@ namespace EditorUI.Widgets
 
     public enum WidgetInputState : byte
     {
-        Sink = 0,       // sink inputs into this or children
-        Passthrough,    // don't allow this to have inputs but still allow children
-        Never,          // this nor it's children will get events
-        Swallow         // consume any inputs on without considering any children
+        /// <summary>Sink inputs into this or children</summary>
+        Sink = 0,
+        /// <summary>Don't allow this to have inputs but still allow children</summary>
+        Passthrough,
+        /// <summary>Neither this nor it's children will get events</summary>
+        Never,
+        /// <summary>Consume any inputs on without considering any children</summary>
+        Swallow,
+        /// <summary>Intercept any input that has not been consumed by a descendent</summary>
+        /// <remarks>Certain interactable specific events will not be propagated since it would result in a messed up state.<br/>fx. 2 interactables cannot both recieve a <see cref="UIInputEventType.MouseEnter"/> since only one can be under the mouse at any given time</remarks>
+        Intercept
     }
 
     public enum AutoResizeMode : byte
@@ -476,5 +598,115 @@ namespace EditorUI.Widgets
         ResizeX,
         ResizeY,
         ResizeXY
+    }
+
+    public enum OverflowMode : byte
+    {
+        Visible = 0,
+        Hidden,
+        Clip,
+        Scroll,
+    }
+
+    public enum ItemAlignment : byte
+    {
+        Center = 0,
+        Start,
+        End,
+        Baseline,
+        Stretch,
+    }
+
+    // Display data setup
+    //   Flow: 00000000000-bb-a
+    //   Flex: 0-hhhh-gg-ff-ee-bb-a
+    //   Grid: 000000000-d-c-bb-a
+
+    public enum DisplayOutside : ushort
+    {
+        /// <summary>Add flow break if there isn't enough space for this widget</summary>
+        Inline = 0b0,
+
+        /// <summary>Add flow break before and after this widget</summary>
+        Block = 0b1,
+
+        // Metadata
+
+        Shift = 0,
+        Mask = 0b1 << Shift,
+    }
+
+    public enum DisplayInside : ushort
+    {
+        /// <summary>Layout widgets after each other depending on their <see cref="Widget.DisplayOutside"/> property</summary>
+        Flow = 0b000,
+
+        /// <summary>Layout widgets according to the current flexbox setup</summary>
+        Flex = 0b010,
+
+        /// <summary>Layout widgets using a grid</summary>
+        Grid = 0b100,
+
+        // Metadata
+
+        Shift = 1,
+        Mask = 0b11 << Shift
+    }
+
+    public enum GridColumnsMethod : ushort
+    {
+        Automatic = 0b0,
+        Templated = 0b1,
+
+        // Metadata
+
+        RowShift = 3,
+        ColumnShift = 4,
+
+        RowMask = 0b1 << RowShift,
+        ColumnMask = 0b1 << ColumnShift
+    }
+
+    public enum FlexDirection : ushort
+    {
+        Row = 0b00,
+        RowReverse = 0b01,
+        Column = 0b10,
+        ColumnReverse = 0b11,
+
+        // Metadata
+
+        Shift = 3,
+        Mask = 0b11 << Shift
+    }
+
+    public enum FlexWrapMode : ushort
+    {
+        Dont = 0b00,
+        Wrap = 0b01,
+        WrapReverse = 0b10,
+
+        // Metadata
+
+        Shift = 5,
+        Mask = 0b11 << Shift
+    }
+
+    public enum FlexItemAlignment : ushort
+    {
+        Start           = 0b0000,
+        End             = 0b0001,
+        Left            = 0b0010,
+        Right           = 0b0011,
+        Center          = 0b0100,
+        SpaceAround     = 0b0101,
+        SpaceBetween    = 0b0110,
+        SpaceEvenly     = 0b0111,
+        Stretch         = 0b1000,
+
+        // Metadata
+
+        Shift = 7,
+        Mask = 0b1111 << Shift
     }
 }

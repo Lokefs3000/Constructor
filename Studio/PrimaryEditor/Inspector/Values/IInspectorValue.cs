@@ -12,9 +12,13 @@ namespace PrimaryEditor.Inspector.Values
         public ref OpaqueRef GetValueType();
         public object? GetObjectValue();
 
+        public void SetValueType<T>(T value) where T : unmanaged;
+        public void SetObject<T>(T? value) where T : class;
+
         public Type TargetType { get; }
         public IInspectorValue? OwningValue { get; }
 
+        public string Name { get; }
         public string TargetName { get; }
         public string FullTargetName { get; }
 

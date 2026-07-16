@@ -1,13 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using EditorUI.Mathematics;
 using EditorUI.Widgets;
 using Primary.Collections;
+using Primary.Collections.ReadOnly;
 using Primary.Utility;
+using PrimaryEditor.Core;
 using PrimaryEditor.Inspector;
+using PrimaryEditor.Inspector.Pooling;
 using PrimaryEditor.Inspector.Values;
+using PrimaryEditor.Inspector.Views;
+using PrimaryEditor.Inspector.Widgets;
 
 namespace PrimaryEditor.Windows.Inspector
 {
@@ -16,6 +23,8 @@ namespace PrimaryEditor.Windows.Inspector
         private readonly InspectorWindow _window;
 
         private int _uniqueHash;
+        private ViewDescription? _viewDescription;
+
         private readonly List<InspectorGroup> _groups;
         private readonly Dictionary<int, InspectorWidget> _widgets;
 
@@ -28,6 +37,7 @@ namespace PrimaryEditor.Windows.Inspector
             _window = window;
 
             _uniqueHash = -1;
+            _viewDescription = null;
 
             _groups = new List<InspectorGroup>();
             _widgets = new Dictionary<int, InspectorWidget>();
@@ -35,7 +45,8 @@ namespace PrimaryEditor.Windows.Inspector
             _containerFrame = new LayoutFrame
             {
                 Size = UIValue2.MaxX,
-                AutoResize = AutoResizeMode.ResizeY
+                AutoResize = AutoResizeMode.ResizeY,
+                Scrollbars = Scrollbars.None
             };
 
             _containerFrame.TryAddClass("value-list");
@@ -60,9 +71,18 @@ namespace PrimaryEditor.Windows.Inspector
             GC.SuppressFinalize(this);
         }
 
-        internal void SetupGroupForHash(int uniqueHash)
+        internal void SetupGroupForHash(InspectorGroup group)
         {
-            _uniqueHash = uniqueHash;
+            _uniqueHash = group.UniqueHash;
+
+            if (EditorRuntime.Instance.InspectorManager.ViewManager.TryGetCustomView(group.Type, out ViewDescription? view))
+            {
+                _viewDescription = view;
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
         }
 
         internal void AddGroup(InspectorGroup group)
@@ -71,42 +91,119 @@ namespace PrimaryEditor.Windows.Inspector
 
             if (_groups.AddUnique(group))
             {
-                RentedList<ChildStack> previousChildIndexStack = [new ChildStack(null, _containerFrame, _containerFrame.Children.Count)];
-
-                foreach (IInspectorValue inspectorValue in group.Values)
+                if (_viewDescription != null)
                 {
-                    ref ChildStack data = ref previousChildIndexStack[^1];
-                    if (previousChildIndexStack.Count > 1)
+                    SetupForCustomView(_viewDescription, group.Values);
+                }
+                else
+                {
+                    throw new NotImplementedException();
+                }
+            }
+        }
+
+        private void SetupForCustomView(ViewDescription viewDescription, ROList<IInspectorValue> inspectorValues)
+        {
+            SetupSubValues(viewDescription.Values, _containerFrame);
+
+            void SetupSubValues(ImmutableArray<ViewObject> values, Widget parentWidget)
+            {
+                foreach (ViewObject value in values)
+                {
+                    if (value is ViewField field)
                     {
-                        while (previousChildIndexStack[^1].Object != inspectorValue.OwningValue && previousChildIndexStack.Count > 1)
+                        IInspectorValue? inspectorValue = FindInspectorValueFor(field.FieldSource);
+                        if (inspectorValue != null)
                         {
-                            previousChildIndexStack.RemoveAt(previousChildIndexStack.Count - 1);
+                            InspectorWidgetField widgetField = GetFieldWidget(field);
+                            widgetField.AddDisplaySource(inspectorValue, inspectorValues);
+
+                            parentWidget.AddChild(widgetField.RootWidget);
                         }
-
-                        data = ref previousChildIndexStack[^1];
+                        else
+                        {
+                            EdLog.Inspector.Warning("Failed to find inspector value for custom view field '{n}'", field.FieldSource.Name);
+                            continue;
+                        }
                     }
-
-                    if (_widgets.TryGetValue(inspectorValue.UniqueHash, out InspectorWidget? widget))
+                    else if (value is ViewGroup group && !group.Values.IsEmpty)
                     {
-                        widget.AddValueSource(inspectorValue);
-                        data.PreviousChildIndex = data.Widget.Children.IndexOf(widget.RootWidget);
+                        InspectorWidgetGroup widgetGroup = GetGroupWidget(group);
+                        widgetGroup.AddDisplaySource(null, inspectorValues);
+
+                        parentWidget.AddChild(widgetGroup.RootWidget);
+                        SetupSubValues(group.Values, group.Conditions.IsEmpty ? parentWidget : widgetGroup.RootWidget);
                     }
-                    else
+                    else if (value is ViewPreset preset && (preset.Presets.Count > 0 || !preset.Values.IsEmpty))
                     {
-                        widget = _window.WidgetPool.GetWidgetForValue(inspectorValue);
+                        InspectorWidgetPreset widgetPreset = GetPresetWidget(preset);
+                        widgetPreset.AddDisplaySource(null, inspectorValues);
 
-                        data.Widget.AddChild(widget.RootWidget);
-                        data.Widget.TryMoveChild(widget.RootWidget, ++data.PreviousChildIndex);
-
-                        _widgets.Add(inspectorValue.UniqueHash, widget);
-                    }
-
-                    if (inspectorValue is IInspectorObject obj)
-                    {
-                        Widget newWidget = ((InspectorWidgetObject)widget).ChildWidget;
-                        previousChildIndexStack.Add(new ChildStack(obj, newWidget, newWidget.Children.Count));
+                        parentWidget.AddChild(widgetPreset.RootWidget);
+                        SetupSubValues(preset.Values, widgetPreset.ChildWidget);
                     }
                 }
+            }
+
+            IInspectorValue? FindInspectorValueFor(ViewSource source)
+            {
+                foreach (IInspectorValue inspectorValue in inspectorValues)
+                {
+                    if (source.Type == inspectorValue.TargetType && inspectorValue.Name == source.Name)
+                    {
+                        return inspectorValue;
+                    }
+                }
+
+                return null;
+            }
+
+            InspectorWidgetField GetFieldWidget(ViewField field)
+            {
+                int hashCode = field.GetHashCode();
+                ref InspectorWidget? inspectorWidget = ref CollectionsMarshal.GetValueRefOrAddDefault(_widgets, hashCode, out bool exists);
+
+                if (!exists)
+                {
+                    InspectorWidgetPool pool = EditorRuntime.Instance.InspectorManager.InspectorWidgetPool;
+                    inspectorWidget = pool.GetPooledWidget<InspectorWidgetField>();
+
+                    ((InspectorWidgetField)inspectorWidget).SetupForDisplay(field);
+                }
+
+                return (InspectorWidgetField)inspectorWidget!;
+            }
+
+            InspectorWidgetGroup GetGroupWidget(ViewGroup group)
+            {
+                int hashCode = group.GetHashCode();
+                ref InspectorWidget? inspectorWidget = ref CollectionsMarshal.GetValueRefOrAddDefault(_widgets, hashCode, out bool exists);
+
+                if (!exists)
+                {
+                    InspectorWidgetPool pool = EditorRuntime.Instance.InspectorManager.InspectorWidgetPool;
+                    inspectorWidget = pool.GetPooledWidget<InspectorWidgetGroup>();
+
+                    ((InspectorWidgetGroup)inspectorWidget).SetupForDisplay(group);
+                }
+
+                return (InspectorWidgetGroup)inspectorWidget!;
+            }
+
+            InspectorWidgetPreset GetPresetWidget(ViewPreset preset)
+            {
+                int hashCode = preset.GetHashCode();
+                ref InspectorWidget? inspectorWidget = ref CollectionsMarshal.GetValueRefOrAddDefault(_widgets, hashCode, out bool exists);
+
+                if (!exists)
+                {
+                    InspectorWidgetPool pool = EditorRuntime.Instance.InspectorManager.InspectorWidgetPool;
+                    inspectorWidget = pool.GetPooledWidget<InspectorWidgetPreset>();
+
+                    ((InspectorWidgetPreset)inspectorWidget).SetupForDisplay(preset);
+                }
+
+                return (InspectorWidgetPreset)inspectorWidget!;
             }
         }
 

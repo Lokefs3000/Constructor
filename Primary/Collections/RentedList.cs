@@ -52,7 +52,7 @@ namespace Primary.Collections
             if (_array != Array.Empty<T>())
             {
                 if (_clearOnReturn)
-                    Array.Clear(_array);
+                    Array.Clear(_array, 0, _count);
 
                 _sourcePool.Return(_array);
                 _array = Array.Empty<T>();

@@ -39,17 +39,29 @@ namespace EditorUI.Widgets
             _imageTint = Color.White;
         }
 
-        protected internal override MeasureReturnData MeasureSelf(ref readonly LayoutContext context)
+        protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
         {
             base.MeasureSelf(in context);
 
             switch (_aspectSource)
             {
-                case AspectSource.X: _idealSize.Y = _idealSize.X * _aspectRatio; break;
-                case AspectSource.Y: _idealSize.X = _idealSize.Y * _aspectRatio; break;
+                case AspectSource.X:
+                    {
+                        float aspectY = _layoutState.IdealSize.X * _aspectRatio;
+                        _layoutState.ContentSize.Y += aspectY - _layoutState.IdealSize.Y;
+                        _layoutState.IdealSize.Y = aspectY;
+                        break;
+                    }
+                case AspectSource.Y:
+                    {
+                        float aspectX = _layoutState.IdealSize.Y * _aspectRatio;
+                        _layoutState.ContentSize.X += aspectX - _layoutState.IdealSize.X;
+                        _layoutState.IdealSize.X = aspectX;
+                        break;
+                    }
             }
 
-            return MeasureReturnData.Success;
+            return MeasureStatus.Success;
         }
 
         protected internal override void PaintSelf(ref PainterContext context)

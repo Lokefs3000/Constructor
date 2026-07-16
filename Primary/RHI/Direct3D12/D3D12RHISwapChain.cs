@@ -179,7 +179,7 @@ namespace Primary.RHI.Direct3D12
             {
                 //TODO: exception handling
                 _device.FlushPendingMessages();
-                throw new Exception(hr.ToString());
+                throw new D3D12RHIException("Failed to present", hr.Value);
             }
 
             _nativeRep->ActiveBufferIndex = (int)_swapChain.GetCurrentBackBufferIndex();

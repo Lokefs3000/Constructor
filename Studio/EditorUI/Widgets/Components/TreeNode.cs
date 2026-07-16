@@ -84,7 +84,7 @@ namespace EditorUI.Widgets.Components
             }
         }
 
-        public override void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public override bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
             switch (inputEvent.EventType)
             {
@@ -92,13 +92,13 @@ namespace EditorUI.Widgets.Components
                     {
                         _isHovered = true;
                         TryUpdateCurrentStylist();
-                        break;
+                        return true;
                     }
                 case UIInputEventType.MouseLeave:
                     {
                         _isHovered = false;
                         TryUpdateCurrentStylist();
-                        break;
+                        return true;
                     }
 
                 case UIInputEventType.MouseDown:
@@ -108,10 +108,14 @@ namespace EditorUI.Widgets.Components
                             if (!InputSystem.Keyboard.KeyModifiers.HasAny(KeyModifier.Control))
                                 ParentTree?.ClearSelectedNodes();
                             Select();
+
+                            return true;
                         }
                         break;
                     }
             }
+
+            return false;
         }
 
         private void TryUpdateCurrentStylist()

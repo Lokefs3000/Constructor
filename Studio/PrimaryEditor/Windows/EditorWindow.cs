@@ -4,14 +4,17 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using CommunityToolkit.Diagnostics;
 using EditorUI;
+using EditorUI.Layout;
 using EditorUI.Serialization;
 using EditorUI.Styling;
+using EditorUI.Visual;
 using EditorUI.Widgets;
 using EditorUI.Windowing;
 using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Threading;
 using PrimaryEditor.Assets;
+using PrimaryEditor.UI.Diagnostics;
 
 namespace PrimaryEditor.Windows
 {
@@ -19,6 +22,8 @@ namespace PrimaryEditor.Windows
     {
         private UILayoutAsset? _layoutAsset;
         private int _currentLayoutLoadIndex;
+
+        private LayoutDebugRenderer? _debugRenderer;
 
         protected EditorWindow(WindowManager windowManager, ValueSerializer valueSerializer) : base(windowManager, valueSerializer)
         {
@@ -42,6 +47,22 @@ namespace PrimaryEditor.Windows
 
             _layoutAsset = AssetManager.LoadAsset<UILayoutAsset>(assetName);
             AssetManager.ListenForAssetLoad(_layoutAsset, this, OnAssetCallback);
+        }
+
+        protected void EnableDebugRenderer()
+        {
+            _debugRenderer = new LayoutDebugRenderer(this);
+        }
+
+        protected void DisableDebugRenderer()
+        {
+            _debugRenderer = null;
+        }
+
+        protected override void PaintOverlay(ref readonly PainterContext painter)
+        {
+            _debugRenderer?.Visualize(in painter, RootWidget);
+            base.PaintOverlay(in painter);
         }
 
         private void OnAssetCallback(UILayoutAsset layoutAsset, bool wasReloaded)
@@ -83,5 +104,7 @@ namespace PrimaryEditor.Windows
 
         internal UILayoutAsset? LayoutAsset => _layoutAsset;
         internal int CurrentLayoutLoadIndex => _currentLayoutLoadIndex;
+
+        public override ILayoutReporter? LayoutReporter => _debugRenderer;
     }
 }

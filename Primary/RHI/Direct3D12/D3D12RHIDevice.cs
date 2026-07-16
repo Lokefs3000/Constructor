@@ -85,19 +85,27 @@ namespace Primary.RHI.Direct3D12
                 if (description.EnableValidation)
                     flags |= DXGI.CreateFactoryDebug;
 
-                HResult hr = DXGI.CreateDXGIFactory2(flags, out _factory);
+                ComPtr<IDXGIFactory7> factoryComPtr;
+
+                HResult hr = DXGI.CreateDXGIFactory2(flags, out factoryComPtr);
                 if (hr.IsFailure)
                 {
                     throw new D3D12RHIException($"Failed to create DXGI factory with error", hr.Value);
                 }
+
+                _factory = factoryComPtr;
             }
 
             {
-                HResult hr = _factory.EnumAdapterByGpuPreference(0, GpuPreference.HighPerformance, out _adapter);
+                ComPtr<IDXGIAdapter4> adapterComPtr;
+
+                HResult hr = _factory.EnumAdapterByGpuPreference(0, GpuPreference.HighPerformance, out adapterComPtr);
                 if (hr.IsFailure)
                 {
                     throw new D3D12RHIException($"Failed to enumerate for a valid DXGI adapter", hr.Value);
                 }
+
+                _adapter = adapterComPtr;
             }
 
             //Video budget
@@ -122,14 +130,18 @@ namespace Primary.RHI.Direct3D12
             //D3D12
             if (description.EnableValidation)
             {
-                HResult hr = D3D12.GetDebugInterface(out _debug);
+                ComPtr<ID3D12Debug6> debugComPtr = default;
+
+                HResult hr = D3D12.GetDebugInterface(out debugComPtr);
                 if (hr.IsSuccess)
                 {
-                    _debug.EnableDebugLayer();
-                    _debug.SetEnableAutoName(true);
+                    debugComPtr.EnableDebugLayer();
+                    debugComPtr.SetEnableAutoName(true);
                 }
                 else
                     _logger?.Warning("Failed to query D3D12 debug interface!");
+
+                _debug = debugComPtr;
             }
 
             {
@@ -142,11 +154,6 @@ namespace Primary.RHI.Direct3D12
                 }
 
                 _device = deviceComPtr;
-
-                if (_device.Handle == null)
-                {
-                    throw new D3D12RHIException($"D3D12 device handle is null!");
-                }
             }
 
             //Validate device features
@@ -235,12 +242,15 @@ namespace Primary.RHI.Direct3D12
             }
 
             {
-                if (new HResult(_device.QueryInterface(out _infoQueue1)).IsSuccess)
+                ComPtr<ID3D12InfoQueue1> infoQueue1ComPtr;
+
+                if (new HResult(_device.QueryInterface(out infoQueue1ComPtr)).IsSuccess)
                 {
-                    //_infoQueue1.Get()->RegisterMessageCallback()
+                    //infoQueue1ComPtr.Get()->RegisterMessageCallback()
                 }
 
-                if (new HResult(_device.QueryInterface(out _infoQueue)).IsSuccess)
+                ComPtr<ID3D12InfoQueue> infoQueueComPtr;
+                if (new HResult(_device.QueryInterface(out infoQueueComPtr)).IsSuccess)
                 {
                     fixed (MessageSeverity* ptr0 = s_allowedSeverities)
                     {
@@ -260,21 +270,28 @@ namespace Primary.RHI.Direct3D12
                                 }
                             };
 
-                            _infoQueue.ClearStorageFilter();
-                            _infoQueue.PushStorageFilter(&filter);
+                            infoQueueComPtr.ClearStorageFilter();
+                            infoQueueComPtr.PushStorageFilter(&filter);
                         }
                     }
 
-                    //_infoQueue.Get()->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
-                    //_infoQueue.Get()->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+                    //infoQueueComPtr.Get()->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+                    //infoQueueComPtr.Get()->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
                 }
 
-                if (new HResult(_device.QueryInterface(out _dredSettings)).IsSuccess)
+                _infoQueue = infoQueueComPtr;
+                _infoQueue1 = infoQueue1ComPtr;
+
+                ComPtr<ID3D12DeviceRemovedExtendedDataSettings1> dredSettingsComPtr;
+
+                if (new HResult(_device.QueryInterface(out dredSettingsComPtr)).IsSuccess)
                 {
-                    _dredSettings.SetAutoBreadcrumbsEnablement(DredEnablement.ForcedOn);
-                    _dredSettings.SetBreadcrumbContextEnablement(DredEnablement.ForcedOn);
-                    _dredSettings.SetPageFaultEnablement(DredEnablement.ForcedOn);
+                    dredSettingsComPtr.SetAutoBreadcrumbsEnablement(DredEnablement.ForcedOn);
+                    dredSettingsComPtr.SetBreadcrumbContextEnablement(DredEnablement.ForcedOn);
+                    dredSettingsComPtr.SetPageFaultEnablement(DredEnablement.ForcedOn);
                 }
+
+                _dredSettings = dredSettingsComPtr;
             }
 
             {
@@ -286,25 +303,33 @@ namespace Primary.RHI.Direct3D12
                     NodeMask = 0
                 };
 
-                HResult hr = _device.CreateCommandQueue(&desc, out _directCmdQueue);
+                ComPtr<ID3D12CommandQueue> commandQueueComPtr;
+
+                HResult hr = _device.CreateCommandQueue(&desc, out commandQueueComPtr);
                 if (hr.IsFailure)
                 {
                     throw new D3D12RHIException($"Failed to create direct command queue", hr.Value);
                 }
 
+                _directCmdQueue = commandQueueComPtr;
+
                 desc.Type = CommandListType.Compute;
-                hr = _device.CreateCommandQueue(&desc, out _computeCmdQueue);
+                hr = _device.CreateCommandQueue(&desc, out commandQueueComPtr);
                 if (hr.IsFailure)
                 {
                     throw new D3D12RHIException($"Failed to create compute command queue", hr.Value);
                 }
 
+                _computeCmdQueue = commandQueueComPtr;
+
                 desc.Type = CommandListType.Copy;
-                hr = _device.CreateCommandQueue(&desc, out _copyCmdQueue);
+                hr = _device.CreateCommandQueue(&desc, out commandQueueComPtr);
                 if (hr.IsFailure)
                 {
                     throw new D3D12RHIException($"Failed to create compute copy queue", hr.Value);
                 }
+
+                _copyCmdQueue = commandQueueComPtr;
             }
 
             {

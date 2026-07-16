@@ -36,6 +36,7 @@
     stroke-position: Outside;
     layout-direction: Horizontal;
     item-padding: 16;
+    scrollbars: None;
 }
 
 .toolbar-group {
@@ -43,6 +44,7 @@
     auto-resize: ResizeX;
     layout-direction: Horizontal;
     item-padding: 4;
+    scrollbars: None;
 }
 
 .toolbar-button {
@@ -70,6 +72,7 @@ button {
     background-color: $default-button-colour;
     stroke-color: $default-button-border-colour;
     stroke-width: 1;
+    stroke-position: Inside;
     corner-radius: 4 4 4 4;
     padding: 4 4 4 4;
 
@@ -114,7 +117,7 @@ dropdownField {
 }
 
 checkbox {
-    checkmark-color: White;
+    checkmark-color: #ffffffbb;
 }
 
 contextMenu {
@@ -145,6 +148,28 @@ popupMenuMenu {
 
 popupMenuSeparator {
     foreground-color: $default-button-colour;
+}
+
+dropdownMenuHost {
+    font-family: $primary-font-family;
+    font-size: 14;
+    background-color: $primary-bg-colour;
+    stroke-color: $primary-deep-bg-colour;
+    stroke-width: 1;
+    stroke-position: Outside;
+}
+
+dropdownItem {
+    background-color: none;
+    text-color: $primary-text-colour;
+
+    !:is-hovered {
+        background-color: $hovered-button-colour;
+    }
+
+    !:is-active {
+        background-color: $selected-highlight-color;
+    }
 }
 
 windowDock {

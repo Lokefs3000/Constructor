@@ -4,7 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <FileVersion>1.0.31.0</FileVersion>
+    <FileVersion>1.0.39.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="runtimes\win-x64\native\" />

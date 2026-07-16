@@ -41,21 +41,23 @@ namespace EditorUI.Popup.Menu
             painter.AddRectangle(new Boundaries(originPosition, originPosition + new Vector2(availableWidth, _itemHeight)), new Paint(_foregroundColor));
         }
 
-        public override void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public override bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
             switch (inputEvent.EventType)
             {
                 case UIInputEventType.MouseEnter:
                     {
                         _owningMenu.BeginItemHover(this);
-                        break;
+                        return true;
                     }
                 case UIInputEventType.MouseLeave:
                     {
                         _owningMenu.EndItemHover(this);
-                        break;
+                        return true;
                     }
             }
+
+            return false;
         }
 
         protected internal override void ClearSavedData()

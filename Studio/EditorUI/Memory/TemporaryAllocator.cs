@@ -54,6 +54,12 @@ namespace EditorUI.Memory
             *ptr = value;
         }
 
+        public unsafe nint GetNativePointer(int size)
+        {
+            void* ptr = (void*)_allocator.Allocate(size);
+            return (nint)ptr;
+        }
+
         public unsafe Span<byte> AsSpan() => new Span<byte>(_allocator.Pointer.ToPointer(), _allocator.CurrentOffset);
 
         public int CurrentDataOffset => _allocator.CurrentOffset;

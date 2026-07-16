@@ -20,8 +20,6 @@ namespace EditorUI.Popup.Menu
 {
     public sealed class ContextMenu : PopupMenu
     {
-        private readonly StylesheetProvider _stylesheetProvider;
-
         private List<PopupMenuItem> _items;
         private List<PopupMenuMenu> _currentMenuStack;
 
@@ -46,8 +44,6 @@ namespace EditorUI.Popup.Menu
 
         public ContextMenu()
         {
-            _stylesheetProvider = new StylesheetProvider(UIManager.Instance.ValueSerializer);
-
             _items = new List<PopupMenuItem>();
             _currentMenuStack = new List<PopupMenuMenu>();
 
@@ -71,7 +67,7 @@ namespace EditorUI.Popup.Menu
             _backgroundColor = Color.White;
         }
 
-        public override void Destroy()
+        public void Destroy()
         {
             ThrowIfLocked();
 
@@ -84,7 +80,16 @@ namespace EditorUI.Popup.Menu
 
             _currentMenuStack.Clear();
             _items.Clear();
-            _stylesheetProvider.Dispose();
+        }
+
+        protected internal override void StartHostingSelf(Window window)
+        {
+        }
+
+        protected internal override void CleanupSelf()
+        {
+            UIManager.Instance.InputManager.ForgetInteractable(this);
+            _currentMenuStack.Clear();
         }
 
         internal override void Lock()
@@ -127,7 +132,7 @@ namespace EditorUI.Popup.Menu
             }
         }
 
-        protected internal override void PaintSelf(ref readonly PainterContext painter, Vector2 originPosition, Window window)
+        protected internal override void PaintSelf(ref readonly PainterContext painter, Window window)
         {
             if (_fontFamily == null || !_fontFamily.IsReadyToUse)
                 return;
@@ -156,8 +161,9 @@ namespace EditorUI.Popup.Menu
             }
         }
 
-        public override void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public override bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
+            return false;
         }
 
         internal override void BeginItemHover(PopupMenuItem item)
@@ -188,7 +194,7 @@ namespace EditorUI.Popup.Menu
             if (item is PopupMenuAction action)
             {
                 OnItemPressed?.Invoke(action.Name);
-                UIManager.Instance.PopupManager.CloseMenu(this);
+                UIManager.Instance.PopupManager.ClosePopup(this);
             }
             else if (item is PopupMenuMenu)
             {
@@ -336,7 +342,6 @@ namespace EditorUI.Popup.Menu
         [Styled(nameof(_backgroundColor))] public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
         #endregion
 
-        public override StylesheetProvider StylesheetProvider => _stylesheetProvider;
         public override StateFlags StateFlags => _stateFlags;
 
         public override bool IsMenuLocked => _isMenuLocked;

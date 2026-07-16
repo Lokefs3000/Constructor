@@ -17,38 +17,40 @@ namespace EditorUI.Widgets
             _isHeld = false;
         }
 
-        public override void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public override bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
+            base.HandleEventSelf(in inputEvent);
+
             switch (inputEvent.EventType)
             {
                 case UIInputEventType.MouseEnter:
                     {
                         _isHovered = true;
                         SetEditedField(true, nameof(IsHovered));
-                        break;
+                        return true;
                     }
                 case UIInputEventType.MouseLeave:
                     {
                         _isHovered = false;
                         SetEditedField(false, nameof(IsHovered));
-                        break;
+                        return true;
                     }
 
                 case UIInputEventType.MouseDown:
                     {
                         _isHeld = true;
                         SetEditedField(true, nameof(IsHeld));
-                        break;
+                        return true;
                     }
                 case UIInputEventType.MouseUp:
                     {
                         _isHeld = false;
                         SetEditedField(false, nameof(IsHeld));
-                        break;
+                        return true;
                     }
             }
 
-            base.HandleEventSelf(in inputEvent);
+            return false;
         }
 
         #region Serializable

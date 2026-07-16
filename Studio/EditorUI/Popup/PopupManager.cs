@@ -6,16 +6,19 @@ using System.Text;
 using EditorUI.Popup.Menu;
 using EditorUI.Styling;
 using EditorUI.Windowing;
+using Primary.Collections.ReadOnly;
 using Primary.Common;
 using Primary.Input;
 using Primary.Mathematics;
 using Primary.Windowing;
+using TerraFX.Interop.Windows;
+using TerraFX.Interop.WinRT;
 
 namespace EditorUI.Popup
 {
     public sealed class PopupManager : IDisposable
     {
-        private PopupHost? _currentPopup;
+        private PopupWindowHost? _popupWindowHost;
         private Window? _popupWindow;
 
         private Window? _currentParentWindow;
@@ -24,7 +27,7 @@ namespace EditorUI.Popup
 
         internal PopupManager()
         {
-            _currentPopup = null;
+            _popupWindowHost = null;
             _popupWindow = null;
 
             _currentParentWindow = null;
@@ -36,7 +39,7 @@ namespace EditorUI.Popup
             {
                 if (disposing)
                 {
-                    _currentPopup?.Destroy();
+                    _popupWindowHost?.Destroy();
                     _popupWindow?.Dispose();
 
                     _currentParentWindow?.OnDestroy -= OnDestroyParentWindowCallback;
@@ -54,77 +57,36 @@ namespace EditorUI.Popup
 
         internal void Update()
         {
-            if (_currentPopup != null && _popupWindow != null)
+            if (_popupWindowHost != null && _popupWindow != null && _popupWindowHost.Hosting != null)
             {
-                _currentPopup.Update();
+                _popupWindowHost.Hosting.UpdateSelf(_popupWindow);
 
-                if (_currentPopup is ISingleStyledObject singleStyledObject)
-                {
-                    StateFlags menuStateFlags = _currentPopup.MenuStateFlags;
-                    if (menuStateFlags.HasFlags(StateFlags.InvalidStyle) || singleStyledObject.StylesheetProvider.HasChangedStylesheets)
-                        UIManager.Instance.StyleManager.UpdateSingleStyling(singleStyledObject);
-                }
+                StateFlags menuStateFlags = _popupWindowHost.Hosting.StateFlags;
+                if (menuStateFlags.HasFlags(StateFlags.InvalidStyle) || _popupWindowHost.StylesheetProvider.HasChangedStylesheets)
+                    UIManager.Instance.StyleManager.UpdateSingleStyling(_popupWindowHost);
             }
         }
 
-        [MemberNotNull(nameof(_popupWindow))]
+        [MemberNotNull(nameof(_popupWindow), nameof(_popupWindowHost))]
         private void CreateWindowIfNull()
         {
             _popupWindow ??= Primary.Windowing.WindowManager.Instance.CreateWindow("__POPUP", new Int2(200), CreateWindowFlags.Hidden | CreateWindowFlags.Borderless | CreateWindowFlags.Transparent);
             _popupWindow.IsModal = true;
+
+            _popupWindowHost ??= new PopupWindowHost(_popupWindow);
         }
 
         private void CloseCurrentPopup()
         {
-            if (_currentPopup != null)
+            if (_popupWindowHost?.Hosting != null)
             {
-                _currentPopup.Destroy();
-                _currentPopup = null;
+                _popupWindowHost.CleanupHosting();
             }
         }
 
-        public void OpenMenu(PopupMenu popupMenu)
+        public void ClosePopup(PopupHost popupHost)
         {
-            Window? targetWindow = null;
-
-            WindowBase? currentWindowFocus = UIManager.Instance.WindowManager.CurrentWindowFocus;
-            if (currentWindowFocus?.Parent?.Host != null)
-            {
-                targetWindow = currentWindowFocus.Parent.Host.OwnedWindow;
-            }
-            else
-            {
-                targetWindow = Primary.Windowing.WindowManager.Instance.ActiveWindow;
-            }
-
-            UIManager.Instance.ActionScheduler.TryScheduleUnique(this, static (key, argsRaw) =>
-            {
-                PopupManager @this = (PopupManager)key;
-                PopupMenuArgs args = (PopupMenuArgs)argsRaw!;
-
-                if (@this._currentPopup != null)
-                    @this.CloseCurrentPopup();
-
-                @this.CreateWindowIfNull();
-
-                if (args.ParentWindow != null && !args.ParentWindow.IsDestroyed)
-                {
-                    @this._popupWindow.Parent = args.ParentWindow;
-                    @this._currentParentWindow = args.ParentWindow;
-
-                    args.ParentWindow!.OnDestroy += @this.OnDestroyParentWindowCallback;
-                }
-
-                @this._currentPopup = new PopupMenuHost(args.Menu, @this._popupWindow);
-
-                @this._popupWindow.Position = InputSystem.Pointer.GlobalMousePosition;
-                @this._popupWindow.Show();
-            }, new PopupMenuArgs(popupMenu, targetWindow));
-        }
-
-        public void CloseMenu(PopupMenu popupMenu)
-        {
-            if (_currentPopup is PopupMenuHost menuHost && menuHost.HostedPopupMenu == popupMenu)
+            if (_popupWindowHost?.Hosting == popupHost)
             {
                 CloseCurrentPopup();
 
@@ -139,6 +101,50 @@ namespace EditorUI.Popup
             }
         }
 
+        private void OpenPopup(PopupHost popupHost)
+        {
+            Window? targetWindow = null;
+
+            WindowBase? currentWindowFocus = UIManager.Instance.WindowManager.CurrentWindowFocus;
+            if (currentWindowFocus?.Parent?.Host != null)
+            {
+                targetWindow = currentWindowFocus.Parent.Host.OwnedWindow;
+            }
+            else
+            {
+                targetWindow = Primary.Windowing.WindowManager.Instance.ActiveWindow;
+            }
+
+            if (_popupWindowHost?.Hosting != null)
+                CloseCurrentPopup();
+
+            CreateWindowIfNull();
+
+            if (targetWindow != null)
+            {
+                _popupWindow.Parent = targetWindow;
+                _currentParentWindow = targetWindow;
+
+                targetWindow!.OnDestroy += OnDestroyParentWindowCallback;
+            }
+
+            _popupWindowHost.SetNewHosting(popupHost);
+            _popupWindow.Show();
+        }
+
+        public void OpenMenu(PopupMenu popupMenu)
+        {
+            OpenPopup(popupMenu);
+        }
+
+        public DropdownMenuHost OpenDropdown(Int2 screenPosition, int menuWidth, ROList<string> options, int startIndex)
+        {
+            DropdownMenuHost dropdownMenu = new DropdownMenuHost(screenPosition, menuWidth, options, startIndex);
+            OpenPopup(dropdownMenu);
+
+            return dropdownMenu;
+        }
+
         private void OnDestroyParentWindowCallback(Window window)
         {
             if (_popupWindow != null && _popupWindow.Parent == window)
@@ -150,9 +156,7 @@ namespace EditorUI.Popup
             }
         }
 
-        internal PopupHost? CurrentPopupHost => _currentPopup;
+        internal PopupWindowHost? CurrentPopupHost => _popupWindowHost?.Hosting == null ? null : _popupWindowHost;
         internal Window? PopupWindow => _popupWindow;
-
-        private record class PopupMenuArgs(PopupMenu Menu, Window? ParentWindow);
     }
 }

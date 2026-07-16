@@ -16,6 +16,11 @@ namespace EditorUI.Input
         [FieldOffset(1)] public readonly UIDragInputEvent Drag;
         [FieldOffset(1)] public readonly UIKeyInputEvent Key;
 
+        public UIInputEvent(UIInputEventType eventType)
+        {
+            EventType = eventType;
+        }
+
         public UIInputEvent(UIInputEventType eventType, UIMouseInputEvent inputEventData)
         {
             EventType = eventType;
@@ -35,30 +40,71 @@ namespace EditorUI.Input
         }
     }
 
+    /// <remarks>
+    /// There are 3 types of focus an interactable can have at any given time
+    /// <list type="bullet">
+    /// <item>
+    /// Hover: The interactable currently under the mouse
+    /// </item>
+    /// <item>
+    /// Button: The interactable under the mouse when the button was pressed (There is a unique focus for context for each button)
+    /// </item>
+    /// <item>
+    /// Input: The interactable that was under the mouse when the left mouse button was both pressed and released
+    /// </item>
+    /// </list>
+    /// </remarks>
     public enum UIInputEventType : byte
     {
         Unknown = 0,
 
         // Mouse
+        /// <remarks>Fired on all interactables in queue</remarks>
         MouseMotion,
+
+        /// <remarks>Fired on all interactables in queue</remarks>
         MouseWheel,
+
+        /// <remarks>Only fired on first interactable in queue</remarks>
         MouseEnter,
+
+        /// <remarks>Only fired on source interactable</remarks>
         MouseLeave,
+
+        /// <remarks>Only fired on source interactable</remarks>
         MouseDown,
+
+        /// <remarks>Only fired on source interactable</remarks>
         MouseUp,
+
+        /// <remarks>Only fired on source interactable</remarks>
         MousePress,
 
         // Focus
+
+        /// <remarks>Only fired on source interactable</remarks>
         FocusGained,
+
+        /// <remarks>Only fired on source interactable</remarks>
         FocusLost,
 
         // Dragging
+
+        /// <remarks>Only fired on interactable with button focus</remarks>
         DragBegin,
+
+        /// <remarks>Only fired on interactable with button focus</remarks>
         DragUpdate,
+
+        /// <remarks>Only fired on interactable with button focus</remarks>
         DragEnd,
 
         // Keyboard
+
+        /// <remarks>Only fired on interactable with input focus</remarks>
         KeyDown,
+
+        /// <remarks>Only fired on interactable with input focus</remarks>
         KeyUp
     }
 

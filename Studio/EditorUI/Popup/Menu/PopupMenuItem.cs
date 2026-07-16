@@ -30,7 +30,7 @@ namespace EditorUI.Popup.Menu
 
         protected internal abstract void MeasureSelf(float maxAvailableWidth);
         protected internal abstract void PaintSelf(ref readonly PainterContext painter, Vector2 originPosition, Vector4 safePadding, float availableWidth);
-        public abstract void HandleEventSelf(ref readonly UIInputEvent inputEvent);
+        public abstract bool HandleEventSelf(ref readonly UIInputEvent inputEvent);
 
         protected internal abstract void ClearSavedData();
         protected internal virtual void ForgetState()

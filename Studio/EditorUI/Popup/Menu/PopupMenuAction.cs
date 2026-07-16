@@ -85,7 +85,7 @@ namespace EditorUI.Popup.Menu
             }
         }
 
-        public override void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public override bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
             switch (inputEvent.EventType)
             {
@@ -95,7 +95,7 @@ namespace EditorUI.Popup.Menu
                         SetEditedField(true, nameof(IsHovered));
 
                         _owningMenu.BeginItemHover(this);
-                        break;
+                        return true;
                     }
                 case UIInputEventType.MouseLeave:
                     {
@@ -103,27 +103,29 @@ namespace EditorUI.Popup.Menu
                         SetEditedField(false, nameof(IsHovered));
 
                         _owningMenu.EndItemHover(this);
-                        break;
+                        return true;
                     }
                 case UIInputEventType.MouseDown:
                     {
                         _isHeld = true;
                         SetEditedField(true, nameof(IsHeld));
-                        break;
+                        return true;
                     }
                 case UIInputEventType.MouseUp:
                     {
                         _isHeld = false;
                         SetEditedField(false, nameof(IsHeld));
-                        break;
+                        return true;
                     }
 
                 case UIInputEventType.MousePress:
                     {
                         _owningMenu.HandleItemPress(this);
-                        break;
+                        return true;
                     }
             }
+
+            return false;
         }
 
         protected internal override void ClearSavedData()

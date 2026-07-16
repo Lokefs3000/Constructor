@@ -59,7 +59,7 @@ namespace PrimaryEditor.Windows.ContentBrowser
             }
         }
 
-        public override void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public override bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
             if (_directory != null)
             {
@@ -67,10 +67,14 @@ namespace PrimaryEditor.Windows.ContentBrowser
                 {
                     if (inputEvent.Mouse.Click == 1)
                         _collection.Select(_directory);
-                    else if (inputEvent.Mouse.Click == 2)
+                    else
                         _collection.ScopeTo(_directory);
+
+                    return true;
                 }
             }
+
+            return false;
         }
 
         public FilesystemDirectory? Directory { get => _directory; set => _directory = value; }

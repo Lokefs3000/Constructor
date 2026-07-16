@@ -86,7 +86,7 @@ namespace PrimaryEditor.Windows.ContentBrowser
             }
         }
 
-        public override void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public override bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
             if (_file != null)
             {
@@ -96,8 +96,12 @@ namespace PrimaryEditor.Windows.ContentBrowser
                         _collection.Select(_file);
                     else if (inputEvent.Mouse.Click == 2)
                         _collection.ScopeTo(_file);
+
+                    return true;
                 }
             }
+
+            return false;
         }
 
         public FilesystemFile? File { get => _file; set => _file = value; }

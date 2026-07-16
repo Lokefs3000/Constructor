@@ -84,6 +84,15 @@ namespace Primary.Mathematics
         /// <summary><paramref name="left"/> <= <paramref name="right"/></summary>
         public static bool LessThanOrEqualAny(Int2 left, Int2 right) => left.X <= right.X || left.Y <= right.Y;
 
+        /// <summary><paramref name="left"/> > <paramref name="right"/></summary>
+        public static bool GreaterThanAll(Int2 left, Int2 right) => Vector128.GreaterThanAll(left.AsVector128(), right.AsVector128());
+        /// <summary><paramref name="left"/> >= <paramref name="right"/></summary>
+        public static bool GreaterThanOrEqualAll(Int2 left, Int2 right) => left.X >= right.X && left.Y >= right.Y;
+        /// <summary><paramref name="left"/> < <paramref name="right"/></summary>
+        public static bool LessThanAll(Int2 left, Int2 right) => Vector128.LessThanAll(left.AsVector128(), right.AsVector128());
+        /// <summary><paramref name="left"/> <= <paramref name="right"/></summary>
+        public static bool LessThanOrEqualAll(Int2 left, Int2 right) => left.X <= right.X && left.Y <= right.Y;
+
         public static Int2 Min(Int2 a, Int2 b) => Vector128.Min(a.AsVector128Unsafe(), b.AsVector128Unsafe()).AsInt2();
         public static Int2 Max(Int2 a, Int2 b) => Vector128.Max(a.AsVector128Unsafe(), b.AsVector128Unsafe()).AsInt2();
         public static Int2 Clamp(Int2 a, Int2 min, Int2 max) => Vector128.Clamp(a.AsVector128Unsafe(), min.AsVector128Unsafe(), max.AsVector128Unsafe()).AsInt2();

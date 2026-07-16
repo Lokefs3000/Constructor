@@ -10,7 +10,7 @@ namespace EditorUI.Input
     {
         public IInteractable GetInteractable(Vector2 point);
 
-        public void HandleEventSelf(ref readonly UIInputEvent inputEvent);
+        public bool HandleEventSelf(ref readonly UIInputEvent inputEvent);
 
         public IInteractionShape? Shape { get; }
         public WidgetInputState InputState { get; }

@@ -6,7 +6,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<FileVersion>1.0.785.0</FileVersion>
+		<FileVersion>1.0.1090.0</FileVersion>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -166,6 +166,18 @@ namespace Primary.Windowing
                 {
                     _position = new Int2(@event.window.data1, @event.window.data2);
                     WindowMoved?.Invoke(_position);
+
+                    if (!_display.Boundaries.IsWithin(_position))
+                    {
+                        fixed (Int2* p = &_position)
+                        {
+                            SDL_DisplayID displayID = SDL_GetDisplayForPoint((SDL_Point*)p);
+                            if ((uint)displayID != _display.Id)
+                            {
+                                _display = WindowManager.Instance.Displays[(uint)displayID];
+                            }
+                        }
+                    }
                 }
                 else if (@event.window.type == SDL_EventType.SDL_EVENT_WINDOW_RESIZED)
                 {
@@ -322,7 +334,7 @@ namespace Primary.Windowing
                 if (SDL_SetWindowPosition(_window, value.X, value.Y))
                 {
                     SDL_SyncWindow(_window);
-                    fixed (Int2* ptr = &_clientSize)
+                    fixed (Int2* ptr = &_position)
                         SDL_GetWindowPosition(_window, &ptr->X, &ptr->Y);
                     //WindowMoved?.Invoke(_clientSize);
                 }

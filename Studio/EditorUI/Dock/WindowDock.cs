@@ -267,7 +267,7 @@ namespace EditorUI.Dock
                 if (_textColor.IsVisible && _fontFamily != null && _fontFamily.Value != null && _fontFamily.IsReadyToUse)
                 {
                     TextManager textManager = UIManager.Instance.TextManager;
-                    TextBuilder textBuilder = new TextBuilder(200.0f - _fontSize - 4.0f, TextWrapMode.Ellipsis, AllowRichText: false);
+                    TextBuilder textBuilder = new TextBuilder(200.0f - _fontSize - 4.0f, TextWrapMode.Ellipsis, TextAlignment.BottomLeft, AllowRichText: false);
                     BuiltTextBuilder builtTextBuilder = BuiltTextBuilder.Build(in textBuilder);
 
                     FontStyleData fontStyleData = _fontFamily.Value!.GetFontStyle(_fontStyle, _fontWeight);
@@ -337,7 +337,7 @@ namespace EditorUI.Dock
             }
         }
 
-        public void HandleEventSelf(ref readonly UIInputEvent inputEvent)
+        public bool HandleEventSelf(ref readonly UIInputEvent inputEvent)
         {
             switch (inputEvent.EventType)
             {
@@ -348,7 +348,8 @@ namespace EditorUI.Dock
                         {
                             TryFocusWindow(_windows[nextWindowIndex]);
                         }
-                        break;
+
+                        return true;
                     }
 
                 case UIInputEventType.DragBegin:
@@ -358,7 +359,7 @@ namespace EditorUI.Dock
                             _dockingSpaceDragStart = _dockingSpace;
                         }
 
-                        break;
+                        return true;
                     }
                 case UIInputEventType.DragUpdate:
                 case UIInputEventType.DragEnd:
@@ -374,9 +375,11 @@ namespace EditorUI.Dock
                                 _dockingSpaceDragStart = -1;
                         }
 
-                        break;
+                        return true;
                     }
             }
+
+            return false;
         }
 
         protected internal override bool TrySetDockHost(DockHost? newHost)

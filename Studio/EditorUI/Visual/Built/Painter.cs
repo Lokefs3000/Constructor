@@ -15,6 +15,7 @@ using Primary.Collections;
 using Primary.Collections.ReadOnly;
 using Primary.Common;
 using Primary.Mathematics;
+using Primary.Threading;
 using Primary.Timing;
 
 namespace EditorUI.Visual.Built
@@ -53,6 +54,10 @@ namespace EditorUI.Visual.Built
         private int _indexCount;
 
         private ushort _currentScissorIndex;
+        private Boundaries _currentDrawBounds;
+        private bool _localDrawBoundsChanged;
+
+        private bool _skipAllCommands;
 
         private bool _disposedValue;
 
@@ -90,6 +95,10 @@ namespace EditorUI.Visual.Built
             _indexCount = 0;
 
             _currentScissorIndex = 0;
+            _currentDrawBounds = Boundaries.Zero;
+            _localDrawBoundsChanged = false;
+
+            _skipAllCommands = false;
         }
 
         private void Dispose(bool disposing)
@@ -143,9 +152,13 @@ namespace EditorUI.Visual.Built
             _indexCount = 0;
 
             _currentScissorIndex = 0;
+            _currentDrawBounds = Boundaries.Zero;
+            _localDrawBoundsChanged = false;
+
+            _skipAllCommands = false;
         }
 
-        internal void FinishPaint()
+        internal JobHandle FinishPaint()
         {
             if (_itemsActuallyAdded < 8)
             {
@@ -177,7 +190,7 @@ namespace EditorUI.Visual.Built
                 return x.SubmissionIndex.CompareTo(y.SubmissionIndex);
             });
 
-            _meshBuilder.Build(_vertexCount, _indexCount, _commandList, _meshBuildQueue, _objectList);
+            return _meshBuilder.Build(_vertexCount, _indexCount, _commandList, _meshBuildQueue, _objectList);
         }
 
         private void AddCommand(PaintCmdType type, int meshIndex, ushort obj0, ushort obj1, ushort obj2, ushort obj3, Boundaries boundaries)
@@ -372,6 +385,18 @@ namespace EditorUI.Visual.Built
             clipRect.X = (int)(clipRect.X + _translateV2.X);
             clipRect.Y = (int)(clipRect.Y + _translateV2.Y);
 
+            if (_scissorStack.Count > 0)
+            {
+                Rect parentClip = _scissorList[_currentScissorIndex];
+
+                Int2 newPosition = Int2.Max(clipRect.Position, parentClip.Position);
+                clipRect = new Rect(newPosition, Int2.Min(clipRect.Size, Int2.Max(parentClip.Size - (parentClip.Position - newPosition), Int2.Zero)));
+            }
+
+            _skipAllCommands = Int2.LessThanOrEqualAny(clipRect.Size, Int2.Zero);
+            _currentDrawBounds = _skipAllCommands ? Boundaries.Zero : clipRect.AsBoundaries();
+            _localDrawBoundsChanged = true;
+
             _scissorStack.Push(_currentScissorIndex);
             _currentScissorIndex = GetIndexForScissor(clipRect);
         }
@@ -379,7 +404,15 @@ namespace EditorUI.Visual.Built
         internal void PopClip()
         {
             if (_scissorStack.TryPop(out ushort result))
+            {
+                Rect clipRect = _scissorList[result];
+
+                _skipAllCommands = Int2.LessThanOrEqualAny(clipRect.Size, Int2.Zero);
+                _currentDrawBounds = _skipAllCommands ? Boundaries.Zero : clipRect.AsBoundaries();
+                _localDrawBoundsChanged = true;
+
                 _currentScissorIndex = result;
+            }
         }
 
         internal void PushTranslate(Vector2 translation)
@@ -409,6 +442,8 @@ namespace EditorUI.Visual.Built
                     _translateV2 = Vector2.Zero;
                     _translateV4 = Vector128<float>.Zero;
                 }
+
+                _localDrawBoundsChanged = true;
             }
         }
 
@@ -417,12 +452,17 @@ namespace EditorUI.Visual.Built
             _translateV2 = translation;
             _translateV4 = Vector128.Create(GetVector64FromVector2(translation));
 
+            _localDrawBoundsChanged = true;
+
             _translateStack.Clear();
             _translateStack.Push(translation);
         }
 
         internal void AddPoints(ReadOnlySpan<Vector2> points, Paint paint, float radius)
         {
+            if (_skipAllCommands)
+                return;
+
             if (points.IsEmpty || radius < 1.0f)
                 return;
 
@@ -455,17 +495,26 @@ namespace EditorUI.Visual.Built
                 p.StoreUnsafe(ref writer.Get<float>(2));
             }
 
-            _vertexCount += points.Length * 4;
-            _indexCount += points.Length * 6;
+            if (!_currentDrawBounds.IsIntersecting(boundaries))
+                return;
+
+            int vertexCount = points.Length * 4;
+            int indexCount = points.Length * 6;
+
+            _vertexCount += vertexCount;
+            _indexCount += indexCount;
 
             int meshIndex = _meshBuildQueue.Count;
-            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Points, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager)));
+            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Points, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager), vertexCount, indexCount));
 
             AddCommand(PaintCmdType.Points, meshIndex, ushort.MaxValue, ushort.MaxValue, ushort.MaxValue, _currentScissorIndex, boundaries);
         }
 
         internal void AddLines(ReadOnlySpan<Vector2> points, Paint paint, LinePaintMode paintMode, float thickness)
         {
+            if (_skipAllCommands)
+                return;
+
             if (thickness < 1.0f)
                 return;
 
@@ -493,6 +542,9 @@ namespace EditorUI.Visual.Built
             Boundaries boundaries = default;
             Vector128<float> thicknessVector = Vector128.Create(thickness) * Vector128.Create(-0.5f, 0.5f, 0.5f, -0.5f);
 
+            int vertexCount;
+            int indexCount;
+
             if (paintMode == LinePaintMode.List)
             {
                 for (int i = 0; i < points.Length;)
@@ -513,9 +565,9 @@ namespace EditorUI.Visual.Built
                     p1v += p;
 
                     if (i == 0)
-                        boundaries = Boundaries.Union(GetBoundariesFromVector128(p), GetBoundariesFromVector128(p));
+                        boundaries = Boundaries.Union(GetBoundariesFromVector128(p0v), GetBoundariesFromVector128(p1v));
                     else
-                        boundaries = Boundaries.Union(boundaries, Boundaries.Union(GetBoundariesFromVector128(p), GetBoundariesFromVector128(p)));
+                        boundaries = Boundaries.Union(boundaries, Boundaries.Union(GetBoundariesFromVector128(p0v), GetBoundariesFromVector128(p1v)));
 
                     p0v.StoreUnsafe(ref writer.Get<float>(4));
                     p1v.StoreUnsafe(ref writer.Get<float>(4));
@@ -523,8 +575,11 @@ namespace EditorUI.Visual.Built
                     p1.StoreUnsafe(ref writer.Get<float>(2));
                 }
 
-                _vertexCount += points.Length / 2 * 4;
-                _indexCount += points.Length / 2 * 6;
+                if (!_currentDrawBounds.IsIntersecting(boundaries))
+                    return;
+
+                vertexCount = points.Length / 2 * 4;
+                indexCount = points.Length / 2 * 6;
             }
             else
             {
@@ -546,9 +601,9 @@ namespace EditorUI.Visual.Built
                     p1v += p;
 
                     if (i == 0)
-                        boundaries = Boundaries.Union(GetBoundariesFromVector128(p), GetBoundariesFromVector128(p));
+                        boundaries = Boundaries.Union(GetBoundariesFromVector128(p0v), GetBoundariesFromVector128(p1v));
                     else
-                        boundaries = Boundaries.Union(boundaries, Boundaries.Union(GetBoundariesFromVector128(p), GetBoundariesFromVector128(p)));
+                        boundaries = Boundaries.Union(boundaries, Boundaries.Union(GetBoundariesFromVector128(p0v), GetBoundariesFromVector128(p1v)));
 
                     p0v.StoreUnsafe(ref writer.Get<float>(4));
                     p1v.StoreUnsafe(ref writer.Get<float>(4));
@@ -558,18 +613,27 @@ namespace EditorUI.Visual.Built
                     p0 = p1;
                 }
 
-                _vertexCount += (points.Length - 1) * 4;
-                _indexCount += (points.Length - 1) * 6;
+                if (!_currentDrawBounds.IsIntersecting(boundaries))
+                    return;
+
+                vertexCount = (points.Length - 1) * 4;
+                indexCount = (points.Length - 1) * 6;
             }
 
+            _vertexCount += vertexCount;
+            _indexCount += indexCount;
+
             int meshIndex = _meshBuildQueue.Count;
-            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Lines, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager)));
+            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Lines, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager), vertexCount, indexCount));
 
             AddCommand(PaintCmdType.Lines, meshIndex, ushort.MaxValue, ushort.MaxValue, ushort.MaxValue, _currentScissorIndex, boundaries);
         }
 
         internal void AddRectangle(Boundaries boundaries, Paint paint, Vector4 cornerRadius)
         {
+            if (_skipAllCommands)
+                return;
+
             if (Vector4.LessThanAll(cornerRadius, Vector4.One))
                 cornerRadius.X = -1.0f;
 
@@ -588,21 +652,27 @@ namespace EditorUI.Visual.Built
             boundaries.AsVector128().StoreUnsafe(ref writer.Get<float>(4));
             cornerRadius.StoreUnsafe(ref writer.Get<float>(4));
 
+            if (!_currentDrawBounds.IsIntersecting(boundaries))
+                return;
+
             _vertexCount += 4;
             _indexCount += 6;
 
             int meshIndex = _meshBuildQueue.Count;
-            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Rectangle, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager)));
+            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Rectangle, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager), 4, 6));
 
             AddCommand(PaintCmdType.Rectangle, meshIndex, ushort.MaxValue, ushort.MaxValue, ushort.MaxValue, _currentScissorIndex, boundaries);
         }
 
         internal void AddQuad(Vector2 tl, Vector2 tr, Vector2 bl, Vector2 br, Paint paint)
         {
+            if (_skipAllCommands)
+                return;
+
             Vector128<float> negative = Vector128.Create(0.0f, 0.0f, -0.0f, -0.0f);
 
-            Vector128<float> top = Vector128.Create(GetVector64FromVector2(tl), GetVector64FromVector2(tr));
-            Vector128<float> bottom = Vector128.Create(GetVector64FromVector2(bl), GetVector64FromVector2(br));
+            Vector128<float> top = Vector128.Create(GetVector64FromVector2(tl), GetVector64FromVector2(tr)) + _translateV4;
+            Vector128<float> bottom = Vector128.Create(GetVector64FromVector2(bl), GetVector64FromVector2(br)) + _translateV4;
 
             if (paint.StrokeWidth > 0)
             {
@@ -633,20 +703,26 @@ namespace EditorUI.Visual.Built
             v0 = Vector128.Xor(v0, negative);
 
             SpanWriter writer = _temporaryAllocator.GetWritableSpan(Unsafe.SizeOf<float>() * 8 + 1);
-            (top + _translateV4).StoreUnsafe(ref writer.Get<float>(4));
-            (bottom + _translateV4).StoreUnsafe(ref writer.Get<float>(4));
+            top.StoreUnsafe(ref writer.Get<float>(4));
+            bottom.StoreUnsafe(ref writer.Get<float>(4));
+
+            if (!_currentDrawBounds.IsIntersecting(GetBoundariesFromVector128(v0)))
+                return;
 
             _vertexCount += 4;
             _indexCount += 6;
 
             int meshIndex = _meshBuildQueue.Count;
-            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Rectangle, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager)));
+            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Rectangle, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager), 4, 6));
 
             AddCommand(PaintCmdType.Rectangle, meshIndex, ushort.MaxValue, ushort.MaxValue, ushort.MaxValue, _currentScissorIndex, GetBoundariesFromVector128(v0));
         }
 
         internal void AddImage(Boundaries boundaries, Boundaries uvs, Paint paint, object texture)
         {
+            if (_skipAllCommands)
+                return;
+
             if (paint.StrokeWidth > 0)
             {
                 switch (paint.StrokePosition)
@@ -662,17 +738,23 @@ namespace EditorUI.Visual.Built
             boundaries.AsVector128().StoreUnsafe(ref writer.Get<float>(4));
             uvs.AsVector128().StoreUnsafe(ref writer.Get<float>(4));
 
+            if (!_currentDrawBounds.IsIntersecting(boundaries))
+                return;
+
             _vertexCount += 4;
             _indexCount += 6;
 
             int meshIndex = _meshBuildQueue.Count;
-            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Image, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager)));
+            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Image, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager), 4, 6));
 
             AddCommand(PaintCmdType.Image, meshIndex, GetIndexForObject(texture), ushort.MaxValue, ushort.MaxValue, _currentScissorIndex, boundaries);
         }
 
         internal void AddCircle(Vector2 center, float radius, Paint paint)
         {
+            if (_skipAllCommands)
+                return;
+
             if (paint.StrokeWidth > 0)
             {
                 switch (paint.StrokePosition)
@@ -693,17 +775,23 @@ namespace EditorUI.Visual.Built
             center.StoreUnsafe(ref writer.Get<float>(2));
             writer.Write(radius);
 
+            if (!_currentDrawBounds.IsIntersecting(GetBoundariesFromVector128(minMax)))
+                return;
+
             _vertexCount += 4;
             _indexCount += 6;
 
             int meshIndex = _meshBuildQueue.Count;
-            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Circle, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager)));
+            _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Circle, writer.SourceData, writer.Length, _depth++, BuiltPaint.Build(in paint, _gradientManager), 4, 6));
 
             AddCommand(PaintCmdType.Circle, meshIndex, ushort.MaxValue, ushort.MaxValue, ushort.MaxValue, _currentScissorIndex, GetBoundariesFromVector128(minMax));
         }
 
         internal void AddText(Vector2 position, TextShapingData shapingData, Paint paint, Vector2 maxExtents)
         {
+            if (_skipAllCommands)
+                return;
+
             ROList<TextShapingSection> sections = shapingData.Sections;
             ROList<TextShapingLine> lines = shapingData.Lines;
 
@@ -713,11 +801,27 @@ namespace EditorUI.Visual.Built
             ushort shapingDataIndex = GetIndexForObject(shapingData);
             BuiltPaint builtPaint = BuiltPaint.Build(in paint, _gradientManager);
 
+            Vector2 sourceExtents = maxExtents;
+
             position += _translateV2;
             maxExtents += position;
 
-            _vertexCount += shapingData.GlyphsWithActualVisual * 4;
-            _indexCount += shapingData.GlyphsWithActualVisual * 6;
+            TextAlignment vertAlign = shapingData.TextBuilder.Alignment & TextAlignment.VerticalAlignment;
+            switch (vertAlign)
+            {
+                case TextAlignment.Top:
+                    {
+                        position.Y -= sourceExtents.Y - shapingData.TotalSize.Y;
+                        break;
+                    }
+                case TextAlignment.Center:
+                    {
+                        position.Y -= sourceExtents.Y - shapingData.TotalSize.Y;
+                        break;
+                    }
+            }
+
+            TextAlignment horiAlign = shapingData.TextBuilder.Alignment & TextAlignment.HorizontalAlignment;
 
             for (int i = 0; i < sections.Count; ++i)
             {
@@ -727,17 +831,28 @@ namespace EditorUI.Visual.Built
                 Vector2 sectionPosition = position;
                 sectionPosition.Y += line.LineYOffset;
 
+                Vector2 screenSectionPosition = sectionPosition;
+                screenSectionPosition.Y -= shapingData.PixelSize;
+
+                Boundaries boundaries = new Boundaries(screenSectionPosition, screenSectionPosition + line.LineSize);
+                if (!_currentDrawBounds.IsIntersecting(boundaries))
+                    return;
+
+                int vertexCount = section.GlyphsWithActualVisual * 4;
+                int indexCount = section.GlyphsWithActualVisual * 6;
+
+                _vertexCount += vertexCount;
+                _indexCount += indexCount;
+
                 sectionPosition.StoreUnsafe(ref writer.Get<float>(2));
                 maxExtents.StoreUnsafe(ref writer.Get<float>(2));
                 writer.Write(shapingDataIndex);
                 writer.Write(i);
 
                 int meshIndex = _meshBuildQueue.Count;
-                _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Text, writer.SourceData + i * singleDataSize, singleDataSize, _depth++, section.Visual.Paint ?? builtPaint));
+                _meshBuildQueue.Add(new MeshBuildCmd(PaintCmdType.Text, writer.SourceData + i * singleDataSize, singleDataSize, _depth++, section.Visual.Paint ?? builtPaint, vertexCount, indexCount));
 
-                sectionPosition.Y -= shapingData.PixelSize;
-
-                AddCommand(PaintCmdType.Text, meshIndex, GetIndexForObject(section.Visual.StyleData), ushort.MaxValue, ushort.MaxValue, _currentScissorIndex, new Boundaries(sectionPosition, sectionPosition + line.LineSize));
+                AddCommand(PaintCmdType.Text, meshIndex, GetIndexForObject(section.Visual.StyleData), ushort.MaxValue, ushort.MaxValue, _currentScissorIndex, boundaries);
             }
         }
 
@@ -752,6 +867,14 @@ namespace EditorUI.Visual.Built
 
         public int VertexCount => _vertexCount;
         public int IndexCount => _indexCount;
+
+        public Vector2 CurrentTranslationV2 => _translateV2;
+        public Vector128<float> CurrentTranslationV4 => _translateV4;
+
+        public Boundaries CurrentDrawBoundaries => _currentDrawBounds;
+        public bool LocalDrawBoundsChanged { get => _localDrawBoundsChanged; set => _localDrawBoundsChanged = value; }
+
+        public bool IsSkippingCommands => _skipAllCommands;
 
         public bool IsEmpty => _submittedCommands == 0;
 

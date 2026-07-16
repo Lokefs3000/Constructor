@@ -6,9 +6,9 @@ namespace EditorUI.Styling
 {
     public interface ISingleStyledObject
     {
-        protected internal StyledObject? StyledObject { get; }
+        public StyledObject? StyledObject { get; }
 
-        protected internal StylesheetProvider StylesheetProvider { get; }
-        protected internal bool GetAllProperties { get; }
+        public StylesheetProvider StylesheetProvider { get; }
+        public bool GetAllProperties { get; }
     }
 }

@@ -4,6 +4,7 @@ using System.Text;
 using CommunityToolkit.HighPerformance;
 using EditorUI.Dock;
 using EditorUI.Input;
+using EditorUI.Layout;
 using EditorUI.Serialization;
 using EditorUI.Statistics;
 using EditorUI.Styling;
@@ -128,6 +129,8 @@ namespace EditorUI.Windowing
 
         public override StylesheetProvider StylesheetProvider => _stylesheetProvider;
         public override Widget RootWidget => _rootWidget;
+
+        public virtual ILayoutReporter? LayoutReporter => null;
 
         public override event Action<IInteractable, ReadOnlyRef<UIInputEvent>>? OnEventDispatched;
 

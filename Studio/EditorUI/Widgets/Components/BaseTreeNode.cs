@@ -44,7 +44,7 @@ namespace EditorUI.Widgets.Components
         }
 
         protected internal abstract void PaintSelf(ref readonly PainterContext painter, Vector2 availableSize);
-        public abstract void HandleEventSelf(ref readonly UIInputEvent inputEvent);
+        public abstract bool HandleEventSelf(ref readonly UIInputEvent inputEvent);
 
         internal void SetNewOwner(TreeView? treeView, BaseTreeNode? parent)
         {

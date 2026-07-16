@@ -14,6 +14,7 @@ namespace Primary
         internal static readonly ILogger RHI = Create("RHI");
         internal static readonly ILogger ImGui = Create("ImGui");
         internal static readonly ILogger Script = Create("Script");
+        internal static readonly ILogger Thread = Create("Thread");
         internal static readonly ILogger Core = Create("Core");
 
         private static ILogger Create(string prefix)

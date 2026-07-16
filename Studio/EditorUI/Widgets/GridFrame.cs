@@ -37,11 +37,14 @@ namespace EditorUI.Widgets
             _maxRowsOrColumns = int.MaxValue;
         }
 
-        protected internal override MeasureReturnData MeasureSelf(ref readonly LayoutContext context)
+        protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
         {
             base.MeasureSelf(in context);
 
-            LayoutLockAxis lockAxis = LayoutLockAxis.None;
+            _positionLockAxis = LayoutLockAxis.AxisXY;
+            _sizeLockAxis = (_verticalBalance == LayoutBalance.Fit && _horizontalBalance == LayoutBalance.Fit) ?
+                LayoutLockAxis.AxisXY : (_verticalBalance == LayoutBalance.Fit ? LayoutLockAxis.AxisY : (_horizontalBalance == LayoutBalance.Fit ? LayoutLockAxis.AxisX : LayoutLockAxis.None));
+
             if (_children != null && _children.Count > 0)
             {
                 switch (_layoutDirection)
@@ -59,7 +62,7 @@ namespace EditorUI.Widgets
                                 int maxColumnsPerRow = Math.Min(_maxRowsOrColumns, _children.Count);
 
                                 float itemPadding = _itemPadding.X == 0.0f ? 0.0f : _itemPadding.X * 0.5f * (maxColumnsPerRow - 1);
-                                float childSize = (_idealSize.X - _padding.X - _padding.Z) / maxColumnsPerRow - itemPadding;
+                                float childSize = (_layoutState.IdealSize.X - _padding.X - _padding.Z) / maxColumnsPerRow - itemPadding;
 
                                 for (int i = 0; i < _children.Count; ++i)
                                 {
@@ -67,7 +70,7 @@ namespace EditorUI.Widgets
                                     child.IdealSize = new Vector2(childSize, 0.0f);
                                 }
 
-                                lockAxis = LayoutLockAxis.AxisX;
+                                _positionLockAxis = LayoutLockAxis.AxisX;
                             }
 
                             break;
@@ -75,17 +78,13 @@ namespace EditorUI.Widgets
                 }
             }
 
-            return new MeasureReturnData(MeasureStatus.Success, lockAxis);
+            return MeasureStatus.Success;
         }
 
         protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
         {
             base.LayoutSelf(in context);
-            return new LayoutReturnData(LayoutLockAxis.AxisXY, true);
-        }
 
-        protected internal override void PostLayoutSelf(ref readonly LayoutContext context)
-        {
             if (_children != null && _children.Count > 0)
             {
                 switch (_layoutDirection)
@@ -102,7 +101,7 @@ namespace EditorUI.Widgets
                                 int totalRowCount = (_children.Count + maxColumnsPerRow - 1) / maxColumnsPerRow;
 
                                 float itemPadding = _itemPadding.X == 0.0f ? 0.0f : _itemPadding.X * 0.5f * maxColumnsPerRow;
-                                float columnWidth = (_idealSize.X - _padding.X - _padding.Z + itemPadding) / maxColumnsPerRow;
+                                float columnWidth = (_layoutState.IdealSize.X - _padding.X - _padding.Z + itemPadding) / maxColumnsPerRow;
 
                                 float rowOffset = 0.0f;
 
@@ -112,7 +111,7 @@ namespace EditorUI.Widgets
                                     int endIndex = Math.Min(startIndex + maxColumnsPerRow, _children.Count);
 
                                     float maxWidgetHeight = 0.0f;
-    
+
                                     for (int j = startIndex; j < endIndex; ++j)
                                     {
                                         Widget widget = _children[j];
@@ -136,7 +135,7 @@ namespace EditorUI.Widgets
                                     float positionAfter = startPosition.X + child.IdealSize.X;
 
                                     // if there is not space for one just place it and don't try to move it
-                                    if ((positionAfter > _idealSize.X && currentColumnCount > 0) || ++currentColumnCount > _maxRowsOrColumns)
+                                    if ((positionAfter > _layoutState.IdealSize.X && currentColumnCount > 0) || ++currentColumnCount > _maxRowsOrColumns)
                                     {
                                         startPosition.X = 0.0f;
                                         startPosition.Y += maxHeightInColumn + _itemPadding.Y;
@@ -158,6 +157,8 @@ namespace EditorUI.Widgets
                         }
                 }
             }
+
+            return new LayoutReturnData(LayoutLockAxis.AxisXY, true);
         }
 
         public override void AddStateFlags(StateFlags flags)

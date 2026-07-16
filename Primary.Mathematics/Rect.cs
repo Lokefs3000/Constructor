@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
 
 namespace Primary.Mathematics
@@ -60,6 +61,18 @@ namespace Primary.Mathematics
             string separator = NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator;
 
             return $"<{X.ToString(format, formatProvider)}{separator} {Y.ToString(format, formatProvider)}{separator} {Width.ToString(format, formatProvider)}{separator} {Height.ToString(format, formatProvider)}>";
+        }
+
+        public readonly bool IsWithin(Int2 point)
+        {
+            Vector128<int> bounds = Unsafe.BitCast<Rect, Vector128<int>>(this);
+            Vector128<int> pointVec = Vector128.Shuffle(point.AsVector128Unsafe(), Vector128.Create(0, 1, 0, 1));
+
+            bounds = Sse41.BlendVariable(bounds, bounds + Vector128.Shuffle(bounds, Vector128.Create(0, 1, 0, 1)), Vector128.Create(0, 0, unchecked((int)0xffffffff), unchecked((int)0xffffffff)));
+
+            return Vector128.GreaterThanOrEqualAll(
+                Sse41.BlendVariable(bounds, pointVec, Vector128.Create(unchecked((int)0xffffffff), unchecked((int)0xffffffff), 0, 0)),
+                Sse41.BlendVariable(bounds, pointVec, Vector128.Create(0, 0, unchecked((int)0xffffffff), unchecked((int)0xffffffff))));
         }
 
         public static Rect Inflate(Rect rect, int width, int height)

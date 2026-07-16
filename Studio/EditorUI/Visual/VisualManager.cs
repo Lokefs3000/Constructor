@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
 using System.Text;
 using CommunityToolkit.HighPerformance;
 using EditorUI.Dock;
@@ -17,6 +19,7 @@ using Primary.Collections.ReadOnly;
 using Primary.Common;
 using Primary.Input;
 using Primary.Mathematics;
+using Primary.Threading;
 using Primary.Timing;
 using Primary.Windowing;
 
@@ -31,7 +34,7 @@ namespace EditorUI.Visual
         private List<Painter> _painters;
         private int _painterIndex;
 
-        private List<(Painter Painter, Window Window)> _pendingPaints;
+        private List<ActivePaintBuild> _activePaintBuilds;
 
         private bool _disposedValue;
 
@@ -44,7 +47,7 @@ namespace EditorUI.Visual
             _painters = new List<Painter>();
             _painterIndex = 0;
 
-            _pendingPaints = new List<(Painter Painter, Window Window)>();
+            _activePaintBuilds = new List<ActivePaintBuild>();
         }
 
         private void Dispose(bool disposing)
@@ -73,17 +76,25 @@ namespace EditorUI.Visual
 
         internal void RenderAll()
         {
+            if (_activePaintBuilds.Count > 0)
+            {
+                for (int i = 0; i < _activePaintBuilds.Count; ++i)
+                {
+                    _activePaintBuilds[i].Monolith.WaitForCompletion();
+                }
+
+                _activePaintBuilds.Clear();
+            }
+
             if (_painterIndex > 0)
             {
-                for (int i = 0; i < _painterIndex; i++)
+                for (int i = 0; i < _painterIndex; ++i)
                 {
                     _painters[i].ClearData();
                 }
 
                 _painterIndex = 0;
             }
-
-            _pendingPaints.Clear();
 
             foreach (DockHost host in _manager.DockManager.DockHosts)
             {
@@ -262,8 +273,8 @@ namespace EditorUI.Visual
             {
                 if (!data.IsEmpty)
                 {
-                    data.FinishPaint();
-                    _pendingPaints.Add((data, host.OwnedWindow));
+                    JobHandle handle = data.FinishPaint();
+                    _activePaintBuilds.Add(new ActivePaintBuild(data, host.OwnedWindow, handle));
 
                     // DrawOutlinesOfCommands(data, host.OwnedWindow);
                 }
@@ -280,10 +291,15 @@ namespace EditorUI.Visual
             {
                 if (dock.CurrentWindow is WidgetWindow window)
                 {
-                    painter.PushClip(dock.WindowRect);
-                    painter.SetGlobalTranslation(dock.WindowRect.Position.AsVector2());
+                    Vector2 localOffset = dock.WindowRect.Position.AsVector2();
 
-                    PaintWidgetRecursiveDown(window.RootWidget, painter);
+                    painter.PushClip(dock.WindowRect);
+                    painter.SetGlobalTranslation(localOffset);
+
+                    Vector128<float> localPositionDual = Vector128.Create(Unsafe.BitCast<Vector2, Vector64<float>>(localOffset));
+                    Boundaries localBoundaries = Boundaries.Zero;
+
+                    PaintWidgetRecursiveDown(window.RootWidget, painter, localBoundaries, ref localPositionDual);
 
                     PainterContext context = new PainterContext(painter);
                     window.PaintOverlay(in context);
@@ -298,7 +314,7 @@ namespace EditorUI.Visual
                 }
             }
 
-            static void PaintWidgetRecursiveDown(Widget widget, Painter painter)
+            static void PaintWidgetRecursiveDown(Widget widget, Painter painter, Boundaries localBoundaries, ref Vector128<float> localPosition)
             {
                 int translateStackSize;
                 int clipStackSize;
@@ -311,10 +327,21 @@ namespace EditorUI.Visual
                     clipStackSize = context.ClipStackSize;
                 }
 
-                foreach (Widget child in widget.Children)
+                if (painter.LocalDrawBoundsChanged)
                 {
-                    if (child.IsEnabled)
-                        PaintWidgetRecursiveDown(child, painter);
+                    painter.LocalDrawBoundsChanged = false;
+                    localBoundaries = Unsafe.BitCast<Vector128<float>, Boundaries>(Unsafe.BitCast<Boundaries, Vector128<float>>(painter.CurrentDrawBoundaries) - painter.CurrentTranslationV4);
+                }
+
+                if (!painter.IsSkippingCommands)
+                {
+                    foreach (Widget child in widget.Children)
+                    {
+                        if (child.IsEnabled && child.ComputedRect.IsIntersecting(localBoundaries))
+                        {
+                            PaintWidgetRecursiveDown(child, painter, localBoundaries, ref localPosition);
+                        }
+                    }
                 }
 
                 while (translateStackSize > 0)
@@ -331,7 +358,7 @@ namespace EditorUI.Visual
             }
         }
 
-        private void PaintPopup(PopupHost popupHost, Window targetWindow)
+        private void PaintPopup(PopupWindowHost windowHost, Window targetWindow)
         {
             if (_painters.Count <= _painterIndex)
                 _painters.Add(new Painter(_gradientManager));
@@ -340,12 +367,12 @@ namespace EditorUI.Visual
             data.PushClip(new Rect(targetWindow.ClientSize));
 
             PainterContext painter = new PainterContext(data);
-            popupHost.Paint(in painter);
+            windowHost.Hosting!.PaintSelf(in painter, targetWindow);
 
             if (!data.IsEmpty)
             {
-                data.FinishPaint();
-                _pendingPaints.Add((data, targetWindow));
+                JobHandle handle = data.FinishPaint();
+                _activePaintBuilds.Add(new ActivePaintBuild(data, targetWindow, handle));
             }
             else
             {
@@ -356,11 +383,14 @@ namespace EditorUI.Visual
 
         public bool TryGetPaintDataForWindow(Window window, ref int incrementalIndex, [NotNullWhen(true)] out Painter? painter)
         {
-            for (; incrementalIndex < _pendingPaints.Count; ++incrementalIndex)
+            for (; incrementalIndex < _activePaintBuilds.Count; ++incrementalIndex)
             {
-                if (window == _pendingPaints[incrementalIndex].Window)
+                ActivePaintBuild paintBuild = _activePaintBuilds[incrementalIndex];
+                if (window == paintBuild.Window)
                 {
-                    painter = _pendingPaints[incrementalIndex].Painter;
+                    paintBuild.Monolith.WaitForCompletion();
+                    painter = paintBuild.Painter;
+
                     ++incrementalIndex;
                     return true;
                 }
@@ -370,32 +400,34 @@ namespace EditorUI.Visual
             return false;
         }
 
-        private void DrawOutlinesOfCommands(Painter target, Window window)
-        {
-            if (target.IsEmpty)
-                return;
-
-            if (_painters.Count <= _painterIndex)
-                _painters.Add(new Painter(_gradientManager));
-
-            Painter data = _painters[_painterIndex++];
-            data.PushClip(new Rect(window.ClientSize));
-
-            Paint paint = new Paint(Color.TransparentBlack, Color.Maroon, 1, StrokePosition.Inside);
-
-            foreach (PaintCmd cmd in target.Commands)
-            {
-                data.AddRectangle(cmd.RenderBounds, paint, Vector4.NegativeZero);
-            }
-
-            data.FinishPaint();
-            _pendingPaints.Add((data, window));
-        }
+        // private void DrawOutlinesOfCommands(Painter target, Window window)
+        // {
+        //     if (target.IsEmpty)
+        //         return;
+        // 
+        //     if (_painters.Count <= _painterIndex)
+        //         _painters.Add(new Painter(_gradientManager));
+        // 
+        //     Painter data = _painters[_painterIndex++];
+        //     data.PushClip(new Rect(window.ClientSize));
+        // 
+        //     Paint paint = new Paint(Color.TransparentBlack, Color.Maroon, 1, StrokePosition.Inside);
+        // 
+        //     foreach (PaintCmd cmd in target.Commands)
+        //     {
+        //         data.AddRectangle(cmd.RenderBounds, paint, Vector4.NegativeZero);
+        //     }
+        // 
+        //     data.FinishPaint();
+        //     _pendingPaints.Add((data, window));
+        // }
 
         public GradientManager GradientManager => _gradientManager;
 
-        public ROList<(Painter Painter, Window Window)> PendingPaints => _pendingPaints;
+        public ROList<ActivePaintBuild> ActivePaintBuilds => _activePaintBuilds;
 
-        public bool HasPendingPaints => _pendingPaints.Count > 0;
+        public bool HasPendingPaints => _activePaintBuilds.Count > 0;
     }
+
+    public readonly record struct ActivePaintBuild(Painter Painter, Window Window, JobHandle Monolith);
 }

@@ -7,4 +7,15 @@
 
 .value-list {
     item-padding: 2;
+    padding: 4 4 4 4;
+}
+
+.field-root {
+    size: 1.0 0 0.0 24;
+}
+
+.preset-children {
+    position: 0.0 0 0.0 24;
+    size: 1.0 0 0.0 0;
+    auto-resize: ResizeY;
 }

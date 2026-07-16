@@ -24,6 +24,16 @@
             "name": "rhi-nodebug",
             "shorthand": null,
             "type": null
+        },
+        {
+            "name": "job-initial-logsize",
+            "shorthand": null,
+            "type": "Integer"
+        },
+        {
+            "name": "job-max-threads",
+            "shorthand": null,
+            "type": "Integer"
         }
     ],
     "includes": []
