@@ -1,5 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
+using Primary.Assets.Types;
+using Primary.Collections.ReadOnly;
 using Primary.Rendering.Assets;
 using System.Buffers;
 using System.Collections.Concurrent;
@@ -17,18 +19,18 @@ namespace Primary.Rendering.Batching
 
         private MaterialAsset? _defaultMaterial;
 
-        private Dictionary<ShaderAsset, ShaderRenderBatcher> _shaderBatchers;
-        private Dictionary<ShaderAsset, ShaderKeyRange> _shaderKeyRanges;
+        private readonly Dictionary<ShaderAsset, ShaderRenderBatcher> _shaderBatchers;
+        private readonly Dictionary<ShaderAsset, ShaderKeyRange> _shaderKeyRanges;
 
-        private Dictionary<ShaderAsset, ushort> _shaderIds;
-        private Dictionary<IRenderMeshSource, ushort> _modelIds;
-        private Dictionary<MaterialAsset, uint> _materialIds;
+        private readonly Dictionary<ShaderAsset, ushort> _shaderIds;
+        private readonly Dictionary<IRenderMeshSource, ushort> _modelIds;
+        private readonly Dictionary<MaterialAsset, uint> _materialIds;
 
-        private Lock _shaderIdsLock;
-        private Lock _modelIdsLock;
-        private Lock _materialIdsLock;
+        private readonly Lock _shaderIdsLock;
+        private readonly Lock _modelIdsLock;
+        private readonly Lock _materialIdsLock;
 
-        private List<ShaderRenderBatcher> _usedBatchers;
+        private readonly List<ShaderRenderBatcher> _usedBatchers;
 
         private RenderKey[]? _rentedKeys;
         private int _rentedKeyCount;
@@ -37,7 +39,7 @@ namespace Primary.Rendering.Batching
         {
             _manager = manager;
 
-            _defaultMaterial = AssetManager.LoadAsset<MaterialAsset>("Engine/Materials/R2DefaultMat.mat2", true);
+            _defaultMaterial = AssetManager.LoadAsset<MaterialAsset>("Engine/Materials/Missing.mat");
 
             _shaderBatchers = new Dictionary<ShaderAsset, ShaderRenderBatcher>();
             _shaderKeyRanges = new Dictionary<ShaderAsset, ShaderKeyRange>();
@@ -187,14 +189,16 @@ namespace Primary.Rendering.Batching
             return _rentedKeys.AsSpan(keyRange.FlagIdxStart, keyRange.FlagIdxEnd - keyRange.FlagIdxStart);
         }
 
-        public MaterialAsset? DefaultMaterial { get => _defaultMaterial; set => _defaultMaterial = value ?? AssetManager.LoadAsset<MaterialAsset>("Engine/Materials/R2DefaultMat.mat2", true); }
+        public MaterialAsset? DefaultMaterial { get => _defaultMaterial; set => _defaultMaterial = value ?? AssetManager.LoadAsset<MaterialAsset>("Engine/Materials/R2DefaultMat.mat2", AssetId.NoLocalId, true); }
 
         public int TotalFlagCount => _rentedKeyCount;
-        public ReadOnlySpan<ShaderRenderBatcher> ShaderBatchers => _usedBatchers.AsSpan();
+        public ROList<ShaderRenderBatcher> ShaderBatchers => _usedBatchers;
 
-        public IReadOnlyDictionary<ShaderAsset, ushort> ShaderIds => _shaderIds;
-        public IReadOnlyDictionary<IRenderMeshSource, ushort> ModelIds => _modelIds;
-        public IReadOnlyDictionary<MaterialAsset, uint> MaterialIds => _materialIds;
+        public RODictionary<ShaderAsset, ushort> ShaderIds => _shaderIds;
+        public RODictionary<IRenderMeshSource, ushort> ModelIds => _modelIds;
+        public RODictionary<MaterialAsset, uint> MaterialIds => _materialIds;
+
+        public bool IsEmpty => _rentedKeyCount == 0 || _shaderIds.Count == 0 || _modelIds.Count == 0 || _materialIds.Count == 0;
     }
 
     /*
@@ -229,16 +233,16 @@ namespace Primary.Rendering.Batching
         }
     }
 
-    public readonly record struct UnbatchedRenderFlag(MaterialAsset Material, RawRenderMesh Mesh, Matrix4x4 Model);
+    public readonly record struct UnbatchedRenderFlag(MaterialAsset Material, IRawRenderMesh Mesh, Matrix4x4 Model);
     public readonly record struct ShaderKeyRange(int FlagIdxStart, int FlagIdxEnd);
 
-    public ref struct ShaderRenderSection(ShaderAsset Shader, ReadOnlySpan<RenderSegment> Segments, ReadOnlySpan<RenderFlag> Flags)
+    public readonly ref struct ShaderRenderSection(ShaderAsset Shader, ReadOnlySpan<RenderSegment> Segments, ReadOnlySpan<RenderFlag> Flags)
     {
-        public ShaderAsset Shader { get; init; } = Shader;
-        public ReadOnlySpan<RenderSegment> Segments { get; init; } = Segments;
-        public ReadOnlySpan<RenderFlag> Flags { get; init; } = Flags;
+        public readonly ShaderAsset Shader { get; init; } = Shader;
+        public readonly ReadOnlySpan<RenderSegment> Segments { get; init; } = Segments;
+        public readonly ReadOnlySpan<RenderFlag> Flags { get; init; } = Flags;
     }
 
     public readonly record struct RenderFlag(Matrix4x4 Matrix, uint DataId);
-    public readonly record struct RenderSegment(MaterialAsset Material, RawRenderMesh Mesh, int FlagIndexStart, int FlagIndexEnd);
+    public readonly record struct RenderSegment(MaterialAsset Material, IRawRenderMesh Mesh, int FlagIndexStart, int FlagIndexEnd);
 }

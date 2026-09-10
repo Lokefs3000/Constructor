@@ -432,7 +432,7 @@ namespace PrimaryEditor.Processors.Shader
         private static void WriteInputLayout(BinaryWriter bw, ShaderData data)
         {
             int idx = data.Functions.FindIndex((x) => Array.Exists(x.Attributes, (y) => y.Signature is AttributeVertex));
-            Checking.Assert(idx != -1);
+            Checking.Assert(idx != -1, "No function has been marked with a [vertex] attribute");
 
             ref readonly FunctionData vertexEntry = ref data.Functions[idx];
             int structData = Array.FindIndex(vertexEntry.Arguments, (x) => x.Generic.Generic == ValueGeneric.Custom);

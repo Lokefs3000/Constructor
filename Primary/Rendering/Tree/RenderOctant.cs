@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Collections.ReadOnly;
 using Primary.Common;
+using Primary.Components;
 using Primary.Mathematics;
 using Primary.Scenes;
 using System.Diagnostics;
@@ -13,9 +14,10 @@ namespace Primary.Rendering.Tree
     {
         private readonly RenderOctant? _parent;
 
-        private readonly AABB _worldBounds;
+        private AABB _worldBounds;
         private readonly OctreePoint _point;
         private readonly int _octantId;
+        private readonly int _depth;
 
         private RenderOctant[]? _octants;
         private List<SceneEntity> _children;
@@ -27,21 +29,35 @@ namespace Primary.Rendering.Tree
             _worldBounds = worldBounds;
             _point = GetOctreePointForOctant(worldBounds.Center - basePosition);
             _octantId = CraftIdFromPoint(_point);
+            _depth = parent != null ? parent._depth + 1 : 0;
 
             _octants = null;
             _children = new List<SceneEntity>();
         }
 
-        internal void EmplaceChild(SceneEntity entity)
+        internal void EmplaceChild(SceneEntity entity, float oversize)
         {
             if (!_children.Contains(entity))
+            {
+                if (oversize > 0.0f)
+                {
+                    ref RenderBounds bounds = ref entity.GetComponent<RenderBounds>();
+                    _worldBounds = AABB.Union(_worldBounds, bounds.ComputedBounds);
+                }
+
                 _children.Add(entity);
+            }
         }
 
         internal void RemoveChild(SceneEntity entity)
         {
             Debug.Assert(_children.Contains(entity));
             _children.Remove(entity);
+        }
+
+        internal void OversizeInternalBoundaries(AABB oversizeBounds)
+        {
+            _worldBounds = AABB.Union(_worldBounds, oversizeBounds);
         }
 
         public RenderOctant? GetOctantAt(OctreePoint point)
@@ -63,6 +79,7 @@ namespace Primary.Rendering.Tree
         public AABB Boundaries => _worldBounds;
         public OctreePoint Point => _point;
         public int OctantId => _octantId;
+        public int Depth => _depth;
 
         public ReadOnlySpan<RenderOctant> Octants => _octants;
         public ROList<SceneEntity> Children => _children;

@@ -57,6 +57,7 @@ namespace Primary.Threading
                 catch (Exception ex)
                 {
                     EngLog.Assets.Error(ex, "Error occured loading asset '{path}'", args.SourcePath);
+                    args.AssetData.UpdateAssetFailed(args.Asset);
                 }
             };
 

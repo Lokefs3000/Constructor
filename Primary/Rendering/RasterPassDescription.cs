@@ -273,7 +273,7 @@ namespace Primary.Rendering
                             _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.NoShaderAccess, resource.ToString());
                         }
 
-                        if (!Flags.HasEither(resource.Description.Usage, FGTextureUsage.RenderTarget | FGTextureUsage.DepthStencil))
+                        if (!Flags.HasEither(resource.Description.Usage, FGTextureUsage.RenderTarget | FGTextureUsage.DepthStencil | FGTextureUsage.UnorderedAccess))
                         {
                             _renderPass.ReportError(RPErrorSource.UseResource, RPErrorType.InvalidUsage, resource.ToString());
                         }

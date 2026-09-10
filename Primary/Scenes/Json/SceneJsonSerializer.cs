@@ -127,6 +127,11 @@ namespace Primary.Scenes.Json
             return SceneValueConverter.Deserialize<TComp, T>(ref reader, ref entity, out value);
         }
 
+        public static bool SerializeGeneric(Utf8JsonWriter writer, object value, ref SceneEntity entity)
+        {
+            return SceneValueConverter.Serialize(writer, value, ref entity);
+        }
+
         public static void PrintWarning(string message, SceneEntity entity, Type? type = null)
         {
             if (type != null)

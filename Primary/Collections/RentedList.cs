@@ -1,11 +1,12 @@
-﻿using CommunityToolkit.Diagnostics;
-using CommunityToolkit.HighPerformance;
-using Primary.Collections.Display;
-using System.Buffers;
+﻿using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using CommunityToolkit.Diagnostics;
+using CommunityToolkit.HighPerformance;
+using Primary.Collections.Display;
+using TerraFX.Interop.Windows;
 
 namespace Primary.Collections
 {
@@ -51,10 +52,13 @@ namespace Primary.Collections
         {
             if (_array != Array.Empty<T>())
             {
-                if (_clearOnReturn)
-                    Array.Clear(_array, 0, _count);
+                if (_array != null)
+                {
+                    if (_clearOnReturn)
+                        Array.Clear(_array, 0, _count);
+                    _sourcePool?.Return(_array);
+                }
 
-                _sourcePool.Return(_array);
                 _array = Array.Empty<T>();
             }
 
@@ -127,6 +131,32 @@ namespace Primary.Collections
             }
 
             _array[_count++] = item;
+        }
+
+        public void AddRange(ReadOnlySpan<T> items)
+        {
+            if (items.IsEmpty)
+                return;
+
+            if (_count + items.Length >= _array.Length)
+            {
+                _capacity = Math.Max(Math.Max(_capacity, _count), 16) * 2;
+
+                while (_capacity < _count + items.Length)
+                    _capacity *= 2;
+
+                T[] newArray = _sourcePool.Rent(_capacity);
+                Array.Copy(_array, newArray, _count);
+
+                if (_array != Array.Empty<T>())
+                    _sourcePool.Return(_array, _clearOnReturn);
+
+                _array = newArray;
+                _capacity = newArray.Length;
+            }
+
+            items.CopyTo(_array.AsSpan(_count));
+            _count += items.Length;
         }
 
         public void Clear()

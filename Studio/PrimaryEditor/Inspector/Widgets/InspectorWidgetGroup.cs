@@ -13,14 +13,13 @@ namespace PrimaryEditor.Inspector.Widgets
 {
     public sealed class InspectorWidgetGroup : InspectorWidget
     {
-        private readonly LayoutFrame _rootWidget;
+        private readonly Widget _rootWidget;
 
         internal InspectorWidgetGroup()
         {
-            _rootWidget = new LayoutFrame()
+            _rootWidget = new Widget()
             {
-                Size = UIValue2.MaxX,
-                AutoResize = AutoResizeMode.ResizeY
+                Width = UIValue.Max
             };
 
             _rootWidget.TryAddClass("values-root");
@@ -44,11 +43,11 @@ namespace PrimaryEditor.Inspector.Widgets
 
             if (viewData != null)
             {
-                _rootWidget.Margin = new Vector4(0.0f, viewData.RelativeOffset.Y, 0.0f, 0.0f);
+                _rootWidget.Margin = new LayoutBox { Top = viewData.RelativeOffset.Y };
             }
             else
             {
-                _rootWidget.Margin = Vector4.Zero;
+                _rootWidget.Margin = LayoutBox.Null;
             }
         }
 

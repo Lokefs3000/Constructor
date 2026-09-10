@@ -212,6 +212,7 @@ namespace Primary.Collections
             if (_array.Length < capacity)
             {
                 GrowCapacity(capacity);
+                ++_version;
             }
         }
 

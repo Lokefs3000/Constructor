@@ -2,7 +2,7 @@
 using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Primary.Mathematics;
-using Primary.Rendering.Debuggable;
+using Primary.Rendering.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

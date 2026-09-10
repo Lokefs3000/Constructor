@@ -602,6 +602,19 @@ namespace Primary.RHI.Direct3D12
             return computePipeline;
         }
 
+        public override RHIReadback? CreateReadback(in RHIReadbackDescription description, [CallerMemberName] string? debugName = "")
+        {
+            if (!ReadbackValidator.Validate(in description, _logger, debugName))
+                return null;
+
+            D3D12RHIReadback readback = new D3D12RHIReadback(this, description);
+            if (debugName != null)
+                readback.DebugName = debugName;
+
+            _resourceTracker.Track(readback);
+            return readback;
+        }
+
         public override void FlushPendingMessages()
         {
             if (!Unsafe.IsNullRef(in _infoQueue1.Get()))

@@ -10,7 +10,6 @@ using Primary.Common.Streams;
 using Primary.Profiling;
 using Primary.Threading;
 using Primary.Timing;
-using TerraFX.Interop.Windows;
 
 namespace Primary.Assets
 {
@@ -52,10 +51,10 @@ namespace Primary.Assets
             _loaders = new Dictionary<Type, IAssetLoader>
             {
                 { typeof(ModelAsset), new ModelAssetLoader() },
+                { typeof(MeshAsset), new MeshAssetLoader() },
                 { typeof(ShaderAsset), new ShaderAssetLoader() },
                 { typeof(MaterialAsset), new MaterialAssetLoader() },
                 { typeof(TextureAsset), new TextureAssetLoader() },
-                { typeof(PostProcessingVolumeAsset), new EffectVolumeLoader() },
                 { typeof(ComputeShaderAsset), new ComputeShaderAssetLoader() },
                 { typeof(TextureAtlasAsset), new TextureAtlasAssetLoader() }
             }.ToFrozenDictionary();
@@ -67,12 +66,12 @@ namespace Primary.Assets
             _immutableAssets = new Lazy<ImmutableAssets>(() =>
             {
                 return new ImmutableAssets(
-                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_White.png", true)),
-                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Black.png", true)),
-                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Normal.png", true)),
-                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Mask.png", true)),
-                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DebugTex_Loading.png", true)),
-                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DebugTex_Error.png", true)));
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_White.png", AssetId.NoLocalId, true)),
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Black.png", AssetId.NoLocalId, true)),
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Normal.png", AssetId.NoLocalId, true)),
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DefaultTex_Mask.png", AssetId.NoLocalId, true)),
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DebugTex_Loading.png", AssetId.NoLocalId, true)),
+                    NullableUtility.AlwaysThrowIfNull(LoadAsset<TextureAsset>("Engine/Textures/DebugTex_Error.png", AssetId.NoLocalId, true)));
             }, LazyThreadSafetyMode.PublicationOnly);
 
             s_instance = this;
@@ -290,7 +289,7 @@ namespace Primary.Assets
         }
 
         /// <summary>Thread-safe</summary>
-        public static T LoadAsset<T>(ReadOnlySpan<char> sourcePath, bool synchronous = false) where T : class, IAssetDefinition
+        public static T LoadAsset<T>(ReadOnlySpan<char> sourcePath, int localId = AssetId.NoLocalId, bool synchronous = false) where T : class, IAssetDefinition
         {
             AssetManager @this = NullableUtility.ThrowIfNull(s_instance);
             if (@this._assetIdProvider == null)
@@ -299,14 +298,14 @@ namespace Primary.Assets
                 return @this.CreateBadAsset<T>(AssetId.Invalid);
             }
 
-            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out AssetId id))
+            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out FileId id))
             {
                 EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
                 return @this.CreateBadAsset<T>(AssetId.Invalid);
             }
 
             @this._assetIdProvider.TryGetAssetPathForId(id, out string? assetPath);
-            return (T)@this.LoadAssetImpl(typeof(T), sourcePath.ToString(), assetPath, id, synchronous, null);
+            return (T)@this.LoadAssetImpl(typeof(T), sourcePath.ToString(), assetPath, new AssetId(id, localId), synchronous, null);
         }
 
         /// <summary>Thread-safe</summary>
@@ -365,7 +364,7 @@ namespace Primary.Assets
         }
 
         /// <summary>Thread-safe</summary>
-        public static object LoadAsset(Type type, ReadOnlySpan<char> sourcePath, bool synchronous = false)
+        public static object LoadAsset(Type type, ReadOnlySpan<char> sourcePath, int localId = AssetId.NoLocalId, bool synchronous = false)
         {
             if (!type.IsAssignableTo(typeof(IAssetDefinition)))
             {
@@ -385,20 +384,14 @@ namespace Primary.Assets
                 return @this.CreateBadAsset(type, AssetId.Invalid);
             }
 
-            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out AssetId assetId))
-            {
-                EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
-                return @this.CreateBadAsset(type, AssetId.Invalid);
-            }
-
-            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out AssetId id))
+            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out FileId id))
             {
                 EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
                 return @this.CreateBadAsset(type, AssetId.Invalid);
             }
 
             @this._assetIdProvider.TryGetAssetPathForId(id, out string? assetPath);
-            return @this.LoadAssetImpl(type, sourcePath.ToString(), assetPath, assetId, synchronous, null);
+            return @this.LoadAssetImpl(type, sourcePath.ToString(), assetPath, new AssetId(id, localId), synchronous, null);
         }
 
         /// <summary>Thread-safe</summary>
@@ -410,7 +403,7 @@ namespace Primary.Assets
         }
 
         /// <summary>Thread-safe</summary>
-        public static void WaitForAssetLoad(ReadOnlySpan<char> sourcePath)
+        public static void WaitForAssetLoad(ReadOnlySpan<char> sourcePath, int localId = AssetId.NoLocalId)
         {
             AssetManager @this = NullableUtility.ThrowIfNull(s_instance);
             if (@this._assetIdProvider == null)
@@ -419,13 +412,13 @@ namespace Primary.Assets
                 return;
             }
 
-            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out AssetId id))
+            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out FileId id))
             {
                 EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
                 return;
             }
 
-            WaitForAssetLoad(id);
+            WaitForAssetLoad(new AssetId(id, localId));
         }
 
         /// <summary>Thread-safe</summary>
@@ -435,7 +428,7 @@ namespace Primary.Assets
         }
 
         /// <summary>Thread-safe</summary>
-        public static async Task WaitForAssetLoadAsync(string sourcePath)
+        public static async Task WaitForAssetLoadAsync(string sourcePath, int localId = AssetId.NoLocalId)
         {
             AssetManager @this = NullableUtility.ThrowIfNull(s_instance);
             if (@this._assetIdProvider == null)
@@ -444,13 +437,13 @@ namespace Primary.Assets
                 return;
             }
 
-            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out AssetId id))
+            if (!@this._assetIdProvider.TryLookupIdForPath(sourcePath, out FileId id))
             {
                 EngLog.Assets.Error("[a:{path}]: Failed to find asset id", sourcePath.ToString());
                 return;
             }
 
-            await WaitForAssetLoadAsync(id);
+            await WaitForAssetLoadAsync(new AssetId(id, localId));
         }
 
         /// <summary>Not thread-safe</summary>

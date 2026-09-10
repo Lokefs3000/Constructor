@@ -20,8 +20,8 @@ namespace PrimaryEditor.Assets.Utility
             reader.Read();
 
             if (Guid.TryParse(str, out Guid result))
-                return new AssetId(result);
-            else if (EditorRuntime.Instance.AssetPipeline.AssetRegistry.TryLookupIdForPath(str, out AssetId id))
+                return new AssetId((FileId)result, AssetId.NoLocalId);
+            else if (AssetPipeline.Instance != null && AssetPipeline.Instance.AssetRegistry.TryLookupIdForPath(str, out FileId id))
                 return id;
             else
                 return AssetId.Invalid;
@@ -29,7 +29,17 @@ namespace PrimaryEditor.Assets.Utility
 
         public override void Write(TomlWriter writer, AssetId value)
         {
-            writer.WriteStringValue(value.ToString());
+            if (value.HasLocalId)
+            {
+                writer.WriteStartArray();
+                writer.WriteStringValue(value.FileId.Guid.ToString());
+                writer.WriteIntegerValue(value.LocalId);
+                writer.WriteEndArray();
+            }
+            else
+            {
+                writer.WriteStringValue(value.FileId.Guid.ToString());
+            }
         }
     }
 }

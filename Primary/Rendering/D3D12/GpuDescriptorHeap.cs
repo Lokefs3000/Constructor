@@ -105,10 +105,11 @@ namespace Primary.Rendering.D3D12
 
             if (_activeHeapIndex >= _activeHeaps.Count || _activeHeapOffset >= _descriptorHeapSize)
             {
+                if (_activeHeapOffset >= _descriptorHeapSize)
+                    ++_activeHeapIndex;
+
                 if (_activeHeapIndex >= _activeHeaps.Count)
                     AddNewHeapToList();
-                else
-                    _activeHeapIndex++;
 
                 _activeDescriptors.Clear();
                 _activeHeapOffset = 0;

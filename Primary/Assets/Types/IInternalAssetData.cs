@@ -16,6 +16,9 @@
         public void SetAssetInternalStatus(ResourceStatus status);
         /// <summary>Thread-safe</summary>
         public void SetAssetInternalName(string name);
+
+        /// <summary>Thread-safe</summary>
+        protected internal void UpdateAssetFailed(IAssetDefinition asset);
     }
 
     public enum ResourceStatus : byte

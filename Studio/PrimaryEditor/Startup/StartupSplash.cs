@@ -12,7 +12,7 @@ using SDL;
 
 namespace PrimaryEditor.Startup
 {
-    internal unsafe sealed class StartupSplash : IDisposable
+    public unsafe sealed class StartupSplash : IDisposable
     {
         private SDL_Window* _window;
         private SDL_Renderer* _renderer;

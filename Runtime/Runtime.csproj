@@ -5,6 +5,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<Configurations>Debug;Release;ReleaseWithDebug</Configurations>
+		<FileVersion>1.0.1.0</FileVersion>
 	</PropertyGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\Primary\Primary.csproj" />

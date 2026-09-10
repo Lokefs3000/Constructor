@@ -1,7 +1,9 @@
 asset_id = "019f320a9777760594a7501110f3c113"
 meta_version = 1
-
-is_compressed = false
-index_stride_mode = "Auto"
-use_half_precision_nodes = false
-use_half_precision_vertices = false
+[unique_config]
+index_stride_mode = 0
+uv_channels = 255
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 1040048950
+name = "Sphere"

@@ -1,4 +1,5 @@
-﻿using Primary.Scenes;
+﻿using Primary.Collections.ReadOnly;
+using Primary.Scenes;
 using Primary.Scenes.Components;
 using System.Collections.Concurrent;
 using System.Reflection;
@@ -78,6 +79,6 @@ namespace Primary.Reflection
         }
 
         public Type? Component => _component;
-        public IReadOnlyDictionary<string, FieldInfo> Fields => _fields;
+        public RODictionary<string, FieldInfo> Fields => _fields;
     }
 }

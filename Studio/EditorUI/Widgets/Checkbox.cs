@@ -12,13 +12,13 @@ using Primary.Input.Devices;
 
 namespace EditorUI.Widgets
 {
-    [UIWidget]
+    [UIWidget, TriggerValues("is-checked")]
     public class Checkbox : Button
     {
         protected bool _isChecked;
 
-        protected UIColor _checkmarkColor;
-        protected float _checkmarkThickness;
+        [StyleInclude] protected UIColor _checkmarkColor;
+        [StyleInclude] protected float _checkmarkThickness;
 
         public Checkbox()
         {
@@ -26,18 +26,6 @@ namespace EditorUI.Widgets
 
             _checkmarkColor = Color.Black;
             _checkmarkThickness = 2.0f;
-        }
-
-        protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
-        {
-            base.MeasureSelf(in context);
-
-            if (_layoutState.IdealSize.X < _layoutState.IdealSize.Y)
-                _layoutState.IdealSize.Y = _layoutState.IdealSize.X;
-            else
-                _layoutState.IdealSize.X = _layoutState.IdealSize.Y;
-
-            return MeasureStatus.Success;
         }
 
         protected internal override void PaintSelf(ref PainterContext context)
@@ -71,11 +59,10 @@ namespace EditorUI.Widgets
         }
 
         #region Serializable
-        [StyleTrigger, Styled(nameof(_isChecked), isEditable: true)]
-        public bool IsChecked { get => _isChecked; set => SetEditedField(value); }
+        public bool IsChecked { get => _isChecked; set => SetTriggerValue("is-checked", value); }
 
-        [Styled(nameof(_checkmarkColor))] public UIColor CheckmarkColor { get => _checkmarkColor; set => SetStyledField(value); }
-        [Styled(nameof(_checkmarkThickness))] public float CheckmarkThickness { get => _checkmarkThickness; set => SetStyledField(value); }
+        public UIColor CheckmarkColor { get => _checkmarkColor; set => SetStyledField(value); }
+        public float CheckmarkThickness { get => _checkmarkThickness; set => SetStyledField(value); }
         #endregion
 
         private record struct CheckmarkLineBuffer

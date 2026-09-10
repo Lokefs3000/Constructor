@@ -24,7 +24,7 @@ namespace Editor.Serialization.Types
     {
         public void Serialize(StringBuilder sb, object? obj)
         {
-            RenderMesh? val = (RenderMesh?)obj;
+            Mesh? val = (Mesh?)obj;
             if (val == null)
             {
                 sb.Append("null");

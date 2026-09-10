@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
 using CommunityToolkit.HighPerformance.Enumerables;
+using Primary.Collections.ReadOnly;
 using Primary.Input.Bindings;
 
 namespace Primary.Input
@@ -72,6 +73,6 @@ namespace Primary.Input
 
         public string Name { get => _name; set => _name = value; }
 
-        public IReadOnlyList<InputAction> Actions => _actions;
+        public ROList<InputAction> Actions => _actions;
     }
 }

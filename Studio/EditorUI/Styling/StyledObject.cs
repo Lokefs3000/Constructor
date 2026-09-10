@@ -5,12 +5,15 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using CommunityToolkit.Diagnostics;
+using CommunityToolkit.HighPerformance;
 using EditorUI.Reflection;
 using EditorUI.Reflection.Cache;
+using EditorUI.Reflection.Dynamic;
 using EditorUI.Styling.Enumerator;
 using EditorUI.Utility;
 using Primary.Collections.ReadOnly;
 using Primary.Common;
+using Primary.Rendering.Recording;
 using Primary.Utility;
 
 namespace EditorUI.Styling
@@ -22,12 +25,13 @@ namespace EditorUI.Styling
         private ushort _triggerMask;
         private ushort _updatedTriggerMask;
 
+        private ulong[] _effectTargets;
+
         private bool _arePropertiesInvalid;
 
         private List<string>? _classList;
 
-        private HashSet<StyleProperty> _overrideSet;
-        private HashSet<StyleProperty> _requiredUpdatesSet;
+        private HashSet<object> _overrideSet;
 
         public StyledObject()
         {
@@ -36,12 +40,13 @@ namespace EditorUI.Styling
             _triggerMask = 0;
             _updatedTriggerMask = 0;
 
+            _effectTargets = _cachedData.TriggerValueCount == 0 ? [] : new ulong[_cachedData.TriggerValueCount];
+
             _arePropertiesInvalid = true;
 
             _classList = null;
 
-            _overrideSet = new HashSet<StyleProperty>();
-            _requiredUpdatesSet = new HashSet<StyleProperty>();
+            _overrideSet = new HashSet<object>();
         }
 
         #region Update
@@ -52,38 +57,79 @@ namespace EditorUI.Styling
                 ClassListEnumerable classList = context.GetClassList(_classList ?? ROList<string>.Empty);
                 PropertyEnumerable properties = context.GetProperties(_updatedTriggerMask, _arePropertiesInvalid ? StylesheetContext.ReturnAll : (ushort)(_triggerMask ^ _updatedTriggerMask));
 
-                // ushort triggerMask = _arePropertiesInvalid ? StylesheetContext.ReturnAll : (ushort)(_triggerMask ^ _updatedTriggerMask);
+                int previousMaxTriggerIndex = sizeof(ushort) * 8 - ushort.LeadingZeroCount(_triggerMask);
+                if (context.GetAllProperties)
+                {
+                    for (int i = 0; i < _effectTargets.Length; ++i)
+                    {
+                        _effectTargets[i] = 0;
+                    }
+                }
 
                 foreach (StylePropertyData key in properties)
                 {
                     if (_cachedData.TryGetPropertyData(key.PropertyName, out PropertyData? propertyData))
                     {
-                        if (_overrideSet.Contains(propertyData.Property) || propertyData.Methods.SetDirect == null)
+                        if (_overrideSet.Contains(propertyData.PropertyOrField) || propertyData.Methods.SetIndirect == null)
                             continue;
 
                         foreach (StylesheetClass stylesheetClass in classList)
                         {
                             ClassStyleKey styleKey = new ClassStyleKey(stylesheetClass, key.AsStyleKey(), key.TriggerMask);
-                            if (context.Stylesheets.TryGetClassValue(styleKey, propertyData, out object? value))
+                            if (context.Stylesheets.TryGetClassValue(styleKey, propertyData, out object? value, out int triggerIndex))
                             {
-                                if (propertyData.Field != null)
-                                    propertyData.Field.SetValue(this, value);
-                                else
-                                    propertyData.Property.SetValue(this, value);
-
-                                if (propertyData.StateFlags != StateFlags.None)
+                                bool shouldSetCurrentProperty = true;
+                                if (!context.GetAllProperties)
                                 {
-                                    AddStateFlags(propertyData.StateFlags);
+                                    for (int i = previousMaxTriggerIndex; i >= 0; --i)
+                                    {
+                                        ref ulong propertyMask = ref _effectTargets.DangerousGetReferenceAt(i);
+                                        bool wasSetHere = Flags.HasFlag(propertyMask, propertyData.PropertyMask);
 
-                                    if (propertyData.Flags.HasFlag(PropertyDataFlags.EffectsParent))
-                                        ParentObject?.AddStateFlags(propertyData.StateFlags);
+                                        if (wasSetHere)
+                                        {
+                                            if (i != triggerIndex)
+                                            {
+                                                propertyMask &= ~propertyData.PropertyMask;
+                                            }
+                                            else
+                                            {
+                                                shouldSetCurrentProperty = false;
+                                            }
+
+                                            break;
+                                        }
+                                    }
                                 }
 
-                                if (propertyData.Callbacks != null && propertyData.Callbacks.Length > 0)
+                                if (shouldSetCurrentProperty)
                                 {
-                                    for (int i = 0; i < propertyData.Callbacks.Length; i++)
+                                    propertyData.Methods.SetIndirect?.Invoke(this, value);
+
+                                    if (propertyData.StateFlags != StateFlags.None)
                                     {
-                                        (t_callbackSet ??= new HashSet<string>()).Add(propertyData.Callbacks[i]);
+                                        AddStateFlags(propertyData.StateFlags);
+                                    }
+
+                                    if (propertyData.Links != null)
+                                    {
+                                        foreach (PropertyLink link in propertyData.Links)
+                                        {
+                                            link.Methods.SetIndirect?.Invoke(this, link.Value);
+                                        }
+                                    }
+
+                                    if (propertyData.Callbacks != null && propertyData.Callbacks.Length > 0)
+                                    {
+                                        for (int i = 0; i < propertyData.Callbacks.Length; i++)
+                                        {
+                                            (t_callbackSet ??= new HashSet<string>()).Add(propertyData.Callbacks[i]);
+                                        }
+                                    }
+
+                                    if (triggerIndex != -1)
+                                    {
+                                        _effectTargets.DangerousGetReferenceAt(triggerIndex) |= propertyData.PropertyMask;
                                     }
                                 }
 
@@ -116,10 +162,10 @@ namespace EditorUI.Styling
         {
             if (_cachedData.TryGetPropertyData(propertyName, out PropertyData? propertyData) && !propertyData.Flags.HasFlag(PropertyDataFlags.IsEditable))
             {
-                if (_overrideSet.Remove(propertyData.Property))
-                {
-                    _requiredUpdatesSet.Add(propertyData.Property);
-                }
+                _overrideSet.Remove(propertyData.PropertyOrField);
+                _arePropertiesInvalid = true;
+
+                AddStateFlags(StateFlags.SelfInvalidStyle);
             }
         }
 
@@ -223,35 +269,33 @@ namespace EditorUI.Styling
         #region Setters
         private void SetValue<T>(T value, string propertyName, bool setAsOverriden)
         {
-            if (_cachedData.TryGetPropertyData(propertyName, out PropertyData? propertyData))
+            if (_cachedData.TryGetPropertyData(propertyName, out PropertyData? propertyData) && propertyData.Methods.SetDirect != null)
             {
-                if (propertyData.Methods.SetDirect != null)
+                for (int i = 0; i < _effectTargets.Length; ++i)
                 {
-                    if (propertyData.Field != null)
-                    {
-                        propertyData.Methods.GetSetFieldDirectUnsafe<T>()!(this, in value);
-                    }
-                    else
-                    {
-                        propertyData.Methods.GetSetPropertyDirectUnsafe<T>()!(this, in value);
-                    }
+                    _effectTargets.DangerousGetReferenceAt(i) &= ~propertyData.PropertyMask;
                 }
 
-                if (propertyData.TriggerMask.HasValue)
+                if (propertyData.Methods.SetDirect != null)
                 {
-                    Debug.Assert(typeof(T) == typeof(bool));
+                    propertyData.Methods.GetSetDirect<T>()?.Invoke(this, value);
+                }
+                else
+                {
+                    return;
+                }
 
-                    if (BoolUtil<T>.GetAsBoolean(ref value))
-                        _updatedTriggerMask |= (ushort)(1 << propertyData.TriggerMask.Value);
-                    else
-                        _updatedTriggerMask &= (ushort)~(1 << propertyData.TriggerMask.Value);
-
-                    AddStateFlags(StateFlags.SelfInvalidStyle);
+                if (propertyData.Links != null)
+                {
+                    foreach (PropertyLink link in propertyData.Links)
+                    {
+                        link.Methods.SetIndirect?.Invoke(this, link.Value);
+                    }
                 }
 
                 if (setAsOverriden && !propertyData.Flags.HasFlag(PropertyDataFlags.IsEditable))
                 {
-                    _overrideSet.Add(propertyData.Property);
+                    _overrideSet.Add(propertyData.PropertyOrField);
                 }
 
                 if (propertyData.StateFlags != StateFlags.None)
@@ -269,13 +313,24 @@ namespace EditorUI.Styling
                         }
                     }
                 }
-
-                _requiredUpdatesSet.Remove(propertyData.Property);
             }
         }
 
         protected void SetStyledField<T>(T value, [CallerMemberName] string propertyName = "") => SetValue(value, propertyName, true);
         protected void SetEditedField<T>(T value, [CallerMemberName] string propertyName = "") => SetValue(value, propertyName, false);
+
+        protected void SetTriggerValue(string propertyName, bool setValue)
+        {
+            if (_cachedData.TryGetTriggerData(propertyName, out TriggerData? triggerData))
+            {
+                if (setValue)
+                    _updatedTriggerMask |= triggerData.TriggerMask;
+                else
+                    _updatedTriggerMask &= (ushort)~triggerData.TriggerMask;
+
+                AddStateFlags(StateFlags.SelfInvalidStyle);
+            }
+        }
         #endregion
 
         public ROList<string> ClassList => _classList ?? ROList<string>.Empty;

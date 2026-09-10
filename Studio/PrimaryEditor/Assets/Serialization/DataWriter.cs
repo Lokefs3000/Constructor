@@ -82,6 +82,19 @@ namespace PrimaryEditor.Assets.Serialization
             _stream.Write(serialized);
         }
 
+        public void WriteValue(int value)
+        {
+            if (!_isLineFresh)
+                _stream.Write((byte)'|');
+            else
+                _isLineFresh = false;
+
+            Span<byte> serialized = stackalloc byte[11];
+            value.TryFormat(serialized, out int bytesWritten);
+
+            _stream.Write(serialized[..bytesWritten]);
+        }
+
         public void WriteValue(bool value)
         {
             if (!_isLineFresh)

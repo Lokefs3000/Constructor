@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using CommunityToolkit.HighPerformance;
+using Primary.Assets;
 using Primary.Assets.Loaders;
 using Primary.Assets.Types;
 using Primary.Collections;
@@ -65,9 +66,8 @@ namespace PrimaryEditor.Assets.Importers
             pipeline.ReloadAsset(id);
         }
 
-        public void PreloadFile(AssetPipeline pipeline, AssetId id)
+        public void PreloadFile(AssetPipeline pipeline, AssetId id, string localPath)
         {
-            
         }
 
         public bool ValidateFile(AssetPipeline pipeline, AssetId id, string localPath)
@@ -86,6 +86,7 @@ namespace PrimaryEditor.Assets.Importers
         }
 
         public string UniqueId => "eui_fontfamily";
+        public Type AssetDefinitionType => typeof(UIFontFamilyAsset);
 
         private static readonly TomlSerializerOptions s_tomlOptions = new TomlSerializerOptions
         {

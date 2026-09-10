@@ -137,6 +137,25 @@ namespace PrimaryEditor.Assets.Serialization
                 throw CreateFailureException($"Failed to parse boolean from string '{Encoding.UTF8.GetString(value)}'");
         }
 
+        public int? ReadInt32()
+        {
+            if (_isLineFresh)
+                _isLineFresh = false;
+            else if (_leadingByte != '|')
+                throw CreateFailureException("Expected deliminator after previous value in list");
+            else
+                _leadingByte = (byte)_stream.ReadByte();
+
+            ReadOnlySpan<byte> value = ReadValue();
+            if (value.SequenceEqual("null"u8))
+                return null;
+
+            if (int.TryParse(value, null, out int result))
+                return result;
+            else
+                throw CreateFailureException($"Failed to parse int32 from string '{Encoding.UTF8.GetString(value)}'");
+        }
+
         public void ReadNewLine()
         {
             if (_stream.Position >= _stream.Length)

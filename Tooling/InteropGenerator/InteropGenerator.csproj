@@ -17,7 +17,7 @@
 	<PropertyGroup>
 		<!-- Workaround for libclang native dependencies -->
 		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' AND '$(PackAsTool)' != 'true'">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
-		<FileVersion>1.0.3.0</FileVersion>
+		<FileVersion>1.0.4.0</FileVersion>
 	</PropertyGroup>
 
 </Project>

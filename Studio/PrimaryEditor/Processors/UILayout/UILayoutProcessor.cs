@@ -68,7 +68,7 @@ namespace PrimaryEditor.Processors.UILayout
                     {
                         if (!FilesystemManager.TryGetLocalPath(attribute.Value, out string? localPath))
                             throw new Exception($"Failed to get local path for stylesheet '{attribute.Value}'");
-                        if (!EditorRuntime.Instance.AssetPipeline.AssetRegistry.TryLookupIdForPath(localPath, out AssetId id))
+                        if (AssetPipeline.Instance == null || !AssetPipeline.Instance.AssetRegistry.TryLookupIdForPath(localPath, out FileId id))
                             throw new Exception($"Failed to get id for path '{localPath}'");
 
                         stylesheets.Add(new UILStylesheet { Id = id });
@@ -78,8 +78,8 @@ namespace PrimaryEditor.Processors.UILayout
                         if (!Guid.TryParse(attribute.Value, out Guid guid))
                             throw new Exception($"Failed to parse stylesheet id '{attribute.Value}'");
 
-                        AssetId assetId = new AssetId(guid);
-                        if (!EditorRuntime.Instance.AssetPipeline.AssetRegistry.IsIdValid(assetId))
+                        FileId assetId = new FileId(guid);
+                        if (AssetPipeline.Instance == null || AssetPipeline.Instance.AssetRegistry.IsIdValid(assetId))
                             throw new Exception($"Invalid id specified for stylesheet '{assetId}'");
 
                         stylesheets.Add(new UILStylesheet { Id = assetId });

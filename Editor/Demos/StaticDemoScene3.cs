@@ -11,7 +11,7 @@ namespace Editor.Demos
         {
             Scene scene = editor.SceneManager.Scenes[0];
 
-            RenderMesh[] renderMeshes = [
+            Mesh[] renderMeshes = [
                 AssetManager.LoadAsset<ModelAsset>("Engine/Models/Capsule.fbx").GetRenderMesh("Capsule"),
                 AssetManager.LoadAsset<ModelAsset>("Engine/Models/Cone.fbx").GetRenderMesh("Cone"),
                 AssetManager.LoadAsset<ModelAsset>("Engine/Models/Cube.fbx").GetRenderMesh("Cube"),

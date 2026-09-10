@@ -18,11 +18,11 @@ namespace PrimaryEditor.Assets
 {
     public sealed class PhysicalFileRegistry
     {
-        private ConcurrentDictionary<AssetId, PhysicalFileInfo> _physicalFiles;
+        private ConcurrentDictionary<FileId, PhysicalFileInfo> _physicalFiles;
 
         internal PhysicalFileRegistry()
         {
-            _physicalFiles = new ConcurrentDictionary<AssetId, PhysicalFileInfo>();
+            _physicalFiles = new ConcurrentDictionary<FileId, PhysicalFileInfo>();
         }
 
         internal void LoadRegistryFromDisk()
@@ -44,7 +44,7 @@ namespace PrimaryEditor.Assets
 
                 while (!serializer.IsAtEndOfStream)
                 {
-                    AssetId assetId = (AssetId)serializer.ReadGuid()!.Value;
+                    FileId assetId = (FileId)serializer.ReadGuid()!.Value;
                     DateTime lastFileWriteTime = serializer.ReadDateTime()!.Value;
                     DateTime lastDataWriteTime = serializer.ReadDateTime()!.Value;
 
@@ -79,7 +79,7 @@ namespace PrimaryEditor.Assets
             }
         }
 
-        internal void StoreFileData(AssetId id, string fullFilePath, string? fullDataPath)
+        internal void StoreFileData(FileId id, string fullFilePath, string? fullDataPath)
         {
             DateTime lastWriteTimeFile = File.GetLastWriteTimeUtc(fullFilePath);
             DateTime lastWriteTimeData = fullDataPath == null ? PhysicalFileInfo.UninitializedDate : File.GetLastWriteTimeUtc(fullDataPath);
@@ -90,7 +90,12 @@ namespace PrimaryEditor.Assets
             _physicalFiles.TryUpdate(id, fileInfo, newFileInfo);
         }
 
-        internal bool IsFileOutOfDate(AssetId id, string fullFilePath)
+        internal void RemoveFileFromRegistry(FileId id)
+        {
+            _physicalFiles.TryRemove(id, out _);
+        }
+
+        internal bool IsFileOutOfDate(FileId id, string fullFilePath)
         {
             PhysicalFileInfo fileInfo = _physicalFiles.GetOrAdd(id, PhysicalFileInfo.Uninitialized);
             DateTime lastWriteTime = File.GetLastWriteTimeUtc(fullFilePath);
@@ -109,7 +114,7 @@ namespace PrimaryEditor.Assets
             return false;
         }
 
-        internal bool IsDataOutOfDate(AssetId id, string fullDataPath)
+        internal bool IsDataOutOfDate(FileId id, string fullDataPath)
         {
             PhysicalFileInfo fileInfo = _physicalFiles.GetOrAdd(id, PhysicalFileInfo.Uninitialized);
             DateTime lastWriteTime = File.GetLastWriteTimeUtc(fullDataPath);
@@ -122,13 +127,13 @@ namespace PrimaryEditor.Assets
                 PhysicalFileInfo newFileInfo = new PhysicalFileInfo(fileInfo.LastFileWriteTime, lastWriteTime);
                 _physicalFiles.TryUpdate(id, newFileInfo, fileInfo);
 
-                return isFileOutOfDate;
+                return isFileOutOfDate || isFileUninitialized;
             }
 
             return false;
         }
 
-        internal bool IsFileOrDataOutOfDate(AssetId id, string fullFilePath, string fullDataPath)
+        internal bool IsFileOrDataOutOfDate(FileId id, string fullFilePath, string fullDataPath)
         {
             PhysicalFileInfo fileInfo = _physicalFiles.GetOrAdd(id, PhysicalFileInfo.Uninitialized);
 
@@ -146,23 +151,23 @@ namespace PrimaryEditor.Assets
                 PhysicalFileInfo newFileInfo = new PhysicalFileInfo(lastWriteTimeFile, lastWriteTimeData);
                 _physicalFiles.TryUpdate(id, newFileInfo, fileInfo);
 
-                return isFileOutOfDate || isDataOutOfDate;
+                return (isFileUninitialized || isFileOutOfDate) || (isDataUninitialized || isDataOutOfDate);
             }
 
             return false;
         }
 
-        internal bool HasRegisteredFile(AssetId id)
+        internal bool HasRegisteredFile(FileId id)
         {
             return _physicalFiles.ContainsKey(id);
         }
 
-        public bool TryGetFileInfo(AssetId id, [NotNullWhen(true)] out PhysicalFileInfo value)
+        public bool TryGetFileInfo(FileId id, [NotNullWhen(true)] out PhysicalFileInfo value)
         {
             return _physicalFiles.TryGetValue(id, out value);
         }
 
-        private static string s_registryFile => Path.Combine(ProjectData.Instance.Paths.LibrarySavedFolder, "PhysicalFiles.dat");
+        private static string s_registryFile => Path.Combine(ProjectData.Instance!.Paths.LibrarySavedFolder, "PhysicalFiles.dat");
 
         public const int CurrentVersion = 1;
     }

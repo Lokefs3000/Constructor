@@ -16,52 +16,21 @@ namespace EditorUI.Widgets
     [UIWidget]
     public class Image : Widget
     {
-        protected AspectSource _aspectSource;
-        protected float _aspectRatio;
+        [StyleSetup(ConverterTypes = [typeof(Sprite), typeof(RHITexture), typeof(TextureAsset)])] protected object? _image;
 
-        protected object? _image;
+        [StyleInclude] protected Vector2 _uvMin;
+        [StyleInclude] protected Vector2 _uvMax;
 
-        protected Vector2 _uvMin;
-        protected Vector2 _uvMax;
-
-        protected UIColor _imageTint;
+        [StyleInclude] protected UIColor _imageTint;
 
         public Image()
         {
-            _aspectSource = AspectSource.None;
-            _aspectRatio = 1.0f;
-
             _image = null;
 
             _uvMin = Vector2.Zero;
             _uvMax = Vector2.One;
 
             _imageTint = Color.White;
-        }
-
-        protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
-        {
-            base.MeasureSelf(in context);
-
-            switch (_aspectSource)
-            {
-                case AspectSource.X:
-                    {
-                        float aspectY = _layoutState.IdealSize.X * _aspectRatio;
-                        _layoutState.ContentSize.Y += aspectY - _layoutState.IdealSize.Y;
-                        _layoutState.IdealSize.Y = aspectY;
-                        break;
-                    }
-                case AspectSource.Y:
-                    {
-                        float aspectX = _layoutState.IdealSize.Y * _aspectRatio;
-                        _layoutState.ContentSize.X += aspectX - _layoutState.IdealSize.X;
-                        _layoutState.IdealSize.X = aspectX;
-                        break;
-                    }
-            }
-
-            return MeasureStatus.Success;
         }
 
         protected internal override void PaintSelf(ref PainterContext context)
@@ -80,24 +49,12 @@ namespace EditorUI.Widgets
         }
 
         #region Serialization
-        [Styled(nameof(_aspectSource), StateFlags.SelfInvalidLayout)] public AspectSource AspectSource { get => _aspectSource; set => SetStyledField(value); }
-        [Styled(nameof(_aspectRatio), StateFlags.SelfInvalidLayout)] public float AspectRatio { get => _aspectRatio; set => SetStyledField(value); }
+        public Sprite? Sprite { get => _image as Sprite; set => SetStyledField(value); }
+        public RHITexture? RHITexture { get => _image as RHITexture; set => SetStyledField(value); }
+        public TextureAsset? Texture { get => _image as TextureAsset; set => SetStyledField(value); }
 
-        [Styled(nameof(_image)), StyleConverterTypes(typeof(TextureAsset), typeof(Sprite))]
-        public object? Picture
-        {
-            get => _image;
-            set
-            {
-                if (value is not Sprite and not TextureAsset and not RHITexture)
-                    SetStyledField<object?>(null);
-                else
-                    SetStyledField(value);
-            }
-        }
-
-        [Styled(nameof(_uvMin))] public Vector2 UVMinimum { get => _uvMin; set => SetStyledField(value); }
-        [Styled(nameof(_uvMax))] public Vector2 UVMaximum { get => _uvMax; set => SetStyledField(value); }
+        public Vector2 UVMinimum { get => _uvMin; set => SetStyledField(value); }
+        public Vector2 UVMaximum { get => _uvMax; set => SetStyledField(value); }
         #endregion
     }
 

@@ -21,7 +21,6 @@ namespace Primary.Components
             SceneEntityManager.Instance.RegisterComponent<EntityScene>();
             SceneEntityManager.Instance.RegisterComponent<RenderBounds>();
             SceneEntityManager.Instance.RegisterComponent<DontSerializeTag>();
-            SceneEntityManager.Instance.RegisterComponent<PostProcessingVolume>();
             SceneEntityManager.Instance.RegisterComponent<RenderOctantInfo>();
 
             SceneEntityManager.Instance.RebuildDependencyGraph();

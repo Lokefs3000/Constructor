@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "VoxelizationDemo": {
+      "commandName": "Project",
+      "commandLineArgs": "--detailed-asset-info",
+      "debugEngines": "managed"
+    }
+  }
+}

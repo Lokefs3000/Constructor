@@ -71,11 +71,14 @@ namespace PrimaryEditor.Windows.ContentBrowser
                 if (obj is FilesystemFile file)
                 {
                     AssetPipeline pipeline = EditorRuntime.Instance.AssetPipeline;
-                    if (pipeline.ImporterRegistry.TryGetImporterForPath(file.LocalPath, out IAssetImporter? importer) &&
-                        pipeline.AssetRegistry.TryLookupIdForPath(file.LocalPath, out AssetId assetId))
+                    if (pipeline.ImporterRegistry.TryGetImporterForPath(file.LocalPath, out AssetImporterData importerData) &&
+                        pipeline.AssetRegistry.TryLookupIdForPath(file.LocalPath, out FileId assetId))
                     {
-                        if (importer is TextureImporter)
-                            EditorRuntime.Instance.InspectorManager.StartInspect<TextureInspectorContext, AssetId>(ref assetId);
+                        if (importerData.Importer is TextureImporter)
+                        {
+                            AssetId id = new AssetId(assetId, AssetId.NoLocalId);
+                            EditorRuntime.Instance.InspectorManager.StartInspect<TextureInspectorContext, AssetId>(ref id);
+                        }
                     }
                 }
             }

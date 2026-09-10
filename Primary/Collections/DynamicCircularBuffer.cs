@@ -6,11 +6,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Primary.Collections.Display;
+using Primary.Common;
 
 namespace Primary.Collections
 {
     [DebuggerTypeProxy(typeof(DynamicCircularBufferDebugView<>))]
-    public sealed class DynamicCircularBuffer<T> : IEnumerable<T>, IReadOnlyCollection<T>
+    public sealed class DynamicCircularBuffer<T> : IEnumerable<T>, IReadOnlyCollection<T>, IArrayIterator<T>
     {
         private T[] _array;
         private int _size;
@@ -188,7 +189,7 @@ namespace Primary.Collections
             return _array[_end];
         }
 
-        public bool TryGetFront([NotNullWhen(true)] out T item)
+        public bool TryGetFront([MaybeNullWhen(false)] out T item)
         {
             if (_size > 0)
             {
@@ -200,7 +201,7 @@ namespace Primary.Collections
             return false;
         }
 
-        public bool TryGetBack([NotNullWhen(true)] out T item)
+        public bool TryGetBack([MaybeNullWhen(false)] out T item)
         {
             if (_size > 0)
             {
@@ -223,7 +224,7 @@ namespace Primary.Collections
         public IEnumerator<T> GetEnumerator() => new Enumerator(this);
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-        public T this[int index]
+        T IArrayIterator<T>.this[int index]
         {
             get
             {
@@ -233,9 +234,16 @@ namespace Primary.Collections
             set
             {
                 ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)index, (uint)_size);
-
                 _array[GetInternalIndex(index)] = value;
-                ++_version;
+            }
+        }
+
+        public ref T this[int index]
+        {
+            get
+            {
+                ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)index, (uint)_size);
+                return ref _array[GetInternalIndex(index)];
             }
         }
 
@@ -260,7 +268,10 @@ namespace Primary.Collections
                 _buffer = buffer;
 
                 _version = buffer._version;
-                _index = buffer._end;
+                _index = buffer._end == 0 ? buffer._array.Length - 1 : buffer._end - 1;
+
+                if (buffer._end == buffer._start)
+                    _index = -1;
 
                 _current = default;
             }
@@ -270,11 +281,14 @@ namespace Primary.Collections
                 if (_version != _buffer._version)
                     throw new InvalidOperationException("Collection was modified outside of the enumerator");
 
-                _index = _buffer._start;
+                _index = _buffer._end == 0 ? _buffer._array.Length - 1 : _buffer._end - 1;
                 _current = default;
+
+                if (_buffer._end == _buffer._start)
+                    _index = -1;
             }
 
-            public void Dispose()
+            void IDisposable.Dispose()
             {
             }
 
@@ -288,18 +302,21 @@ namespace Primary.Collections
                     return false;
                 }
 
-                _current = _buffer._array[_index++];
+                _current = _buffer._array[_index];
 
-                if ((_index = (_index % _buffer._array.Length)) == _buffer._end)
+                if (_index == _buffer._start)
                 {
                     _index = -1;
+                    return true;
                 }
 
+                if (--_index < 0)
+                    _index = _buffer._array.Length - 1;
                 return true;
             }
 
-            public T Current => _current!;
-            object IEnumerator.Current => _current!;
+            public readonly T Current => _current!;
+            readonly object IEnumerator.Current => _current!;
         }
     }
 }

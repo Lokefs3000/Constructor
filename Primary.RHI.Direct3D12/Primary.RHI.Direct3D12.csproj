@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Configurations>Debug;Release;ReleaseWithDebug</Configurations>
+    <FileVersion>1.0.1.0</FileVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
     <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>

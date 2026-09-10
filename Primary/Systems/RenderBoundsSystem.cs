@@ -22,10 +22,15 @@ namespace Primary.Systems
         public void Update(Entity e, ref WorldTransform world, ref MeshRenderer renderer, ref RenderBounds bounds)
         {
             if (renderer.Mesh == null)
+            {
+                bounds.ComputedBounds = AABB.Zero;
+                bounds.MeshLoadIndex = -1;
+                bounds.UpdateIndex = -1;
                 return;
+            }
 
             int frameIndex = Time.FrameIndex;
-            if (world.UpdateIndex == frameIndex || renderer.UpdateIndex == frameIndex)
+            if (world.UpdateIndex == frameIndex || renderer.UpdateIndex == frameIndex || renderer.Mesh.LoadIndex != bounds.MeshLoadIndex)
             {
                 AABB local = renderer.Mesh.Boundaries;
 
@@ -44,6 +49,7 @@ namespace Primary.Systems
 
                 bounds.ComputedBounds = new AABB(absMin, absMax);
                 bounds.UpdateIndex = frameIndex;
+                bounds.MeshLoadIndex = renderer.Mesh.LoadIndex;
             }
         }
 

@@ -14,7 +14,7 @@ namespace PrimaryEditor.Processors.TextureAtlas
     {
         public static unsafe void Execute(string localPath, TextureAtlasConfiguration config, Stream outputStream)
         {
-            AssetPipeline pipeline = EditorRuntime.Instance.AssetPipeline;
+            AssetPipeline pipeline = AssetPipeline.Instance ?? throw new InvalidOperationException("Asset pipeline static instance is null");
 
             if (!pipeline.AssetRegistry.IsIdValid(config.Texture))
                 throw new Exception("Texture asset id is not valid");
@@ -22,7 +22,7 @@ namespace PrimaryEditor.Processors.TextureAtlas
             if (!pipeline.AssetRegistry.TryGetLocalPathForId(config.Texture, out string? texturePath))
                 throw new Exception($"Failed to get path to texture from provided id '{config.Texture}'");
 
-            if (!pipeline.ImporterRegistry.TryGetImporterForPath(texturePath, out IAssetImporter? importer) && importer is not TextureImporter)
+            if (!pipeline.ImporterRegistry.TryGetImporterForPath(texturePath, out AssetImporterData importerData) && importerData.Importer is not TextureImporter)
                 throw new Exception($"Texture asset id is not a valid texture file");
 
             int spriteCount = Math.Min(config.Sprites.Length, ushort.MaxValue);

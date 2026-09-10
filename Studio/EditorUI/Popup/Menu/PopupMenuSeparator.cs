@@ -88,9 +88,9 @@ namespace EditorUI.Popup.Menu
         #endregion
 
         #region Styled
-        [Styled(nameof(_height), StateFlags.SelfInvalidLayout)] public float Height { get => _height; set => SetStyledField(value); }
+       public float Height { get => _height; set => SetStyledField(value); }
 
-        [Styled(nameof(_foregroundColor))] public UIColor ForegroundColor { get => _foregroundColor; set => SetStyledField(value); }
+       public UIColor ForegroundColor { get => _foregroundColor; set => SetStyledField(value); }
         #endregion
 
         public override PopupMenu OwningMenu => _owningMenu;

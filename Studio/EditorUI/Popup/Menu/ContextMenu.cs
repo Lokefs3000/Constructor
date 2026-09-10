@@ -31,16 +31,16 @@ namespace EditorUI.Popup.Menu
 
         private Vector2 _rootItemMenuSize;
 
-        private IAssetProvider<FontFamily>? _fontFamily;
-        private FontStyle _fontStyle;
-        private FontWeight _fontWeight;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private IAssetProvider<FontFamily>? _fontFamily;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private FontStyle _fontStyle;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private FontWeight _fontWeight;
 
-        private float _fontSize;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private float _fontSize;
 
-        private Vector4 _itemPadding;
-        private float _maxWidth;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private Vector4 _itemPadding;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private float _maxWidth;
 
-        private UIColor _backgroundColor;
+        [StyleInclude] private UIColor _backgroundColor;
 
         public ContextMenu()
         {
@@ -330,16 +330,16 @@ namespace EditorUI.Popup.Menu
         #endregion
 
         #region Serializable
-        [Styled(nameof(_fontFamily), StateFlags.SelfInvalidLayout)] public override IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
-        [Styled(nameof(_fontStyle), StateFlags.SelfInvalidLayout)] public override FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
-        [Styled(nameof(_fontWeight), StateFlags.SelfInvalidLayout)] public override FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
-        
-        [Styled(nameof(_fontSize), StateFlags.SelfInvalidLayout)] public override float FontSize { get => _fontSize; set => SetStyledField(value); }
+        public override IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
+        public override FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
+        public override FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
 
-        [Styled(nameof(_itemPadding), StateFlags.SelfInvalidLayout)] public override Vector4 ItemPadding { get => _itemPadding; set => SetStyledField(value); }
-        [Styled(nameof(_maxWidth), StateFlags.SelfInvalidLayout)] public override float MaxWidth { get => _maxWidth; set => SetStyledField(value); }
+        public override float FontSize { get => _fontSize; set => SetStyledField(value); }
 
-        [Styled(nameof(_backgroundColor))] public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
+        public override Vector4 ItemPadding { get => _itemPadding; set => SetStyledField(value); }
+        public override float MaxWidth { get => _maxWidth; set => SetStyledField(value); }
+
+        public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
         #endregion
 
         public override StateFlags StateFlags => _stateFlags;

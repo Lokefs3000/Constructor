@@ -16,13 +16,14 @@ using TerraFX.Interop.Windows;
 
 namespace EditorUI.Popup.Menu
 {
+    [TriggerValues("is-hovered", "is-held")]
     public sealed class PopupMenuMenu : PopupMenuItem
     {
         private readonly PopupMenu _owningMenu;
         private readonly PopupMenuMenu? _owningItem;
 
         private string _name;
-        private string _text;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private string _text;
 
         private List<PopupMenuItem> _items;
 
@@ -31,11 +32,11 @@ namespace EditorUI.Popup.Menu
 
         private TextShapingData? _shapingData;
 
-        private UIColor _backgroundColor;
-        private UIColor _textColor;
-        private UIColor _arrowColor;
+        [StyleInclude] private UIColor _backgroundColor;
+        [StyleInclude] private UIColor _textColor;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private UIColor _arrowColor;
 
-        private float _arrowThickness;
+        [StyleInclude] private float _arrowThickness;
 
         private bool _isHovered;
         private bool _isHeld;
@@ -118,7 +119,7 @@ namespace EditorUI.Popup.Menu
 
                 if (_textColor.IsVisible)
                     painter.AddText(new Vector2(originPosition.X, originPosition.Y + _itemHeight), _shapingData, new Vector2(availableWidth, _itemHeight), new Paint(_textColor));
-                
+
             }
         }
 
@@ -128,30 +129,24 @@ namespace EditorUI.Popup.Menu
             {
                 case UIInputEventType.MouseEnter:
                     {
-                        _isHovered = true;
-                        SetEditedField(true, nameof(IsHovered));
-
+                        SetTriggerValue("is-hovered", true);
                         _owningMenu.BeginItemHover(this);
                         return true;
                     }
                 case UIInputEventType.MouseLeave:
                     {
-                        _isHovered = false;
-                        SetEditedField(false, nameof(IsHovered));
-
+                        SetTriggerValue("is-hovered", false);
                         _owningMenu.EndItemHover(this);
                         return true;
                     }
                 case UIInputEventType.MouseDown:
                     {
-                        _isHeld = true;
-                        SetEditedField(true, nameof(IsHeld));
+                        SetTriggerValue("is-held", true);
                         return true;
                     }
                 case UIInputEventType.MouseUp:
                     {
-                        _isHeld = false;
-                        SetEditedField(false, nameof(IsHeld));
+                        SetTriggerValue("is-held", false);
                         return true;
                     }
 
@@ -195,8 +190,8 @@ namespace EditorUI.Popup.Menu
             _isHovered = false;
             _isHeld = false;
 
-            SetEditedField(false, nameof(IsHovered));
-            SetEditedField(false, nameof(IsHeld));
+            SetTriggerValue("is-hovered", false);
+            SetTriggerValue("is-held", false);
         }
 
         #region StyledObject
@@ -257,16 +252,13 @@ namespace EditorUI.Popup.Menu
         }
 
         #region Serializable
-        [Styled(nameof(_backgroundColor))] public UIColor BackgroundColor { get => _backgroundColor; set => _backgroundColor = value; }
-        [Styled(nameof(_textColor))] public UIColor TextColor { get => _textColor; set => _textColor = value; }
-        [Styled(nameof(_arrowColor))] public UIColor ArrowColor { get => _arrowColor; set => _arrowColor = value; }
+        public UIColor BackgroundColor { get => _backgroundColor; set => _backgroundColor = value; }
+        public UIColor TextColor { get => _textColor; set => _textColor = value; }
+        public UIColor ArrowColor { get => _arrowColor; set => _arrowColor = value; }
 
-        [Styled(nameof(_arrowThickness))] public float ArrowThickness { get => _arrowThickness; set => _arrowThickness = value; }
+        public float ArrowThickness { get => _arrowThickness; set => _arrowThickness = value; }
 
-        [StyleTrigger, Styled(nameof(_isHovered), isEditable: true)]
         public bool IsHovered { get => _isHovered; }
-
-        [StyleTrigger, Styled(nameof(_isHeld), isEditable: true)]
         public bool IsHeld { get => _isHeld; }
         #endregion
 

@@ -46,9 +46,11 @@ namespace Primary.Components
         public Matrix4x4 Transformation;
         public int UpdateIndex;
 
-        public Vector3 ForwardVector => new Vector3(Transformation.M31, Transformation.M32, Transformation.M33);
-        public Vector3 UpVector => new Vector3(Transformation.M21, Transformation.M22, Transformation.M23);
-        public Vector3 RightVector => new Vector3(Transformation.M11, Transformation.M12, Transformation.M13);
+        public readonly Vector3 Position => Transformation.Translation;
+
+        public readonly Vector3 ForwardVector => new Vector3(Transformation.M31, Transformation.M32, Transformation.M33);
+        public readonly Vector3 UpVector => new Vector3(Transformation.M21, Transformation.M22, Transformation.M23);
+        public readonly Vector3 RightVector => new Vector3(Transformation.M11, Transformation.M12, Transformation.M13);
     }
 
     [ComponentUsage(CanBeAdded: false), DontSerializeComponent]
@@ -58,9 +60,11 @@ namespace Primary.Components
         public Matrix4x4 Transformation;
         public int UpdateIndex;
 
-        public Vector3 ForwardVector => new Vector3(Transformation.M31, Transformation.M32, Transformation.M33);
-        public Vector3 UpVector => new Vector3(Transformation.M21, Transformation.M22, Transformation.M23);
-        public Vector3 RightVector => new Vector3(Transformation.M11, Transformation.M12, Transformation.M13);
+        public readonly Vector3 Position => Transformation.Translation;
+
+        public readonly Vector3 ForwardVector => new Vector3(Transformation.M31, Transformation.M32, Transformation.M33);
+        public readonly Vector3 UpVector => new Vector3(Transformation.M21, Transformation.M22, Transformation.M23);
+        public readonly Vector3 RightVector => new Vector3(Transformation.M11, Transformation.M12, Transformation.M13);
     }
 
     [Flags]

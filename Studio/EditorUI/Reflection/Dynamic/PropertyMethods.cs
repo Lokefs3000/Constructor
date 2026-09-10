@@ -6,21 +6,15 @@ using System.Text;
 
 namespace EditorUI.Reflection.Dynamic
 {
-    public record class PropertyMethods(Delegate? SetDirect)
+    public record class PropertyMethods(Delegate? SetDirect, SetIndirect? SetIndirect)
     {
-        public SetFieldDirect<T>? GetSetFieldDirectUnsafe<T>()
+        public SetDirect<T>? GetSetDirect<T>()
         {
-            Debug.Assert(SetDirect is SetFieldDirect<T>);
-            return Unsafe.As<SetFieldDirect<T>?>(SetDirect);
-        }
-
-        public SetPropertyDirect<T>? GetSetPropertyDirectUnsafe<T>()
-        {
-            Debug.Assert(SetDirect is SetPropertyDirect<T>);
-            return Unsafe.As<SetPropertyDirect<T>?>(SetDirect);
+            Debug.Assert(SetDirect is SetDirect<T>);
+            return Unsafe.As<SetDirect<T>?>(SetDirect);
         }
     }
 
-    public delegate void SetFieldDirect<T>(object instance, ref readonly T value);
-    public delegate void SetPropertyDirect<T>(object instance, ref readonly T value);
+    public delegate void SetDirect<T>(object instance, T value);
+    public delegate void SetIndirect(object instance, object? value);
 }

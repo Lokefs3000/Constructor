@@ -18,7 +18,7 @@ namespace PrimaryEditor.Windows
         private readonly GroupPool _groupPool;
         private readonly Dictionary<int, WidgetGroup> _groups;
 
-        private LayoutFrame? _valuesView;
+        private Widget? _valuesView;
 
         public InspectorWindow(WindowManager windowManager, ValueSerializer valueSerializer) : base(windowManager, valueSerializer)
         {
@@ -33,7 +33,7 @@ namespace PrimaryEditor.Windows
 
         protected internal override void InitializeSelf()
         {
-            _valuesView = RootWidget.FindWidgetWithId<LayoutFrame>("values-view", true);
+            _valuesView = RootWidget.FindWidgetWithId<Widget>("values-view", true);
         }
 
         protected internal override void CleanupReloadSelf()

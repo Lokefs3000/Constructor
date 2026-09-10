@@ -1,7 +1,7 @@
 asset_id = "019f320a97817bc4a38f20f42d46ca85"
 meta_version = 1
 
-[handling]
+[unique_config.handling]
 image_type = "Color"
 image_format = "Automatic"
 alpha_source = "Opaque"
@@ -13,14 +13,14 @@ gamma_correct = false
 premultiplied_alpha = false
 flip_vertical = false
 
-[mipmaps]
+[unique_config.mipmaps]
 generate_mipmaps = true
 mipmap_filter = "Box"
 max_mipmap_count = 2147483647
 min_mipmap_size = 1
 scale_alpha_for_mipmaps = false
 
-[visual]
+[unique_config.visual]
 swizzle = ["R", "G", "B", "A"]
 reduction_type = "Standard"
 min_filter = "Linear"

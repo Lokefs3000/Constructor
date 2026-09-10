@@ -12,6 +12,7 @@ using Primary.Mathematics;
 
 namespace EditorUI.Widgets.Components
 {
+    [TriggerValues("is-hovered", "is-held", "is-active")]
     public sealed class Scroller : StyledObject, IInteractable, IInteractionShape
     {
         private readonly ScrollView _scrollView;
@@ -24,12 +25,12 @@ namespace EditorUI.Widgets.Components
         private bool _isHeld;
         private bool _isActive;
 
-        private UIColor _scrollerColor;
-        private Vector4 _cornerRadius;
+        [StyleInclude] private UIColor _scrollerColor;
+        [StyleInclude] private Vector4 _cornerRadius;
 
-        private ushort _strokeWidth;
-        private StrokePosition _strokePosition;
-        private UIColor _strokeColor;
+        [StyleInclude] private ushort _strokeWidth;
+        [StyleInclude] private StrokePosition _strokePosition;
+        [StyleInclude] private UIColor _strokeColor;
 
         private float _computedSize;
 
@@ -86,8 +87,7 @@ namespace EditorUI.Widgets.Components
 
                     if (!_isActive)
                     {
-                        SetEditedField(true, nameof(_isActive));
-                        _isActive = true;
+                        SetTriggerValue("is-active", true);
                     }
 
                     float top = computedRect.Minimum.Y + scroll * _computedSize;
@@ -100,8 +100,7 @@ namespace EditorUI.Widgets.Components
                 {
                     if (_isActive)
                     {
-                        SetEditedField(false, nameof(_isActive));
-                        _isActive = false;
+                        SetTriggerValue("is-active", false);
                     }
                 }
             }
@@ -117,22 +116,19 @@ namespace EditorUI.Widgets.Components
             {
                 case UIInputEventType.MouseEnter:
                     {
-                        _isHovered = true;
-                        SetEditedField(true, nameof(IsHovered));
+                        SetTriggerValue("is-hovered", true);
                         return true;
                     }
                 case UIInputEventType.MouseLeave:
                     {
-                        _isHovered = false;
-                        SetEditedField(false, nameof(IsHovered));
+                        SetTriggerValue("is-hovered", false);
                         return true;
                     }
                 case UIInputEventType.MouseDown:
                     {
                         if (inputEvent.Mouse.Button == MouseButton.Left)
                         {
-                            _isHeld = true;
-                            SetEditedField(true, nameof(IsHeld));
+                            SetTriggerValue("is-held", true);
                             return true;
                         }
 
@@ -142,8 +138,7 @@ namespace EditorUI.Widgets.Components
                     {
                         if (inputEvent.Mouse.Button == MouseButton.Left)
                         {
-                            _isHeld = false;
-                            SetEditedField(false, nameof(IsHeld));
+                            SetTriggerValue("is-held", false);
                             return true;
                         }
 
@@ -233,19 +228,16 @@ namespace EditorUI.Widgets.Components
         public override StateFlags StateFlags => _stateFlags;
 
         #region Serializable
-        [StyleTrigger, Styled(nameof(_isHovered), isEditable: true)]
         public bool IsHovered => _isHovered;
-        [StyleTrigger, Styled(nameof(_isHeld), isEditable: true)]
         public bool IsHeld => _isHeld;
-        [StyleTrigger, Styled(nameof(_isActive), isEditable: true)]
         public bool IsActive => _isActive;
 
-        [Styled(nameof(_scrollerColor))] public UIColor ScrollerColor { get => _scrollerColor; set => SetStyledField(value); }
-        [Styled(nameof(_cornerRadius))] public Vector4 CornerRadius { get => _cornerRadius; set => SetStyledField(value); }
+        public UIColor ScrollerColor { get => _scrollerColor; set => SetStyledField(value); }
+        public Vector4 CornerRadius { get => _cornerRadius; set => SetStyledField(value); }
 
-        [Styled(nameof(_strokeColor))] public UIColor StrokeColor { get => _strokeColor; set => SetStyledField(value); }
-        [Styled(nameof(_strokePosition))] public StrokePosition StrokePosition { get => _strokePosition; set => SetStyledField(value); }
-        [Styled(nameof(_strokeWidth))] public ushort StrokeWidth { get => _strokeWidth; set => SetStyledField(value); }
+        public UIColor StrokeColor { get => _strokeColor; set => SetStyledField(value); }
+        public StrokePosition StrokePosition { get => _strokePosition; set => SetStyledField(value); }
+        public ushort StrokeWidth { get => _strokeWidth; set => SetStyledField(value); }
         #endregion
     }
 }

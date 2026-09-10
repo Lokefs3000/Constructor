@@ -30,6 +30,17 @@ namespace Primary.Rendering.Assets
             _hasIndices = hasIndices;
         }
 
+        public RawRenderMesh(IRenderMeshSource source)
+        {
+            _source = source;
+            _uniqueId = 0;
+            _boundaries = AABB.Zero;
+            _vertexOffset = 0;
+            _indexOffset = 0;
+            _indexCount = 0;
+            _hasIndices = false;
+        }
+
         public IRenderMeshSource Source => _source;
         public int UniqueId => _uniqueId;
 
@@ -41,4 +52,16 @@ namespace Primary.Rendering.Assets
 
         public bool HasIndices => _hasIndices;
     }
+
+    public interface IRawRenderMesh
+    {
+        public IRenderMeshSource? MeshSource { get; }
+        public AABB Boundaries { get; }
+        public ref readonly RenderMeshDrawArgs Args { get; }
+
+        public int UniqueId { get; }
+        public int LoadIndex { get; }
+    }
+
+    public readonly record struct RenderMeshDrawArgs(IRenderMeshSource MeshSource, uint VertexOffset, uint IndexOffset, uint VertexOrIndexCount, bool NeedsIndexedDraw);
 }

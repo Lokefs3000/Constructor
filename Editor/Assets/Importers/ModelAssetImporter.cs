@@ -66,7 +66,7 @@ namespace Editor.Assets.Importers
             AssetId modelId = pipeline.Identifier.GetOrRegisterAsset(localInputFile);
             EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localInputFile, true));
 
-            AssetCategoryDatabase category = EditorRuntime.GlobalSingleton.AssetDatabase.GetCategory<RenderMesh>()!;
+            AssetCategoryDatabase category = EditorRuntime.GlobalSingleton.AssetDatabase.GetCategory<Mesh>()!;
             for (int i = 0; i < proc.MeshInfos.Length; i++)
             {
                 ref ModelMeshInfo mmi = ref proc.MeshInfos[i];
@@ -115,7 +115,7 @@ namespace Editor.Assets.Importers
 
             EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, true));
 
-            AssetCategoryDatabase category = EditorRuntime.GlobalSingleton.AssetDatabase.GetCategory<RenderMesh>()!;
+            AssetCategoryDatabase category = EditorRuntime.GlobalSingleton.AssetDatabase.GetCategory<Mesh>()!;
 
             Stream dataReadStream = stream;
             if (Flags.HasFlag(header.Flags, PMFHeaderFlags.IsCompressed))

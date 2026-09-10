@@ -1,42 +1,39 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using CommunityToolkit.HighPerformance;
+using Editor.Processors.Texture;
+using Primary.Assets;
 using Primary.Assets.Loaders;
 using Primary.Assets.Types;
+using Primary.Common;
+using Primary.Utility;
+using PrimaryEditor.Assets.Database;
 using PrimaryEditor.Assets.Exceptions;
 using PrimaryEditor.Assets.Utility;
 using PrimaryEditor.Processors.TextureAtlas;
 using Tomlyn;
+using Tomlyn.Serialization;
 
 namespace PrimaryEditor.Assets.Importers
 {
     internal sealed class TextureAtlasImporter : IAssetImporter
     {
-        public void ImportFile(AssetPipeline pipeline, AssetId id, Stream inputStream, Stream outputStream, string localPath, string localOutputPath, bool isTrialImport)
+        public void ImportFile(in ImportContext context)
         {
-            pipeline.FilesystemManager.SetFileRemap(localPath, null);
-
-            string? sourceText = FilesystemManager.ReadAllText(localPath);
-            if (sourceText == null)
-            {
-                EdLog.Assets.Error("[{file}]: Failed to read texture atlas source", localPath);
-                throw new AssetImportException();
-            }
-
             TextureAtlasConfiguration config;
             try
             {
-                config = TomlSerializer.Deserialize<TextureAtlasConfiguration>(sourceText, s_tomlOptions)!;
+                config = TomlSerializer.Deserialize<TextureAtlasConfiguration>(context.InputStream, s_tomlOptions)!;
             }
             catch (TomlException ex)
             {
-                EdLog.Assets.Error(ex, "[{file}]: Error occured parsing texture atlas", localPath);
+                EdLog.Assets.Error(ex, "[{file}]: Error occured parsing texture atlas", context.LocalPath);
                 throw new AssetImportException();
             }
 
             try
             {
-                TextureAtlasProcessor.Execute(localPath, config, outputStream);
+                TextureAtlasProcessor.Execute(context.LocalPath, config, context.OutputStream);
             }
             catch (Exception ex)
             {
@@ -44,14 +41,7 @@ namespace PrimaryEditor.Assets.Importers
                 throw new AssetImportException();
             }
 
-            pipeline.Associator.MakeAssociation(id, config.Texture, true);
-
-            pipeline.FilesystemManager.SetFileRemap(localPath, localOutputPath);
-            pipeline.ReloadAsset(id);
-        }
-
-        public void PreloadFile(AssetPipeline pipeline, AssetId id)
-        {
+            context.AddDependency(config.Texture);
         }
 
         public bool ValidateFile(AssetPipeline pipeline, AssetId id, string localPath)
@@ -70,6 +60,12 @@ namespace PrimaryEditor.Assets.Importers
         }
 
         public string UniqueId => "texture_atlas";
+        public Type AssetDefinitionType => typeof(TextureAtlasAsset);
+
+        public string? DefaultConfigName => "DefaultConfig_TextureAtlas.toml";
+        public Type? ConfigType => null;
+
+        public TomlConverter[] Converters => [];
 
         private static readonly TomlSerializerOptions s_tomlOptions = new TomlSerializerOptions
         {

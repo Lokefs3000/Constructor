@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<FileVersion>1.0.438.0</FileVersion>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\Primary\Primary.csproj" />
+		<ProjectReference Include="..\..\Studio\PrimaryEditor\PrimaryEditor.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\Primary.SourceGenerator\Primary.SourceGenerator.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="Arguments.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Filesystems.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Source\Content\Shaders\Compute\" />
+	  <Folder Include="Source\Content\Shaders\Lighting\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Hexa.NET.ImGui" Version="2.2.9" />
+	  <PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.18" />
+	</ItemGroup>
+
+	<Target Name="PatchExec" AfterTargets="PostBuildEvent">
+		<Exec Command="call &quot;..\..\..\..\..\Patcher\D3D12SDKVersionPatcher\PatchEditor.bat&quot; &quot;VoxelizationDemo&quot;" WorkingDirectory="$(OutDir)" />
+	</Target>
+
+</Project>

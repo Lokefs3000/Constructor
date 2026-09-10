@@ -57,5 +57,34 @@ namespace Primary.Scenes.Json.Converters
             reader.TrySkip();
             return false;
         }
+
+        public static bool TrySerialize(Utf8JsonWriter writer, ref Color value)
+        {
+            if (value.R == value.G && value.R == value.B)
+            {
+                if (value.A >= 1.0f)
+                {
+                    writer.WriteNumberValue(value.R);
+                }
+                else
+                {
+                    writer.WriteStartArray();
+                    writer.WriteNumberValue(value.R);
+                    writer.WriteNumberValue(value.A);
+                    writer.WriteEndArray();
+                }
+            }
+            else
+            {
+                writer.WriteStartArray();
+                writer.WriteNumberValue(value.R);
+                writer.WriteNumberValue(value.G);
+                writer.WriteNumberValue(value.B);
+                writer.WriteNumberValue(value.A);
+                writer.WriteEndArray();
+            }
+
+            return true;
+        }
     }
 }

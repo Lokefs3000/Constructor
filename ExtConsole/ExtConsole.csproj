@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>Icon.ico</ApplicationIcon>
-    <FileVersion>1.0.1.0</FileVersion>
+    <FileVersion>1.0.2.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

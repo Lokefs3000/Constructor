@@ -21,14 +21,14 @@ namespace PrimaryEditor.Assets.Utility
             reader.Read();
 
             if (Guid.TryParse(str, out Guid result))
-                return new AssetId(result);
+                return new AssetId((FileId)result, AssetId.NoLocalId);
             else
                 throw new TomlException("Failed to parse guid");
         }
 
         public override void Write(TomlWriter writer, AssetId value)
         {
-            writer.WriteStringValue(value.ToString());
+            writer.WriteStringValue(value.FileId.Guid.ToString());
         }
     }
 }

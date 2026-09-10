@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -11,46 +12,58 @@ using Primary;
 using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Collections;
+using Primary.Collections.ReadOnly;
 using Primary.Common;
+using Primary.Profiling;
 using Primary.Streams;
+using PrimaryEditor.Assets.Database;
 using PrimaryEditor.Assets.Exceptions;
 using PrimaryEditor.Assets.Filesystem;
 using PrimaryEditor.Assets.Importers;
 using PrimaryEditor.Assets.Loaders;
 using PrimaryEditor.Assets.Serialization;
+using PrimaryEditor.Assets.Utility;
 using PrimaryEditor.Core;
 using PrimaryEditor.Project;
 using PrimaryEditor.Startup;
 using Tomlyn;
-using Tomlyn.Model;
 
 namespace PrimaryEditor.Assets
 {
     public sealed class AssetPipeline
     {
-        private EditorRuntime _runtime;
+        private readonly EditorRuntime? _runtime;
+
+        private readonly bool _printDetailedAssetInfo;
 
         // primary
-        private FilesystemManager _filesystemManager;
-        private AssetAssociator _associator;
-        private AssetConfiguration _configuration;
-        private ImportScheduler _importScheduler;
+        private readonly FilesystemManager _filesystemManager;
+        private readonly AssetAssociator _associator;
+        private readonly AssetConfiguration _configuration;
+        private readonly ImportScheduler _importScheduler;
 
         // registries
-        private ImporterRegistry _importerRegistry;
-        private PhysicalFileRegistry _physicalFileRegistry;
-        private AssetRegistry _assetRegistry;
+        private readonly ImporterRegistry _importerRegistry;
+        private readonly PhysicalFileRegistry _physicalFileRegistry;
+        private readonly AssetRegistry _assetRegistry;
+
+        // databases
+        private readonly AssetDatabase _database;
 
         // assets
-        private ConcurrentDictionary<AssetId, AssetImportData> _importedAssets;
+        private readonly ConcurrentDictionary<FileId, AssetImportData> _importedAssets;
 
-        private Lock _reloadLock;
-        private HashSet<AssetId> _assetsToReload;
-        private HashSet<AssetId> _pendingImports;
+        private readonly Lock _reloadLock;
+        private readonly HashSet<AssetId> _assetsToReload;
+        private readonly HashSet<AssetId> _pendingImports;
 
-        internal AssetPipeline(EditorRuntime runtime)
+        public AssetPipeline(EditorRuntime? runtime)
         {
+            s_instance.Target = this;
+
             _runtime = runtime;
+
+            _printDetailedAssetInfo = AppArguments.HasArgument("detailed-asset-info");
 
             _filesystemManager = new FilesystemManager(this);
             _associator = new AssetAssociator();
@@ -61,17 +74,20 @@ namespace PrimaryEditor.Assets
             _physicalFileRegistry = new PhysicalFileRegistry();
             _assetRegistry = new AssetRegistry();
 
-            _importedAssets = new ConcurrentDictionary<AssetId, AssetImportData>();
+            _database = new AssetDatabase();
+
+            _importedAssets = new ConcurrentDictionary<FileId, AssetImportData>();
 
             _reloadLock = new Lock();
             _assetsToReload = new HashSet<AssetId>();
             _pendingImports = new HashSet<AssetId>();
         }
 
-        internal void ImportAnyChangesLaunch(StartupSplash splash)
+        public void ImportAnyChangesLaunch(StartupSplash? splash)
         {
             long setupTimestamp = Stopwatch.GetTimestamp();
 
+            SetupDefaultDirectories();
             MountRequiredFilesystems();
             LoadDefaultData();
             RegisterImporters();
@@ -80,13 +96,13 @@ namespace PrimaryEditor.Assets
 
             long importWaitTimestamp;
             long saveDataTimestamp;
-            if (!AppArguments.HasArgument("skip-asset-check"))
+            if (!AppArguments.HasArgument("--skip-asset-check"))
             {
-                splash.ActionName = "Finding assets..";
+                splash?.ActionName = "Finding assets..";
 
                 Queue<string> foldersToSearch = new Queue<string>();
-                HashSet<AssetId> requiredImports = new HashSet<AssetId>();
-                HashSet<AssetId> newAssets = new HashSet<AssetId>();
+                HashSet<FileId> requiredImports = new HashSet<FileId>();
+                HashSet<FileId> newAssets = new HashSet<FileId>();
 
                 foreach (BaseFilesystem filesystem in _filesystemManager.Filesystems)
                 {
@@ -98,7 +114,7 @@ namespace PrimaryEditor.Assets
                     foldersToSearch.Clear();
                     foldersToSearch.Enqueue(filesystem.WorkingDirectory);
 
-                    splash.ActionName = $"Finding assets.. ({filesystem.NamespaceKey})";
+                    splash?.ActionName = $"Finding assets.. ({filesystem.NamespaceKey})";
 
                     long startTimestamp = Stopwatch.GetTimestamp();
 
@@ -129,8 +145,10 @@ namespace PrimaryEditor.Assets
                             {
                                 contentFs?.Structure.AddFile(localPath);
 
+                                bool hasImporterFor = _importerRegistry.TryGetImporterForPath(localPath, out AssetImporterData importerData);
+
                                 ++searchedFiles;
-                                AssetDataHeader dataHeader;
+                                AssetDataConfig? dataConfig;
 
                                 string assetDataPath = entryPathInDir + ".assetdat";
                                 if (File.Exists(assetDataPath))
@@ -142,19 +160,23 @@ namespace PrimaryEditor.Assets
                                         continue;
                                     }
 
-                                    if (!TomlSerializer.TryDeserialize(sourceStream, AssetDataHeaderTomlContext.Default, out dataHeader))
+                                    try
                                     {
-                                        EdLog.Assets.Error("Failed to deserialize asset data file '{f}'! Time to close the application and fix whatever is messed up here", assetDataPath);
+                                        dataConfig = TomlSerializer.Deserialize<AssetDataConfig>(sourceStream, importerData.TomlOptions ?? s_tomlOptions)!;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        EdLog.Assets.Error(ex, "Failed to deserialize asset data file '{f}'! Time to close the application and fix whatever is messed up here", assetDataPath);
                                         continue;
                                     }
 
-                                    if (dataHeader.Id.IsInvalid)
+                                    if (dataConfig.Id.IsInvalid)
                                     {
                                         EdLog.Assets.Error("Invalid id present within the asset data for file '{f}'", localPath);
                                         continue;
                                     }
 
-                                    if (dataHeader.Version != AssetDataHeader.TargetVersion)
+                                    if (dataConfig.MetaVersion != AssetDataConfig.CurrentVersion)
                                     {
                                         throw new NotSupportedException("Upgrading version not supported yet");
                                     }
@@ -163,47 +185,99 @@ namespace PrimaryEditor.Assets
                                 }
                                 else
                                 {
-                                    dataHeader = new AssetDataHeader((AssetId)Guid.CreateVersion7(), false);
+                                    dataConfig = new AssetDataConfig
+                                    {
+                                        Id = (FileId)Guid.CreateVersion7(),
+                                        MetaVersion = AssetDataConfig.CurrentVersion,
 
-                                    FileUtility.TryWriteAllText(assetDataPath, @$"asset_id = ""{dataHeader.Id}""
-meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
+                                        SubAssets = [],
+                                        UniqueConfig = importerData.DefaultConfig
+                                    };
+
+                                    if (!TryWriteAssetDataFor(localPath, dataConfig))
+                                    {
+                                        continue;
+                                    }
 
                                     ++generatedAssetDatas;
                                     EdLog.Assets.Debug("Created asset data file for '{f}'", localPath);
                                 }
 
-                                bool hasImporterFor = _importerRegistry.TryGetImporterForPath(localPath, out IAssetImporter? importer);
-
-                                if (!_importedAssets.TryGetValue(dataHeader.Id, out AssetImportData importData))
+                                if (!_importedAssets.TryGetValue(dataConfig.Id, out AssetImportData importData))
                                 {
-                                    importData = new AssetImportData(null, false, !hasImporterFor);
-                                    _importedAssets[dataHeader.Id] = importData;
+                                    importData = new AssetImportData(dataConfig.Id, null, false, !hasImporterFor);
+                                    _importedAssets[dataConfig.Id] = importData;
 
-                                    newAssets.Add(dataHeader.Id);
+                                    newAssets.Add(dataConfig.Id);
                                 }
 
-                                string? importedPath = _importedAssets.ContainsKey(dataHeader.Id) ? GetLibraryImportPathFor(dataHeader.Id) : null;
-                                _assetRegistry.SetupFileWithinRegistryWithId(dataHeader.Id, localPath, importedPath);
+                                string? importedPath = _importedAssets.ContainsKey(dataConfig.Id) ? GetLibraryImportPathFor(dataConfig.Id) : null;
+                                _assetRegistry.SetupFileWithinRegistryWithId(dataConfig.Id, localPath, importedPath);
 
-                                if (hasImporterFor)
+                                if (hasImporterFor && importData.ImporterId != null && importerData.Importer.UniqueId != importData.ImporterId)
                                 {
-                                    if (importData.ImporterId != null && importer!.UniqueId != importData.ImporterId)
-                                    {
-                                        EdLog.Assets.Warning("Conflicting importer ids for asset '{p}' ('{c}', '{n}')", localPath, importData.ImporterId, importer!.UniqueId);
-                                    }
+                                    EdLog.Assets.Warning("Conflicting importer ids for asset '{p}' ('{c}', '{n}')", localPath, importData.ImporterId, importerData.Importer.UniqueId);
+                                }
 
-                                    bool shouldTryImport = importData.IsSkippedOnImport ?
-                                        _physicalFileRegistry.IsDataOutOfDate(dataHeader.Id, assetDataPath) :
-                                        _physicalFileRegistry.IsFileOrDataOutOfDate(dataHeader.Id, entryPathInDir, assetDataPath)/* || (importData.ImporterId != null && importedPath != null && !IsFileImportedAndValid(importer!, dataHeader.Id, importedPath))*/;
+                                bool shouldTryImport = (importData.IsSkippedOnImport && !_associator.DoesAssetHaveAssociations(dataConfig.Id)) ?
+                                    _physicalFileRegistry.IsDataOutOfDate(dataConfig.Id, assetDataPath) :
+                                    _physicalFileRegistry.IsFileOrDataOutOfDate(dataConfig.Id, entryPathInDir, assetDataPath)/* || (importData.ImporterId != null && importedPath != null && !IsFileImportedAndValid(importer!, dataHeader.Id, importedPath))*/;
 
-                                    if (shouldTryImport)
+                                if (hasImporterFor && !shouldTryImport && importData.IsImported && !importData.IsSkippedOnImport && importedPath != null)
+                                {
+                                    try
                                     {
-                                        if (requiredImports.Add(dataHeader.Id))
+                                        shouldTryImport = !importerData.Importer.ValidateFile(this, dataConfig.Id, importedPath);
+
+                                        if (shouldTryImport && _printDetailedAssetInfo)
                                         {
-                                            ImportDependents(dataHeader.Id);
+                                            EdLog.Assets.Information("Asset '{p}' failed asset validation step", localPath);
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        EdLog.Assets.Warning(ex, "Error occured trying to validate file '{p}'", localPath);
+                                        shouldTryImport = true;
+                                    }
+                                }
+
+                                if (shouldTryImport)
+                                {
+                                    if (hasImporterFor)
+                                    {
+                                        if (requiredImports.Add(dataConfig.Id))
+                                        {
+                                            ImportDependents(dataConfig.Id);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ImportDependents(dataConfig.Id);
+                                    }
+                                }
+
+                                if (hasImporterFor && (!shouldTryImport || (shouldTryImport && !hasImporterFor)))
+                                {
+                                    _database.AddEntry(importerData.Importer.AssetDefinitionType, dataConfig.Id);
+
+                                    foreach (SubAssetConfig subAsset in dataConfig.SubAssets)
+                                    {
+                                        Type? type = Type.GetType(subAsset.AssetType, false);
+                                        if (type != null)
+                                        {
+                                            _database.AddEntry(type, new DatabaseEntry(new AssetId(dataConfig.Id, subAsset.LocalId), subAsset.Name));
+                                        }
+                                        else
+                                        {
+                                            EdLog.Assets.Warning("Failed to resolve type '{t}' on asset '{f}'", subAsset.AssetType, localPath);
                                         }
                                     }
                                 }
+
+                                // if (_printDetailedAssetInfo && importData.IsSkippedOnImport)
+                                // {
+                                //     EdLog.Assets.Information("Skipping import for asset '{p}'", localPath);
+                                // }
                             }
                         }
                     }
@@ -216,27 +290,27 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
                 EdLog.Assets.Information("New assets: {c}", newAssets.Count);
                 EdLog.Assets.Information("Scheduling import for {c} total assets", requiredImports.Count);
 
-                splash.ActionName = $"Scheduling imports.. ({requiredImports.Count})";
+                splash?.ActionName = $"Scheduling imports.. ({requiredImports.Count})";
 
-                foreach (AssetId id in requiredImports)
+                foreach (FileId id in requiredImports)
                 {
                     if (_assetRegistry.TryGetLocalPathForId(id, out string? localPath) &&
-                        _importerRegistry.TryGetImporterForPath(localPath, out IAssetImporter? importer) &&
+                        _importerRegistry.TryGetImporterForPath(localPath, out AssetImporterData importerData) &&
                         FilesystemManager.TryGetFullPath(localPath, out string? fullPath))
                     {
-                        ScheduleForImport(importer, id, localPath, fullPath, newAssets.Contains(id));
+                        ScheduleForImport(importerData, id, localPath, fullPath, newAssets.Contains(id));
                     }
                 }
 
-                splash.ActionName = $"Waiting for imports.. ({_importScheduler.ScheduledImports})";
-                splash.ProgressReporter = () => (float)(_importScheduler.FinishedImports / (double)_importScheduler.ScheduledImports);
+                splash?.ActionName = $"Waiting for imports.. ({_importScheduler.ScheduledImports})";
+                splash?.ProgressReporter = () => (float)(_importScheduler.FinishedImports / (double)_importScheduler.ScheduledImports);
 
                 importWaitTimestamp = Stopwatch.GetTimestamp();
 
                 _importScheduler.WaitForAllImports();
                 _assetsToReload.Clear();
 
-                splash.ProgressReporter = null;
+                splash?.ProgressReporter = null;
                 saveDataTimestamp = Stopwatch.GetTimestamp();
 
                 void ImportDependents(AssetId id)
@@ -246,7 +320,7 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
                     {
                         foreach (AssetId dependent in associationData.Dependents)
                         {
-                            if (requiredImports.Add(dependent))
+                            if (!_associator.IsAssetOnlyActingAsReload(dependent, id) && requiredImports.Add(dependent))
                             {
                                 ImportDependents(dependent);
                             }
@@ -256,7 +330,7 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
             }
             else
             {
-                EdLog.Assets.Information("!!! ASSET CHECK IS DIABLED !!!");
+                EdLog.Assets.Information("!!! ASSET CHECK IS DISABLED !!!");
 
                 importWaitTimestamp = assetCheckTimestamp;
                 saveDataTimestamp = assetCheckTimestamp;
@@ -273,9 +347,27 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
     Save data:      {d}s
     Total:          {e}s", Stopwatch.GetElapsedTime(setupTimestamp, assetCheckTimestamp).TotalSeconds, Stopwatch.GetElapsedTime(assetCheckTimestamp, importWaitTimestamp).TotalSeconds, Stopwatch.GetElapsedTime(importWaitTimestamp, saveDataTimestamp).TotalSeconds, Stopwatch.GetElapsedTime(saveDataTimestamp, endTimestamp).TotalSeconds, Stopwatch.GetElapsedTime(setupTimestamp).TotalSeconds);
 
+            void SetupDefaultDirectories()
+            {
+                splash?.ActionName = "Ensuring directory structure..";
+
+                if (ProjectData.Instance == null)
+                    throw new InvalidOperationException("Project data must have been setup prior to asset pipeline launch");
+
+                string projectRootDir = ProjectData.Instance.Paths.RootFolder;
+                Directory.CreateDirectory(Path.Combine(projectRootDir, "Library/Cache"));
+                Directory.CreateDirectory(Path.Combine(projectRootDir, "Library/Config"));
+                Directory.CreateDirectory(Path.Combine(projectRootDir, "Library/Imported"));
+                Directory.CreateDirectory(Path.Combine(projectRootDir, "Library/Log"));
+                Directory.CreateDirectory(Path.Combine(projectRootDir, "Library/Saved"));
+            }
+
             void MountRequiredFilesystems()
             {
-                splash.ActionName = "Mounting filesystems..";
+                splash?.ActionName = "Mounting filesystems..";
+
+                if (ProjectData.Instance == null)
+                    throw new InvalidOperationException("Project data must have been setup prior to asset pipeline launch");
 
                 _filesystemManager.MountLibrary();
                 _filesystemManager.MountContent(ProjectData.Instance.Paths.ContentFolder, "Content");
@@ -289,7 +381,7 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
 
             void LoadDefaultData()
             {
-                splash.ActionName = "Loading asset data..";
+                splash?.ActionName = "Loading asset data..";
 
                 // _filesystemManager.LoadRemappingsFromDisk();
                 _associator.LoadAssocationsFromDisk();
@@ -302,19 +394,23 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
 
             void RegisterImporters()
             {
-                splash.ActionName = "Registering importers..";
+                splash?.ActionName = "Registering importers..";
 
                 _importerRegistry.RegisterImporter<TextureImporter>(".png", ".jpg", ".jpeg", ".cubemap", ".texcomp");
                 _importerRegistry.RegisterImporter<ShaderImporter>(".shader");
-                _importerRegistry.RegisterImporter<UIFontFamilyImporter>(".uifont");
-                _importerRegistry.RegisterImporter<UILayoutImporter>(".layout");
-                _importerRegistry.RegisterImporter<StylesheetImporter>(".style");
                 _importerRegistry.RegisterImporter<TextureAtlasImporter>(".atlas");
+                _importerRegistry.RegisterImporter<ModelImporter>(".obj", ".fbx", ".gltf", ".glb");
+                _importerRegistry.RegisterImporter<MaterialImporter>(".mat");
+                _importerRegistry.RegisterImporter<ComputeShaderImporter>(".compute");
+
+                // _importerRegistry.RegisterImporter<UIFontFamilyImporter>(".uifont");
+                // _importerRegistry.RegisterImporter<UILayoutImporter>(".layout");
+                // _importerRegistry.RegisterImporter<StylesheetImporter>(".style");
             }
 
             void SaveGeneratedData()
             {
-                splash.ActionName = "Saving asset data..";
+                splash?.ActionName = "Saving asset data..";
 
                 // _filesystemManager.SaveRemappingsToDisk();
                 _associator.SaveAssociationsToDisk();
@@ -330,9 +426,13 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
         {
             splash.ActionName = "Registering assets..";
 
-            _runtime.AssetManager.RegisterCustomAsset<UIFontFamilyAsset>(new UIFontFamilyLoader());
-            _runtime.AssetManager.RegisterCustomAsset<UILayoutAsset>(new UILayoutAssetLoader());
-            _runtime.AssetManager.RegisterCustomAsset<StylesheetAsset>(new StylesheetAssetLoader());
+            Engine? engine = Engine.GlobalSingleton;
+            if (engine != null)
+            {
+                engine.AssetManager.RegisterCustomAsset<UIFontFamilyAsset>(new UIFontFamilyLoader());
+                engine.AssetManager.RegisterCustomAsset<UILayoutAsset>(new UILayoutAssetLoader());
+                engine.AssetManager.RegisterCustomAsset<StylesheetAsset>(new StylesheetAssetLoader());
+            }
         }
 
         private void LoadImportedAssetsFromDisk()
@@ -354,14 +454,14 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
 
                 while (!serializer.IsAtEndOfStream)
                 {
-                    AssetId assetId = (AssetId)serializer.ReadGuid()!.Value;
+                    FileId assetId = (FileId)serializer.ReadGuid()!.Value;
                     string? importerId = serializer.ReadString();
                     bool isImported = serializer.ReadBoolean()!.Value;
                     bool isSkippedOnImport = serializer.ReadBoolean()!.Value;
 
                     serializer.ReadNewLine();
 
-                    _importedAssets[assetId] = new AssetImportData(importerId, isImported, isSkippedOnImport);
+                    _importedAssets[assetId] = new AssetImportData(assetId, importerId, isImported, isSkippedOnImport);
                 }
             }
         }
@@ -417,67 +517,238 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
         }
 
         #region Updates
-        internal void HandleUpdates()
+        public void HandleUpdates()
         {
-            _importScheduler.UpdateImportStatus();
+            using (new ProfilingScope("UpdateAssets"))
+            {
+                _importScheduler.UpdateImportStatus();
+                _database.FlushPendingUpdates();
 
-            CheckFilesystemUpdates();
-            TryImportPending();
-            ReloadPending();
+                CheckFilesystemUpdates();
+                TryImportPending();
+                ReloadPending();
+            }
         }
 
         private void CheckFilesystemUpdates()
         {
+            bool areAnyUpdatesAvailable = false;
+            bool isWithinAnyTimeoutPeriod = false;
+
             foreach (BaseFilesystem filesystem in _filesystemManager.Filesystems)
             {
-                if (filesystem is ContentFilesystem content && content.AreFileUpdatesAvailable)
+                if (filesystem is ContentFilesystem content)
                 {
-                    if (content.TryEnterLock())
+                    if (!areAnyUpdatesAvailable)
                     {
-                        while (content.TryPopFileEvent(out FileEvent fileEvent))
+                        areAnyUpdatesAvailable = content.AreFileUpdatesAvailable;
+                    }
+
+                    if (areAnyUpdatesAvailable && content.IsWithinTimeoutPeriod)
+                    {
+                        isWithinAnyTimeoutPeriod = true;
+                        break;
+                    }
+                }
+            }
+
+            if (areAnyUpdatesAvailable && !isWithinAnyTimeoutPeriod)
+            {
+                RentedList<FileEvent> fileEvents = new RentedList<FileEvent>();
+
+                HashSet<string> createdFiles = new HashSet<string>();
+                HashSet<string> deletedFiles = new HashSet<string>();
+                HashSet<string> changedFiles = new HashSet<string>();
+
+                foreach (BaseFilesystem filesystem in _filesystemManager.Filesystems)
+                {
+                    if (filesystem is ContentFilesystem content && content.AreFileUpdatesAvailable)
+                    {
+                        if (content.TryEnterLock())
                         {
-                            switch (fileEvent.EventType)
-                            {
-                                case FileEventType.Deleted:
-                                    break;
-                                case FileEventType.Renamed:
-                                    {
-                                        TryRenameAssetData(fileEvent.LocalFilePath, fileEvent.NewLocalFilePath!);
-                                        _assetRegistry.UpdateLocalPath(fileEvent.LocalFilePath, fileEvent.NewLocalFilePath!);
-                                        break;
-                                    }
-                                case FileEventType.Created:
-                                    {
-                                        TryCreateAssetDataFor(fileEvent.LocalFilePath, out bool alreadyExists);
-                                        if (alreadyExists)
-                                            TryImportChangedAsset(fileEvent.LocalFilePath);
-                                        break;
-                                    }
-                                case FileEventType.Changed:
-                                    {
-                                        string localPath = fileEvent.LocalFilePath;
-                                        if (localPath.EndsWith(".assetdat"))
-                                        {
-                                            localPath = localPath[..(localPath.Length - ".assetdat".Length)];
-                                            if (!FilesystemManager.Exists(localPath))
-                                                break;
-                                        }
-
-                                        TryImportChangedAsset(localPath);
-                                        break;
-                                    }
-                                case FileEventType.Moved:
-                                    {
-                                        TryMoveAssetData(fileEvent.LocalFilePath, fileEvent.NewLocalFilePath!);
-                                        _assetRegistry.UpdateLocalPath(fileEvent.LocalFilePath, fileEvent.NewLocalFilePath!);
-                                        break;
-                                    }
-                            }
-
-                            EdLog.Assets.Information("{ty}: localPath:'{p}' newLocalPath:'{n}'", fileEvent.EventType, fileEvent.LocalFilePath, fileEvent.NewLocalFilePath);
+                            content.FlushPendingFileEvents(ref fileEvents);
+                            content.ExitLock();
                         }
 
-                        content.ExitLock();
+                        if (!fileEvents.IsEmpty)
+                        {
+                            if (_printDetailedAssetInfo)
+                                EdLog.Assets.Information("Processing file events for content filesystem '{p}'", content.NamespaceKey);
+                            foreach (FileEvent fileEvent in fileEvents)
+                            {
+                                if (_printDetailedAssetInfo)
+                                    EdLog.Assets.Information("    > {type}: Path:'{p}' NewPath:'{np}' IsDir:{id}", fileEvent.EventType, fileEvent.LocalFilePath, fileEvent.NewLocalFilePath, fileEvent.IsDirectory);
+
+                                switch (fileEvent.EventType)
+                                {
+                                    case FileEventType.Created:
+                                        {
+                                            if (fileEvent.IsDirectory)
+                                            {
+                                                FilesystemDirectory? directory = content.Structure.AddDirectory(fileEvent.LocalFilePath);
+                                                if (directory != null)
+                                                {
+                                                    DiscoverDirectoryFor(content.Structure, directory);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                createdFiles.Add(fileEvent.LocalFilePath);
+                                            }
+
+                                            break;
+                                        }
+                                    case FileEventType.Deleted:
+                                        {
+                                            if (fileEvent.IsDirectory)
+                                            {
+                                                content.Structure.RemoveDirectory(fileEvent.LocalFilePath);
+                                            }
+                                            else
+                                            {
+                                                deletedFiles.Add(fileEvent.LocalFilePath);
+                                            }
+
+                                            break;
+                                        }
+
+                                    case FileEventType.Moved:
+                                    case FileEventType.Renamed:
+                                        {
+                                            if (fileEvent.NewLocalFilePath != null)
+                                            {
+                                                if (fileEvent.IsDirectory)
+                                                {
+                                                    content.Structure.RenameDirectory(fileEvent.LocalFilePath, fileEvent.NewLocalFilePath);
+                                                }
+                                                else if (!fileEvent.LocalFilePath.EndsWith(".assetdat"))
+                                                {
+                                                    content.Structure.RenameFile(fileEvent.LocalFilePath, fileEvent.NewLocalFilePath);
+                                                    if (TryMoveAssetData(fileEvent.LocalFilePath, fileEvent.NewLocalFilePath))
+                                                    {
+                                                        if (createdFiles.Remove(fileEvent.LocalFilePath))
+                                                            createdFiles.Add(fileEvent.NewLocalFilePath);
+
+                                                        if (createdFiles.Remove(fileEvent.LocalFilePath + ".assetdat"))
+                                                            createdFiles.Add(fileEvent.NewLocalFilePath + ".assetdat");
+                                                    }
+                                                }
+                                            }
+
+                                            break;
+                                        }
+
+                                    case FileEventType.Changed:
+                                        {
+                                            if (!fileEvent.IsDirectory)
+                                            {
+                                                changedFiles.Add(fileEvent.LocalFilePath);
+                                            }
+
+                                            break;
+                                        }
+                                }
+                            }
+
+                            fileEvents.Clear();
+                        }
+                    }
+                }
+
+                if (createdFiles.Count > 0)
+                {
+                    foreach (string localPath in createdFiles)
+                    {
+                        if (!localPath.EndsWith(".assetdat") && FilesystemManager.TryGetFullPath(localPath + ".assetdat", out string? newFullPath))
+                        {
+                            if (TryCreateAssetDataFor(localPath, out AssetDataConfig? dataConfig, out bool exists))
+                            {
+                                if (exists)
+                                {
+                                    if (_assetRegistry.TryGetLocalPathForId(dataConfig.Id, out string? oldLocalPath) &&
+                                        FilesystemManager.TryGetFullPath(oldLocalPath, out string? oldFullPath))
+                                    {
+                                        deletedFiles.Remove(oldLocalPath);
+                                        FileUtility.TryMove(oldFullPath, newFullPath + ".assetdat");
+                                    }
+
+                                    _assetRegistry.UpdateLocalPath(dataConfig.Id, localPath);
+                                    _physicalFileRegistry.StoreFileData(dataConfig.Id, newFullPath, newFullPath + ".assetdat");
+                                }
+                                else if (_importerRegistry.TryGetImporterForPath(localPath, out _))
+                                {
+                                    changedFiles.Add(localPath);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (deletedFiles.Count > 0)
+                {
+                    foreach (string localPath in deletedFiles)
+                    {
+                        if (localPath.EndsWith(".assetdat"))
+                        {
+                            ReadOnlySpan<char> orignalLocalPath = localPath.AsSpan(0, localPath.Length - ".assetdat".Length);
+                            if (_assetRegistry.TryLookupIdForPath(orignalLocalPath, out FileId id))
+                            {
+                                _assetRegistry.RemoveAssetFromRegistry(id);
+                                _physicalFileRegistry.RemoveFileFromRegistry(id);
+
+                                RemoveImportedAsset(id);
+                            }
+                        }
+                        else if (TryReadAssetDataFor(localPath, out AssetDataConfig? dataConfig))
+                        {
+                            if (FilesystemManager.TryGetFullPath(localPath + ".assetdat", out string? fullAssetDatPath))
+                                FileUtility.TryDelete(fullAssetDatPath);
+
+                            _assetRegistry.RemoveAssetFromRegistry(dataConfig.Id);
+                            _physicalFileRegistry.RemoveFileFromRegistry(dataConfig.Id);
+
+                            RemoveImportedAsset(dataConfig.Id);
+                        }
+                    }
+                }
+
+                if (changedFiles.Count > 0)
+                {
+                    foreach (string localPath in changedFiles)
+                    {
+                        ReadOnlySpan<char> orignalLocalPath;
+                        if (localPath.EndsWith(".assetdat"))
+                            orignalLocalPath = localPath.AsSpan(0, localPath.Length - ".assetdat".Length);
+                        else
+                            orignalLocalPath = localPath;
+
+                        if (_assetRegistry.TryLookupIdForPath(orignalLocalPath, out FileId id))
+                        {
+                            TryImportChangedAsset(orignalLocalPath.Length == localPath.Length ? localPath : orignalLocalPath.ToString());
+                        }
+                    }
+                }
+
+                fileEvents.Dispose();
+            }
+        }
+
+        private void DiscoverDirectoryFor(FilesystemStructure structure, FilesystemDirectory directory)
+        {
+            if (FilesystemManager.TryFindFilesystemFor(directory.LocalPath, out BaseFilesystem? filesystem) &&
+                filesystem.TryGetFullPath(directory.LocalPath, out string? fullPath))
+            {
+                if (_printDetailedAssetInfo)
+                    EdLog.Assets.Information("Discovering files for structure in directory '{dir}'", directory.LocalPath);
+
+                foreach (string fileSystemEntry in Directory.EnumerateFileSystemEntries(directory.LocalPath, "*.*", SearchOption.AllDirectories))
+                {
+                    if (filesystem.TryGetLocalPath(fileSystemEntry, out string? localPath))
+                    {
+                        if (Directory.Exists(fileSystemEntry))
+                            structure.AddDirectory(localPath);
+                        else
+                            structure.AddFile(localPath);
                     }
                 }
             }
@@ -501,7 +772,7 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
                         continue;
                     }
 
-                    if (_importerRegistry.TryGetImporterForPath(localPath, out IAssetImporter? importer))
+                    if (_importerRegistry.TryGetImporterForPath(localPath, out AssetImporterData importerData))
                     {
                         if (!FilesystemManager.TryGetFullPath(localPath, out string? fullPath))
                         {
@@ -509,7 +780,7 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
                             continue;
                         }
 
-                        ScheduleForImport(importer, id, localPath, fullPath, false);
+                        ScheduleForImport(importerData, id, localPath, fullPath, false);
                     }
                     else
                     {
@@ -532,100 +803,241 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
         {
             if (_assetsToReload.Count > 0)
             {
-                using (_reloadLock.EnterScope())
+                Engine? engine = Engine.GlobalSingleton;
+                if (engine != null)
                 {
-                    foreach (AssetId id in _assetsToReload)
+                    using (_reloadLock.EnterScope())
                     {
-                        _runtime.AssetManager.ForceReloadAsset(id);
-                    }
+                        using RentedArray<AssetId> currentAssets = new RentedArray<AssetId>(_assetsToReload.Count);
 
+                        int index = 0;
+                        foreach (AssetId id in _assetsToReload)
+                        {
+                            currentAssets[index++] = id;
+                        }
+
+                        _assetsToReload.Clear();
+                        EdLog.Assets.Information("Reloading #{c} assets", currentAssets.Count);
+
+                        foreach (AssetId id in currentAssets)
+                        {
+                            engine.AssetManager.ForceReloadAsset(id);
+
+                            using (_associator.GetAssocationDataWithLockScope(id, out AssociationData associationData, out bool exists))
+                            {
+                                if (exists)
+                                {
+                                    foreach (AssetId dependent in associationData.Dependents)
+                                    {
+                                        if (_associator.IsAssetOnlyActingAsReload(id, dependent))
+                                            _assetsToReload.Add(dependent);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
                     _assetsToReload.Clear();
                 }
             }
         }
 
-        private void TryCreateAssetDataFor(string localPath, out bool alreadyExists)
+        private bool TryCreateAssetDataFor(string localPath, [NotNullWhen(true)] out AssetDataConfig? dataConfig, out bool exists)
         {
-            alreadyExists = false;
+            dataConfig = null;
+            exists = false;
 
             if (!FilesystemManager.TryGetFullPath(localPath, out string? fullPath))
             {
                 EdLog.Assets.Warning("Failed to get full path for '{p}' to generate asset data file", localPath);
-                return;
+                return false;
             }
 
-            string assetDataPath = fullPath + ".assetdat";
+            _importerRegistry.TryGetImporterForPath(localPath, out AssetImporterData importerData);
 
-            // If the file already exists the asset has already been prepared for use
+            string assetDataPath = localPath.EndsWith(".assetdat") ? fullPath : fullPath + ".assetdat";
             if (File.Exists(assetDataPath))
             {
-                alreadyExists = true;
-                return;
-            }
-
-            AssetId id = _assetRegistry.SetupFileWithinRegistry(localPath, null);
-
-            FileUtility.TryWriteAllText(assetDataPath, @$"asset_id = ""{id}""
-meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
-
-            _physicalFileRegistry.StoreFileData(id, fullPath, assetDataPath);
-
-            EdLog.Assets.Debug("Created asset data file for '{f}' ({id})", localPath, id);
-        }
-
-        private void TryRenameAssetData(string oldLocalPath, string newLocalPath)
-        {
-            if (!FilesystemManager.TryGetFullPath(oldLocalPath, out string? fullPath))
-            {
-                EdLog.Assets.Warning("Failed to get full path for '{p}' to rename asset data file", oldLocalPath);
-                return;
-            }
-
-            string assetDataPath = Path.Combine(fullPath);
-            if (File.Exists(assetDataPath))
-            {
-                string newFileName = Path.GetFileNameWithoutExtension(newLocalPath);
-                string newAssetDataPath = Path.Combine(Path.GetDirectoryName(assetDataPath)!, newFileName + ".assetdat");
-
                 try
                 {
-                    File.Move(assetDataPath, newAssetDataPath);
+                    using Stream? sourceStream = FileUtility.TryWaitOpenNoThrow(assetDataPath, FileMode.Open, FileAccess.Read, FileShare.Read, 5, 60);
+                    if (sourceStream == null)
+                    {
+                        EdLog.Assets.Error("Failed to open asset data file '{f}'", assetDataPath);
+                        throw new AssetIgnoredException();
+                    }
+
+                    try
+                    {
+                        dataConfig = TomlSerializer.Deserialize<AssetDataConfig>(sourceStream, importerData.TomlOptions ?? s_tomlOptions)!;
+                    }
+                    catch (Exception ex)
+                    {
+                        EdLog.Assets.Error(ex, "Failed to deserialize asset data file '{f}'", assetDataPath);
+                        throw new AssetIgnoredException();
+                    }
+
+                    if (!_assetRegistry.IsIdValid(dataConfig.Id))
+                    {
+                        EdLog.Assets.Error("Id in asset data '{f}' is not valid", assetDataPath);
+                        throw new AssetIgnoredException();
+                    }
+
+                    if (dataConfig.MetaVersion != AssetDataConfig.CurrentVersion)
+                    {
+                        throw new NotSupportedException("Upgrading version not supported yet");
+                    }
+
+                    exists = true;
+                    return true;
+                }
+                catch (AssetIgnoredException)
+                {
                 }
                 catch (Exception ex)
                 {
-                    EdLog.Assets.Warning(ex, "Failed to move asset data path from '{f}' to '{t}'", assetDataPath, newAssetDataPath);
+                    EdLog.Assets.Error(ex, "Exception raised trying to read asset data file '{p}'", assetDataPath);
                 }
             }
+
+            dataConfig = new AssetDataConfig
+            {
+                Id = _assetRegistry.SetupFileWithinRegistry(localPath, null),
+                MetaVersion = AssetDataConfig.CurrentVersion,
+
+                SubAssets = [],
+                UniqueConfig = importerData.DefaultConfig
+            };
+
+            if (!TryWriteAssetDataFor(localPath, dataConfig))
+            {
+                EdLog.Assets.Error("Failed to write asset data for local path '{f}'", localPath);
+                return false;
+            }
+
+            _physicalFileRegistry.StoreFileData(dataConfig.Id, fullPath, assetDataPath);
+
+            if (_printDetailedAssetInfo)
+                EdLog.Assets.Information("Created asset data file for '{f}' ({id})", localPath, dataConfig.Id);
+
+            return true;
         }
 
-        private void TryMoveAssetData(string oldLocalPath, string newLocalPath)
+        private bool TryReadAssetDataFor(string localPath, [NotNullWhen(true)] out AssetDataConfig? dataConfig)
+        {
+            dataConfig = default;
+
+            if (!FilesystemManager.TryGetFullPath(localPath, out string? fullPath))
+            {
+                EdLog.Assets.Warning("Failed to get full path for '{p}' to generate asset data file", localPath);
+                return false;
+            }
+
+            _importerRegistry.TryGetImporterForPath(localPath, out AssetImporterData importerData);
+
+            string assetDataPath = localPath.EndsWith(".assetdat") ? fullPath : fullPath + ".assetdat";
+            if (File.Exists(assetDataPath))
+            {
+                try
+                {
+                    using Stream? sourceStream = FileUtility.TryWaitOpenNoThrow(assetDataPath, FileMode.Open, FileAccess.Read, FileShare.Read, 5, 60);
+                    if (sourceStream == null)
+                    {
+                        EdLog.Assets.Error("Failed to open asset data file '{f}'", assetDataPath);
+                        throw new AssetIgnoredException();
+                    }
+
+                    try
+                    {
+                        dataConfig = TomlSerializer.Deserialize<AssetDataConfig>(sourceStream, importerData.TomlOptions ?? s_tomlOptions)!;
+                    }
+                    catch (Exception ex)
+                    {
+                        EdLog.Assets.Error(ex, "Failed to deserialize asset data file '{f}'", assetDataPath);
+                        return false;
+                    }
+
+                    if (!_assetRegistry.IsIdValid(dataConfig.Id))
+                    {
+                        EdLog.Assets.Error("Id in asset data '{f}' is not valid", assetDataPath);
+                        throw new AssetIgnoredException();
+                    }
+
+                    if (dataConfig.MetaVersion != AssetDataConfig.CurrentVersion)
+                    {
+                        throw new NotSupportedException("Upgrading version not supported yet");
+                    }
+
+                    return true;
+                }
+                catch (AssetIgnoredException)
+                {
+                }
+                catch (Exception ex)
+                {
+                    EdLog.Assets.Error(ex, "Exception raised trying to read asset data file '{p}'", assetDataPath);
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryWriteAssetDataFor(string localPath, AssetDataConfig dataConfig)
+        {
+            if (!FilesystemManager.TryGetFullPath(localPath, out string? fullPath))
+            {
+                EdLog.Assets.Warning("Failed to get full path for '{p}' to generate asset data file", localPath);
+                return false;
+            }
+
+            _importerRegistry.TryGetImporterForPath(localPath, out AssetImporterData importerData);
+
+            try
+            {
+                using Stream stream = FileUtility.TryWaitOpen(fullPath + ".assetdat", FileMode.Create, FileAccess.Write, FileShare.None);
+                TomlSerializer.Serialize(stream, dataConfig, importerData.TomlOptions ?? s_tomlOptions);
+            }
+            catch (Exception ex)
+            {
+                EdLog.Assets.Error(ex, "Failed to serialize asset data to disk for '{f}'", localPath);
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool TryMoveAssetData(string oldLocalPath, string newLocalPath)
         {
             if (!FilesystemManager.TryGetFullPath(oldLocalPath, out string? fullPath))
             {
                 EdLog.Assets.Warning("Failed to get full path for '{p}' to rename asset data file", oldLocalPath);
-                return;
+                return false;
             }
 
             if (!FilesystemManager.TryGetFullPath(newLocalPath, out string? newFullPath))
             {
                 EdLog.Assets.Warning("Failed to get full path for '{p}' to rename asset data file", newLocalPath);
-                return;
+                return false;
             }
 
             string assetDataPath = Path.Combine(fullPath);
-            if (File.Exists(assetDataPath))
-            {
-                string newAssetDataPath = newFullPath + ".assetdat";
+            string newAssetDataPath = newFullPath + ".assetdat";
 
-                try
-                {
-                    File.Move(assetDataPath, newAssetDataPath);
-                }
-                catch (Exception ex)
-                {
-                    EdLog.Assets.Warning(ex, "Failed to move asset data path from '{f}' to '{t}'", assetDataPath, newAssetDataPath);
-                }
+            if (_assetRegistry.TryLookupIdForPath(oldLocalPath, out FileId id) && FileUtility.TryMove(assetDataPath, newAssetDataPath))
+            {
+                _assetRegistry.UpdateLocalPath(id, newLocalPath);
+                _physicalFileRegistry.StoreFileData(id, newFullPath, newAssetDataPath);
+
+                return true;
             }
+            else
+            {
+                EdLog.Assets.Warning("Failed to move asset data path from '{f}' to '{t}'", assetDataPath, newAssetDataPath);
+            }
+
+            return false;
         }
         #endregion
         #region Import
@@ -638,7 +1050,7 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
             }
 
             AssetId id = GetOrRegisterIdForPath(localPath);
-            if (_importerRegistry.TryGetImporterForPath(localPath, out IAssetImporter? importer))
+            if (_importerRegistry.TryGetImporterForPath(localPath, out AssetImporterData importerData))
             {
                 _pendingImports.Add(id);
             }
@@ -648,7 +1060,7 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
             {
                 foreach (AssetId dependent in associationData.Dependents)
                 {
-                    if (_assetRegistry.TryGetLocalPathForId(dependent, out string? dependentLocalPath))
+                    if (!_associator.IsAssetOnlyActingAsReload(id, dependent) && _assetRegistry.TryGetLocalPathForId(dependent, out string? dependentLocalPath))
                         TryImportChangedAsset(dependentLocalPath);
                 }
             }
@@ -668,11 +1080,17 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
             }
         }
 
-        private void ScheduleForImport(IAssetImporter importer, AssetId id, string localPath, string fullPath, bool isTrialImport)
+        private void ScheduleForImport(AssetImporterData importerData, AssetId id, string localPath, string fullPath, bool isTrialImport)
         {
             Action action = () =>
             {
                 DateTime startTime = DateTime.Now;
+
+                if (!TryReadAssetDataFor(localPath, out AssetDataConfig? dataConfig))
+                {
+                    EdLog.Assets.Error("[{file}]: Failed to read asset data config", localPath);
+                    return;
+                }
 
                 using FileStream? inputStream = FileUtility.TryWaitOpenNoThrow(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 if (inputStream == null)
@@ -685,9 +1103,9 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
 
                 {
                     GuidStringArray stringArray = default;
-                    id.TryFormat(stringArray.Span, out int _);
+                    id.FileId.TryFormat(stringArray.Span, out int _);
 
-                    string prefixDir = Path.Combine(ProjectData.Instance.Paths.LibraryImportedFolder, stringArray.Span[..2].ToString());
+                    string prefixDir = Path.Combine(ProjectData.Instance!.Paths.LibraryImportedFolder, stringArray.Span[30..].ToString());
                     if (!Directory.Exists(prefixDir))
                         Directory.CreateDirectory(prefixDir);
 
@@ -700,7 +1118,14 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
 
                 try
                 {
-                    importer.ImportFile(this, id, inputStream, outputStream, localPath, localOutputPath, isTrialImport);
+                    ImportContext context = new ImportContext(this, id, localPath, localOutputPath, isTrialImport, inputStream, dataConfig, outputStream);
+                    importerData.Importer.ImportFile(in context);
+
+                    _associator.ClearAssociations(id);
+                    if (context.Dependencies.Count > 0)
+                        _associator.MakeAssociations(id, context.Dependencies);
+                    if (context.ReloadConnections.Count > 0)
+                        _associator.MakeAssociations(id, context.ReloadConnections, actAsReloadFlag: true);
 
                     if (!outputStream.IsEmpty)
                     {
@@ -715,7 +1140,32 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
                         fileStream.Flush(true);
                     }
 
-                    ReportImportAsFinished(id, importer);
+                    bool doSubAssetsStillMatch = dataConfig.SubAssets.Length == context.SubAssets.Count;
+                    if (doSubAssetsStillMatch)
+                    {
+                        context.SortSubAssets();
+                        dataConfig.SubAssets.Sort(static (x, y) => x.LocalId.CompareTo(y.LocalId));
+
+                        for (int i = 0; i < dataConfig.SubAssets.Length; ++i)
+                        {
+                            SubAssetConfig subAsset = dataConfig.SubAssets[i];
+                            (Type type, int localId, string? name) = context.SubAssets[i];
+
+                            if (subAsset.AssetType != type.AssemblyQualifiedName || subAsset.LocalId != localId || subAsset.Name != name)
+                            {
+                                doSubAssetsStillMatch = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    (Type Type, int LocalId, string? Name)[]? removedAssets = null;
+                    if (!doSubAssetsStillMatch)
+                    {
+                        RegenerateDataConfigNewSubAssets(localPath, dataConfig, context.SubAssets.AsSpan(), out removedAssets);
+                    }
+
+                    ReportImportAsFinished(id, importerData, removedAssets, context);
                 }
                 catch (AssetIgnoredException)
                 {
@@ -724,7 +1174,7 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
 
                     outputStream.SetLength(0);
 
-                    ReportImportAsIgnored(id, importer);
+                    ReportImportAsIgnored(id, importerData);
                     return;
                 }
                 catch (Exception ex)
@@ -733,11 +1183,15 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
                     {
                         EdLog.Assets.Error(ex, "[{file}]: An unexpected error occured while trying to import", localPath);
                     }
+                    else
+                    {
+                        EdLog.Assets.Error(ex, "[{file}]: An exception occured while trying to import", localPath);
+                    }
 
                     if (File.Exists(outputFilePath))
                         File.Delete(outputFilePath);
 
-                    ReportImportAsFailed(id, importer);
+                    ReportImportAsFailed(id, importerData, dataConfig);
                     return;
                 }
 
@@ -750,22 +1204,106 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
             _importScheduler.ScheduleImport(action, id);
         }
 
-        internal void ReportImportAsFinished(AssetId id, IAssetImporter importer)
+        private void RegenerateDataConfigNewSubAssets(string localPath, AssetDataConfig dataConfig, ReadOnlySpan<(Type Type, int LocalId, string? Name)> currentSubAssets, out (Type Type, int LocalId, string? Name)[]? removedAssets)
         {
+            removedAssets = null;
+
+            if (currentSubAssets.IsEmpty)
+            {
+                using RentedList<(Type Type, int LocalId, string? Name)> list = new RentedList<(Type Type, int LocalId, string? Name)>();
+                for (int i = 0; i < dataConfig.SubAssets.Length; ++i)
+                {
+                    SubAssetConfig subAsset = dataConfig.SubAssets[i];
+
+                    Type? type = Type.GetType(subAsset.AssetType);
+                    if (type != null)
+                    {
+                        list.Add((type, subAsset.LocalId, subAsset.Name));
+                    }
+                }
+
+                if (!list.IsEmpty)
+                    removedAssets = [.. list];
+
+                dataConfig.SubAssets = [];
+            }
+            else
+            {
+                dataConfig.SubAssets = dataConfig.SubAssets.Length == currentSubAssets.Length ? dataConfig.SubAssets : new SubAssetConfig[currentSubAssets.Length];
+
+                using RentedList<(Type Type, int LocalId, string? Name)> list = new RentedList<(Type Type, int LocalId, string? Name)>();
+                for (int i = 0; i < dataConfig.SubAssets.Length; ++i)
+                {
+                    ref SubAssetConfig subAsset = ref dataConfig.SubAssets[i];
+                    (Type Type, int LocalId, string? Name) currentSubAsset = currentSubAssets[i];
+
+                    if (subAsset == null || (subAsset.AssetType != currentSubAsset.Type.AssemblyQualifiedName || subAsset.LocalId != currentSubAsset.LocalId || subAsset.Name != currentSubAsset.Name))
+                    {
+                        if (subAsset != null)
+                        {
+                            Type? type = Type.GetType(subAsset.AssetType);
+                            if (type != null)
+                            {
+                                list.Add((type, subAsset.LocalId, subAsset.Name));
+                            }
+
+                        }
+                        else
+                        {
+                            subAsset = new SubAssetConfig();
+                        }
+
+                        subAsset.AssetType = currentSubAsset.Type.AssemblyQualifiedName!;
+                        subAsset.LocalId = currentSubAsset.LocalId;
+                        subAsset.Name = currentSubAsset.Name ?? string.Empty;
+                    }
+                }
+
+                if (!list.IsEmpty)
+                    removedAssets = [.. list];
+            }
+
+            TryWriteAssetDataFor(localPath, dataConfig);
+        }
+
+        internal void ReportImportAsFinished(AssetId id, AssetImporterData importerData, (Type Type, int LocalId, string? Name)[]? removedAssets, ImportContext context)
+        {
+            ReloadAsset(id);
+
+            // foreach ((_, int localId, _) in context.SubAssets)
+            // {
+            //     ReloadAsset(id.WithLocalId(localId));
+            // }
+
             if (!_assetRegistry.TryGetAssetPathForId(id, out string? localPath))
                 return;
 
-            if (!_importedAssets.TryGetValue(id, out AssetImportData importData) || importData.ImporterId != importer.UniqueId || !importData.IsImported || importData.IsSkippedOnImport)
+            if (!_importedAssets.TryGetValue(id, out AssetImportData importData) || importData.ImporterId != importerData.Importer.UniqueId || !importData.IsImported || importData.IsSkippedOnImport)
             {
-                importData.ImporterId = importer.UniqueId;
+                importData.ImporterId = importerData.Importer.UniqueId;
                 importData.IsImported = true;
                 importData.IsSkippedOnImport = false;
 
                 _importedAssets[id] = importData;
             }
+
+            _database.AddEntry(importerData.Importer.AssetDefinitionType, id);
+
+            if (removedAssets != null)
+            {
+                foreach ((Type type, int localId, string? name) in removedAssets)
+                {
+                    _database.RemoveEntry(type, new DatabaseEntry(new AssetId(context.Id, localId), name));
+                }
+            }
+
+            foreach ((Type type, int localId, string? name) in context.SubAssets)
+            {
+                _database.AddEntry(type, new DatabaseEntry(new AssetId(context.Id, localId), name));
+            }
         }
 
-        internal void ReportImportAsFailed(AssetId id, IAssetImporter importer)
+        internal void ReportImportAsFailed(AssetId id, AssetImporterData importerData, AssetDataConfig dataConfig)
         {
             if (_importedAssets.TryGetValue(id, out AssetImportData importData))
             {
@@ -775,10 +1313,20 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
                 _assetRegistry.RemoveAssetPath(id);
 
                 FileUtility.TryDelete(GetLibraryImportPathFor(id));
+                _database.RemoveEntry(importerData.Importer.AssetDefinitionType, id);
+
+                foreach (SubAssetConfig subAsset in dataConfig.SubAssets)
+                {
+                    Type? type = Type.GetType(subAsset.AssetType, false);
+                    if (type != null)
+                    {
+                        _database.RemoveEntry(type, new AssetId(dataConfig.Id, subAsset.LocalId));
+                    }
+                }
             }
         }
 
-        internal void ReportImportAsIgnored(AssetId id, IAssetImporter importer)
+        internal void ReportImportAsIgnored(AssetId id, AssetImporterData importerData)
         {
             if (!_assetRegistry.TryGetAssetPathForId(id, out string? localPath))
                 return;
@@ -795,30 +1343,31 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
         /// <param name="localPath">The file within the filesystem to get an id for.</param>
         /// <returns>The files id or <seealso cref="AssetId.Invalid"/> if the file is invalid.</returns>
         /// <remarks>This method will always fail when trying to register a file with an '.assetdat' extension since that file actually holds it's parent files id.</remarks>
-        internal AssetId GetOrRegisterIdForPath(string localPath)
+        internal FileId GetOrRegisterIdForPath(string localPath)
         {
             // assetdat files cannot have an id
             if (localPath.EndsWith(".assetdat"))
                 return AssetId.Invalid;
 
-            if (!_assetRegistry.TryLookupIdForPath(localPath, out AssetId id))
+            if (!_assetRegistry.TryLookupIdForPath(localPath, out FileId id))
             {
                 // This in return also ends up doing a check for if the path is local
                 if (!FilesystemManager.TryGetFullPath(localPath, out string? fullPath))
-                    return AssetId.Invalid;
+                    return FileId.Invalid;
 
                 // No logic in creating an id for a file that doesn't exist
                 if (!File.Exists(fullPath))
-                    return AssetId.Invalid;
+                    return FileId.Invalid;
 
                 string dataFilePath = fullPath + ".assetdat";
 
-                AssetId assetId = _assetRegistry.SetupFileWithinRegistry(localPath, null);
+                FileId assetId = _assetRegistry.SetupFileWithinRegistry(localPath, null);
                 _physicalFileRegistry.StoreFileData(id, fullPath, File.Exists(dataFilePath) ? dataFilePath : null);
             }
 
             return id;
         }
+
         #endregion
 
         public FilesystemManager FilesystemManager => _filesystemManager;
@@ -829,20 +1378,22 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
         public PhysicalFileRegistry PhysicalFileRegistry => _physicalFileRegistry;
         public AssetRegistry AssetRegistry => _assetRegistry;
 
+        public AssetDatabase Database => _database;
+
         private static string GetLibraryImportPathFor(AssetId id)
         {
             Span<char> formatBuffer = stackalloc char[32];
-            id.TryFormat(formatBuffer, out int _);
+            id.FileId.TryFormat(formatBuffer, out int _);
             return GetLibraryImportPathFor(formatBuffer);
         }
 
         private static string GetLibraryImportPathFor(ReadOnlySpan<char> id)
         {
             Debug.Assert(id.Length == 32);
-            return $"Library/Imported/{id[..2]}/{id[2..]}";
+            return $"Library/Imported/{id[30..]}/{id[..30]}";
         }
 
-        private static string s_importedDataPath => Path.Combine(ProjectData.Instance.Paths.LibrarySavedFolder, "ImportedFiles.dat");
+        private static string s_importedDataPath => Path.Combine(ProjectData.Instance!.Paths.LibrarySavedFolder, "ImportedFiles.dat");
         private static readonly JsonSerializerOptions s_options = new JsonSerializerOptions
         {
             WriteIndented = EditorRuntime.IsDebugBuild,
@@ -850,14 +1401,22 @@ meta_version = {AssetDataHeader.TargetVersion}", 5, 60);
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
 
-        public static readonly TomlSerializerOptions AssetDataSerializerOptions = new TomlSerializerOptions
+        public static readonly TomlSerializerOptions s_tomlOptions = new TomlSerializerOptions
         {
             WriteIndented = true,
             IndentSize = 4,
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            Converters = [
+                new EarlyFileIdTomlConverter(),
+                new EarlyAssetIdTomlConverter()
+                ]
         };
 
-        private record struct AssetImportData(string? ImporterId, bool IsImported, bool IsSkippedOnImport);
+        private static readonly WeakReference s_instance = new WeakReference(null);
+
+        public static AssetPipeline? Instance => Unsafe.As<AssetPipeline>(s_instance.Target);
+
+        private record struct AssetImportData(AssetId Id, string? ImporterId, bool IsImported, bool IsSkippedOnImport);
 
         [InlineArray(32)]
         private struct GuidStringArray

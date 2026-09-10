@@ -41,7 +41,7 @@ namespace Primary.Collections
                 // clear even if nothing happens
                 if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
                     Array.Clear(_array);
-            }    
+            }
             else
             {
                 _array = newCapacity == 0 ? Array.Empty<T>() : new T[newCapacity];
@@ -59,6 +59,10 @@ namespace Primary.Collections
         {
             _start = 0;
             _end = 0;
+
+            _size = 0;
+
+            ++_version;
 
             if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
                 Array.Clear(_array);
@@ -98,21 +102,18 @@ namespace Primary.Collections
 
             ++_version;
             --_size;
-            
+
+            if (++_start >= _array.Length)
+                _start = 0;
+
             if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
             {
                 (T item, _array[_start]) = (_array[_start], default!);
-                if (++_start == _array.Length)
-                    _start = 0;
-
                 return item;
             }
             else
             {
                 T item = _array[_start++];
-                if (_start == _array.Length)
-                    _start = 0;
-
                 return item;
             }
         }
@@ -124,20 +125,17 @@ namespace Primary.Collections
             ++_version;
             --_size;
 
+            if (--_end < 0)
+                _end = _array.Length - 1;
+
             if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
             {
                 (T item, _array[_end]) = (_array[_end], default!);
-                if (--_end == 0)
-                    _end = _array.Length - 1;
-
                 return item;
             }
             else
             {
-                T item = _array[_end--];
-                if (_end == 0)
-                    _end = _array.Length - 1;
-
+                T item = _array[_end];
                 return item;
             }
         }
@@ -145,20 +143,20 @@ namespace Primary.Collections
         public T Front()
         {
             ArgumentOutOfRangeException.ThrowIfZero(_size);
-            return _array[_start];
+            return _array[_start == _array.Length - 1 ? 0 : _start + 1];
         }
 
         public T Back()
         {
             ArgumentOutOfRangeException.ThrowIfZero(_size);
-            return _array[_end];
+            return _array[(_end == 0 ? _array.Length : _end) - 1];
         }
 
-        public bool TryGetFront([NotNullWhen(true)] out T? item)
+        public bool TryGetFront([MaybeNullWhen(false)] out T? item)
         {
             if (_size > 0)
             {
-                item = _array[_start];
+                item = _array[_start == _array.Length - 1 ? 0 : _start + 1];
                 return true;
             }
 
@@ -166,11 +164,11 @@ namespace Primary.Collections
             return false;
         }
 
-        public bool TryGetBack([NotNullWhen(true)] out T? item)
+        public bool TryGetBack([MaybeNullWhen(false)] out T? item)
         {
             if (_size > 0)
             {
-                item = _array[_end];
+                item = _array[(_end == 0 ? _array.Length : _end) - 1];
                 return true;
             }
 

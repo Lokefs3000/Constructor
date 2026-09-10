@@ -6,8 +6,14 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<FileVersion>1.0.1090.0</FileVersion>
+		<FileVersion>1.0.1369.0</FileVersion>
 	</PropertyGroup>
+
+	<ItemGroup>
+	  <Compile Remove="Assets\Importers\StylesheetImporter.cs" />
+	  <Compile Remove="Assets\Importers\UIFontFamilyImporter.cs" />
+	  <Compile Remove="Assets\Importers\UILayoutImporter.cs" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\Editor.Shaders\Editor.Shaders.csproj" />
@@ -36,6 +42,12 @@
 
 	<ItemGroup>
 	  <Folder Include="Rendering\Passes\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="Assets\Importers\StylesheetImporter.cs" />
+	  <None Include="Assets\Importers\UIFontFamilyImporter.cs" />
+	  <None Include="Assets\Importers\UILayoutImporter.cs" />
 	</ItemGroup>
 	
 	<Target Name="PatchExec" AfterTargets="PostBuildEvent">

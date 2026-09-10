@@ -41,22 +41,22 @@ namespace EditorUI.Dock
 
         private int _dockingSpaceDragStart;
 
-        private IAssetProvider<FontFamily>? _fontFamily;
-        private FontStyle _fontStyle;
-        private FontWeight _fontWeight;
+        [StyleInclude] private IAssetProvider<FontFamily>? _fontFamily;
+        [StyleInclude] private FontStyle _fontStyle;
+        [StyleInclude] private FontWeight _fontWeight;
 
-        private float _fontSize;
+        [StyleInclude] private float _fontSize;
 
-        private UIColor _backgroundColor;
-        private UIColor _tabColor;
-        private UIColor _textColor;
+        [StyleInclude] private UIColor _backgroundColor;
+        [StyleInclude] private UIColor _tabColor;
+        [StyleInclude] private UIColor _textColor;
 
-        private UIColor _activeTabColor;
+        [StyleInclude] private UIColor _activeTabColor;
 
-        private ushort _strokeWidth;
-        private UIColor _strokeColor;
+        [StyleInclude] private ushort _strokeWidth;
+        [StyleInclude] private UIColor _strokeColor;
 
-        private Vector4 _tabCornerRadius;
+        [StyleInclude] private Vector4 _tabCornerRadius;
 
         internal WindowDock(DockFlags flags, DockManager dockManager, WindowManager windowManager) : base(flags)
         {
@@ -367,7 +367,7 @@ namespace EditorUI.Dock
                         if (inputEvent.Drag.Button == MouseButton.Left && _dockingSpaceDragStart != -1)
                         {
                             int newDockingSpace = _dockingSpaceDragStart - (int)((_dockingSide == DockingSide.Left || _dockingSide == DockingSide.Right) ? inputEvent.Drag.Delta.X : inputEvent.Drag.Delta.Y);
-                            
+
                             if (newDockingSpace != _dockingSpace)
                                 Space = newDockingSpace;
 
@@ -480,22 +480,22 @@ namespace EditorUI.Dock
         public override ROList<DockBase> Docks => _docks;
 
         #region Serializable
-        [Styled(nameof(_fontFamily))] public IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
-        [Styled(nameof(_fontStyle))] public FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
-        [Styled(nameof(_fontWeight))] public FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
+        public IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
+        public FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
+        public FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
 
-        [Styled(nameof(_fontSize))] public float FontSize { get => _fontSize; set => SetStyledField(value); }
+        public float FontSize { get => _fontSize; set => SetStyledField(value); }
 
-        [Styled(nameof(_backgroundColor))] public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
-        [Styled(nameof(_tabColor))] public UIColor TabColor { get => _tabColor; set => SetStyledField(value); }
-        [Styled(nameof(_textColor))] public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
+        public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
+        public UIColor TabColor { get => _tabColor; set => SetStyledField(value); }
+        public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
 
-        [Styled(nameof(_activeTabColor))] public UIColor ActiveTabColor { get => _activeTabColor; set => SetStyledField(value); }
+        public UIColor ActiveTabColor { get => _activeTabColor; set => SetStyledField(value); }
 
-        [Styled(nameof(_strokeWidth))] public ushort StrokeWidth { get => _strokeWidth; set => SetStyledField(value); }
-        [Styled(nameof(_strokeColor))] public UIColor StrokeColor { get => _strokeColor; set => SetStyledField(value); }
+        public ushort StrokeWidth { get => _strokeWidth; set => SetStyledField(value); }
+        public UIColor StrokeColor { get => _strokeColor; set => SetStyledField(value); }
 
-        [Styled(nameof(_tabCornerRadius))] public Vector4 TabCornerRadius { get => _tabCornerRadius; set => SetStyledField(value); }
+        public Vector4 TabCornerRadius { get => _tabCornerRadius; set => SetStyledField(value); }
         #endregion
 
         public const int TabHeight = 24;

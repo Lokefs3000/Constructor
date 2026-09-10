@@ -1,23 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 using PrimaryEditor.Core;
 using PrimaryEditor.Startup;
+using TerraFX.Interop.Windows;
 
 namespace PrimaryEditor.Project
 {
     public sealed class ProjectData
     {
-        private ProjectPaths _paths;
+        private readonly ProjectPaths _paths;
 
-        internal ProjectData()
+        public ProjectData()
         {
+            s_instance.Target = this;
+
             _paths = new ProjectPaths();
         }
 
-        internal void SetupData(string projectPath, StartupSplash splash)
+        public void SetupData(string projectPath, StartupSplash? splash)
         {
-            splash.ActionName = "Setting up project data..";
+            splash?.ActionName = "Setting up project data..";
 
             projectPath = projectPath.Replace('\\', '/');
 
@@ -26,6 +30,7 @@ namespace PrimaryEditor.Project
 
         public ProjectPaths Paths => _paths;
 
-        public static ProjectData Instance => EditorRuntime.Instance.ProjectData;
+        private static readonly WeakReference s_instance = new WeakReference(null);
+        public static ProjectData? Instance => Unsafe.As<ProjectData>(s_instance.Target);
     }
 }

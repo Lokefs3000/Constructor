@@ -7,6 +7,11 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Folder Name="/Demo/">
+    <Project Path="Demo/VoxelizationDemo/VoxelizationDemo.csproj" Id="f9aba521-8c7c-44bd-8ff2-60efbebd0e4b">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
   <Folder Name="/Editor/">
     <Project Path="D:/source/repos/Constructor/Editor.Geometry/Editor.Geometry.csproj" />
     <Project Path="D:/source/repos/Constructor/Editor.Interop/Editor.Interop.csproj">

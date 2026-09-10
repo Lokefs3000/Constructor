@@ -25,22 +25,22 @@ namespace Primary
     {
         private static Engine? s_instance = null;
 
-        private Logbook _logbook;
-        private ThreadHelper _threadHelper;
-        private ScriptingManager _scriptingManager;
-        private ConsoleManager _consoleManager;
-        private Time _time;
-        private ProfilingManager _profilingManager;
-        private AssetFilesystem _assetFilesystem;
-        private AssetManager _assetManager;
-        private EventManager _eventManager;
-        private WindowManager _windowManager;
-        private SceneManager _sceneManager;
-        private RenderingManager _renderingManager;
-        private SystemManager _systemManager;
-        private InputSystem _inputSystem;
-        private ImGuiManager _imguiManager;
-        private JobScheduler _jobScheduler;
+        protected readonly Logbook _logbook;
+        protected readonly ThreadHelper _threadHelper;
+        protected readonly ScriptingManager _scriptingManager;
+        protected readonly ConsoleManager _consoleManager;
+        protected readonly Time _time;
+        protected readonly ProfilingManager _profilingManager;
+        protected readonly AssetFilesystem _assetFilesystem;
+        protected readonly AssetManager _assetManager;
+        protected readonly EventManager _eventManager;
+        protected readonly WindowManager _windowManager;
+        protected readonly SceneManager _sceneManager;
+        protected readonly RenderingManager _renderingManager;
+        protected readonly SystemManager _systemManager;
+        protected readonly InputSystem _inputSystem;
+        protected readonly ImGuiManager _imguiManager;
+        protected readonly JobScheduler _jobScheduler;
 
         public Engine(ReadOnlySpan<string> args)
         {

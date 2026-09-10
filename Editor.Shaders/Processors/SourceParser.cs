@@ -125,6 +125,10 @@ namespace Editor.Shaders.Processors
 
                 signatureRange = new Range(_start, _index);
             }
+            else if (identifier.EndsWith("ByteAddressBuffer"))
+            {
+                intent = IdentifierIntent.Resource;
+            }
 
             if (char.IsWhiteSpace(Peek()))
                 SkipWhitespace();

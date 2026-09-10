@@ -58,7 +58,7 @@ namespace PrimaryEditor.Assets
                         {
                             if (manager.ValueSerializer.TryDeserialize(propertyData, propertyValue.Value, out object? value, out Exception? exception))
                             {
-                                propertyData.Property.SetValue(obj, value);
+                                propertyData.Methods.SetIndirect!(obj, value);
                             }
                             else
                             {

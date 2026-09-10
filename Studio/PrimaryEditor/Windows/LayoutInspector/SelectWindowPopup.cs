@@ -19,7 +19,7 @@ namespace PrimaryEditor.Windows.LayoutInspector
         private readonly LayoutInspectorWindow _window;
 
         private Widget? _rootWidget;
-        private LayoutFrame? _listWidget;
+        private Widget? _listWidget;
         private Widget? _previewBackground;
         private Widget? _previewRect;
 
@@ -56,7 +56,7 @@ namespace PrimaryEditor.Windows.LayoutInspector
         internal void Initialize()
         {
             _rootWidget = _window.RootWidget.FindWidgetWithId<Widget>("sel-window-popup", true)!;
-            _listWidget = _rootWidget.FindWidgetWithId<LayoutFrame>("list", true)!;
+            _listWidget = _rootWidget.FindWidgetWithId<Widget>("list", true)!;
 
             Widget previewContainer = _rootWidget.FindWidgetWithId<Widget>("preview", true)!;
             _previewBackground = previewContainer.FindWidgetWithId<Widget>("background", true)!;
@@ -103,13 +103,15 @@ namespace PrimaryEditor.Windows.LayoutInspector
                         Button button = new Button()
                         {
                             Parent = _listWidget,
-                            Size = new UIValue2(1.0f, 0, 0.0f, 32),
+                            Width = UIValue.Max,
+                            Height = 32
                         };
 
                         Label label = new Label()
                         {
                             Parent = button,
-                            Size = UIValue2.Max,
+                            Width = UIValue.Max,
+                            Height = UIValue.Max,
                             Alignment = TextAlignment.CenterLeft,
                             AllowRichText = false,
                             InputState = WidgetInputState.Never,
@@ -143,23 +145,37 @@ namespace PrimaryEditor.Windows.LayoutInspector
                 if (host.OwnedWindow.ClientSize.X > host.OwnedWindow.ClientSize.Y)
                 {
                     if (idealSize.X < idealSize.Y)
-                        _previewBackground.Size = new UIValue2(1.0f, (idealSize.Y / idealSize.X) * (host.OwnedWindow.ClientSize.Y / (float)host.OwnedWindow.ClientSize.X));
+                    {
+                        _previewBackground.Width = 1.0f;
+                        _previewBackground.Height = (idealSize.Y / idealSize.X) * (host.OwnedWindow.ClientSize.Y / (float)host.OwnedWindow.ClientSize.X);
+                    }
                     else
-                        _previewBackground.Size = new UIValue2((idealSize.X / idealSize.Y) * (host.OwnedWindow.ClientSize.Y / (float)host.OwnedWindow.ClientSize.X), 1.0f);
+                    {
+                        _previewBackground.Width = (idealSize.X / idealSize.Y) * (host.OwnedWindow.ClientSize.Y / (float)host.OwnedWindow.ClientSize.X);
+                        _previewBackground.Height = 1.0f;
+                    }
                 }
                 else
                 {
                     if (idealSize.X < idealSize.Y)
-                        _previewBackground.Size = new UIValue2(1.0f, (idealSize.Y / idealSize.X) * (host.OwnedWindow.ClientSize.X / (float)host.OwnedWindow.ClientSize.Y));
+                    {
+                        _previewBackground.Width = 1.0f;
+                        _previewBackground.Height = (idealSize.Y / idealSize.X) * (host.OwnedWindow.ClientSize.X / (float)host.OwnedWindow.ClientSize.Y);
+                    }
                     else
-                        _previewBackground.Size = new UIValue2((idealSize.X / idealSize.Y) * (host.OwnedWindow.ClientSize.X / (float)host.OwnedWindow.ClientSize.Y), 1.0f);
+                    {
+                        _previewBackground.Width = 1.0f;
+                        _previewBackground.Height = (idealSize.X / idealSize.Y) * (host.OwnedWindow.ClientSize.X / (float)host.OwnedWindow.ClientSize.Y);
+                    }
                 }
 
                 Vector2 relativeOffset = window.WindowRect.Position.AsVector2() / host.HostRect.Size.AsVector2();
                 Vector2 relativeSize = window.WindowRect.Size.AsVector2() / host.HostRect.Size.AsVector2();
 
-                _previewRect!.Position = new UIValue2(relativeOffset.X, relativeOffset.Y);
-                _previewRect!.Size = new UIValue2(relativeSize.X, relativeSize.Y);
+                _previewRect!.Left = relativeOffset.X;
+                _previewRect!.Top = relativeOffset.Y;
+                _previewRect!.Width = relativeSize.X;
+                _previewRect!.Height = relativeSize.Y;
 
                 _previewBackground!.IsEnabled = true;
                 return;

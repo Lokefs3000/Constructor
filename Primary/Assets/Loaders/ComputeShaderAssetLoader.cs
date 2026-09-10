@@ -43,6 +43,8 @@ namespace Primary.Assets.Loaders
             if (assetData is not ComputeShaderAssetData shaderData)
                 throw new ArgumentException(nameof(assetData));
 
+            FrozenDictionary<FastStringHash, ComputeShaderKernel> previousKernels = shaderData.Kernels;
+
             shaderData.Dispose();
 
             try
@@ -620,7 +622,11 @@ namespace Primary.Assets.Loaders
 
                     KernelThreadSize threadSize = new KernelThreadSize(kernel.ThreadSizeX, kernel.ThreadSizeY, kernel.ThreadSizeZ);
 
-                    kernels.Add(kernelName, new ComputeShaderKernel(shader, threadSize, outputProperties, remapTable.ToFrozenDictionary(), propertyBlockSize, headerBlockSize, headerFlags, pipeline));
+                    if (!previousKernels.TryGetValue(kernelName, out ComputeShaderKernel? previousKernalData))
+                        previousKernalData = new ComputeShaderKernel();
+
+                    previousKernalData.SetupData(shader, threadSize, outputProperties, remapTable.ToFrozenDictionary(), propertyBlockSize, headerBlockSize, headerFlags, pipeline);
+                    kernels.Add(kernelName, previousKernalData);
                 }
 
                 shaderData.UpdateAssetData(shader, kernels.ToFrozenDictionary());
@@ -654,6 +660,7 @@ namespace Primary.Assets.Loaders
             {
                 int x = 0;
 
+                if ((x = (Usage != PsSortDummyUsage.Constants).CompareTo(other.Usage != PsSortDummyUsage.Constants)) != 0) return x;
                 if ((x = Usage.CompareTo(other.Usage)) != 0) return x;
                 if ((x = Type.CompareTo(other.Type)) != 0) return x;
                 return Name.CompareTo(other.Name, StringComparison.Ordinal);

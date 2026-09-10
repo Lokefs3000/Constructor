@@ -10,38 +10,29 @@ using Primary.Assets.Loaders;
 using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Serialization.Toml;
+using Primary.Utility;
 using PrimaryEditor.Assets.Exceptions;
 using PrimaryEditor.Assets.Utility;
 using TerraFX.Interop.Windows;
 using Tomlyn;
+using Tomlyn.Serialization;
 
 namespace PrimaryEditor.Assets.Importers
 {
     internal sealed class TextureImporter : IAssetImporter
     {
-        public void ImportFile(AssetPipeline pipeline, AssetId id, Stream inputStream, Stream outputStream, string localPath, string localOutputPath, bool isTrialImport)
+        public void ImportFile(in ImportContext context)
         {
-            pipeline.FilesystemManager.SetFileRemap(localPath, null);
-
-            bool isDefaultConfig = false;
-
             TextureConfiguration config;
-            if (localPath.EndsWith(".texcomp"))
+            if (context.LocalPath.EndsWith(".texcomp"))
             {
-                string? sourceText = FilesystemManager.ReadAllText(localPath);
-                if (sourceText == null)
-                {
-                    EdLog.Assets.Error("[{file}]: Failed to read composite texture configuration", localPath);
-                    throw new AssetImportException();
-                }
-
                 try
                 {
-                    config = TomlSerializer.Deserialize<CompositeConfiguration>(sourceText, s_tomlOptions)!;
+                    config = TomlSerializer.Deserialize<CompositeConfiguration>(context.InputStream, s_tomlOptions)!;
                 }
                 catch (TomlException ex)
                 {
-                    EdLog.Assets.Error(ex, "[{file}]: Error occured parsing composite texture configuration", localPath);
+                    EdLog.Assets.Error(ex, "[{file}]: Error occured parsing composite texture configuration", context.LocalPath);
                     throw new AssetImportException();
                 }
 
@@ -49,11 +40,10 @@ namespace PrimaryEditor.Assets.Importers
 
                 if (composite.CompositeInfo.Channels == TextureCompositeChannel.None)
                 {
-                    EdLog.Assets.Error("[{file}]: No channels specified for composite texture", localPath);
+                    EdLog.Assets.Error("[{file}]: No channels specified for composite texture", context.LocalPath);
                     throw new AssetImportException();
                 }
 
-                AssetId[] additionalSources = new AssetId[int.PopCount((int)composite.CompositeInfo.Channels)];
                 for (int i = 0, j = 0; i < 4; i++)
                 {
                     if (composite.CompositeInfo.Channels.HasFlag((TextureCompositeChannel)(1 << i)))
@@ -67,34 +57,25 @@ namespace PrimaryEditor.Assets.Importers
                             _ => default
                         };
 
-                        if (!pipeline.AssetRegistry.IsIdValid(channel.Asset))
+                        if (!context.Pipeline.AssetRegistry.IsIdValid(channel.Asset))
                         {
-                            EdLog.Assets.Error("[{file}]: Composite channel '{c}' id is not valid", localPath, (TextureCompositeChannel)(1 << i));
+                            EdLog.Assets.Error("[{file}]: Composite channel '{c}' id is not valid", context.LocalPath, (TextureCompositeChannel)(1 << i));
                             throw new AssetImportException();
                         }
 
-                        additionalSources[j++] = channel.Asset;
+                        context.AddDependency(channel.Asset);
                     }
                 }
-
-                pipeline.Associator.MakeAssociations(id, additionalSources, true);
             }
-            else if (localPath.EndsWith(".cubemap"))
+            else if (context.LocalPath.EndsWith(".cubemap"))
             {
-                string? sourceText = FilesystemManager.ReadAllText(localPath);
-                if (sourceText == null)
-                {
-                    EdLog.Assets.Error("[{file}]: Failed to read cubemap texture configuration", localPath);
-                    throw new AssetImportException();
-                }
-
                 try
                 {
-                    config = TomlSerializer.Deserialize<CubemapConfiguration>(sourceText, s_tomlOptions)!;
+                    config = TomlSerializer.Deserialize<CubemapConfiguration>(context.InputStream, s_tomlOptions)!;
                 }
                 catch (TomlException ex)
                 {
-                    EdLog.Assets.Error(ex, "[{file}]: Error occured parsing cubemap texture configuration", localPath);
+                    EdLog.Assets.Error(ex, "[{file}]: Error occured parsing cubemap texture configuration", context.LocalPath);
                     throw new AssetImportException();
                 }
 
@@ -104,12 +85,12 @@ namespace PrimaryEditor.Assets.Importers
                 {
                     CubemapConfiguration.Composited composited = cubemap.CompositedInfo;
 
-                    AssetId[] additionalSources = [composited.PositiveX, composited.NegativeX, composited.PositiveY,
-                                                   composited.NegativeY, composited.PositiveZ, composited.NegativeZ];
+                    FileId[] additionalSources = [composited.PositiveX, composited.NegativeX, composited.PositiveY,
+                                                  composited.NegativeY, composited.PositiveZ, composited.NegativeZ];
 
                     for (int i = 0; i < additionalSources.Length; i++)
                     {
-                        if (!pipeline.AssetRegistry.IsIdValid(additionalSources[i]))
+                        if (!context.Pipeline.AssetRegistry.IsIdValid(additionalSources[i]))
                         {
                             string faceName = i switch
                             {
@@ -122,56 +103,29 @@ namespace PrimaryEditor.Assets.Importers
                                 _ => string.Empty
                             };
 
-                            EdLog.Assets.Error("[{file}]: Cubemap face '{f}' id is not valid", localPath, faceName);
+                            EdLog.Assets.Error("[{file}]: Cubemap face '{f}' id is not valid", context.LocalPath, faceName);
                             throw new AssetImportException();
                         }
                     }
 
-                    pipeline.Associator.MakeAssociations(id, additionalSources, true);
+                    context.AddDependencies(additionalSources);
                 }
             }
             else
             {
-                string? configFile = pipeline.Configuration.GetLocalConfigPath(localPath);
-                if (configFile == null)
-                {
-                    pipeline.ReportImportAsIgnored(id, this);
-                    throw new AssetIgnoredException();
-                }
-
-                string? sourceText = FilesystemManager.ReadAllText(configFile);
-                if (sourceText == null)
-                {
-                    EdLog.Assets.Error("[{file}]: Failed to read texture configuration", localPath);
-                    throw new AssetImportException();
-                }
-
-                try
-                {
-                    config = TomlSerializer.Deserialize<TextureConfiguration>(sourceText, s_tomlOptions)!;
-                }
-                catch (TomlException ex)
-                {
-                    if (isTrialImport)
-                        throw new AssetIgnoredException();
-
-                    EdLog.Assets.Error(ex, "[{file}]: Error occured parsing texture configuration", localPath);
-                    throw new AssetImportException();
-                }
-
-                isDefaultConfig = true;
+                config = context.GetAssetConfiguration<TextureConfiguration>();
             }
 
-            config.DefaultId = id;
-            config.IdProvider = pipeline.AssetRegistry;
+            config.DefaultId = context.Id;
+            config.IdProvider = context.Pipeline.AssetRegistry;
 
-            outputStream.Write(new TextureHeader());
-            outputStream.Write(new TextureSampler());
+            context.OutputStream.Write(new TextureHeader());
+            context.OutputStream.Write(new TextureSampler());
 
             ProcessedTextureData textureData;
             try
             {
-                textureData = TextureProcessor.Execute(config, outputStream);
+                textureData = TextureProcessor.Execute(config, context.OutputStream);
             }
             catch (Exception ex)
             {
@@ -179,8 +133,8 @@ namespace PrimaryEditor.Assets.Importers
                 throw new AssetLoadException();
             }
 
-            outputStream.Seek(0, SeekOrigin.Begin);
-            outputStream.Write(new TextureHeader
+            context.OutputStream.Seek(0, SeekOrigin.Begin);
+            context.OutputStream.Write(new TextureHeader
             {
                 FileHeader = TextureHeader.Header,
                 FileVersion = TextureHeader.Version,
@@ -196,7 +150,7 @@ namespace PrimaryEditor.Assets.Importers
                 ArraySize = (ushort)textureData.ArraySize
             });
 
-            outputStream.Write(new TextureSampler
+            context.OutputStream.Write(new TextureSampler
             {
                 Swizzle = textureData.Swizzle,
 
@@ -219,19 +173,6 @@ namespace PrimaryEditor.Assets.Importers
 
                 MaxAnisotropy = (byte)config.VisualInfo.MaxAnisotropy
             });
-
-            if (isDefaultConfig)
-            {
-                pipeline.Associator.ClearAssociations(id);
-            }
-
-            pipeline.FilesystemManager.SetFileRemap(localPath, localOutputPath);
-            pipeline.ReloadAsset(id);
-        }
-
-        public void PreloadFile(AssetPipeline pipeline, AssetId id)
-        {
-            
         }
 
         public bool ValidateFile(AssetPipeline pipeline, AssetId id, string localPath)
@@ -271,6 +212,15 @@ namespace PrimaryEditor.Assets.Importers
         }
 
         public string UniqueId => "texture";
+        public Type AssetDefinitionType => typeof(TextureAsset);
+
+        public string? DefaultConfigName => "DefaultConfig_Texture.toml";
+        public Type? ConfigType => typeof(TextureConfiguration);
+
+        public TomlConverter[] Converters => [
+            new ColorTomlConverter(),
+            new TextureSwizzleConverter()
+            ];
 
         private static TextureFormat GetFormatToFileEquivalent(TextureImageFormat format) => format switch
         {
@@ -300,7 +250,7 @@ namespace PrimaryEditor.Assets.Importers
         private static readonly TomlSerializerOptions s_tomlOptions = new TomlSerializerOptions
         {
             Converters = [
-                new EarlyAssetIdTomlConverter(),
+                new EarlyFileIdTomlConverter(),
                 new ColorTomlConverter(),
                 new TextureSwizzleConverter()
                 ],

@@ -862,6 +862,7 @@ namespace Primary.Assets.Loaders
             {
                 int x = 0;
 
+                if ((x = (Usage != PsSortDummyUsage.Constants).CompareTo(other.Usage != PsSortDummyUsage.Constants)) != 0) return x;
                 if ((x = Usage.CompareTo(other.Usage)) != 0) return x;
                 if ((x = Type.CompareTo(other.Type)) != 0) return x;
                 return Name.CompareTo(other.Name, StringComparison.Ordinal);

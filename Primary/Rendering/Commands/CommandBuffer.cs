@@ -454,6 +454,202 @@ namespace Primary.Rendering.Commands
             }
         }
 
+        public unsafe void Read(FGReadBufferDesc desc)
+        {
+            if (!desc.Source.IsExternal && !_stateData.ContainsResource(desc.Source, FGResourceUsage.Read))
+            {
+                _errorReporter.ReportError(RPErrorSource.ReadBuffer, RPErrorType.NoResourceAccess, desc.Source.ToString());
+                return;
+            }
+
+            if (desc.SrcOffset + desc.NumBytes > FGResourceUtility.GetWidth(desc.Source))
+            {
+                _errorReporter.ReportError(RPErrorSource.ReadBuffer, RPErrorType.OutOfRange, desc.Source.ToString());
+                return;
+            }
+
+            if (desc.DstOffset + desc.NumBytes > desc.Destination.Description.Width)
+            {
+                _errorReporter.ReportError(RPErrorSource.ReadBuffer, RPErrorType.OutOfRange, desc.Destination.ToString());
+                return;
+            }
+
+            _recorder.AddCommand(RecCommandType.CopyBuffer, new CmdCopyBuffer
+            {
+                Source = desc.Source,
+                SourceOffset = desc.SrcOffset,
+
+                Destination = desc.Destination,
+                DestinationOffset = desc.DstOffset,
+
+                NumBytes = desc.NumBytes
+            });
+        }
+
+        public unsafe void Read(FGReadTextureDesc desc)
+        {
+            if (!ValidateCopySource(this, desc.Source, FGResourceUsage.Read))
+                return;
+
+            int srcWidth = -1;
+            int srcHeight = -1;
+            int srcDepth = -1;
+
+            if (desc.SourceBox.HasValue)
+            {
+                FGBox box = desc.SourceBox.Value;
+                if (desc.Source.Type == FGTextureCopySourceType.SubresourceIndex)
+                {
+                    (int width, int height, int depth) = FGResourceUtility.GetTextureSize(desc.Source.Resource.AsTexture());
+                    (width, height, depth) = FGResourceUtility.GetSizeForSubresource(desc.Source.SubresourceIndex, width, height, depth);
+
+                    if (box.X + box.Width > width || box.Y + box.Height > height || box.Z + box.Depth > depth)
+                    {
+                        _errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.OutOfRange, desc.Source.Resource.ToString());
+                        return;
+                    }
+
+                    srcWidth = width;
+                    srcHeight = height;
+                    srcDepth = depth;
+                }
+                else
+                {
+                    if (box.X + box.Width > desc.Source.Footprint.Width || box.Y + box.Height > desc.Source.Footprint.Height || box.Z + box.Depth > desc.Source.Footprint.Depth)
+                    {
+                        _errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.OutOfRange, desc.Source.Resource.ToString());
+                        return;
+                    }
+
+                    srcWidth = (int)desc.Source.Footprint.Width;
+                    srcHeight = (int)desc.Source.Footprint.Height;
+                    srcDepth = (int)desc.Source.Footprint.Depth;
+                }
+            }
+            else
+            {
+                if (desc.Source.Type == FGTextureCopySourceType.SubresourceIndex)
+                {
+                    (int width, int height, int depth) = FGResourceUtility.GetTextureSize(desc.Source.Resource.AsTexture());
+                    (width, height, depth) = FGResourceUtility.GetSizeForSubresource(desc.Source.SubresourceIndex, width, height, depth);
+
+                    srcWidth = width;
+                    srcHeight = height;
+                    srcDepth = depth;
+                }
+                else
+                {
+                    srcWidth = (int)desc.Source.Footprint.Width;
+                    srcHeight = (int)desc.Source.Footprint.Height;
+                    srcDepth = (int)desc.Source.Footprint.Depth;
+                }
+            }
+
+            if (srcWidth == 0 || srcHeight == 0 || srcDepth == 0)
+                return;
+
+            CmdDataTextureSource source = new CmdDataTextureSource
+            {
+                Resource = desc.Source.Resource
+            };
+
+            if (desc.Source.Type == FGTextureCopySourceType.SubresourceIndex)
+            {
+                source.Type = CmdDataTextureSourceType.SubresourceIndex;
+                source.SubresourceIndex = desc.Source.SubresourceIndex;
+            }
+            else
+            {
+                source.Type = CmdDataTextureSourceType.Footprint;
+                source.Footprint = new CmdDataTextureFootprint
+                {
+                    Offset = desc.Source.Footprint.Offset,
+
+                    Format = desc.Source.Footprint.Format,
+
+                    Width = desc.Source.Footprint.Width,
+                    Height = desc.Source.Footprint.Height,
+                    Depth = desc.Source.Footprint.Depth,
+
+                    RowPitch = desc.Source.Footprint.RowPitch
+                };
+            }
+
+            CmdDataTextureSource destination = new CmdDataTextureSource
+            {
+                Resource = desc.Destination,
+                Type = CmdDataTextureSourceType.SubresourceIndex,
+                SubresourceIndex = 0
+            };
+
+            _recorder.AddCommand(RecCommandType.CopyTexture, new CmdCopyTexture
+            {
+                Source = source,
+                SourceBox = desc.SourceBox,
+
+                Destination = destination,
+                DstX = desc.DstX,
+                DstY = desc.DstY,
+                DstZ = desc.DstZ,
+            });
+
+            static bool ValidateCopySource(CommandBuffer cmd, FGTextureCopySource src, FGResourceUsage usage)
+            {
+                if (!src.Resource.IsExternal && !cmd._stateData.ContainsResource(src.Resource, usage))
+                {
+                    cmd._errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.NoResourceAccess, src.Resource.ToString());
+                    return false;
+                }
+
+                if (src.Type == FGTextureCopySourceType.SubresourceIndex)
+                {
+                    if (src.Resource.ResourceId != FGResourceId.Texture)
+                    {
+                        cmd._errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.InvalidResourceType, src.Resource.ToString());
+                        return false;
+                    }
+
+                    if (src.SubresourceIndex > FGResourceUtility.GetMaxSubresources(src.Resource))
+                    {
+                        cmd._errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.InvalidSubresource, src.Resource.ToString());
+                        return false;
+                    }
+                }
+                else
+                {
+                    FGTextureFootprint footprint = src.Footprint;
+                    if (src.Resource.ResourceId != FGResourceId.Buffer)
+                    {
+                        cmd._errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.InvalidResourceType, src.Resource.ToString());
+                        return false;
+                    }
+
+                    //TODO: add "footprint" format validation
+
+                    if (src.Resource.ResourceId == FGResourceId.Buffer)
+                    {
+                        int totalByteSizeRequied = (int)(RHIFormatInfo.Query(footprint.Format).BytesPerPixel * footprint.Width * footprint.Height * footprint.Depth);
+                        if (totalByteSizeRequied > FGResourceUtility.GetWidth(src.Resource.AsBuffer()))
+                        {
+                            cmd._errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.OutOfRange, src.Resource.ToString());
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        int totalByteSizeRequied = (int)(RHIFormatInfo.Query(footprint.Format).BytesPerPixel * footprint.Width * footprint.Height * footprint.Depth);
+                        if (totalByteSizeRequied > (int)(RHIFormatInfo.Query(FGResourceUtility.GetFormat(src.Resource.AsTexture())).BytesPerPixel * footprint.Width * footprint.Height * footprint.Depth))
+                        {
+                            cmd._errorReporter.ReportError(RPErrorSource.CopyTexture, RPErrorType.OutOfRange, src.Resource.ToString());
+                            return false;
+                        }
+                    }
+                }
+
+                return true;
+            }
+        }
+
         public unsafe FGMappedSubresource<T> Map<T>(FGMapBufferDesc desc) where T : unmanaged
         {
             if (!desc.Buffer.IsExternal && !_stateData.ContainsResource(desc.Buffer, FGResourceUsage.Write))
@@ -598,6 +794,9 @@ namespace Primary.Rendering.Commands
     }
 
     public readonly record struct FGTextureFootprint(uint Offset, RHIFormat Format, uint Width, uint Height, uint Depth, uint RowPitch);
+
+    public readonly record struct FGReadBufferDesc(FrameGraphBuffer Source, uint SrcOffset, RHIReadback Destination, uint DstOffset, uint NumBytes);
+    public readonly record struct FGReadTextureDesc(FGTextureCopySource Source, FGBox? SourceBox, RHIReadback Destination, uint DstOffset, uint DstX, uint DstY, uint DstZ);
 
     public readonly record struct FGMapBufferDesc(FrameGraphBuffer Buffer, uint Offset, uint ElementCount)
     {

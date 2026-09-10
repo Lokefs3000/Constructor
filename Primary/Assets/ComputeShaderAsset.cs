@@ -1,4 +1,5 @@
 ﻿using Primary.Assets.Types;
+using Primary.Collections.ReadOnly;
 using Primary.Rendering.Assets;
 using Primary.RHI;
 using System;
@@ -65,28 +66,47 @@ namespace Primary.Assets
             _kernels = kernels;
         }
 
-        internal IReadOnlyDictionary<FastStringHash, ComputeShaderKernel> Kernels => _kernels;
+        internal FrozenDictionary<FastStringHash, ComputeShaderKernel> Kernels => _kernels;
     }
 
     public record class ComputeShaderKernel : IShaderResourceSource
     {
-        private readonly ComputeShaderAsset _asset;
+        private ComputeShaderAsset _asset;
 
-        private readonly KernelThreadSize _threadSize;
+        private KernelThreadSize _threadSize;
 
-        private readonly ShaderProperty[] _properties;
-        private readonly FrozenDictionary<int, int> _remappingTable;
+        private ShaderProperty[] _properties;
+        private FrozenDictionary<int, int> _remappingTable;
 
-        private readonly int _propertyBlockSize;
-        private readonly int _headerBlockSize;
+        private int _propertyBlockSize;
+        private int _headerBlockSize;
 
-        private readonly ShHeaderFlags _headerFlags;
+        private ShHeaderFlags _headerFlags;
 
-        private readonly RHIComputePipeline _computePipeline;
+        private RHIComputePipeline _computePipeline;
 
-        private readonly int _resourceCount;
+        private int _resourceCount;
 
-        internal ComputeShaderKernel(ComputeShaderAsset asset, KernelThreadSize threadSize, ShaderProperty[] properties, FrozenDictionary<int, int> remappingTable, int propertyBlockSize, int headerBlockSize, ShHeaderFlags headerFlags, RHIComputePipeline computePipeline)
+        internal ComputeShaderKernel()
+        {
+            _asset = default!;
+
+            _threadSize = default;
+
+            _properties = [];
+            _remappingTable = FrozenDictionary<int, int>.Empty;
+
+            _propertyBlockSize = 0;
+            _headerBlockSize = 0;
+
+            _headerFlags = ShHeaderFlags.None;
+
+            _computePipeline = default!;
+
+            _resourceCount = 0;
+        }
+
+        internal void SetupData(ComputeShaderAsset asset, KernelThreadSize threadSize, ShaderProperty[] properties, FrozenDictionary<int, int> remappingTable, int propertyBlockSize, int headerBlockSize, ShHeaderFlags headerFlags, RHIComputePipeline computePipeline)
         {
             _asset = asset;
 

@@ -30,9 +30,8 @@ namespace PrimaryEditor.Assets.Importers
             pipeline.ReloadAsset(id);
         }
 
-        public void PreloadFile(AssetPipeline pipeline, AssetId id)
+        public void PreloadFile(AssetPipeline pipeline, AssetId id, string localPath)
         {
-            
         }
 
         public bool ValidateFile(AssetPipeline pipeline, AssetId id, string localPath)
@@ -51,5 +50,6 @@ namespace PrimaryEditor.Assets.Importers
         }
 
         public string UniqueId => "eui_layout";
+        public Type AssetDefinitionType => typeof(UILayoutAsset);
     }
 }

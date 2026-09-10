@@ -35,9 +35,9 @@ namespace EditorUI.Mathematics
             Absolute = absolute;
         }
 
-        public readonly float Evaluate(float space)
+        public readonly int Evaluate(float space)
         {
-            return Relative == 0.0f ? Absolute : (Relative * space + Absolute);
+            return Relative == 0.0f ? Absolute : ((int)(Relative * space + 0.5f) + Absolute);
         }
 
         public readonly override bool Equals([NotNullWhen(true)] object? obj) => obj is UIValue value && Equals(value);
@@ -57,6 +57,9 @@ namespace EditorUI.Mathematics
 
         public static bool operator ==(UIValue left, UIValue right) => left.Equals(right);
         public static bool operator !=(UIValue left, UIValue right) => !(left == right);
+
+        public static implicit operator UIValue(int absolute) => new UIValue(absolute);
+        public static implicit operator UIValue(float relative) => new UIValue(relative);
 
         public static readonly UIValue Zero = new UIValue();
         public static readonly UIValue Max = new UIValue(1.0f);

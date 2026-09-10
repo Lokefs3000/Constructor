@@ -21,7 +21,7 @@ namespace PrimaryEditor.Windows
     public sealed class ContentBrowserWindow : EditorWindow
     {
         private TreeView? _directoryTree;
-        private LayoutFrame? _contentToolbar;
+        private Widget? _contentToolbar;
         private GridView? _contentGrid;
 
         private EntryGridCollection _gridCollection;
@@ -61,7 +61,7 @@ namespace PrimaryEditor.Windows
         protected internal override void InitializeSelf()
         {
             _directoryTree = RootWidget.FindWidgetWithId<TreeView>("directory-tree", true)!;
-            _contentToolbar = RootWidget.FindWidgetWithId<LayoutFrame>("content-toolbar", true)!;
+            _contentToolbar = RootWidget.FindWidgetWithId<Widget>("content-toolbar", true)!;
             _contentGrid = RootWidget.FindWidgetWithId<GridView>("content-grid", true)!;
 
             {
@@ -224,7 +224,7 @@ namespace PrimaryEditor.Windows
                 {
                     label = new Label()
                     {
-                        Size = new UIValue2(0.0f, 1.0f),
+                        Height = UIValue.Max,
                         Alignment = TextAlignment.CenterLeft,
                     };
 

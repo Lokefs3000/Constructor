@@ -20,7 +20,7 @@ namespace EditorUI.Widgets
         protected ICollectionBinding<GridViewItem>? _items;
         protected GridViewItemStyle? _itemStyle;
 
-        protected Int2 _itemSize;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected Int2 _itemSize;
 
         public GridView()
         {
@@ -30,7 +30,7 @@ namespace EditorUI.Widgets
             _itemSize = new Int2(32);
         }
 
-        protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
+        protected internal override void AfterComputedRectSelf()
         {
             if (_items != null)
             {
@@ -46,8 +46,6 @@ namespace EditorUI.Widgets
             {
                 _viewSize = Vector2.Zero;
             }
-
-            return base.LayoutSelf(in context);
         }
 
         protected internal override void PaintSelf(ref PainterContext painter)
@@ -137,7 +135,7 @@ namespace EditorUI.Widgets
         }
 
         #region Serializable
-        [Styled(nameof(_itemSize), StateFlags.SelfInvalidLayout)] public Int2 ItemSize { get => _itemSize; set => _itemSize = value; }
+        public Int2 ItemSize { get => _itemSize; set => _itemSize = value; }
         #endregion
     }
 

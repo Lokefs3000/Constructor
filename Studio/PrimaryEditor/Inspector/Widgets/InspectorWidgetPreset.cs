@@ -17,31 +17,31 @@ namespace PrimaryEditor.Inspector.Widgets
         private readonly Widget _valuesRootWidget;
         private readonly Label _displayLabel;
         private readonly DropdownField _presetField;
-        private readonly LayoutFrame _childWidget;
+        private readonly Widget _childWidget;
 
         internal InspectorWidgetPreset()
         {
             _rootWidget = new Widget()
             {
-                Size = UIValue2.MaxX,
-                AutoResize = AutoResizeMode.ResizeY
+                Width = UIValue.Max,
             };
             _valuesRootWidget = new Widget() { Parent = _rootWidget };
             _displayLabel = new Label()
             {
                 Parent = _valuesRootWidget,
-                Size = new UIValue2(0.5f, 1.0f),
+                Width = 0.5f,
+                Height = 1.0f
             };
             _presetField = new DropdownField()
             {
                 Parent = _valuesRootWidget,
-                Position = new UIValue2(0.5f, 0.0f),
-                Size = new UIValue2(0.5f, 1.0f)
+                Left = 0.5f,
+                Width = 0.5f,
+                Height = 1.0f
             };
-            _childWidget = new LayoutFrame
+            _childWidget = new Widget
             {
                 Parent = _rootWidget,
-                AutoResize = AutoResizeMode.ResizeY,
             };
 
             _valuesRootWidget.TryAddClass("field-root");
@@ -67,8 +67,8 @@ namespace PrimaryEditor.Inspector.Widgets
 
             if (viewData != null)
             {
-                _rootWidget.Margin = new Vector4(0.0f, viewData.RelativeOffset.Y, 0.0f, 0.0f);
-                _displayLabel.Margin = new Vector4(viewData.RelativeOffset.X, 0.0f, 0.0f, 0.0f);
+                _rootWidget.Margin = new LayoutBox { Top = viewData.RelativeOffset.Y };
+                _displayLabel.Margin = new LayoutBox { Left = viewData.RelativeOffset.X };
 
                 _valuesRootWidget.IsEnabled = true;
 
@@ -81,8 +81,8 @@ namespace PrimaryEditor.Inspector.Widgets
             }
             else
             {
-                _rootWidget.Margin = Vector4.Zero;
-                _displayLabel.Margin = Vector4.Zero;
+                _rootWidget.Margin = LayoutBox.Null;
+                _displayLabel.Margin = LayoutBox.Null;
 
                 _valuesRootWidget.IsEnabled = false;
             }

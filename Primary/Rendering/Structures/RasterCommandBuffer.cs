@@ -61,6 +61,9 @@ namespace Primary.Rendering.Structures
         public void Copy(FGBufferCopyDesc desc) => _commandBuffer.Copy(desc);
         public void Copy(FGTextureCopyDesc desc) => _commandBuffer.Copy(desc);
 
+        public void Read(FGReadBufferDesc desc) => _commandBuffer.Read(desc);
+        public void Read(FGReadTextureDesc desc) => _commandBuffer.Read(desc);
+
         public FGMappedSubresource<T> Map<T>(FGMapBufferDesc desc) where T : unmanaged => _commandBuffer.Map<T>(desc);
         public FGMappedSubresource<T> Map<T>(FrameGraphTexture texture) where T : unmanaged => _commandBuffer.Map<T>(texture);
 

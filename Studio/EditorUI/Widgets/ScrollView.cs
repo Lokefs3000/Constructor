@@ -19,14 +19,14 @@ namespace EditorUI.Widgets
     [UIWidget]
     public class ScrollView : Widget
     {
-        protected Scrollbars _scrollbars;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected Scrollbars _scrollbars;
 
-        protected ScrollbarVisibility _verticalScrollbar;
-        protected ScrollbarVisibility _horizontalScrollbar;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected ScrollbarVisibility _verticalScrollbar;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected ScrollbarVisibility _horizontalScrollbar;
 
-        protected float _scrollbarWidth;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected float _scrollbarWidth;
 
-        protected UIColor _scrollbarBackgroundColor;
+        [StyleInclude] protected UIColor _scrollbarBackgroundColor;
 
         protected Scroller _verticalScroller;
         protected Scroller _horizontalScroller;
@@ -61,88 +61,88 @@ namespace EditorUI.Widgets
             base.DestroySelf();
         }
 
-        protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
-        {
-            MeasureStatus status = base.MeasureSelf(in context);
-            if (status == MeasureStatus.Success)
-            {
-                if ((Flags.HasFlag(_scrollbars, Scrollbars.Vertical) && _verticalScrollbar == ScrollbarVisibility.Always) || _verticalScroller.IsEnabled)
-                    _layoutState.ContentSize.X -= _scrollbarWidth;
-                if ((Flags.HasFlag(_scrollbars, Scrollbars.Horizontal) && _horizontalScrollbar == ScrollbarVisibility.Always) || _horizontalScroller.IsEnabled)
-                    _layoutState.ContentSize.Y -= _scrollbarWidth;
-            }
+        // protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
+        // {
+        //     MeasureStatus status = base.MeasureSelf(in context);
+        //     if (status == MeasureStatus.Success)
+        //     {
+        //         if ((Flags.HasFlag(_scrollbars, Scrollbars.Vertical) && _verticalScrollbar == ScrollbarVisibility.Always) || _verticalScroller.IsEnabled)
+        //             _layoutState.ContentSize.X -= _scrollbarWidth;
+        //         if ((Flags.HasFlag(_scrollbars, Scrollbars.Horizontal) && _horizontalScrollbar == ScrollbarVisibility.Always) || _horizontalScroller.IsEnabled)
+        //             _layoutState.ContentSize.Y -= _scrollbarWidth;
+        //     }
+        // 
+        //     return MeasureStatus.Success;
+        // }
 
-            return MeasureStatus.Success;
-        }
-
-        protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
-        {
-            base.LayoutSelf(in context);
-
-            bool mayHaveUpdatedContentSize = false;
-
-            Vector2 maxChildExtents = _viewSize;
-            if (_children != null)
-            {
-                foreach (Widget child in _children)
-                {
-                    maxChildExtents = Vector2.Max(child.IdealPosition + child.IdealSize, maxChildExtents);
-                }
-
-                _viewSize = Vector2.Max(maxChildExtents, _viewSize);
-            }
-
-            _verticalScroller.IsEnabled = (_autoResize == AutoResizeMode.None || _autoResize == AutoResizeMode.ResizeX) && Flags.HasFlag(_scrollbars, Scrollbars.Vertical) && (_verticalScrollbar == ScrollbarVisibility.Always || (_verticalScrollbar == ScrollbarVisibility.Auto && maxChildExtents.Y > _layoutState.IdealSize.Y));
-            _horizontalScroller.IsEnabled = (_autoResize == AutoResizeMode.None || _autoResize == AutoResizeMode.ResizeY) && Flags.HasFlag(_scrollbars, Scrollbars.Horizontal) && (_horizontalScrollbar == ScrollbarVisibility.Always || (_horizontalScrollbar == ScrollbarVisibility.Auto && maxChildExtents.X > _layoutState.IdealSize.X));
-
-            if (_verticalScroller.IsEnabled)
-            {
-                if (!_verticalScroller.WasPreviouslyEnabled)
-                {
-                    mayHaveUpdatedContentSize = true;
-                    _layoutState.ContentSize.X = _layoutState.IdealSize.X - _scrollbarWidth;
-
-                    AddStateFlags(_verticalScroller.StateFlags & ~StateFlags.This);
-                }
-
-                _verticalScroller.FinalizeLayout(_layoutState.ContentSize.Y);
-            }
-            else if (_verticalScroller.WasPreviouslyEnabled)
-            {
-                UIManager.Instance.InputManager.ForgetInteractable(_verticalScroller);
-                _verticalScroller.WasPreviouslyEnabled = false;
-                mayHaveUpdatedContentSize = true;
-            }
-
-            if (_horizontalScroller.IsEnabled)
-            {
-                if (!_horizontalScroller.WasPreviouslyEnabled)
-                {
-                    mayHaveUpdatedContentSize = true;
-                    _layoutState.ContentSize.Y = _layoutState.IdealSize.Y - _scrollbarWidth;
-
-                    AddStateFlags(_verticalScroller.StateFlags & ~StateFlags.This);
-                }
-
-                _horizontalScroller.FinalizeLayout(_layoutState.ContentSize.X);
-            }
-            else if (_horizontalScroller.WasPreviouslyEnabled)
-            {
-                UIManager.Instance.InputManager.ForgetInteractable(_horizontalScroller);
-                _horizontalScroller.WasPreviouslyEnabled = false;
-                mayHaveUpdatedContentSize = true;
-            }
-
-            ScrollPosition = Vector2.Clamp(_scrollPosition, Vector2.Zero, Vector2.Max(Vector2.Zero, _viewSize - _layoutState.ContentSize));
-            _viewSize = Vector2.Max(maxChildExtents, _layoutState.ContentSize);
-
-            if (mayHaveUpdatedContentSize && _children != null && _children.Count > 0)
-            {
-                AddStateFlags(StateFlags.SelfInvalidLayout);
-            }
-
-            return LayoutReturnData.Success;
-        }
+        // protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
+        // {
+        //     base.LayoutSelf(in context);
+        // 
+        //     bool mayHaveUpdatedContentSize = false;
+        // 
+        //     Vector2 maxChildExtents = _viewSize;
+        //     if (_children != null)
+        //     {
+        //         foreach (Widget child in _children)
+        //         {
+        //             maxChildExtents = Vector2.Max(child.IdealPosition + child.IdealSize, maxChildExtents);
+        //         }
+        // 
+        //         _viewSize = Vector2.Max(maxChildExtents, _viewSize);
+        //     }
+        // 
+        //     _verticalScroller.IsEnabled = (_autoResize == AutoResizeMode.None || _autoResize == AutoResizeMode.ResizeX) && Flags.HasFlag(_scrollbars, Scrollbars.Vertical) && (_verticalScrollbar == ScrollbarVisibility.Always || (_verticalScrollbar == ScrollbarVisibility.Auto && maxChildExtents.Y > _layoutState.IdealSize.Y));
+        //     _horizontalScroller.IsEnabled = (_autoResize == AutoResizeMode.None || _autoResize == AutoResizeMode.ResizeY) && Flags.HasFlag(_scrollbars, Scrollbars.Horizontal) && (_horizontalScrollbar == ScrollbarVisibility.Always || (_horizontalScrollbar == ScrollbarVisibility.Auto && maxChildExtents.X > _layoutState.IdealSize.X));
+        // 
+        //     if (_verticalScroller.IsEnabled)
+        //     {
+        //         if (!_verticalScroller.WasPreviouslyEnabled)
+        //         {
+        //             mayHaveUpdatedContentSize = true;
+        //             _layoutState.ContentSize.X = _layoutState.IdealSize.X - _scrollbarWidth;
+        // 
+        //             AddStateFlags(_verticalScroller.StateFlags & ~StateFlags.This);
+        //         }
+        // 
+        //         _verticalScroller.FinalizeLayout(_layoutState.ContentSize.Y);
+        //     }
+        //     else if (_verticalScroller.WasPreviouslyEnabled)
+        //     {
+        //         UIManager.Instance.InputManager.ForgetInteractable(_verticalScroller);
+        //         _verticalScroller.WasPreviouslyEnabled = false;
+        //         mayHaveUpdatedContentSize = true;
+        //     }
+        // 
+        //     if (_horizontalScroller.IsEnabled)
+        //     {
+        //         if (!_horizontalScroller.WasPreviouslyEnabled)
+        //         {
+        //             mayHaveUpdatedContentSize = true;
+        //             _layoutState.ContentSize.Y = _layoutState.IdealSize.Y - _scrollbarWidth;
+        // 
+        //             AddStateFlags(_verticalScroller.StateFlags & ~StateFlags.This);
+        //         }
+        // 
+        //         _horizontalScroller.FinalizeLayout(_layoutState.ContentSize.X);
+        //     }
+        //     else if (_horizontalScroller.WasPreviouslyEnabled)
+        //     {
+        //         UIManager.Instance.InputManager.ForgetInteractable(_horizontalScroller);
+        //         _horizontalScroller.WasPreviouslyEnabled = false;
+        //         mayHaveUpdatedContentSize = true;
+        //     }
+        // 
+        //     ScrollPosition = Vector2.Clamp(_scrollPosition, Vector2.Zero, Vector2.Max(Vector2.Zero, _viewSize - _layoutState.ContentSize));
+        //     _viewSize = Vector2.Max(maxChildExtents, _layoutState.ContentSize);
+        // 
+        //     if (mayHaveUpdatedContentSize && _children != null && _children.Count > 0)
+        //     {
+        //         AddStateFlags(StateFlags.SelfInvalidLayout);
+        //     }
+        // 
+        //     return LayoutReturnData.Success;
+        // }
 
         protected internal override void PaintSelf(ref PainterContext painter)
         {
@@ -260,40 +260,40 @@ namespace EditorUI.Widgets
             }
         }
 
-        public override LayoutBehaviour LayoutBehaviour
-        {
-            get
-            {
-                bool shouldActAsGroup = false;
-                if (_autoResize != AutoResizeMode.ResizeXY)
-                {
-                    if (_autoResize == AutoResizeMode.ResizeX)
-                    {
-                        shouldActAsGroup = _verticalScrollbar != ScrollbarVisibility.Never && _scrollbars.HasFlags(Scrollbars.Vertical);
-                    }
-                    else if (_autoResize == AutoResizeMode.ResizeY)
-                    {
-                        shouldActAsGroup = _horizontalScrollbar != ScrollbarVisibility.Never && _scrollbars.HasFlags(Scrollbars.Horizontal);
-                    }
-                    else
-                    {
-                        shouldActAsGroup = _scrollbars != Scrollbars.None && (_verticalScrollbar != ScrollbarVisibility.Never || _horizontalScrollbar != ScrollbarVisibility.Never);
-                    }
-                }
-
-                return shouldActAsGroup ? new LayoutBehaviour(true, true) : LayoutBehaviour.Default;
-            }
-        }
+        //public override LayoutBehaviour LayoutBehaviour
+        //{
+        //    get
+        //    {
+        //        bool shouldActAsGroup = false;
+        //        if (_autoResize != AutoResizeMode.ResizeXY)
+        //        {
+        //            if (_autoResize == AutoResizeMode.ResizeX)
+        //            {
+        //                shouldActAsGroup = _verticalScrollbar != ScrollbarVisibility.Never && _scrollbars.HasFlags(Scrollbars.Vertical);
+        //            }
+        //            else if (_autoResize == AutoResizeMode.ResizeY)
+        //            {
+        //                shouldActAsGroup = _horizontalScrollbar != ScrollbarVisibility.Never && _scrollbars.HasFlags(Scrollbars.Horizontal);
+        //            }
+        //            else
+        //            {
+        //                shouldActAsGroup = _scrollbars != Scrollbars.None && (_verticalScrollbar != ScrollbarVisibility.Never || _horizontalScrollbar != ScrollbarVisibility.Never);
+        //            }
+        //        }
+        //
+        //        return shouldActAsGroup ? new LayoutBehaviour(true, true) : LayoutBehaviour.Default;
+        //    }
+        //}
 
         #region Styleable
-        [Styled(nameof(_scrollbars), StateFlags.SelfInvalidLayout)] public Scrollbars Scrollbars { get => _scrollbars; set => SetStyledField(value); }
+        public Scrollbars Scrollbars { get => _scrollbars; set => SetStyledField(value); }
 
-        [Styled(nameof(_verticalScrollbar), StateFlags.SelfInvalidLayout)] public ScrollbarVisibility VerticalScrollbar { get => _verticalScrollbar; set => SetStyledField(value); }
-        [Styled(nameof(_horizontalScrollbar), StateFlags.SelfInvalidLayout)] public ScrollbarVisibility HorizontalScrollbar { get => _horizontalScrollbar; set => SetStyledField(value); }
+        public ScrollbarVisibility VerticalScrollbar { get => _verticalScrollbar; set => SetStyledField(value); }
+        public ScrollbarVisibility HorizontalScrollbar { get => _horizontalScrollbar; set => SetStyledField(value); }
 
-        [Styled(nameof(_scrollbarWidth), StateFlags.SelfInvalidLayout)] public float ScrollbarWidth { get => _scrollbarWidth; set => SetStyledField(value); }
+        public float ScrollbarWidth { get => _scrollbarWidth; set => SetStyledField(value); }
 
-        [Styled(nameof(_scrollbarBackgroundColor))] public UIColor ScrollbarBackgroundColor { get => _scrollbarBackgroundColor; set => SetStyledField(value); }
+        public UIColor ScrollbarBackgroundColor { get => _scrollbarBackgroundColor; set => SetStyledField(value); }
         #endregion
     }
 

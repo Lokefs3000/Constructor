@@ -1,4 +1,5 @@
-﻿using Primary.Components;
+﻿using Primary.Collections.ReadOnly;
+using Primary.Components;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -97,6 +98,8 @@ namespace Primary.Scenes.Components
                 currentGraph.ConnectionsList.Add(new ComponentConnection(required.Type, ConnectionType.Connected));
             }
         }
+
+        public RODictionary<Type, ComponentDependency> Dependencies => _dependencies;
     }
 
     public readonly record struct ComponentDependency
@@ -111,7 +114,7 @@ namespace Primary.Scenes.Components
         }
 
         public Assembly SourceAssembly => _sourceAssembly;
-        public IReadOnlyList<ComponentConnection> Connections => _connections;
+        public ROList<ComponentConnection> Connections => _connections;
 
         internal List<ComponentConnection> ConnectionsList => _connections;
     }

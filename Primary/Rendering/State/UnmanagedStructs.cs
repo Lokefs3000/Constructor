@@ -21,18 +21,21 @@ namespace Primary.Rendering.State
         public static readonly CmdDataResource NullBuffer = new CmdDataResource(CmdResourceType.Buffer, false, (nint)nuint.MaxValue);
         public static readonly CmdDataResource NullTexture = new CmdDataResource(CmdResourceType.Texture, false, (nint)nuint.MaxValue);
         public static readonly CmdDataResource NullSampler = new CmdDataResource(CmdResourceType.Sampler, false, (nint)nuint.MaxValue);
+        public static readonly CmdDataResource NullReadback = new CmdDataResource(CmdResourceType.Readback, false, (nint)nuint.MaxValue);
 
         public static unsafe implicit operator CmdDataResource(FrameGraphBuffer buffer) => new CmdDataResource(CmdResourceType.Buffer, buffer.IsExternal, buffer.IsExternal ? (nint)Unsafe.As<RHIBuffer>(buffer.Resource!).GetAsNative() : buffer.Index);
         public static unsafe implicit operator CmdDataResource(FrameGraphTexture texture) => new CmdDataResource(CmdResourceType.Texture, texture.IsExternal, texture.IsExternal ? (nint)Unsafe.As<RHITexture>(texture.Resource!).GetAsNative() : texture.Index);
         public static unsafe implicit operator CmdDataResource(RHISampler sampler) => new CmdDataResource(CmdResourceType.Sampler, true, (nint)sampler.GetAsNative());
         public static unsafe implicit operator CmdDataResource(FrameGraphResource resource) => resource.ResourceId == FGResourceId.Texture ? resource.AsTexture() : resource.AsBuffer();
+        public static unsafe implicit operator CmdDataResource(RHIReadback readback) => new CmdDataResource(CmdResourceType.Readback, true, (nint)readback.GetAsNative());
     }
 
     internal enum CmdResourceType : byte
     {
         Buffer = 0,
         Texture,
-        Sampler
+        Sampler,
+        Readback
     }
 
     internal struct CmdSetRenderTarget
@@ -134,6 +137,7 @@ namespace Primary.Rendering.State
 
     internal struct CmdSetConstants
     {
+        public ushort DataOffset;
         public int DataSize;
         public nint DataPointer;
     }

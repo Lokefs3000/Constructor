@@ -72,6 +72,8 @@ namespace Primary.Rendering.D3D12
         private Queue<RHISwapChain> _awaitingPresents;
         private HashSet<D3D12RHISwapChain> _activeSwapChains;
 
+        private HashSet<Ptr<D3D12RHIReadbackNative>> _pendingReadbacks;
+
         private bool _hasPixAvailable;
 
         private bool _disposedValue;
@@ -123,6 +125,8 @@ namespace Primary.Rendering.D3D12
 
             _awaitingPresents = new Queue<RHISwapChain>();
             _activeSwapChains = new HashSet<D3D12RHISwapChain>();
+
+            _pendingReadbacks = new HashSet<Ptr<D3D12RHIReadbackNative>>();
 
             _hasPixAvailable = CheckForPIXBinaries();
         }
@@ -216,6 +220,19 @@ namespace Primary.Rendering.D3D12
                 }
             }
 
+            if (_pendingReadbacks.Count > 0)
+            {
+                using (new ProfilingScope("Readback"))
+                {
+                    foreach (Ptr<D3D12RHIReadbackNative> readback in _pendingReadbacks)
+                    {
+                        readback.Pointer->HasDataReady = true;
+                    }
+
+                    _pendingReadbacks.Clear();
+                }
+            }
+
             using (new ProfilingScope("GdUpdate"))
             {
                 _gd.HandlePendingUpdates();
@@ -257,6 +274,8 @@ namespace Primary.Rendering.D3D12
 
                 bool hasSwapChainRt = false;
                 int pixEventDepth = 0;
+
+                ID3D12RootSignature* currentRootSignature = null;
 
                 foreach (nint eventPtr in timeline.Events)
                 {
@@ -303,6 +322,7 @@ namespace Primary.Rendering.D3D12
                                 RestoreGraphicsCmdState(cmds.Cmds);
 
                             pixEventDepth = 0;
+                            currentRootSignature = null;
                         }
 
                         string currentPassName = manager.RenderPass.Passes[timeline.Passes[passIndex]].Name;
@@ -375,6 +395,14 @@ namespace Primary.Rendering.D3D12
                                             _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Buffer);
 
                                             cmds.Cmds.CopyBufferRegion(destinationNative, cmd.DestinationOffset, sourceNative, cmd.SourceOffset, cmd.NumBytes);
+
+                                            if (destinationResource.Id == NRDResourceId.Readback)
+                                            {
+                                                D3D12RHIReadbackNative* native = (D3D12RHIReadbackNative*)destinationResource.Native;
+
+                                                native->HasDataReady = false;
+                                                _pendingReadbacks.Add(native);
+                                            }
 
                                             break;
                                         }
@@ -465,7 +493,7 @@ namespace Primary.Rendering.D3D12
                                                 else
                                                     _barrierManager.AddTextureBarrier(sourceNative, BarrierSync.Copy, BarrierAccess.CopySource, BarrierLayout.CopySource);
 
-                                                if (destinationResource.Id == NRDResourceId.Buffer)
+                                                if (destinationResource.Id == NRDResourceId.Buffer || destinationResource.Id == NRDResourceId.Readback)
                                                     _barrierManager.AddBufferBarrier(destinationResource, BarrierSync.Copy, BarrierAccess.CopyDest);
                                                 else
                                                     _barrierManager.AddTextureBarrier(destinationResource, BarrierSync.Copy, BarrierAccess.CopyDest, BarrierLayout.CopyDest);
@@ -474,6 +502,14 @@ namespace Primary.Rendering.D3D12
                                             _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Buffer | BarrierFlushTypes.Texture);
 
                                             cmds.Cmds.CopyTextureRegion(&destinationCopyLocation, cmd.DstX, cmd.DstY, cmd.DstZ, &sourceCopyLocation, cmd.SourceBox.HasValue ? &box : null);
+
+                                            if (destinationResource.Id == NRDResourceId.Readback)
+                                            {
+                                                D3D12RHIReadbackNative* native = (D3D12RHIReadbackNative*)destinationResource.Native;
+
+                                                native->HasDataReady = false;
+                                                _pendingReadbacks.Add(native);
+                                            }
 
                                             break;
                                         }
@@ -493,6 +529,8 @@ namespace Primary.Rendering.D3D12
                                                 cmds.Cmds.SetPipelineState(pipelineState);
                                                 cmds.Cmds.SetGraphicsRootSignature((ID3D12RootSignature*)Unsafe.AsPointer(ref pipeline.RootSignature.Get()));
 
+                                                currentRootSignature = pipeline.RootSignature;
+
                                                 cmds.Cmds.IASetPrimitiveTopology(pipeline.Description.PrimitiveTopologyType switch
                                                 {
                                                     RHIPrimitiveTopologyType.Triangle => D3DPrimitiveTopology.D3DPrimitiveTopologyTrianglelist,
@@ -507,6 +545,8 @@ namespace Primary.Rendering.D3D12
 
                                                 cmds.Cmds.SetPipelineState(ref pipeline.PipelineState.Get());
                                                 cmds.Cmds.SetComputeRootSignature(ref pipeline.RootSignature.Get());
+
+                                                currentRootSignature = pipeline.RootSignature;
                                             }
 
                                             break;
@@ -521,6 +561,7 @@ namespace Primary.Rendering.D3D12
                                             _state.HeaderFlags = cmd.HeaderFlags;
                                             _state.AllocateInternalBuffers(cmd.DataSizeRequired, cmd.ConstantsSize);
 
+                                            resourceByteOffsetBackup = -1;
                                             break;
                                         }
                                     case RecCommandType.SetRawData:
@@ -549,7 +590,9 @@ namespace Primary.Rendering.D3D12
                                                     {
                                                         Debug.Assert(resourceByteOffsetBackup != -1);
                                                         byteOffset = resourceByteOffsetBackup;
-                                                        break;
+
+                                                        ChangeActiveHeap(listType, cmds.Cmds, currentRootSignature, _gpuHeap, _samplerHeap);
+                                                        goto case RecCommandType.SetResource;
                                                     }
 
                                                     *(uint*)(_state.ResourceData + cmd.DataOffset) = index;
@@ -569,7 +612,9 @@ namespace Primary.Rendering.D3D12
                                                     {
                                                         Debug.Assert(resourceByteOffsetBackup != -1);
                                                         byteOffset = resourceByteOffsetBackup;
-                                                        break;
+
+                                                        ChangeActiveHeap(listType, cmds.Cmds, currentRootSignature, _gpuHeap, _samplerHeap);
+                                                        goto case RecCommandType.SetResource;
                                                     }
 
                                                     *(uint*)(_state.ResourceData + cmd.DataOffset) = index;
@@ -580,9 +625,10 @@ namespace Primary.Rendering.D3D12
                                                     if (changedActiveHeap)
                                                     {
                                                         Debug.Assert(resourceByteOffsetBackup != -1);
-
                                                         byteOffset = resourceByteOffsetBackup;
-                                                        break;
+
+                                                        ChangeActiveHeap(listType, cmds.Cmds, currentRootSignature, _gpuHeap, _samplerHeap);
+                                                        goto case RecCommandType.SetResource;
                                                     }
 
                                                     if (resource.Id == NRDResourceId.Buffer)
@@ -600,6 +646,29 @@ namespace Primary.Rendering.D3D12
                                                 }
                                             }
 
+                                            static void ChangeActiveHeap(CommandListType listType, ID3D12GraphicsCommandList10* cmdList, ID3D12RootSignature* currentRootSignature, GpuDescriptorHeap gpuHeap, SamplerDescriptorHeap samplerHeap)
+                                            {
+                                                if (currentRootSignature != null)
+                                                {
+                                                    if (listType == CommandListType.Direct)
+                                                        cmdList->SetGraphicsRootSignature(null);
+                                                    else if (listType == CommandListType.Compute)
+                                                        cmdList->SetComputeRootSignature(null);
+
+                                                    SetHeapBundle bundle = new SetHeapBundle(gpuHeap.GetActiveHeapOrCreateNew(), samplerHeap.GetActiveHeapOrCreateNew());
+                                                    cmdList->SetDescriptorHeaps(2, (ID3D12DescriptorHeap**)&bundle);
+
+                                                    if (listType == CommandListType.Direct)
+                                                        cmdList->SetGraphicsRootSignature(currentRootSignature);
+                                                    else if (listType == CommandListType.Compute)
+                                                        cmdList->SetComputeRootSignature(currentRootSignature);
+                                                }
+                                                else
+                                                {
+                                                    SetHeapBundle bundle = new SetHeapBundle(gpuHeap.GetActiveHeapOrCreateNew(), samplerHeap.GetActiveHeapOrCreateNew());
+                                                    cmdList->SetDescriptorHeaps(2, (ID3D12DescriptorHeap**)&bundle);
+                                                }
+                                            }
                                             break;
                                         }
                                     case RecCommandType.SetConstants:
@@ -613,7 +682,7 @@ namespace Primary.Rendering.D3D12
                                             }
                                             else
                                             {
-                                                NativeMemory.Copy(cmd.DataPointer.ToPointer(), _state.ResourceData.ToPointer(), (nuint)cmd.DataSize);
+                                                NativeMemory.Copy(cmd.DataPointer.ToPointer(), (_state.ResourceData + cmd.DataOffset).ToPointer(), (nuint)cmd.DataSize);
                                             }
 
                                             break;
@@ -631,6 +700,9 @@ namespace Primary.Rendering.D3D12
                                                 }
                                                 else
                                                 {
+#if DEBUG
+                                                    Span<uint> debugViewSpan = new Span<uint>(_state.ResourceData.ToPointer(), _state.ResourceSize / sizeof(uint));
+#endif
                                                     cmds.Cmds.SetGraphicsRoot32BitConstants(0, (uint)(_state.ResourceSize / sizeof(uint)), _state.ResourceData.ToPointer(), 0);
                                                 }
                                             }
@@ -649,6 +721,7 @@ namespace Primary.Rendering.D3D12
                                                 }
                                             }
 
+                                            resourceByteOffsetBackup = -1;
                                             break;
                                         }
 
@@ -1195,7 +1268,7 @@ namespace Primary.Rendering.D3D12
 
         public NRDResourceInfo QueryTextureInfo(FrameGraphTexture texture, int offset, int size)
         {
-            ResourceDesc1 desc = ResourceManager.GetBufferDescription(this, size);
+            ResourceDesc1 desc = ResourceManager.GetTextureDescription(this, texture);
             ResourceAllocationInfo allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);
 
             return new NRDResourceInfo((int)allocInfo.SizeInBytes, (int)allocInfo.Alignment);

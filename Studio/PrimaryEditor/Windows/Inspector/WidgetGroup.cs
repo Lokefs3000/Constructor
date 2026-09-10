@@ -28,7 +28,7 @@ namespace PrimaryEditor.Windows.Inspector
         private readonly List<InspectorGroup> _groups;
         private readonly Dictionary<int, InspectorWidget> _widgets;
 
-        private readonly LayoutFrame _containerFrame;
+        private readonly ScrollView _containerFrame;
 
         private bool _disposedValue;
 
@@ -42,10 +42,9 @@ namespace PrimaryEditor.Windows.Inspector
             _groups = new List<InspectorGroup>();
             _widgets = new Dictionary<int, InspectorWidget>();
 
-            _containerFrame = new LayoutFrame
+            _containerFrame = new ScrollView
             {
-                Size = UIValue2.MaxX,
-                AutoResize = AutoResizeMode.ResizeY,
+                Width = UIValue.Max,
                 Scrollbars = Scrollbars.None
             };
 
@@ -207,7 +206,7 @@ namespace PrimaryEditor.Windows.Inspector
             }
         }
 
-        public LayoutFrame RootWidget => _containerFrame;
+        public Widget RootWidget => _containerFrame;
 
         private record struct ChildStack(IInspectorObject? Object, Widget Widget, int PreviousChildIndex);
     }

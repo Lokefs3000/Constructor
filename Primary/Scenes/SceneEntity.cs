@@ -64,6 +64,15 @@ namespace Primary.Scenes
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [UnscopedRef]
+        public bool HasComponent<T>() where T : struct, IComponent
+        {
+            if (IsNull)
+                throw new NullReferenceException();
+            return _entity.Has<T>();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [UnscopedRef]
         public IComponent? AddComponent(Type type)
         {
             if (IsNull)
@@ -97,6 +106,15 @@ namespace Primary.Scenes
                 throw new NullReferenceException();
 
             return SceneEntityManager.Instance.SetComponent(in _entity, type, value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [UnscopedRef]
+        public bool HasComponent(Type type)
+        {
+            if (IsNull)
+                throw new NullReferenceException();
+            return _entity.Has(type);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

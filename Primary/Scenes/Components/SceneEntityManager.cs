@@ -276,6 +276,9 @@ namespace Primary.Scenes.Components
             }
         }
 
+        public ComponentRegistry Registry => _registry;
+        public ComponentDependencyGraph DependencyGraph => _dependencyGraph;
+
         public static EntityEvents Events { get => Instance._events; set => Instance._events = value; }
 
         public static event Action<SceneEntity>? EntityRenamed;

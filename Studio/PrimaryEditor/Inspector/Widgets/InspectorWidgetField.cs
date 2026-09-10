@@ -22,7 +22,8 @@ namespace PrimaryEditor.Inspector.Widgets
             _displayLabel = new Label()
             {
                 Parent = _rootWidget,
-                Size = new UIValue2(0.5f, 1.0f),
+                Width = 0.5f,
+                Height = UIValue.Max
             };
 
             _rootWidget.TryAddClass("field-root");
@@ -46,15 +47,15 @@ namespace PrimaryEditor.Inspector.Widgets
 
             if (viewData != null)
             {
-                _rootWidget.Margin = new Vector4(0.0f, viewData.RelativeOffset.Y, 0.0f, 0.0f);
-                _displayLabel.Margin = new Vector4(viewData.RelativeOffset.X, 0.0f, 0.0f, 0.0f);
+                _rootWidget.Margin = new LayoutBox { Top = viewData.RelativeOffset.Y };
+                _displayLabel.Margin = new LayoutBox { Left = viewData.RelativeOffset.X };
 
                 _displayLabel.Text = viewData.DisplayName;
             }
             else
             {
-                _rootWidget.Margin = Vector4.Zero;
-                _displayLabel.Margin = Vector4.Zero;
+                _rootWidget.Margin = LayoutBox.Null;
+                _displayLabel.Margin = LayoutBox.Null;
 
                 _displayLabel.Text = null;
             }

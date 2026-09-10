@@ -73,15 +73,26 @@ namespace PrimaryEditor.Inspector.Values
 
             _value = Unsafe.As<T1, T>(ref value);
             _hasModifiedValue = true;
+
+            if (_parentObject?.TargetType.IsValueType ?? false)
+                _parentObject.UpdateSelf();
         }
 
         public void SetObject<T1>(T1? value) where T1 : class
         {
-            if (!typeof(T).IsClass)
+            if (!typeof(T).IsClass && !typeof(T).IsInterface)
                 throw new InvalidOperationException();
 
             _value = Unsafe.As<T1?, T?>(ref value);
             _hasModifiedValue = true;
+        }
+
+        public void UpdateSelf()
+        {
+            _hasModifiedValue = true;
+
+            if (_parentObject?.TargetType.IsValueType ?? false)
+                _parentObject.UpdateSelf();
         }
 
         public Type TargetType => typeof(T);

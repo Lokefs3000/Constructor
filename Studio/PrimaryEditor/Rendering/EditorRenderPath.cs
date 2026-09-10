@@ -11,7 +11,7 @@ namespace PrimaryEditor.Rendering
 {
     public sealed class EditorRenderPath : IRenderPath
     {
-        public void PreRenderPassSetup(RenderingManager manager)
+        public void PreRenderPassSetup(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
         {
 
         }

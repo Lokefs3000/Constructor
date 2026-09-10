@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Primary.Windowing;
 using TerraFX.Interop;
 using TerraFX.Interop.Windows;
 
@@ -6,18 +7,18 @@ namespace Primary.IO
 {
     public static unsafe class FileDialog
     {
-        public static OpenFileDialogResult OpenFile(OpenFileDialogParams @params)
+        public static OpenFileDialogResult OpenFile(OpenFileDialogParams @params, Window? window = null)
         {
             if (OperatingSystem.IsWindows())
-                return Win32Impl.OpenFile(@params);
+                return Win32Impl.OpenFile(@params, window);
 
             throw new NotImplementedException();
         }
 
-        public static SaveFileDialogResult SaveFile(SaveFileDialogParams @params)
+        public static SaveFileDialogResult SaveFile(SaveFileDialogParams @params, Window? window = null)
         {
             if (OperatingSystem.IsWindows())
-                return Win32Impl.SaveFile(@params);
+                return Win32Impl.SaveFile(@params, window);
 
             throw new NotImplementedException();
         }
@@ -25,7 +26,7 @@ namespace Primary.IO
         private static class Win32Impl
         {
 #pragma warning disable CA1416 // Validate platform compatibility
-            private static TRet TrySetupDefaultDialog<TRet, TType>(DefaultDialogParams @params, TRet defaultRet, FileDialogCallback<TRet, TType> callback, FileDialogCancel<TRet> cancel) where TRet : allows ref struct where TType : unmanaged, INativeGuid
+            private static TRet TrySetupDefaultDialog<TRet, TType>(Window? window, DefaultDialogParams @params, TRet defaultRet, FileDialogCallback<TRet, TType> callback, FileDialogCancel<TRet> cancel) where TRet : allows ref struct where TType : unmanaged, INativeGuid
             {
                 if (@params.Filters.IsEmpty)
                 {
@@ -110,7 +111,7 @@ namespace Primary.IO
                                     CoFreeString(ptr);
                                 }
 
-                                HRESULT hr = rootDialog->Show(HWND.NULL);
+                                HRESULT hr = rootDialog->Show(window == null ? HWND.NULL : (HWND)window.NativeWindowHandle);
                                 if (hr.SUCCEEDED)
                                 {
                                     defaultRet = callback(pfd.Pointer);
@@ -135,13 +136,13 @@ namespace Primary.IO
                 return defaultRet;
             }
 
-            public static OpenFileDialogResult OpenFile(OpenFileDialogParams @params)
+            public static OpenFileDialogResult OpenFile(OpenFileDialogParams @params, Window? window)
             {
                 Debug.Assert(OperatingSystem.IsWindows());
 
                 bool hasMultiSelect = @params.AllowMultiSelect;
 
-                return TrySetupDefaultDialog<OpenFileDialogResult, IFileOpenDialog>(new DefaultDialogParams(@params), new OpenFileDialogResult(FileDialogResult.Error, ReadOnlySpan<string>.Empty), (x) =>
+                return TrySetupDefaultDialog<OpenFileDialogResult, IFileOpenDialog>(window, new DefaultDialogParams(@params), new OpenFileDialogResult(FileDialogResult.Error, ReadOnlySpan<string>.Empty), (x) =>
                 {
                     ReadOnlySpan<string> mem = ReadOnlySpan<string>.Empty;
 
@@ -199,11 +200,11 @@ namespace Primary.IO
                 }, () => new OpenFileDialogResult(FileDialogResult.Cancel, ReadOnlySpan<string>.Empty));
             }
 
-            public static SaveFileDialogResult SaveFile(SaveFileDialogParams @params)
+            public static SaveFileDialogResult SaveFile(SaveFileDialogParams @params, Window? window)
             {
                 Debug.Assert(OperatingSystem.IsWindows());
 
-                return TrySetupDefaultDialog<SaveFileDialogResult, IFileSaveDialog>(new DefaultDialogParams(@params), new SaveFileDialogResult(FileDialogResult.Error, string.Empty), (x) =>
+                return TrySetupDefaultDialog<SaveFileDialogResult, IFileSaveDialog>(window, new DefaultDialogParams(@params), new SaveFileDialogResult(FileDialogResult.Error, string.Empty), (x) =>
                 {
                     string mem = string.Empty;
 

@@ -113,10 +113,10 @@ namespace PrimaryEditor.UI.Diagnostics
 
                 painter.AddRectangle(widget.ComputedRect, new Paint(Color.TransparentBlack, Color.Maroon, 1));
 
-                if (widget.Margin != Vector4.Zero)
-                    painter.AddRectangle(new Boundaries(widget.ComputedRect.Minimum - widget.Margin.GetLower(), widget.ComputedRect.Maximum + widget.Margin.GetUpper()), new Paint(Color.TransparentBlack, Color.Blue, 1));
-                if (widget.Padding != Vector4.Zero)
-                    painter.AddRectangle(new Boundaries(widget.ComputedRect.Minimum + widget.Padding.GetLower(), widget.ComputedRect.Maximum - widget.Padding.GetUpper()), new Paint(Color.TransparentBlack, Color.ForestGreen, 1));
+                //if (widget.Margin != Vector4.Zero)
+                //    painter.AddRectangle(new Boundaries(widget.ComputedRect.Minimum - widget.Margin.GetLower(), widget.ComputedRect.Maximum + widget.Margin.GetUpper()), new Paint(Color.TransparentBlack, Color.Blue, 1));
+                //if (widget.Padding != Vector4.Zero)
+                //    painter.AddRectangle(new Boundaries(widget.ComputedRect.Minimum + widget.Padding.GetLower(), widget.ComputedRect.Maximum - widget.Padding.GetUpper()), new Paint(Color.TransparentBlack, Color.ForestGreen, 1));
 
                 foreach (Widget child in widget.Children)
                 {

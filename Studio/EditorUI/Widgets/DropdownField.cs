@@ -35,18 +35,18 @@ namespace EditorUI.Widgets
 
         private DropdownMenuHost? _currentVisibleMenu;
 
-        protected IAssetProvider<FontFamily>? _fontFamily;
-        protected FontStyle _fontStyle;
-        protected FontWeight _fontWeight;
+        [StyleInclude] protected IAssetProvider<FontFamily>? _fontFamily;
+        [StyleInclude] protected FontStyle _fontStyle;
+        [StyleInclude] protected FontWeight _fontWeight;
 
-        protected float _fontSize;
+        [StyleInclude] protected float _fontSize;
 
-        protected bool _allowRichText;
+        [StyleInclude] protected bool _allowRichText;
 
-        protected UIColor _textColor;
+        [StyleInclude] protected UIColor _textColor;
 
-        protected Vector4 _innerPadding;
-        protected Boundaries _innerBoundaries;
+        [StyleInclude] protected Vector4 _innerPadding;
+        [StyleInclude] protected Boundaries _innerBoundaries;
 
         protected List<string> _options;
         protected int _index;
@@ -89,32 +89,32 @@ namespace EditorUI.Widgets
             base.DestroySelf();
         }
 
-        protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
-        {
-            base.MeasureSelf(in context);
+        // protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
+        // {
+        //     base.MeasureSelf(in context);
+        // 
+        //     if (_fontFamily != null && !_fontFamily.IsReadyToUse)
+        //     {
+        //         return MeasureStatus.MissingPendingData;
+        //     }
+        // 
+        //     return MeasureStatus.Success;
+        // }
 
-            if (_fontFamily != null && !_fontFamily.IsReadyToUse)
-            {
-                return MeasureStatus.MissingPendingData;
-            }
-
-            return MeasureStatus.Success;
-        }
-
-        protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
-        {
-            _textExtents = Vector2.Max(Vector2.Zero, _layoutState.IdealSize - _innerPadding.GetLower() - _innerPadding.GetUpper());
-
-            if (_fontFamily != null && _fontFamily.IsReadyToUse && (_lastIdealSize != _textExtents || _hasBadShapingData))
-            {
-                SetIdealSizeFor();
-                _hasBadShapingData = false;
-                _lastIdealSize = _textExtents;
-            }
-
-            base.LayoutSelf(in context);
-            return LayoutReturnData.Success;
-        }
+        // protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
+        // {
+        //     _textExtents = Vector2.Max(Vector2.Zero, _layoutState.IdealSize - _innerPadding.GetLower() - _innerPadding.GetUpper());
+        // 
+        //     if (_fontFamily != null && _fontFamily.IsReadyToUse && (_lastIdealSize != _textExtents || _hasBadShapingData))
+        //     {
+        //         SetIdealSizeFor();
+        //         _hasBadShapingData = false;
+        //         _lastIdealSize = _textExtents;
+        //     }
+        // 
+        //     base.LayoutSelf(in context);
+        //     return LayoutReturnData.Success;
+        // }
 
         protected internal override void AfterComputedRectSelf()
         {
@@ -197,8 +197,7 @@ namespace EditorUI.Widgets
             }
         }
 
-        [StyleUpdateCallback(nameof(FontFamily), nameof(FontStyle), nameof(FontWeight), nameof(FontSize), nameof(AllowRichText),
-            nameof(AutoResize), nameof(Size))]
+        [StyleUpdateCallback(nameof(FontFamily), nameof(FontStyle), nameof(FontWeight), nameof(FontSize), nameof(AllowRichText))]
         private void InvalidateCurrentTextData()
         {
             _hasBadShapingData = true;
@@ -312,15 +311,15 @@ namespace EditorUI.Widgets
         }
 
         #region Serializable
-        [Styled(nameof(_fontFamily))] public IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
-        [Styled(nameof(_fontStyle))] public FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
-        [Styled(nameof(_fontWeight))] public FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
+        public IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
+        public FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
+        public FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
 
-        [Styled(nameof(_fontSize))] public float FontSize { get => _fontSize; set => SetStyledField(value); }
+        public float FontSize { get => _fontSize; set => SetStyledField(value); }
 
-        [Styled(nameof(_allowRichText))] public bool AllowRichText { get => _allowRichText; set => SetStyledField(value); }
+        public bool AllowRichText { get => _allowRichText; set => SetStyledField(value); }
 
-        [Styled(nameof(_textColor))] public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
+        public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
         #endregion
     }
 }

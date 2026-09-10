@@ -130,6 +130,8 @@ namespace Primary.Input.Devices
 
         public Int2 GlobalMousePosition => _globalMousePosition;
 
+        public event Action<Vector2>? OnMouseMotion;
+
         public static MouseButton TranslateButton(SDLButton button) => button switch
         {
             SDLButton.SDL_BUTTON_LEFT => MouseButton.Left,

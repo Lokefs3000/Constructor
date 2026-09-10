@@ -6,6 +6,7 @@ using System.Text.Json;
 using CommunityToolkit.HighPerformance;
 using Editor.Processors.Texture;
 using Editor.Shaders;
+using Primary.Assets;
 using Primary.Assets.Loaders;
 using Primary.Assets.Types;
 using Primary.Collections;
@@ -16,57 +17,30 @@ using PrimaryEditor.Assets.Utility;
 using PrimaryEditor.Processors.Shader;
 using PrimaryEditor.Project;
 using Tomlyn;
+using Tomlyn.Serialization;
 using ShaderProcessor = PrimaryEditor.Processors.Shader.ShaderProcessor;
 
 namespace PrimaryEditor.Assets.Importers
 {
     public sealed class ShaderImporter : IAssetImporter
     {
-        public void ImportFile(AssetPipeline pipeline, AssetId id, Stream inputStream, Stream outputStream, string localPath, string localOutputPath, bool isTrialImport)
+        public void ImportFile(in ImportContext context)
         {
-            pipeline.FilesystemManager.SetFileRemap(localPath, null);
+            ShaderConfiguration config = context.GetAssetConfiguration<ShaderConfiguration>();
 
-            string? configFile = pipeline.Configuration.GetLocalConfigPath(localPath);
-            if (configFile == null)
-            {
-                pipeline.ReportImportAsIgnored(id, this);
-                throw new AssetIgnoredException();
-            }
-
-            string? sourceText = FilesystemManager.ReadAllText(configFile);
-            if (sourceText == null)
-            {
-                EdLog.Assets.Error("[{file}]: Failed to read shader configuration", localPath);
-                throw new AssetImportException();
-            }
-
-            ShaderConfiguration config;
-            try
-            {
-                config = TomlSerializer.Deserialize<ShaderConfiguration>(sourceText, s_tomlOptions)!;
-            }
-            catch (TomlException ex)
-            {
-                if (isTrialImport)
-                    throw new AssetIgnoredException();
-
-                EdLog.Assets.Error(ex, "[{file}]: Error occured parsing shader configuration", localPath);
-                throw new AssetImportException();
-            }
-
-            config.DefaultId = id;
-            config.IdProvider = pipeline.AssetRegistry;
+            config.DefaultId = context.Id;
+            config.IdProvider = context.Pipeline.AssetRegistry;
 
             config.IncludeDirectories = [
-                Path.GetDirectoryName(FilesystemManager.GetFullPath(localPath)!)!,
-                .. pipeline.FilesystemManager.Filesystems
+                Path.GetDirectoryName(FilesystemManager.GetFullPath(context.LocalPath)!)!,
+                .. context.Pipeline.FilesystemManager.Filesystems
                     .Where(static (x) => x is ContentFilesystem)
                     .Select(static (x) => Path.GetDirectoryName(x.WorkingDirectory) ?? x.WorkingDirectory)];
 
             ShaderProcesserResult result;
             try
             {
-                result = ShaderProcessor.Execute(config, ShaderCompileTarget.Direct3D12, outputStream);
+                result = ShaderProcessor.Execute(config, ShaderCompileTarget.Direct3D12, context.OutputStream);
             }
             catch (Exception ex)
             {
@@ -74,45 +48,17 @@ namespace PrimaryEditor.Assets.Importers
                 throw new AssetLoadException();
             }
 
-            if (result.IncludedFiles.Length == 0)
+            foreach (string includedFile in result.IncludedFiles)
             {
-                pipeline.Associator.ClearAssociations(id);
-            }
-            else
-            {
-                using RentedList<AssetId> includedFileIds = new RentedList<AssetId>();
-                foreach (string includedFile in result.IncludedFiles)
+                if (FilesystemManager.TryGetLocalPath(includedFile, out string? includeLocalPath))
                 {
-                    if (FilesystemManager.TryGetLocalPath(includedFile, out string? includeLocalPath))
-                    {
-                        includedFileIds.Add(pipeline.GetOrRegisterIdForPath(includeLocalPath));
-                    }
+                    context.AddDependency(context.Pipeline.GetOrRegisterIdForPath(includeLocalPath));
                 }
-
-                pipeline.Associator.MakeAssociations(id, includedFileIds.AsSpan(), true);
             }
-
-            pipeline.FilesystemManager.SetFileRemap(localPath, localOutputPath);
-            pipeline.ReloadAsset(id);
-        }
-
-        public void PreloadFile(AssetPipeline pipeline, AssetId id)
-        {
-            throw new NotImplementedException();
         }
 
         public bool ValidateFile(AssetPipeline pipeline, AssetId id, string localPath)
         {
-            string? configFile = pipeline.Configuration.GetConfigPath(localPath);
-            if (configFile == null)
-                return false;
-
-            string? sourceFile = FilesystemManager.ReadAllText(configFile);
-            if (sourceFile == null)
-                return false;
-            if (!TomlSerializer.TryDeserialize<ShaderConfiguration>(sourceFile, out _, s_tomlOptions))
-                return false;
-
             using Stream? stream = FilesystemManager.OpenStream(localPath);
 
             if (stream == null || stream.Length < Unsafe.SizeOf<SBCHeader>())
@@ -127,11 +73,17 @@ namespace PrimaryEditor.Assets.Importers
         }
 
         public string UniqueId => "shader";
+        public Type AssetDefinitionType => typeof(ShaderAsset);
+
+        public string? DefaultConfigName => "DefaultConfig_Shader.toml";
+        public Type? ConfigType => typeof(ShaderConfiguration);
+
+        public TomlConverter[] Converters => [];
 
         private static readonly TomlSerializerOptions s_tomlOptions = new TomlSerializerOptions
         {
             Converters = [
-                new EarlyAssetIdTomlConverter()
+                new EarlyFileIdTomlConverter()
                 ],
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         };

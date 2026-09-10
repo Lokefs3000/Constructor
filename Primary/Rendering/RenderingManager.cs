@@ -7,7 +7,7 @@ using Primary.Rendering.Assets;
 using Primary.Rendering.Batching;
 using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
-using Primary.Rendering.Debuggable;
+using Primary.Rendering.Diagnostics;
 using Primary.Rendering.NRD;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
@@ -70,6 +70,8 @@ namespace Primary.Rendering
             _finalBlitSwapChainPB = new PropertyBlock(_finalBlitSwapChain);
 
             _renderedWindows = new HashSet<Window>();
+
+            _debugManager.TrySetupAfterRenderInit(this);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -177,6 +179,8 @@ namespace Primary.Rendering
                 _renderPassManager.ClearInternals();
                 _globalsManager.CleanupTransitional();
 
+                _debugManager.FinishCurrentRender();
+
                 _renderedWindows.Clear();
             }
         }
@@ -193,7 +197,7 @@ namespace Primary.Rendering
 
                 SetupContextForOutput(outputData, out RenderContextContainer context);
 
-                _currentPath?.PreRenderPassSetup(this);
+                _currentPath?.PreRenderPassSetup(this, _renderPassManager.RenderPass.Blackboard, context);
                 _renderPassManager.SetupPasses(RenderPassRunContext.PerCamera, context);
 
                 if (_renderPassManager.RenderPass.Passes.Length > previousPassCount)
@@ -371,11 +375,6 @@ namespace Primary.Rendering
                 Texture = FrameGraphTexture.Invalid;
                 Source = FrameGraphTexture.Invalid;
             }
-        }
-
-        public void RenderDebug(Debuggable.IDebugRenderer renderer)
-        {
-            OctreeVisualizer.Visualize(_octreeManager, renderer);
         }
 
         public RHIDevice GraphicsDevice => _graphicsDevice;

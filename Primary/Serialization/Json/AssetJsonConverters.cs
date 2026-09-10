@@ -18,16 +18,8 @@ namespace Primary.Serialization.Json
             if (reader.TokenType == JsonTokenType.Null)
                 return null;
 
-            if (reader.TokenType != JsonTokenType.String)
-                throw new JsonException();
-
-            IAssetDefinition asset;
-            if (Guid.TryParse(reader.ValueSpan, out Guid guid))
-                asset = (IAssetDefinition)AssetManager.LoadAsset(typeToConvert, (AssetId)guid);
-            else
-                asset = (IAssetDefinition)AssetManager.LoadAsset(typeToConvert, reader.GetString());
-
-            return asset;
+            AssetId id = s_idJsonConverter.Read(ref reader, typeof(AssetId), options);
+            return (IAssetDefinition)AssetManager.LoadAsset(typeToConvert, id);
         }
 
         public override void Write(Utf8JsonWriter writer, IAssetDefinition value, JsonSerializerOptions options)
@@ -41,5 +33,7 @@ namespace Primary.Serialization.Json
         }
 
         public static readonly AssetJsonConverter Default = new AssetJsonConverter();
+
+        private static readonly AssetIdJsonConverter s_idJsonConverter = new AssetIdJsonConverter();
     }
 }

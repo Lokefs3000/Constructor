@@ -15,6 +15,7 @@ using TerraFX.Interop.Windows;
 
 namespace EditorUI.Popup.Menu
 {
+    [TriggerValues("is-hovered", "is-active")]
     public sealed class PopupMenuAction : PopupMenuItem
     {
         private readonly PopupMenu _owningMenu;
@@ -26,8 +27,8 @@ namespace EditorUI.Popup.Menu
 
         private TextShapingData? _shapingData;
 
-        private UIColor _backgroundColor;
-        private UIColor _textColor;
+        [StyleInclude] private UIColor _backgroundColor;
+        [StyleInclude] private UIColor _textColor;
 
         private bool _isHovered;
         private bool _isHeld;
@@ -91,30 +92,24 @@ namespace EditorUI.Popup.Menu
             {
                 case UIInputEventType.MouseEnter:
                     {
-                        _isHovered = true;
-                        SetEditedField(true, nameof(IsHovered));
-
+                        SetTriggerValue("is-hovered", true);
                         _owningMenu.BeginItemHover(this);
                         return true;
                     }
                 case UIInputEventType.MouseLeave:
                     {
-                        _isHovered = false;
-                        SetEditedField(false, nameof(IsHovered));
-
+                        SetTriggerValue("is-hovered", false);
                         _owningMenu.EndItemHover(this);
                         return true;
                     }
                 case UIInputEventType.MouseDown:
                     {
-                        _isHeld = true;
-                        SetEditedField(true, nameof(IsHeld));
+                        SetTriggerValue("is-held", true);
                         return true;
                     }
                 case UIInputEventType.MouseUp:
                     {
-                        _isHeld = false;
-                        SetEditedField(false, nameof(IsHeld));
+                        SetTriggerValue("is-held", false);
                         return true;
                     }
 
@@ -174,13 +169,10 @@ namespace EditorUI.Popup.Menu
         #endregion
 
         #region Serializable
-        [Styled(nameof(_backgroundColor))] public UIColor BackgroundColor { get => _backgroundColor; set => _backgroundColor = value; }
-        [Styled(nameof(_textColor))] public UIColor TextColor { get => _textColor; set => _textColor = value; }
-
-        [StyleTrigger, Styled(nameof(_isHovered), isEditable: true)]
+        public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
+        public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
+        
         public bool IsHovered { get => _isHovered; }
-
-        [StyleTrigger, Styled(nameof(_isHeld), isEditable: true)]
         public bool IsHeld { get => _isHeld; }
         #endregion
 

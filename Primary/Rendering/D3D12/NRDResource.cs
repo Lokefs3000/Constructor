@@ -45,10 +45,17 @@ namespace Primary.Rendering.D3D12
             Native = sampler;
         }
 
+        public NRDResource(D3D12RHIReadbackNative* readback)
+        {
+            EncId = NRDResourceId.Readback | NRDResourceId.External;
+            Native = readback;
+        }
+
         public ID3D12Resource2* GetNativeResource(ResourceManager resources) => Id switch
         {
             NRDResourceId.Buffer => IsExternal ? ((D3D12RHIBufferNative*)Native)->Resource : resources.GetResource(this),
             NRDResourceId.Texture => IsExternal ? ((D3D12RHITextureNative*)Native)->Resource : resources.GetResource(this),
+            NRDResourceId.Readback => ((D3D12RHIReadbackNative*)Native)->Resource,
             _ => throw new NullReferenceException()
         };
 
@@ -76,6 +83,7 @@ namespace Primary.Rendering.D3D12
         Buffer = 0,
         Texture,
         Sampler,
+        Readback,
 
         External = 1 << 7
     }

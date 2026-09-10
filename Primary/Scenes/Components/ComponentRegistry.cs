@@ -1,6 +1,7 @@
 ﻿using Arch.Core;
 using Arch.Core.Extensions;
 using CommunityToolkit.HighPerformance;
+using Primary.Collections.ReadOnly;
 using Primary.Components;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
@@ -49,7 +50,7 @@ namespace Primary.Scenes.Components
         /// <summary>Not thread-safe</summary>
         internal ref readonly ComponentRegistryEntry FindComponentEntry(Type type) => ref CollectionsMarshal.GetValueRefOrNullRef(_entries, type);
 
-        public IReadOnlyDictionary<Type, ComponentRegistryEntry> Entries => _entries;
+        public RODictionary<Type, ComponentRegistryEntry> Entries => _entries;
 
         private readonly record struct AssemblyList(HashSet<Type> Types);
     }
@@ -58,6 +59,8 @@ namespace Primary.Scenes.Components
     {
         public readonly Type Type;
         public readonly ComponentType NativeType;
+
+        public readonly ComponentBehaviour Behaviour;
 
         public readonly TryGetRef TryGetRefImpl;
         public readonly AddOrGet AddOrGetImpl;
@@ -68,6 +71,9 @@ namespace Primary.Scenes.Components
             Type = type;
             NativeType = nativeType;
 
+            ComponentUsageAttribute? usageAttribute = type.GetCustomAttribute<ComponentUsageAttribute>();
+            Behaviour = new ComponentBehaviour(usageAttribute?.CanBeAdded ?? true);
+
             TryGetRefImpl = tryGetRefImpl;
             AddOrGetImpl = addOrGetImpl;
             BoxImpl = boxImpl;
@@ -77,6 +83,8 @@ namespace Primary.Scenes.Components
         public delegate ref GenericComponent AddOrGet(ref readonly Entity entity);
         public delegate IComponent Box(ref GenericComponent component);
     }
+
+    public readonly record struct ComponentBehaviour(bool CanBeAdded);
 
     public readonly record struct GenericComponent : IComponent { }
 }

@@ -1,13 +1,7 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Security.Cryptography;
-using System.Text;
-using Primary.Assets.Types;
+﻿using System.Collections.Concurrent;
+using CommunityToolkit.HighPerformance;
 using Primary.Collections;
-using Primary.Common;
 using Primary.Console;
-using TerraFX.Interop.Windows;
 
 namespace PrimaryEditor.Assets.Filesystem
 {
@@ -22,11 +16,12 @@ namespace PrimaryEditor.Assets.Filesystem
         private readonly FilesystemStructure _structure;
 
         private Lock _lock;
+        private bool _isLockCurrentlyActive;
 
-        private DateTime _oldestEvent;
-        private DynamicCircularBuffer<TimedFileEvent> _timedFileEvents;
+        private DateTime _lastEventTime;
+        private List<FileEvent> _currentPendingFileEvents;
 
-        private ConcurrentDictionary<string, object?> _directories;
+        private ConcurrentDictionary<string, byte> _directories;
 
         private bool _disposedValue;
 
@@ -52,17 +47,18 @@ namespace PrimaryEditor.Assets.Filesystem
             _structure = new FilesystemStructure(namespaceKey);
 
             _lock = new Lock();
+            _isLockCurrentlyActive = false;
 
-            _oldestEvent = DateTime.MinValue;
-            _timedFileEvents = new DynamicCircularBuffer<TimedFileEvent>(16);
+            _lastEventTime = DateTime.MinValue;
+            _currentPendingFileEvents = new List<FileEvent>();
 
-            _directories = new ConcurrentDictionary<string, object?>();
+            _directories = new ConcurrentDictionary<string, byte>();
 
             foreach (string directoryName in Directory.GetDirectories(workingDirectory))
             {
                 if (TryGetLocalPath(directoryName, out string? localPath))
                 {
-                    _directories.TryAdd(localPath, null);
+                    _directories.TryAdd(localPath, 0);
                 }
                 else
                 {
@@ -72,8 +68,6 @@ namespace PrimaryEditor.Assets.Filesystem
 
             _watcher.Changed += OnFileChangedCallback;
             _watcher.Renamed += OnFileRenamedCallback;
-            _watcher.Created += OnFileCreatedCallback;
-            _watcher.Deleted += OnFileDeletedCallback;
         }
 
         private void Dispose(bool disposing)
@@ -200,117 +194,179 @@ namespace PrimaryEditor.Assets.Filesystem
             return null;
         }
 
+        private void TryPushNewFileEvent(string fullPath, string? newFullPath, FileEventType eventType)
+        {
+            if (!TryGetLocalPath(fullPath, out string? localPath))
+            {
+                EdLog.Assets.Warning("Failed to push filesystem event '{ev}' because no local path was found for '{p}'", eventType, fullPath);
+                return;
+            }
+
+            string? newLocalPath = null;
+            if (newFullPath != null)
+            {
+                if (!TryGetLocalPath(newFullPath, out newLocalPath))
+                {
+                    EdLog.Assets.Warning("Failed to push filesystem events '{ev}' because no local path was found for '{p}'", eventType, newFullPath);
+                    return;
+                }
+            }
+
+            bool isDirectory = Directory.Exists(newFullPath ?? fullPath);
+            if (isDirectory)
+            {
+                if (eventType == FileEventType.Renamed && newLocalPath != null)
+                {
+                    if (_directories.TryRemove(localPath, out _))
+                        _directories.TryAdd(newLocalPath, 0);
+                }
+                else
+                {
+                    _directories.TryAdd(localPath, 0);
+                }
+            }
+            else if (eventType == FileEventType.Deleted)
+            {
+                if (_directories.TryRemove(localPath, out _))
+                    isDirectory = true;
+            }
+
+            using (_lock.EnterScope())
+            {
+                _isLockCurrentlyActive = true;
+
+                _lastEventTime = DateTime.Now;
+
+                bool shouldPushNewEvent = true;
+                for (int i = _currentPendingFileEvents.Count - 1; i >= 0; i--)
+                {
+                    FileEvent currentEventData = _currentPendingFileEvents[i];
+                    if (currentEventData.LocalFilePath == localPath)
+                    {
+                        if (currentEventData.EventType == eventType)
+                        {
+                            shouldPushNewEvent = false;
+                            break;
+                        }
+
+                        switch (eventType)
+                        {
+                            case FileEventType.Created:
+                                {
+                                    if (currentEventData.EventType == FileEventType.Deleted)
+                                    {
+                                        _currentPendingFileEvents[i] = new FileEvent(
+                                            currentEventData.LocalFilePath,
+                                            localPath,
+                                            FileEventType.Moved,
+                                            isDirectory);
+
+                                        shouldPushNewEvent = false;
+                                    }
+                                    else if (currentEventData.EventType == FileEventType.Moved)
+                                    {
+                                        shouldPushNewEvent = false;
+                                    }
+
+                                    break;
+                                }
+                            case FileEventType.Deleted:
+                                {
+                                    if (currentEventData.EventType == FileEventType.Created)
+                                    {
+                                        _currentPendingFileEvents[i] = new FileEvent(
+                                            localPath,
+                                            currentEventData.LocalFilePath,
+                                            FileEventType.Moved,
+                                            isDirectory);
+
+                                        shouldPushNewEvent = false;
+                                    }
+                                    else if (currentEventData.EventType == FileEventType.Moved)
+                                    {
+                                        shouldPushNewEvent = false;
+                                    }
+
+                                    break;
+                                }
+                            case FileEventType.Renamed:
+                                {
+                                    if (currentEventData.LocalFilePath == newLocalPath && currentEventData.EventType == FileEventType.Moved)
+                                    {
+                                        shouldPushNewEvent = false;
+                                    }
+
+                                    break;
+                                }
+                        }
+
+                        if (!shouldPushNewEvent)
+                            break;
+                    }
+                }
+
+                if (shouldPushNewEvent)
+                {
+                    _currentPendingFileEvents.Add(new FileEvent(localPath, newLocalPath, eventType, isDirectory));
+                }
+
+                _isLockCurrentlyActive = false;
+            }
+        }
+
         private void OnFileChangedCallback(object sender, FileSystemEventArgs e)
         {
-            if (Directory.Exists(e.FullPath))
+            switch (e.ChangeType)
             {
-                return;
+                case WatcherChangeTypes.Created:
+                    {
+                        TryPushNewFileEvent(e.FullPath, null, FileEventType.Created);
+                        break;
+                    }
+                case WatcherChangeTypes.Deleted:
+                    {
+                        TryPushNewFileEvent(e.FullPath, null, FileEventType.Deleted);
+                        break;
+                    }
+                case WatcherChangeTypes.Changed:
+                    {
+                        TryPushNewFileEvent(e.FullPath, null, FileEventType.Changed);
+                        break;
+                    }
             }
-
-            if (!TryGetLocalPath(e.FullPath, out string? localPath))
-            {
-                EdLog.Assets.Warning("Failed to handle file changed callback because no local path was found for '{p}'", e.FullPath);
-                return;
-            }
-
-            using var lockScope = _lock.EnterScope();
-            _timedFileEvents.PushBack(new TimedFileEvent(DateTime.Now + TimeoutDuration, new FileEvent(localPath, null, FileEventType.Changed)));
         }
 
         private void OnFileRenamedCallback(object sender, RenamedEventArgs e)
         {
-            if (e.FullPath.EndsWith(".assetdat"))
+            if (e.FullPath.EndsWith(".assetdat") || e.OldFullPath.EndsWith(".assetdat"))
                 return;
 
-            if (!TryGetLocalPath(e.FullPath, out string? localPath))
-            {
-                EdLog.Assets.Warning("Failed to handle file renamed callback because no local path was found for '{p}'", e.FullPath);
-                return;
-            }
-
-            if (!TryGetLocalPath(e.OldFullPath, out string? oldLocalPath))
-            {
-                EdLog.Assets.Warning("Failed to handle file renamed callback because no local path was found for '{p}'", e.OldFullPath);
-                return;
-            }
-
-            using var lockScope = _lock.EnterScope();
-            _timedFileEvents.PushBack(new TimedFileEvent(DateTime.MinValue, new FileEvent(oldLocalPath, localPath, FileEventType.Renamed)));
+            TryPushNewFileEvent(e.OldFullPath, e.FullPath, FileEventType.Renamed);
         }
 
-        private void OnFileCreatedCallback(object sender, FileSystemEventArgs e)
+        internal void FlushPendingFileEvents(ref RentedList<FileEvent> fileEvents)
         {
-            if (e.FullPath.EndsWith(".assetdat"))
-                return;
-
-            if (!TryGetLocalPath(e.FullPath, out string? localPath))
+            if (_currentPendingFileEvents.Count > 0)
             {
-                EdLog.Assets.Warning("Failed to handle created file callback because no local path was found for '{p}'", e.FullPath);
-                return;
+                fileEvents.AddRange(_currentPendingFileEvents.AsSpan());
+                _currentPendingFileEvents.Clear();
             }
-
-            if (Directory.Exists(e.FullPath))
-            {
-                _directories.TryAdd(localPath, null);
-                return;
-            }
-
-            FileEvent eventData = new FileEvent(localPath, null, FileEventType.Created);
-            DateTime now = DateTime.Now;
-
-            using var lockScope = _lock.EnterScope();
-            _timedFileEvents.PushBack(new TimedFileEvent(DateTime.Now + TimeoutDuration, eventData));
-        }
-
-        private void OnFileDeletedCallback(object sender, FileSystemEventArgs e)
-        {
-            if (e.FullPath.EndsWith(".assetdat"))
-                return;
-
-            if (!TryGetLocalPath(e.FullPath, out string? localPath))
-            {
-                EdLog.Assets.Warning("Failed to handle deleted file callback because no local path was found for '{p}'", e.FullPath);
-                return;
-            }
-
-            if (_directories.TryRemove(localPath, out _))
-            {
-                return;
-            }
-
-            FileEvent eventData = new FileEvent(localPath, null, FileEventType.Deleted);
-            DateTime now = DateTime.Now;
-
-            using var lockScope = _lock.EnterScope();
-            _timedFileEvents.PushBack(new TimedFileEvent(now + TimeoutDuration, eventData));
-        }
-
-        internal bool TryPopFileEvent(out FileEvent fileEvent)
-        {
-            if (_timedFileEvents.TryGetFront(out TimedFileEvent timedFileEvent))
-            {
-                if (timedFileEvent.Timeout < DateTime.Now)
-                {
-                    fileEvent = timedFileEvent.EventData;
-
-                    _timedFileEvents.PopFront();
-                    return true;
-                }
-
-                _oldestEvent = timedFileEvent.Timeout;
-            }
-
-            fileEvent = default;
-            return false;
         }
 
         internal bool TryEnterLock()
         {
-            return _lock.TryEnter(0);
+            if (_lock.TryEnter(0))
+            {
+                _isLockCurrentlyActive = true;
+                return true;
+            }
+
+            return false;
         }
 
         internal void ExitLock()
         {
+            _isLockCurrentlyActive = false;
             _lock.Exit();
         }
 
@@ -319,21 +375,21 @@ namespace PrimaryEditor.Assets.Filesystem
 
         public FilesystemStructure Structure => _structure;
 
-        public bool AreFileUpdatesAvailable => !_timedFileEvents.IsEmpty && _oldestEvent < DateTime.Now;
-
-        private readonly record struct TimedFileEvent(DateTime Timeout, FileEvent EventData);
+        public bool AreFileUpdatesAvailable => _currentPendingFileEvents.Count > 0 && !_isLockCurrentlyActive;
+        public bool IsWithinTimeoutPeriod => DateTime.Now < _lastEventTime + TimeoutDuration;
 
         public static readonly ConsoleVar<TimeSpan> TimeoutDuration = new ConsoleVar<TimeSpan>(TimeSpan.FromSeconds(0.2));
     }
 
-    public readonly record struct FileEvent(string LocalFilePath, string? NewLocalFilePath, FileEventType EventType);
+    public readonly record struct FileEvent(string LocalFilePath, string? NewLocalFilePath, FileEventType EventType, bool IsDirectory);
 
+    [Flags]
     public enum FileEventType : byte
     {
-        Created = 0,
-        Deleted,
-        Renamed,
-        Changed,
-        Moved
+        Created = 1 << 0,
+        Deleted = 1 << 1,
+        Renamed = 1 << 2,
+        Changed = 1 << 3,
+        Moved = 1 << 4
     }
 }

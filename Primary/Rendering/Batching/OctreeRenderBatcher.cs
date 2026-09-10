@@ -2,7 +2,9 @@
 using Collections.Pooled;
 using CommunityToolkit.HighPerformance;
 using Primary.Assets;
+using Primary.Collections.ReadOnly;
 using Primary.Components;
+using Primary.Mathematics;
 using Primary.Profiling;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Statistics;
@@ -52,7 +54,7 @@ namespace Primary.Rendering.Batching
             _renderingData.Clear();
         }
 
-        internal void Execute(RenderList list, RegionOctree octree)
+        internal void Execute(RenderList list, RegionOctree octree, in Frustrum cullingFrustrum)
         {
             using (new ProfilingScope("BatchOctree"))
             {
@@ -61,12 +63,21 @@ namespace Primary.Rendering.Batching
                 _octants.Clear();
                 _octants.Enqueue(octree.RootOctant);
 
+                if (octree.Children.Count > 0)
+                {
+                    ++batchStats.RegionsIterated;
+                    BatchEntitiesWithinOctant(list, octree.Children.AsSpan(), in cullingFrustrum, ref batchStats);
+                }
+
                 while (_octants.TryDequeue(out RenderOctant? octant))
                 {
+                    if (!cullingFrustrum.Intersects(octant.Boundaries))
+                        continue;
+
                     if (octant.Children.Count > 0)
                     {
                         ++batchStats.OctantsTraversed;
-                        BatchEntitiesWithinOctant(list, octant, ref batchStats);
+                        BatchEntitiesWithinOctant(list, octant.Children.AsSpan(), in cullingFrustrum, ref batchStats);
                     }
 
                     foreach (RenderOctant subOctant in octant.Octants)
@@ -79,11 +90,10 @@ namespace Primary.Rendering.Batching
             }
         }
 
-        private void BatchEntitiesWithinOctant(RenderList list, RenderOctant octant, ref BatchStatistics batchStats)
+        private void BatchEntitiesWithinOctant(RenderList list, ReadOnlySpan<SceneEntity> entities, in Frustrum cullingFrustrum, ref BatchStatistics batchStats)
         {
             World world = Engine.GlobalSingleton.SceneManager.World;
 
-            ReadOnlySpan<SceneEntity> entities = octant.ChildrenList.AsSpan();
             for (int i = 0; i < entities.Length; i++)
             {
                 ref readonly SceneEntity entity = ref entities[i];
@@ -103,9 +113,8 @@ namespace Primary.Rendering.Batching
                     Debug.Assert(!Unsafe.IsNullRef(in bounds));
                     Debug.Assert(!Unsafe.IsNullRef(in transform));
 
-                    /*
-                        TODO: CULL OBJECT 
-                    */
+                    if (!cullingFrustrum.Intersects(bounds.ComputedBounds))
+                        continue;
 
                     MaterialAsset material = (renderer.Material == null || renderer.Material.Shader == null) ? list.DefaultMaterial! : renderer.Material;
                     ShaderAsset? shader = material.Shader;
@@ -113,7 +122,11 @@ namespace Primary.Rendering.Batching
                     if (shader == null)
                         continue;
 
-                    RawRenderMesh mesh = renderer.Mesh;
+                    IRawRenderMesh mesh = renderer.Mesh;
+                    IRenderMeshSource? meshSource = mesh.MeshSource;
+
+                    if (meshSource == null || !meshSource.IsLoaded)
+                        continue;
 
                     if (shader == null)
                     {
@@ -121,7 +134,7 @@ namespace Primary.Rendering.Batching
                         shader = list.DefaultMaterial!.Shader!;
                     }
 
-                    if (!shader.IsLoaded || !material.IsLoaded || !mesh.Source.IsLoaded)
+                    if (!shader.IsLoaded || !material.IsLoaded)
                         continue;
 
                     if (!_shaderSourceIndices.TryGetValue(shader, out ushort shaderId))
@@ -130,10 +143,10 @@ namespace Primary.Rendering.Batching
                         _shaderSourceIndices.Add(shader, shaderId);
                     }
 
-                    if (!_meshSourceIndices.TryGetValue(mesh.Source, out ushort modelId))
+                    if (!_meshSourceIndices.TryGetValue(meshSource, out ushort modelId))
                     {
-                        modelId = list.GetModelId(mesh.Source);
-                        _meshSourceIndices.Add(mesh.Source, modelId);
+                        modelId = list.GetModelId(meshSource);
+                        _meshSourceIndices.Add(meshSource, modelId);
                     }
 
                     if (!_materialSourceIndices.TryGetValue(material, out uint materialId))

@@ -1,6 +1,11 @@
 {
     "arguments": [
         {
+            "name": "core-minimal",
+            "shorthand": null,
+            "type": null
+        },
+        {
             "name": "r-force-swapchain-8bit",
             "shorthand": null,
             "type": null
@@ -34,6 +39,11 @@
             "name": "job-max-threads",
             "shorthand": null,
             "type": "Integer"
+        },
+        {
+            "name": "render-draw-gizmos",
+            "shorthand": null,
+            "type": null
         }
     ],
     "includes": []

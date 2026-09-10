@@ -11,7 +11,7 @@ namespace EditorUI.Widgets.Stylists
         private readonly Widget _parent;
         private bool _isDestroyed;
 
-        protected string? _id;
+        [StyleSetup(IsEditable = true)] protected string? _id;
 
         private StateFlags _stateFlags;
 
@@ -68,7 +68,7 @@ namespace EditorUI.Widgets.Stylists
         protected internal override StyledObject? ParentObject => _parent;
 
         #region Serializable
-        [Styled(nameof(_id), isEditable: true)] public string? Id { get => _id; set => SetEditedField(value); }
+        public string? Id { get => _id; set => SetEditedField(value); }
         #endregion
     }
 }

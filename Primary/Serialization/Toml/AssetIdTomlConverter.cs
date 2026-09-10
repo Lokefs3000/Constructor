@@ -1,8 +1,10 @@
-﻿using Primary.Assets;
-using Primary.Assets.Types;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.Json;
+using Primary.Assets;
+using Primary.Assets.Types;
+using Tomlyn;
 using Tomlyn.Serialization;
 
 namespace Primary.Serialization.Toml
@@ -15,18 +17,74 @@ namespace Primary.Serialization.Toml
 
         public override AssetId Read(TomlReader reader)
         {
-            string str = reader.GetString();
-            reader.Read();
+            if (reader.TokenType == TomlTokenType.StartArray)
+            {
+                reader.Read();
 
-            if (Guid.TryParse(str, out Guid result))
-                return new AssetId(result);
+                if (reader.TokenType != TomlTokenType.String)
+                    throw new TomlException("Expected GUID for asset id");
+
+                string guidName = reader.GetString();
+                if (!Guid.TryParse(guidName, out Guid guid))
+                {
+                    if (!Engine.GlobalSingleton.AssetManager.IdProvider.TryLookupIdForPath(guidName, out FileId fileId))
+                    {
+                        throw new TomlException("Failed to parse GUID");
+                    }
+
+                    guid = fileId.Guid;
+                }
+
+                reader.Read();
+
+                if (reader.TokenType != TomlTokenType.Integer)
+                    throw new TomlException("Expected number id for local id");
+                int localId = (int)reader.GetInt64();
+
+                reader.Read();
+
+                if (reader.TokenType != TomlTokenType.EndArray)
+                    throw new TomlException("Expected end of array for asset id");
+
+                return new AssetId((FileId)guid, localId);
+            }
+            else if (reader.TokenType == TomlTokenType.String)
+            {
+                if (reader.TokenType != TomlTokenType.String)
+                    throw new TomlException("Expected GUID for asset id");
+
+                string guidName = reader.GetString();
+                if (!Guid.TryParse(guidName, out Guid guid))
+                {
+                    if (!Engine.GlobalSingleton.AssetManager.IdProvider.TryLookupIdForPath(guidName, out FileId fileId))
+                    {
+                        throw new TomlException("Failed to parse GUID");
+                    }
+
+                    guid = fileId.Guid;
+                }
+
+                return new AssetId((FileId)guid, 0);
+            }
             else
-                return Engine.GlobalSingleton.AssetManager.IdProvider.TryLookupIdForPath(str, out AssetId assetId) ? assetId : AssetId.Invalid;
+            {
+                throw new TomlException("Expected either array or GUID for asset id");
+            }
         }
 
         public override void Write(TomlWriter writer, AssetId value)
         {
-            writer.WriteStringValue(value.ToString());
+            if (value.LocalId != AssetId.NoLocalId)
+            {
+                writer.WriteStartArray();
+                writer.WriteStringValue(value.FileId.Guid.ToString());
+                writer.WriteIntegerValue(value.LocalId);
+                writer.WriteEndArray();
+            }
+            else
+            {
+                writer.WriteStringValue(value.FileId.Guid.ToString());
+            }
         }
     }
 }

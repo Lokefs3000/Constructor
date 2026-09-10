@@ -24,7 +24,7 @@ namespace PrimaryEditor.UI.Serialization
             }
             else if (source.StartsWith("id(") && source[^1] == ')')
             {
-                AssetId assetId = new AssetId(Guid.Parse(source[3..^1], CultureInfo.InvariantCulture));
+                AssetId assetId = new AssetId((FileId)Guid.Parse(source[3..^1], CultureInfo.InvariantCulture), AssetId.NoLocalId);
 
                 TextureAsset asset = AssetManager.LoadAsset<TextureAsset>(assetId);
                 return asset.Status == ResourceStatus.Bad ? null : asset;

@@ -34,15 +34,15 @@ namespace EditorUI.Widgets
 
         private float _internalFullWidth;
 
-        protected float _indentSize;
-        protected float _nodeHeight;
+        [StyleInclude] protected float _indentSize;
+        [StyleInclude] protected float _nodeHeight;
 
-        protected ushort _activeStrokeWidth;
-        protected UIColor _activeStrokeColor;
-        protected Vector4 _activeCornerRadius;
+        [StyleInclude] protected ushort _activeStrokeWidth;
+        [StyleInclude] protected UIColor _activeStrokeColor;
+        [StyleInclude] protected Vector4 _activeCornerRadius;
 
-        protected UIColor _arrowColor;
-        protected float _arrowThickness;
+        [StyleInclude] protected UIColor _arrowColor;
+        [StyleInclude] protected float _arrowThickness;
 
         public TreeView()
         {
@@ -82,24 +82,24 @@ namespace EditorUI.Widgets
             base.DestroySelf();
         }
 
-        protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
-        {
-            base.MeasureSelf(in context);
+        // protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
+        // {
+        //     base.MeasureSelf(in context);
+        // 
+        //     Vector2 lastViewSize = _viewSize;
+        //     _maxNodeDepth = _childNodes.Count == 0 ? 0 : _childNodes.Max(static (x) => x.MaxNodeDepth);
+        //     _viewSize = new Vector2(_maxNodeDepth * _indentSize + _nodeHeight, _childNodes.Sum(static (x) => x.ShownNodeCount) * _nodeHeight);
+        // 
+        //     return lastViewSize != _viewSize ? MeasureStatus.DontCheckChanges : MeasureStatus.Success;
+        // }
 
-            Vector2 lastViewSize = _viewSize;
-            _maxNodeDepth = _childNodes.Count == 0 ? 0 : _childNodes.Max(static (x) => x.MaxNodeDepth);
-            _viewSize = new Vector2(_maxNodeDepth * _indentSize + _nodeHeight, _childNodes.Sum(static (x) => x.ShownNodeCount) * _nodeHeight);
-
-            return lastViewSize != _viewSize ? MeasureStatus.DontCheckChanges : MeasureStatus.Success;
-        }
-
-        protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
-        {
-            base.LayoutSelf(in context);
-
-            _internalFullWidth = Math.Max(_maxNodeDepth * _indentSize + _nodeHeight, _layoutState.ContentSize.X - _nodeHeight - 2.0f);
-            return LayoutReturnData.Success;
-        }
+        // protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
+        // {
+        //     base.LayoutSelf(in context);
+        // 
+        //     _internalFullWidth = Math.Max(_maxNodeDepth * _indentSize + _nodeHeight, _layoutState.ContentSize.X - _nodeHeight - 2.0f);
+        //     return LayoutReturnData.Success;
+        // }
 
         protected internal override void PaintSelf(ref PainterContext painter)
         {
@@ -668,12 +668,12 @@ namespace EditorUI.Widgets
         public ROList<BaseTreeNode> ChildNodes => _childNodes;
 
         #region Serializable
-        [Styled(nameof(_indentSize), StateFlags.SelfInvalidLayout)] public float IndentSize { get => _indentSize; set => SetStyledField(value); }
-        [Styled(nameof(_nodeHeight), StateFlags.SelfInvalidLayout)] public float NodeHeight { get => _nodeHeight; set => SetStyledField(value); }
+        public float IndentSize { get => _indentSize; set => SetStyledField(value); }
+        public float NodeHeight { get => _nodeHeight; set => SetStyledField(value); }
 
-        [Styled(nameof(_activeStrokeWidth))] public ushort ActiveStrokeWidth { get => _activeStrokeWidth; set => SetStyledField(value); }
-        [Styled(nameof(_activeStrokeColor))] public UIColor ActiveStrokeColor { get => _activeStrokeColor; set => SetStyledField(value); }
-        [Styled(nameof(_activeCornerRadius))] public Vector4 ActiveCornerRadius { get => _activeCornerRadius; set => SetStyledField(value); }
+        public ushort ActiveStrokeWidth { get => _activeStrokeWidth; set => SetStyledField(value); }
+        public UIColor ActiveStrokeColor { get => _activeStrokeColor; set => SetStyledField(value); }
+        public Vector4 ActiveCornerRadius { get => _activeCornerRadius; set => SetStyledField(value); }
         #endregion
 
         private record struct LineArrowBuffer

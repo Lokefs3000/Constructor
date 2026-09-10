@@ -9,6 +9,7 @@ namespace PrimaryEditor.Project
         private string _rootFolder;
         private string _contentFolder;
         private string _libraryFolder;
+        private string _prefsFolder;
 
         private string _librarySavedFolder;
         private string _libraryConfigFolder;
@@ -19,6 +20,7 @@ namespace PrimaryEditor.Project
         {
             _contentFolder = string.Empty;
             _libraryFolder = string.Empty;
+            _prefsFolder = string.Empty;
 
             _librarySavedFolder = string.Empty;
             _libraryConfigFolder = string.Empty;
@@ -31,6 +33,7 @@ namespace PrimaryEditor.Project
             _rootFolder = projectDir;
             _contentFolder = Path.Combine(projectDir, "Content");
             _libraryFolder = Path.Combine(projectDir, "Library");
+            _prefsFolder = Path.Combine(projectDir, "Prefs");
 
             _librarySavedFolder = Path.Combine(_libraryFolder, "Saved");
             _libraryConfigFolder = Path.Combine(_libraryFolder, "Config");
@@ -41,6 +44,7 @@ namespace PrimaryEditor.Project
         public string RootFolder => _rootFolder;
         public string ContentFolder => _contentFolder;
         public string LibraryFolder => _libraryFolder;
+        public string PrefsFolder => _prefsFolder;
 
         public string LibrarySavedFolder => _librarySavedFolder;
         public string LibraryConfigFolder => _libraryConfigFolder;

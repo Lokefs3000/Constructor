@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
+using Primary.Collections.ReadOnly;
 using PrimaryEditor.Inspector.Caching;
 using PrimaryEditor.Inspector.Pooling;
 using PrimaryEditor.Inspector.Reflection;
@@ -22,8 +24,10 @@ namespace PrimaryEditor.Inspector
         private List<InspectorContext> _contexts;
         private InspectorContext? _primaryContext;
 
-        internal InspectorManager()
+        public InspectorManager()
         {
+            s_instance.Target = this;
+
             _valueSourceGenerator = new ValueSourceGenerator();
             _descriptionCache = new DescriptionCache(_valueSourceGenerator);
             _viewManager = new ViewManager();
@@ -36,7 +40,7 @@ namespace PrimaryEditor.Inspector
             _primaryContext = null;
         }
 
-        internal void UpdateContexts()
+        public void UpdateContexts()
         {
             for (int i = 0; i < _contexts.Count; ++i)
             {
@@ -46,6 +50,14 @@ namespace PrimaryEditor.Inspector
 
         public InspectorContext? StartInspect<T, TContext>(ref TContext context) where T : InspectorContext where TContext : notnull
         {
+            foreach (InspectorContext alreadyActiveContext in _contexts)
+            {
+                if (alreadyActiveContext.MatchesContext(ref context))
+                {
+                    return alreadyActiveContext;
+                }
+            }
+
             try
             {
                 T inspectorContext = (T)Activator.CreateInstance(typeof(T), BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, [context], null)!;
@@ -63,6 +75,22 @@ namespace PrimaryEditor.Inspector
             }
         }
 
+        public bool StopInspect<TContext>(ref TContext context) where TContext : notnull
+        {
+            for (int i = 0; i < _contexts.Count; ++i)
+            {
+                InspectorContext inspectorContext = _contexts[i];
+                if (inspectorContext.MatchesContext(ref context))
+                {
+                    _contexts.RemoveAt(i);
+                    OnInspectEnd?.Invoke(inspectorContext);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public ValueSourceGenerator ValueSourceGenerator => _valueSourceGenerator;
         public DescriptionCache DescriptionCache => _descriptionCache;
         public ViewManager ViewManager => _viewManager;
@@ -71,6 +99,14 @@ namespace PrimaryEditor.Inspector
 
         public EnumValueCache EnumValueCache => _enumValueCache;
 
+        public ROList<InspectorContext> Contexts => _contexts;
+        public InspectorContext? PrimaryContext => _primaryContext;
+
         public event Action<InspectorContext>? OnInspectStart;
+        public event Action<InspectorContext>? OnInspectEnd;
+
+        internal static InspectorManager Instance => Unsafe.As<InspectorManager>(s_instance.Target)!;
+
+        private static WeakReference s_instance = new WeakReference(null);
     }
 }

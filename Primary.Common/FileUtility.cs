@@ -117,6 +117,19 @@
             }
         }
 
+        public static bool TryMove(string sourceFileName, string destFileName, bool overwrite = true)
+        {
+            try
+            {
+                File.Move(sourceFileName, destFileName, overwrite);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         public static bool TryWriteAllText(string fullPath, ReadOnlySpan<char> contents, int maxTries = 10, int timeoutMs = 250)
         {
             for (int i = 0; i < maxTries; i++)

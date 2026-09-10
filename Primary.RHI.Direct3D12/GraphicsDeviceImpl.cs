@@ -15,7 +15,6 @@ using Vortice.Direct3D12.Debug;
 using Vortice.DXGI;
 using D3D12MemAlloc = Interop.D3D12MemAlloc;
 using Feature = Vortice.Direct3D12.Feature;
-using Terra = TerraFX.Interop.DirectX;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -198,10 +197,10 @@ namespace Primary.RHI.Direct3D12
                     D3D12MemAlloc.ALLOCATOR_DESC desc = new()
                     {
                         Flags = /*D3D12MemAlloc.ALLOCATOR_FLAGS.ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT*/D3D12MemAlloc.ALLOCATOR_FLAGS.ALLOCATOR_FLAG_NONE,
-                        pDevice = (Terra.ID3D12Device*)_device.NativePointer.ToPointer(),
+                        pDevice = _device.NativePointer.ToPointer(),
                         PreferredBlockSize = 0,
                         pAllocationCallbacks = null,
-                        pAdapter = (Terra.IDXGIAdapter*)_adapter.NativePointer.ToPointer()
+                        pAdapter = _adapter.NativePointer.ToPointer()
                     };
 
                     D3D12MemAlloc.Allocator* allocator = null;

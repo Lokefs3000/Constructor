@@ -61,77 +61,12 @@ namespace PrimaryEditor.Assets
 
         internal void LoadRemappingsFromDisk()
         {
-            if (File.Exists(s_registryFile))
-            {
-                RemappingDataJson data;
-                try
-                {
-                    data = JsonSerializer.Deserialize(File.ReadAllText(s_registryFile), RemappingDataJsonContext.Default.RemappingDataJson)!;
-                }
-                catch (Exception ex)
-                {
-                    EdLog.Assets.Error(ex, "Failed to read file remappings from disk!");
-                    return;
-                }
-
-                if (data.Version != PhysicalFileJson.FileVersion)
-                {
-                    EdLog.Assets.Error("Incorrect remappings data version '{v}'", data.Version);
-                    return;
-                }
-
-                foreach (RemappingDataEntry entry in data.Remappings)
-                {
-                    if (!TryFindFilesystemFor(entry.Remap, out BaseFilesystem? filesystem))
-                    {
-                        EdLog.Assets.Warning("Failed to find filesystem for file remap '{rm}'", entry.Remap);
-                    }
-                    else
-                    {
-                        // this should not fail
-                        if (filesystem.TryGetFullPath(entry.Remap, out string? fullPath))
-                        {
-                            if (!File.Exists(fullPath))
-                            {
-                                EdLog.Assets.Error("File pointed to by the remapping '{rm}' does not exist", entry.Remap);
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            EdLog.Assets.Warning("Unexpected failure trying to get full path for remap '{rm}'", entry.Remap);
-                        }
-                    }
-
-                    if (!_fileRemappings.TryAdd(entry.Source, new FileRemapData(entry.Remap, filesystem)))
-                    {
-                        EdLog.Assets.Warning("Duplicate file remapping '{k}'", entry.Source);
-                    }
-                }
-            }
+            
         }
 
         internal void SaveRemappingsToDisk()
         {
-            RemappingDataJson data = new RemappingDataJson();
-
-            using RentedList<RemappingDataEntry> entries = new RentedList<RemappingDataEntry>();
-            foreach (var (key, remap) in _fileRemappings)
-            {
-                entries.Add(new RemappingDataEntry(key, remap.RemapPath));
-            }
-
-            data.Remappings = entries.ToArray();
-
-            try
-            {
-                File.WriteAllText(s_registryFile, JsonSerializer.Serialize(data, RemappingDataJsonContext.Default.RemappingDataJson));
-            }
-            catch (Exception ex)
-            {
-                EdLog.Assets.Error(ex, "Failed to read file remappings from disk!");
-                throw;
-            }
+            
         }
 
         internal void MountContent(string directory, string namespaceKey)
@@ -211,7 +146,10 @@ namespace PrimaryEditor.Assets
 
         public static string? GetLocalPath(string fullPath)
         {
-            FilesystemManager self = EditorRuntime.Instance.AssetPipeline.FilesystemManager;
+            if (AssetPipeline.Instance == null)
+                return null;
+
+            FilesystemManager self = AssetPipeline.Instance!.FilesystemManager;
             foreach (BaseFilesystem filesystem in self._filesystems)
             {
                 if (filesystem.TryGetLocalPath(fullPath, out string? localPath))
@@ -223,7 +161,10 @@ namespace PrimaryEditor.Assets
 
         public static string? GetFullPath(string localPath)
         {
-            FilesystemManager self = EditorRuntime.Instance.AssetPipeline.FilesystemManager;
+            if (AssetPipeline.Instance == null)
+                return null;
+
+            FilesystemManager self = AssetPipeline.Instance.FilesystemManager;
             foreach (BaseFilesystem filesystem in self._filesystems)
             {
                 if (filesystem.TryGetFullPath(localPath, out string? fullPath))
@@ -247,7 +188,10 @@ namespace PrimaryEditor.Assets
 
         public static string? ReadAllText(string localPath, bool ignoreRemapping = false)
         {
-            FilesystemManager self = EditorRuntime.Instance.AssetPipeline.FilesystemManager;
+            if (AssetPipeline.Instance == null)
+                return null;
+
+            FilesystemManager self = AssetPipeline.Instance.FilesystemManager;
             if (!ignoreRemapping && self._fileRemappings.TryGetValue(localPath, out FileRemapData remapData))
             {
                 if (remapData.Filesystem != null)
@@ -271,7 +215,10 @@ namespace PrimaryEditor.Assets
 
         public static byte[]? ReadAllBytes(string localPath, bool ignoreRemapping = false)
         {
-            FilesystemManager self = EditorRuntime.Instance.AssetPipeline.FilesystemManager;
+            if (AssetPipeline.Instance == null)
+                return null;
+
+            FilesystemManager self = AssetPipeline.Instance.FilesystemManager;
             if (!ignoreRemapping && self._fileRemappings.TryGetValue(localPath, out FileRemapData remapData))
             {
                 if (remapData.Filesystem != null)
@@ -295,7 +242,10 @@ namespace PrimaryEditor.Assets
 
         public static Stream? OpenStream(string localPath, bool ignoreRemapping = false)
         {
-            FilesystemManager self = EditorRuntime.Instance.AssetPipeline.FilesystemManager;
+            if (AssetPipeline.Instance == null)
+                return null;
+
+            FilesystemManager self = AssetPipeline.Instance.FilesystemManager;
             if (!ignoreRemapping && self._fileRemappings.TryGetValue(localPath, out FileRemapData remapData))
             {
                 if (remapData.Filesystem != null)
@@ -319,7 +269,10 @@ namespace PrimaryEditor.Assets
 
         public static bool Exists(string localPath)
         {
-            FilesystemManager self = EditorRuntime.Instance.AssetPipeline.FilesystemManager;
+            if (AssetPipeline.Instance == null)
+                return false;
+
+            FilesystemManager self = AssetPipeline.Instance.FilesystemManager;
             foreach (BaseFilesystem filesystem in self._filesystems)
             {
                 if (!filesystem.IsPathNamespacedTo(localPath))

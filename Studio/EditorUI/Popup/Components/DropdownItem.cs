@@ -14,6 +14,7 @@ using Primary.Mathematics;
 
 namespace EditorUI.Popup.Components
 {
+    [TriggerValues("is-hovered", "is-active")]
     internal sealed class DropdownItem : StyledObject, IInteractable
     {
         private readonly DropdownMenuHost _host;
@@ -26,8 +27,8 @@ namespace EditorUI.Popup.Components
         private bool _isHovered;
         private bool _isActive;
 
-        private UIColor _backgroundColor;
-        private UIColor _textColor;
+        [StyleSetup] private UIColor _backgroundColor;
+        [StyleSetup] private UIColor _textColor;
 
         private TextShapingData? _shapingData;
 
@@ -99,14 +100,12 @@ namespace EditorUI.Popup.Components
             {
                 case UIInputEventType.MouseEnter:
                     {
-                        _isHovered = true;
-                        SetEditedField(true, nameof(IsHovered));
+                        SetTriggerValue("is-hovered", _isHovered = true);
                         return true;
                     }
                 case UIInputEventType.MouseLeave:
                     {
-                        _isHovered = false;
-                        SetEditedField(false, nameof(IsHovered));
+                        SetTriggerValue("is-hovered", _isHovered = false);
                         return true;
                     }
 
@@ -144,14 +143,11 @@ namespace EditorUI.Popup.Components
         public WidgetInputState InputState => WidgetInputState.Sink;
 
         #region Serializable
-        [StyleTrigger, Styled(nameof(_isHovered), isEditable: true)]
         public bool IsHovered => _isHovered;
-
-        [StyleTrigger, Styled(nameof(_isActive), isEditable: true)]
         public bool IsActive => _isActive;
 
-        [Styled(nameof(_backgroundColor))] public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
-        [Styled(nameof(_textColor))] public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
+        public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
+        public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
         #endregion
     }
 }

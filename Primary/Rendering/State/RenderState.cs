@@ -6,13 +6,8 @@ using Primary.Rendering.Assets;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
 using Primary.RHI;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using TerraFX.Interop.Windows;
 
 namespace Primary.Rendering.State
 {
@@ -108,6 +103,7 @@ namespace Primary.Rendering.State
         internal virtual bool CommitState(LinearBlockAllocator allocator, CommandRecorder recorder)
         {
             PropertyChangeFlags changeFlags = PropertyChangeFlags.None;
+            bool hasSetResourcesInfo = false;
 
             if (_dataBlock.Value != null && (_dataBlock.IsDirty || (_dataBlock.Value.IsOutOfDate || _dataBlock.Value.UpdateIndex != _lastDataBlockUpdateIndex)))
             {
@@ -129,6 +125,8 @@ namespace Primary.Rendering.State
                         ConstantsSize = _constantsDataSize,
                         DataSizeRequired = block.ResourceCount * sizeof(uint) + block.BlockSize + (_hasConstantsSeparated ? 0 : _constantsDataSize)
                     });
+
+                    hasSetResourcesInfo = true;
                 }
 
                 _lastDataBlockUpdateIndex = block.UpdateIndex;
@@ -284,9 +282,9 @@ namespace Primary.Rendering.State
             {
                 recorder.AddCommand(RecCommandType.SetResourcesInfo, new CmdSetResourcesInfo
                 {
-                    HeaderFlags = ShHeaderFlags.None,
-                    ConstantsSize = 0,
-                    DataSizeRequired = 0
+                    HeaderFlags = _hasConstantsSeparated ? ShHeaderFlags.HeaderIsBuffer : ShHeaderFlags.None,
+                    ConstantsSize = _constantsDataSize,
+                    DataSizeRequired = _hasConstantsSeparated ? 0 : _constantsDataSize
                 });
             }
 
@@ -295,8 +293,13 @@ namespace Primary.Rendering.State
                 nint dataPtr = allocator.Allocate(_constantsDataSize);
                 NativeMemory.Copy(_constantsData.ToPointer(), dataPtr.ToPointer(), (nuint)_constantsDataSize);
 
+#if DEBUG
+                Span<uint> debugView = new Span<uint>(dataPtr.ToPointer(), _constantsDataSize / Unsafe.SizeOf<uint>());
+#endif
+
                 recorder.AddCommand(RecCommandType.SetConstants, new CmdSetConstants
                 {
+                    DataOffset = 0,
                     DataSize = _constantsDataSize,
                     DataPointer = dataPtr
                 });

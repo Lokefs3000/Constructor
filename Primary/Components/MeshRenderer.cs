@@ -15,12 +15,12 @@ namespace Primary.Components
         [IgnoreDataMember]
         private SceneEntity _self;
 
-        private RawRenderMesh? _mesh;
+        private IRawRenderMesh? _mesh;
         private MaterialAsset? _material;
 
         private int _frameIndex;
 
-        public RawRenderMesh? Mesh
+        public IRawRenderMesh? Mesh
         {
             get => _mesh;
             set
@@ -43,7 +43,7 @@ namespace Primary.Components
             }
         }
 
-        public int UpdateIndex => _frameIndex;
+        public readonly int UpdateIndex => _frameIndex;
     }
 
     [ComponentUsage(CanBeAdded: false)]

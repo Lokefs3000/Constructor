@@ -1,6 +1,7 @@
 ﻿using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Rendering.Assets;
+using Primary.Serialization.Json;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -12,34 +13,41 @@ namespace Primary.Scenes.Json.Converters
 {
     internal static class AssetConverter
     {
-        public static bool TryDeserialize<T>(ref Utf8JsonReader reader, ref T? result) where T : class, IAssetDefinition
+        public static bool TryDeserialize<T>(ref Utf8JsonReader reader, ref T? result, JsonSerializerOptions options) where T : class, IAssetDefinition
         {
-            Unsafe.SkipInit(out result);
-
-            if (reader.TokenType != JsonTokenType.String)
-                goto ReturnBad;
-
-            if (reader.ValueTextEquals("null"u8))
+            if (reader.TokenType == JsonTokenType.Null)
             {
                 result = null;
                 return true;
             }
 
-            if (!Guid.TryParse(reader.ValueSpan, out Guid modelAssetId))
-                result = AssetManager.LoadAsset<T>(reader.GetString());
-            else
-                result = AssetManager.LoadAsset<T>((AssetId)modelAssetId);
+            try
+            {
+                AssetId assetId = s_idJsonConverter.Read(ref reader, typeof(AssetId), options);
 
-            if (result.Id != AssetId.Invalid)
-                AssetManager.WaitForAssetLoad(result.Id);
-            if (result == null || result.Status != ResourceStatus.Success)
+                result = AssetManager.LoadAsset<T>(assetId);
+                return true;
+            }
+            catch (Exception)
+            {
+                result = null;
                 return false;
-
-            return true;
-        ReturnBad:
-
-            reader.TrySkip();
-            return false;
+            }
         }
+
+        public static bool TrySerialize(Utf8JsonWriter writer, IAssetDefinition value, JsonSerializerOptions options)
+        {
+            try
+            {
+                s_idJsonConverter.Write(writer, value.Id, options);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        private static readonly AssetIdJsonConverter s_idJsonConverter = new AssetIdJsonConverter();
     }
 }

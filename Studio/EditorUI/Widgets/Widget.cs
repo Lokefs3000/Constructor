@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -26,31 +27,47 @@ namespace EditorUI.Widgets
     {
         protected bool _isDestroyed;
 
-        protected string? _id;
+        [StyleSetup(IsEditable = true)] protected string? _id;
 
-        protected bool _isEnabled;
-        protected WidgetInputState _inputState;
+        [StyleSetup(StateFlags.SelfInvalidLayout, IsEditable = true)] protected bool _isEnabled;
+        [StyleSetup(IsEditable = true)] protected WidgetInputState _inputState;
 
         protected Widget? _parent;
         protected List<Widget>? _children;
         protected List<Stylist>? _stylists;
 
-        protected UIValue2 _position;
-        protected UIValue2 _size;
+        #region Layout
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected PositionMode _position;
+        protected OverflowMode _overflow;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected ItemAlignment _alignItems;
 
-        protected Vector2 _anchor;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected UIValue? _left;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected UIValue? _right;
 
-        protected Vector4 _margin;
-        protected Vector4 _padding;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected UIValue? _top;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected UIValue? _bottom;
 
-        protected AutoResizeMode _autoResize;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected UIValue? _width;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected UIValue? _height;
 
-        protected UIColor _backgroundColor;
-        protected Vector4 _cornerRadius;
+        [StyleSetup(StateFlags.SelfInvalidLayout, IsGroup = true)] protected LayoutVector2 _anchor;
 
-        protected UIColor _strokeColor;
-        protected StrokePosition _strokePosition;
-        protected ushort _strokeWidth;
+        [StyleSetup(StateFlags.SelfInvalidLayout, IsGroup = true)] protected LayoutBox _margin;
+        [StyleSetup(StateFlags.SelfInvalidLayout, IsGroup = true)] protected LayoutBox _padding;
+
+        [StyleSetup(StateFlags.SelfInvalidLayout, IsGroup = true, Flatten = true)] protected DisplayState _display;
+
+        [StyleSetup(StateFlags.SelfInvalidLayout)] protected float? _aspectRatio;
+        #endregion
+
+        #region Display
+        [StyleInclude] protected UIColor _backgroundColor;
+        [StyleInclude] protected Vector4 _cornerRadius;
+
+        [StyleInclude] protected UIColor _strokeColor;
+        [StyleInclude] protected StrokePosition _strokePosition;
+        [StyleInclude] protected ushort _strokeWidth;
+        #endregion
 
         // Internal state
         protected WidgetLayoutState _layoutState;
@@ -59,6 +76,8 @@ namespace EditorUI.Widgets
 
         // This widgets rect in the window
         protected Boundaries _computedRect;
+
+        protected LayoutChangeMask _changeMask;
 
         protected StateFlags _stateFlags;
 
@@ -73,15 +92,24 @@ namespace EditorUI.Widgets
             _children = null;
             _stylists = null;
 
-            _position = UIValue2.Zero;
-            _size = UIValue2.Zero;
+            _position = PositionMode.Relative;
+            _overflow = OverflowMode.Visible;
+            _alignItems = ItemAlignment.Start;
 
-            _anchor = Vector2.Zero;
+            _left = null;
+            _right = null;
 
-            _margin = Vector4.Zero;
-            _padding = Vector4.Zero;
+            _width = null;
+            _height = null;
 
-            _autoResize = AutoResizeMode.None;
+            _anchor = LayoutVector2.Null;
+
+            _margin = LayoutBox.Null;
+            _padding = LayoutBox.Null;
+
+            _display = new DisplayState { DisplayOutside = DisplayOutside.Inline, DisplayInside = DisplayInside.Flow };
+
+            _aspectRatio = null;
 
             _backgroundColor = Color.TransparentBlack;
             _cornerRadius = Vector4.Zero;
@@ -95,6 +123,8 @@ namespace EditorUI.Widgets
             _sizeLockAxis = LayoutLockAxis.None;
 
             _computedRect = Boundaries.Zero;
+
+            _changeMask = LayoutChangeMask.None;
 
             _stateFlags = StateFlags.SelfInvalidLayout | StateFlags.SelfInvalidStyle;
         }
@@ -120,61 +150,7 @@ namespace EditorUI.Widgets
             }
         }
 
-        protected internal virtual MeasureStatus MeasureSelf(ref readonly LayoutContext context)
-        {
-            if (!context.LayoutLock.HasFlags(LayoutLockAxis.AxisX))
-            {
-                if (_autoResize == AutoResizeMode.ResizeX || _autoResize == AutoResizeMode.ResizeXY)
-                    _layoutState.IdealSize.X = float.NegativeZero;
-                else
-                    _layoutState.IdealSize.X = _size.X.Evaluate(context.ParentSize.X);
-            }
-
-            if (!context.LayoutLock.HasFlags(LayoutLockAxis.AxisY))
-            {
-                if (_autoResize == AutoResizeMode.ResizeY || _autoResize == AutoResizeMode.ResizeXY)
-                    _layoutState.IdealSize.Y = float.NegativeZero;
-                else
-                    _layoutState.IdealSize.Y = _size.Y.Evaluate(context.ParentSize.Y);
-            }
-
-            _layoutState.ContentSize = _layoutState.IdealSize;
-            if (Vector4.GreaterThanAny(_padding, Vector4.Zero))
-                _layoutState.ContentSize -= _padding.GetLower() + _padding.GetUpper();
-
-            return MeasureStatus.Success;
-        }
-
-        protected internal virtual LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
-        {
-            bool hasAnyMargin = Vector4.GreaterThanAny(_margin, Vector4.Zero);
-
-            if (!context.LayoutLock.HasFlags(LayoutLockAxis.AxisX))
-            {
-                _layoutState.IdealPosition.X = _position.X.Evaluate(context.ParentSize.X);
-                if (hasAnyMargin)
-                    _layoutState.IdealPosition.X += _margin.X;
-            }
-
-            if (!context.LayoutLock.HasFlags(LayoutLockAxis.AxisY))
-            {
-                _layoutState.IdealPosition.Y = _position.Y.Evaluate(context.ParentSize.Y);
-                if (hasAnyMargin)
-                    _layoutState.IdealPosition.X += _margin.X;
-            }
-
-            if (!_anchor.Equals(Vector2.Zero))
-                _layoutState.IdealPosition -= _anchor * _layoutState.IdealSize;
-
-            _layoutState.ContentPosition = _layoutState.IdealPosition;
-            if (_padding.X > 0.0f || _padding.Y > 0.0f)
-            {
-                _layoutState.ContentPosition.X += _padding.X;
-                _layoutState.ContentPosition.Y += _padding.Y;
-            }
-
-            return LayoutReturnData.Success;
-        }
+        protected internal virtual Vector2? QueryMeasurements(ref readonly LayoutContext context) => null;
 
         protected internal virtual void AfterComputedRectSelf()
         {
@@ -411,7 +387,28 @@ namespace EditorUI.Widgets
         public virtual IInteractable GetInteractable(Vector2 point) => this;
         #endregion
 
-        public virtual LayoutBehaviour LayoutBehaviour => LayoutBehaviour.Default;
+        #region Layout callbacks
+        [StyleUpdateCallback(nameof(Left), nameof(Right), nameof(Width), nameof(Height),
+            nameof(MarginLeft), nameof(MarginTop), nameof(MarginRight), nameof(MarginBottom), nameof(AspectRatio))]
+        private void OnTransformTypeChanged() => _changeMask |= LayoutChangeMask.Transform;
+
+        [StyleUpdateCallback(nameof(AnchorX), nameof(AnchorY))]
+        private void OnAnchorTypeChanged() => _changeMask |= LayoutChangeMask.Anchor;
+
+        [StyleUpdateCallback(nameof(PaddingLeft), nameof(PaddingTop), nameof(PaddingRight), nameof(PaddingBottom), nameof(AlignItems),
+            nameof(FlexAlignItems), nameof(FlexDirection), nameof(FlexWrap),
+            nameof(GridRowAutoSize), nameof(GridRowTemplate), nameof(GridColumnAutoSize), nameof(GridColumnTemplate))]
+        private void OnChildLayoutTypeChanged() => _changeMask |= LayoutChangeMask.ChildLayout;
+
+        [StyleUpdateCallback(nameof(DisplayInside), nameof(DisplayOutside))]
+        private void OnDisplayTypeChanged() => _changeMask |= LayoutChangeMask.Display;
+
+        [StyleUpdateCallback(nameof(OverflowX), nameof(OverflowY))]
+        private void OnOverflowTypeChanged() => _changeMask |= LayoutChangeMask.Overflow;
+
+        [StyleUpdateCallback(nameof(Position))]
+        private void OnPositionTypeChanged() => _changeMask |= LayoutChangeMask.Position;
+        #endregion
 
         public bool IsDestroyed => _isDestroyed;
 
@@ -431,6 +428,9 @@ namespace EditorUI.Widgets
         public Boundaries ComputedRect { get => _computedRect; protected internal set => _computedRect = value; }
 
         internal ref WidgetLayoutState LayoutState => ref _layoutState;
+        internal ref DisplayState DisplayState => ref _display;
+
+        internal ref LayoutChangeMask ChangeMask => ref _changeMask;
 
         public override StateFlags StateFlags => _stateFlags;
 
@@ -488,9 +488,8 @@ namespace EditorUI.Widgets
         #endregion
 
         #region Serializable
-        [Styled(nameof(_id), isEditable: true)] public string? Id { get => _id; set => SetEditedField(value); }
+        public string? Id { get => _id; set => SetEditedField(value); }
 
-        [Styled(nameof(_isEnabled), StateFlags.SelfInvalidLayout, true, true)]
         public bool IsEnabled
         {
             get => _isEnabled;
@@ -500,7 +499,7 @@ namespace EditorUI.Widgets
                     SetEditedField(value);
             }
         }
-        [Styled(nameof(_inputState), isEditable: true)]
+
         public WidgetInputState InputState
         {
             get => _inputState;
@@ -511,23 +510,128 @@ namespace EditorUI.Widgets
             }
         }
 
-        [Styled(nameof(_position), StateFlags.SelfInvalidLayout)] public UIValue2 Position { get => _position; set => SetStyledField(value); }
-        [Styled(nameof(_size), StateFlags.SelfInvalidLayout)] public UIValue2 Size { get => _size; set => SetStyledField(value); }
+        public PositionMode Position { get => _position; set => SetStyledField(value); }
+        [StyleSetup(StateFlags.SelfInvalidLayout)] public OverflowMode OverflowX { get => (OverflowMode)(((int)_overflow >> (int)OverflowMode.XShift) & (int)OverflowMode.XMask); set => SetStyledField((OverflowMode)(((int)_overflow << (int)OverflowMode.XShift) & (int)OverflowMode.XMask)); }
+        [StyleSetup(StateFlags.SelfInvalidLayout)] public OverflowMode OverflowY { get => (OverflowMode)(((int)_overflow >> (int)OverflowMode.YShift) & (int)OverflowMode.XMask); set => SetStyledField((OverflowMode)(((int)_overflow << (int)OverflowMode.YShift) & (int)OverflowMode.YMask)); }
+        public ItemAlignment AlignItems { get => _alignItems; set => SetStyledField(value); }
 
-        [Styled(nameof(_anchor), StateFlags.SelfInvalidLayout)] public Vector2 Anchor { get => _anchor; set => SetStyledField(value); }
+        public UIValue? Left { get => _left; set => SetStyledField(value); }
+        public UIValue? Right { get => _right; set => SetStyledField(value); }
 
-        [Styled(nameof(_padding), StateFlags.SelfInvalidLayout)] public Vector4 Padding { get => _padding; set => SetStyledField(value); }
-        [Styled(nameof(_margin), StateFlags.SelfInvalidLayout)] public Vector4 Margin { get => _margin; set => SetStyledField(value); }
+        public UIValue? Top { get => _top; set => SetStyledField(value); }
+        public UIValue? Bottom { get => _bottom; set => SetStyledField(value); }
 
-        [Styled(nameof(_autoResize), StateFlags.SelfInvalidLayout)] public AutoResizeMode AutoResize { get => _autoResize; set => SetStyledField(value); }
+        public UIValue? Width { get => _width; set => SetStyledField(value); }
+        public UIValue? Height { get => _height; set => SetStyledField(value); }
 
-        [Styled(nameof(_backgroundColor))] public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
-        [Styled(nameof(_cornerRadius))] public Vector4 CornerRadius { get => _cornerRadius; set => SetStyledField(value); }
+        public LayoutVector2 Anchor
+        {
+            get => _anchor;
+            set
+            {
+                SetStyledField(value.X, nameof(AnchorX));
+                SetStyledField(value.Y, nameof(AnchorY));
+            }
+        }
 
-        [Styled(nameof(_strokeColor))] public UIColor StrokeColor { get => _strokeColor; set => SetStyledField(value); }
-        [Styled(nameof(_strokePosition))] public StrokePosition StrokePosition { get => _strokePosition; set => SetStyledField(value); }
-        [Styled(nameof(_strokeWidth))] public ushort StrokeWidth { get => _strokeWidth; set => SetStyledField(value); }
+        public LayoutBox Margin
+        {
+            get => _margin;
+            set
+            {
+                SetStyledField(value.Left, nameof(MarginLeft));
+                SetStyledField(value.Top, nameof(MarginTop));
+                SetStyledField(value.Right, nameof(MarginRight));
+                SetStyledField(value.Bottom, nameof(MarginBottom));
+            }
+        }
+
+        public LayoutBox Padding
+        {
+            get => _padding;
+            set
+            {
+                SetStyledField(value.Left, nameof(PaddingLeft));
+                SetStyledField(value.Top, nameof(PaddingTop));
+                SetStyledField(value.Right, nameof(PaddingRight));
+                SetStyledField(value.Bottom, nameof(PaddingBottom));
+            }
+        }
+
+        public DisplayOutside DisplayOutside { get => _display.DisplayOutside; set => SetStyledField(value); }
+        public DisplayInside DisplayInside { get => _display.DisplayInside; set => SetStyledField(value); }
+
+        public UIValue? GridRowTemplate { get => _display.Grid.RowTemplate; set => SetStyledField(value); }
+        public int? GridRowAutoSize { get => _display.Grid.RowAutoSize; set => SetStyledField(value); }
+
+        public UIValue? GridColumnTemplate { get => _display.Grid.ColumnTemplate; set => SetStyledField(value); }
+        public int? GridColumnAutoSize { get => _display.Grid.ColumnAutoSize; set => SetStyledField(value); }
+
+        public FlexDirection FlexDirection { get => _display.Flex.Direction; set => SetStyledField(value); }
+        public FlexWrapMode FlexWrap { get => _display.Flex.WrapMode; set => SetStyledField(value); }
+        public FlexItemAlignment FlexAlignItems { get => _display.Flex.AlignItems; set => SetStyledField(value); }
+
+        public float? AspectRatio { get => _aspectRatio; set => SetStyledField(value); }
+
+        public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
+        public Vector4 CornerRadius { get => _cornerRadius; set => SetStyledField(value); }
+
+        public UIColor StrokeColor { get => _strokeColor; set => SetStyledField(value); }
+        public StrokePosition StrokePosition { get => _strokePosition; set => SetStyledField(value); }
+        public ushort StrokeWidth { get => _strokeWidth; set => SetStyledField(value); }
+
+        #region Extended
+        public float? AnchorX { get => _anchor.X; set => SetStyledField(value); }
+        public float? AnchorY { get => _anchor.Y; set => SetStyledField(value); }
+
+        public int? MarginLeft { get => _margin.Left; set => SetStyledField(value); }
+        public int? MarginTop { get => _margin.Top; set => SetStyledField(value); }
+        public int? MarginRight { get => _margin.Right; set => SetStyledField(value); }
+        public int? MarginBottom { get => _margin.Bottom; set => SetStyledField(value); }
+
+        public int? PaddingLeft { get => _padding.Left; set => SetStyledField(value); }
+        public int? PaddingTop { get => _padding.Top; set => SetStyledField(value); }
+        public int? PaddingRight { get => _padding.Right; set => SetStyledField(value); }
+        public int? PaddingBottom { get => _padding.Bottom; set => SetStyledField(value); }
+
+        public OverflowMode Overflow
+        {
+            get => _overflow;
+            set
+            {
+                OverflowX = value;
+                OverflowY = value;
+            }
+        }
         #endregion
+
+        #endregion
+    }
+
+    public record struct LayoutVector2
+    {
+        [StyleInclude] public float? X;
+        [StyleInclude] public float? Y;
+
+        public static LayoutVector2 Null => new LayoutVector2 { X = null, Y = null };
+    }
+
+    public record struct LayoutBox
+    {
+        [StyleInclude] public int? Left;
+        [StyleInclude] public int? Top;
+        [StyleInclude] public int? Right;
+        [StyleInclude] public int? Bottom;
+
+        public LayoutBox(int left, int top, int right, int bottom)
+        {
+            Left = left;
+            Top = top;
+            Right = right;
+            Bottom = bottom;
+        }
+
+        public static LayoutBox Null => new LayoutBox { Left = null, Top = null, Right = null, Bottom = null };
     }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -551,24 +655,79 @@ namespace EditorUI.Widgets
     }
 
     [StructLayout(LayoutKind.Explicit)]
-    public record struct LayoutState
+    public record struct DisplayState
     {
-        
-    }
+        [FieldOffset(0)] public ushort Value;
+        [FieldOffset(0), StyleSetup(Flatten = true), StyleCondition(nameof(DisplayInside), DisplayInside.Grid)] public GridDisplayState Grid;
+        [FieldOffset(0), StyleSetup(Flatten = true), StyleCondition(nameof(DisplayInside), DisplayInside.Flex)] public FlexDisplayState Flex;
 
-    public record struct LayoutGridState
-    {
-        
-    }
-
-    public readonly record struct LayoutBehaviour(bool AsGroup, bool ListenToChildren)
-    {
-        public LayoutBehaviour(LayoutBehaviour template) : this(template.AsGroup, template.ListenToChildren)
+        [StyleInclude]
+        public DisplayOutside DisplayOutside
         {
+            readonly get => (DisplayOutside)((Value & (ushort)DisplayOutside.Mask) >> (ushort)DisplayOutside.Shift);
+            set => Value = (ushort)((Value & ~(ushort)DisplayOutside.Mask) | (ushort)value);
         }
 
-        public static LayoutBehaviour Default => new LayoutBehaviour(false, false);
-        public static LayoutBehaviour Group => new LayoutBehaviour(true, false);
+        [StyleInclude]
+        public DisplayInside DisplayInside
+        {
+            readonly get => (DisplayInside)((Value & (ushort)DisplayInside.Mask) >> (ushort)DisplayInside.Shift);
+            set => Value = (ushort)((Value & ~(ushort)DisplayInside.Mask) | (ushort)value);
+        }
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public record struct GridDisplayState
+    {
+        [FieldOffset(0)] public ushort Value;
+
+        [FieldOffset(2)] public UIValue? RowSize;
+        [FieldOffset(10)] public UIValue? ColumnSize;
+
+        public GridColumnsMethod Rows
+        {
+            readonly get => (GridColumnsMethod)((Value & (ushort)GridColumnsMethod.RowMask) >> (ushort)GridColumnsMethod.RowShift);
+            set => Value = (ushort)((Value & ~(ushort)GridColumnsMethod.RowMask) | ((ushort)value << (ushort)GridColumnsMethod.RowShift));
+        }
+
+        public GridColumnsMethod Columns
+        {
+            readonly get => (GridColumnsMethod)((Value & (ushort)GridColumnsMethod.ColumnMask) >> (ushort)GridColumnsMethod.ColumnShift);
+            set => Value = (ushort)((Value & ~(ushort)GridColumnsMethod.ColumnMask) | ((ushort)value << (ushort)GridColumnsMethod.ColumnShift));
+        }
+
+        [StyleInclude, StyleLink(nameof(Rows), GridColumnsMethod.Templated)] public UIValue? RowTemplate { get => RowSize; set => RowSize = value; }
+        [StyleInclude, StyleLink(nameof(Rows), GridColumnsMethod.Automatic)] public int? RowAutoSize { get => RowSize?.Absolute; set => RowSize = value.HasValue ? new UIValue(value.Value) : null; }
+
+        [StyleInclude, StyleLink(nameof(Columns), GridColumnsMethod.Templated)] public UIValue? ColumnTemplate { get => ColumnSize; set => ColumnSize = value; }
+        [StyleInclude, StyleLink(nameof(Columns), GridColumnsMethod.Automatic)] public int? ColumnAutoSize { get => ColumnSize?.Absolute; set => ColumnSize = value.HasValue ? new UIValue(value.Value) : null; }
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public record struct FlexDisplayState
+    {
+        [FieldOffset(0)] public ushort Value;
+
+        [StyleInclude]
+        public FlexDirection Direction
+        {
+            readonly get => (FlexDirection)((Value & (ushort)FlexDirection.Mask) >> (ushort)FlexDirection.Shift);
+            set => Value = (ushort)((Value & ~(ushort)FlexDirection.Mask) | ((ushort)value << (ushort)FlexDirection.Shift));
+        }
+
+        [StyleSetup(AliasAs = "Wrap")]
+        public FlexWrapMode WrapMode
+        {
+            readonly get => (FlexWrapMode)((Value & (ushort)FlexWrapMode.Mask) >> (ushort)FlexWrapMode.Shift);
+            set => Value = (ushort)((Value & ~(ushort)FlexWrapMode.Mask) | ((ushort)value << (ushort)FlexWrapMode.Shift));
+        }
+
+        [StyleInclude]
+        public FlexItemAlignment AlignItems
+        {
+            readonly get => (FlexItemAlignment)((Value & (ushort)FlexItemAlignment.Mask) >> (ushort)FlexItemAlignment.Shift);
+            set => Value = (ushort)((Value & ~(ushort)FlexItemAlignment.Mask) | ((ushort)value << (ushort)FlexItemAlignment.Shift));
+        }
     }
 
     public delegate void WidgetEventHandler(Widget widget);
@@ -592,12 +751,22 @@ namespace EditorUI.Widgets
         Intercept
     }
 
-    public enum AutoResizeMode : byte
+    public enum LayoutChangeMask : byte
     {
         None = 0,
-        ResizeX,
-        ResizeY,
-        ResizeXY
+
+        Transform = 1 << 0,
+        Display = 1 << 1,
+        Overflow = 1 << 2,
+        ChildLayout = 1 << 3,
+        Anchor = 1 << 4,
+        Position = 1 << 5
+    }
+
+    public enum PositionMode : byte
+    {
+        Relative = 0,
+        Absolute
     }
 
     public enum OverflowMode : byte
@@ -606,6 +775,13 @@ namespace EditorUI.Widgets
         Hidden,
         Clip,
         Scroll,
+
+        // Metadata
+        XShift = 0,
+        YShift = 4,
+
+        XMask = 0b1111 << XShift,
+        YMask = 0b1111 << YShift
     }
 
     public enum ItemAlignment : byte
@@ -694,15 +870,15 @@ namespace EditorUI.Widgets
 
     public enum FlexItemAlignment : ushort
     {
-        Start           = 0b0000,
-        End             = 0b0001,
-        Left            = 0b0010,
-        Right           = 0b0011,
-        Center          = 0b0100,
-        SpaceAround     = 0b0101,
-        SpaceBetween    = 0b0110,
-        SpaceEvenly     = 0b0111,
-        Stretch         = 0b1000,
+        Start = 0b0000,
+        End = 0b0001,
+        Left = 0b0010,
+        Right = 0b0011,
+        Center = 0b0100,
+        SpaceAround = 0b0101,
+        SpaceBetween = 0b0110,
+        SpaceEvenly = 0b0111,
+        Stretch = 0b1000,
 
         // Metadata
 

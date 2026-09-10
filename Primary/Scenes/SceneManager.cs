@@ -1,5 +1,6 @@
 ﻿using Arch.Core;
 using Primary.Assets;
+using Primary.Collections.ReadOnly;
 using Primary.Components;
 using Primary.Profiling;
 
@@ -127,7 +128,7 @@ namespace Primary.Scenes
         internal Components.SceneEntityManager EntityManager => _entityManager;
         public SceneDeserializer Deserializer => _deserializer;
 
-        public IReadOnlyList<Scene> Scenes => _scenes;
+        public ROList<Scene> Scenes => _scenes;
 
         public event Action<Scene>? SceneLoaded;
         public event Action<Scene>? SceneUnloaded;

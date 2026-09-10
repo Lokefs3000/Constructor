@@ -198,7 +198,7 @@ namespace Editor.Processors.Texture
                                     textureData.Stride = 2;
                                 }
 
-                                handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC5u : TextureImageFormat.RG8;
+                                handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC3n : TextureImageFormat.RG8;
                                 handling.AlphaSource = TextureAlphaSource.Source;
 
                                 swizzleRemap.R = TextureSwizzleChannel.One;
@@ -270,7 +270,7 @@ namespace Editor.Processors.Texture
                         textureData.Stride = fi.ChannelCount;
 
                     if (fi.IsBlockCompressed)
-                        mipmaps.MinMipMapSize = 4;
+                        mipmaps.MinMipMapSize = Math.Max(mipmaps.MinMipMapSize, 4);
 
                     while (true)
                     {

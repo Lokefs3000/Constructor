@@ -5,7 +5,7 @@ using EditorUI.Input;
 
 namespace EditorUI.Widgets
 {
-    [UIWidget]
+    [UIWidget, TriggerValues("is-hovered", "is-held")]
     public class Button : Widget
     {
         protected bool _isHovered;
@@ -25,27 +25,23 @@ namespace EditorUI.Widgets
             {
                 case UIInputEventType.MouseEnter:
                     {
-                        _isHovered = true;
-                        SetEditedField(true, nameof(IsHovered));
+                        SetTriggerValue("is-hovered", true);
                         return true;
                     }
                 case UIInputEventType.MouseLeave:
                     {
-                        _isHovered = false;
-                        SetEditedField(false, nameof(IsHovered));
+                        SetTriggerValue("is-hovered", false);
                         return true;
                     }
 
                 case UIInputEventType.MouseDown:
                     {
-                        _isHeld = true;
-                        SetEditedField(true, nameof(IsHeld));
+                        SetTriggerValue("is-held", true);
                         return true;
                     }
                 case UIInputEventType.MouseUp:
                     {
-                        _isHeld = false;
-                        SetEditedField(false, nameof(IsHeld));
+                        SetTriggerValue("is-held", false);
                         return true;
                     }
             }
@@ -54,10 +50,7 @@ namespace EditorUI.Widgets
         }
 
         #region Serializable
-        [StyleTrigger, Styled(nameof(_isHovered), isEditable: true)]
         public bool IsHovered { get => _isHovered; }
-
-        [StyleTrigger, Styled(nameof(_isHeld), isEditable: true)]
         public bool IsHeld { get => _isHeld; }
         #endregion
     }

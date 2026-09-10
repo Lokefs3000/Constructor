@@ -25,17 +25,17 @@ namespace EditorUI.Popup
         private Int2 _screenPosition;
         private Int2 _screenSize;
 
-        private IAssetProvider<FontFamily>? _fontFamily;
-        private FontStyle _fontStyle;
-        private FontWeight _fontWeight;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private IAssetProvider<FontFamily>? _fontFamily;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private FontStyle _fontStyle;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private FontWeight _fontWeight;
 
-        private float _fontSize;
+        [StyleSetup(StateFlags.SelfInvalidLayout)] private float _fontSize;
 
-        private UIColor _backgroundColor;
+        [StyleInclude] private UIColor _backgroundColor;
 
-        private UIColor _strokeColor;
-        private StrokePosition _strokePosition;
-        private ushort _strokeWidth;
+        [StyleInclude] private UIColor _strokeColor;
+        [StyleInclude] private StrokePosition _strokePosition;
+        [StyleInclude] private ushort _strokeWidth;
 
         internal DropdownMenuHost(Int2 screenPosition, int menuWidth, ROList<string> options, int index)
         {
@@ -156,17 +156,17 @@ namespace EditorUI.Popup
         public override IInteractionShape? Shape => this;
 
         #region Serializable
-        [Styled(nameof(_fontFamily), StateFlags.SelfInvalidLayout)] public IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
-        [Styled(nameof(_fontStyle), StateFlags.SelfInvalidLayout)] public FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
-        [Styled(nameof(_fontWeight), StateFlags.SelfInvalidLayout)] public FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
+        public IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
+        public FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
+        public FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
 
-        [Styled(nameof(_fontSize), StateFlags.SelfInvalidLayout)] public float FontSize { get => _fontSize; set => SetStyledField(value); }
+        public float FontSize { get => _fontSize; set => SetStyledField(value); }
 
-        [Styled(nameof(_backgroundColor))] public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
+        public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
 
-        [Styled(nameof(_strokeColor))] public UIColor StrokeColor { get => _strokeColor; set => SetStyledField(value); }
-        [Styled(nameof(_strokePosition))] public StrokePosition StrokePosition { get => _strokePosition; set => SetStyledField(value); }
-        [Styled(nameof(_strokeWidth))] public ushort StrokeWidth { get => _strokeWidth; set => SetStyledField(value); }
+        public UIColor StrokeColor { get => _strokeColor; set => SetStyledField(value); }
+        public StrokePosition StrokePosition { get => _strokePosition; set => SetStyledField(value); }
+        public ushort StrokeWidth { get => _strokeWidth; set => SetStyledField(value); }
         #endregion
 
         public event Action<int>? OnIndexSelected;

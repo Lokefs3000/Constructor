@@ -41,6 +41,8 @@ namespace Primary.RHI
         public abstract RHIGraphicsPipeline? CreateGraphicsPipeline(in RHIGraphicsPipelineDescription description, in RHIGraphicsPipelineBytecode bytecode, [CallerMemberName] string? debugName = "");
         /// <summary>Thread-safe</summary>
         public abstract RHIComputePipeline? CreateComputePipeline(in RHIComputePipelineDescription description, in RHIComputePipelineBytecode bytecode, [CallerMemberName] string? debugName = "");
+        /// <summary>Thread-safe</summary>
+        public abstract RHIReadback? CreateReadback(in RHIReadbackDescription description, [CallerMemberName] string? debugName = "");
 
         /// <summary>Thread-safe</summary>
         public abstract void FlushPendingMessages();

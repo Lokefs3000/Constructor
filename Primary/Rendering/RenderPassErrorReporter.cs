@@ -50,6 +50,9 @@ namespace Primary.Rendering
         CopyBuffer,
         CopyTexture,
 
+        ReadBuffer,
+        ReadTexture,
+
         SetConstants,
 
         PresentOnWindow,

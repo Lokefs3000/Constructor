@@ -80,6 +80,11 @@ namespace Primary.Mathematics
             return new AABB(center - half, center + half);
         }
 
+        public static AABB Union(AABB left, AABB right)
+        {
+            return new AABB(Vector3.Min(left.Minimum, right.Minimum), Vector3.Max(left.Maximum, right.Maximum));
+        }
+
         public static readonly AABB Zero = new AABB();
         public static readonly AABB Infinite = new AABB(Vector3.NegativeInfinity, Vector3.PositiveInfinity);
         public static readonly AABB NegativeInfinite = new AABB(Vector3.PositiveInfinity, Vector3.NegativeInfinity);

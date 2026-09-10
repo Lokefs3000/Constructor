@@ -431,6 +431,18 @@ namespace Primary.Scenes
             return null;
         }
 
+        public static bool TryGetComponentData<T>(out Component componentData) where T : IComponent
+        {
+            SceneEntityManager @this = NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target));
+            return @this._components.TryGetValue(typeof(T), out componentData);
+        }
+
+        public static bool TryGetComponentData(Type type, out Component componentData)
+        {
+            SceneEntityManager @this = NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target));
+            return @this._components.TryGetValue(type, out componentData);
+        }
+
         public static SceneEntity CreateEntity(Scene? scene) => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target)).CreateReadyEntity(scene);
 
         public static void DestroyEntity(SceneEntity entity)

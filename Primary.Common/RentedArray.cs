@@ -12,7 +12,7 @@ namespace Primary.Common
         private readonly T[] _array;
         private readonly bool _returnClear;
 
-        internal RentedArray(int count, ArrayPool<T> pool, bool clearOnReturn = false)
+        public RentedArray(int count, ArrayPool<T> pool, bool clearOnReturn = false)
         {
             _pool = pool;
             _count = count;
@@ -20,7 +20,7 @@ namespace Primary.Common
             _returnClear = RuntimeHelpers.IsReferenceOrContainsReferences<T>() || clearOnReturn;
         }
 
-        internal RentedArray(int count, bool clearOnReturn = false) : this(count, ArrayPool<T>.Shared, clearOnReturn) { }
+        public RentedArray(int count, bool clearOnReturn = false) : this(count, ArrayPool<T>.Shared, clearOnReturn) { }
 
         #region Interface
         public void Dispose()

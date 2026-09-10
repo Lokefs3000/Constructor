@@ -40,5 +40,17 @@ namespace Primary.Scenes.Json.Converters
             reader.TrySkip();
             return false;
         }
+
+        public static bool TrySerialize(Utf8JsonWriter writer, ref Vector4 value)
+        {
+            writer.WriteStartArray();
+            writer.WriteNumberValue(value.X);
+            writer.WriteNumberValue(value.Y);
+            writer.WriteNumberValue(value.Z);
+            writer.WriteNumberValue(value.W);
+            writer.WriteEndArray();
+
+            return true;
+        }
     }
 }

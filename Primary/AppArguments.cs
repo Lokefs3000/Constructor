@@ -12,7 +12,7 @@ namespace Primary
         private static FrozenDictionary<string, ArgumentFormat>? _argumentFormats = null;
         private static Dictionary<string, object> _arguments = new Dictionary<string, object>();
 
-        internal static void Parse(ReadOnlySpan<string> args)
+        public static void Parse(ReadOnlySpan<string> args)
         {
             if (_argumentFormats == null)
                 DeserializeArguments();

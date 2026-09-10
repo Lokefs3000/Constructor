@@ -3,16 +3,19 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
 using CommunityToolkit.HighPerformance;
 using EditorUI.Dock;
+using EditorUI.Mathematics;
 using EditorUI.Statistics;
 using EditorUI.Utility;
 using EditorUI.Widgets;
 using EditorUI.Windowing;
 using Primary.Collections;
+using Primary.Collections.Extensions;
 using Primary.Collections.ReadOnly;
 using Primary.Common;
 using Primary.Extensions;
@@ -27,7 +30,7 @@ namespace EditorUI.Layout
 
         private HashSet<Widget> _failedWidgets;
 
-        private List<LayoutGroup> _layoutGroups;
+        private List<WidgetTreeData> _treeData;
 
         private Stack<WidgetSearchData> _searchDataStack;
         private Stack<int> _groupIdStack;
@@ -39,7 +42,7 @@ namespace EditorUI.Layout
 
             _failedWidgets = new HashSet<Widget>();
 
-            _layoutGroups = new List<LayoutGroup>();
+            _treeData = new List<WidgetTreeData>();
 
             _searchDataStack = new Stack<WidgetSearchData>();
             _groupIdStack = new Stack<int>();
@@ -84,64 +87,10 @@ namespace EditorUI.Layout
 
             layoutReporter?.OnLayoutBegin();
 
-            SetupLayoutGroups(rootWidget, layoutReporter);
-            
-            if (_layoutGroups.Count > 0)
+            GatherWidgetsForLayout(rootWidget, layoutReporter);
+            if (_treeData.Count > 0)
             {
-                Span<LayoutGroup> layoutGroups = _layoutGroups.AsSpan();
-                bool forceRecalculate = false;
-
-                // Measure all first
-                for (int i = 0; i < layoutGroups.Length; ++i)
-                {
-                    ref LayoutGroup layoutGroup = ref layoutGroups[i];
-                    MeasureWidgetsInGroup(ref layoutGroup, ref forceRecalculate, layoutReporter);
-                }
-
-                // Layout incrementally
-                for (int i = layoutGroups.Length - 1; i >= 0; --i)
-                {
-                    ref LayoutGroup layoutGroup = ref layoutGroups[i];
-                    if (layoutGroup.NeedsMeasure)
-                        MeasureWidgetsInGroup(ref layoutGroup, ref forceRecalculate, layoutReporter);
-                    LayoutWidgetsInGroup(ref layoutGroup, layoutReporter);
-
-                    layoutGroup.NeedsRelayout = false;
-                    layoutGroup.NeedsMeasure = false;
-
-                    if (layoutGroup.TreeOwner.StateFlags.HasFlags(StateFlags.SelfInvalidLayout))
-                    {
-                        _groupIdStack.Push(layoutGroup.GroupId);
-                        while (++i < layoutGroups.Length && _groupIdStack.Count > 0)
-                        {
-                            ref LayoutGroup previousLayoutGroup = ref layoutGroups[i];
-                            while (_groupIdStack.TryPeek(out int result))
-                            {
-                                if (previousLayoutGroup.ParentGroupId == result)
-                                {
-                                    previousLayoutGroup.NeedsRelayout = true;
-                                    previousLayoutGroup.NeedsMeasure = true;
-                                    _groupIdStack.Push(previousLayoutGroup.GroupId);
-                                    break;
-                                }
-
-                                _groupIdStack.Pop();
-                            }
-                        }
-
-                        layoutGroup.NeedsRelayout = true;
-                        layoutGroup.NeedsMeasure = true;
-
-                        _groupIdStack.Clear();
-                    }
-                }
-
-                // Compute window space rects
-                for (int i = 0; i < layoutGroups.Length; ++i)
-                {
-                    ref LayoutGroup layoutGroup = ref layoutGroups[i];
-                    ComputeRectForWidgetsInGroup(ref layoutGroup);
-                }
+                UpdatePartialTree();
 
                 _forceRecalculateStack.Clear();
 
@@ -158,342 +107,450 @@ namespace EditorUI.Layout
                 }
             }
 
-            ClearLayoutData();
-
             widgetWindow?.LayoutStatistics = statistics;
         }
 
-        private void MeasureWidgetsInGroup(ref LayoutGroup layoutGroup, ref bool forceRecalculate, ILayoutReporter? layoutReporter)
+        // This method likely has a good chunk of comments as im pretty much walking myself through all the rules to laying widgets out
+
+        private void UpdatePartialTree()
         {
-            RentedList<WidgetData> widgets = layoutGroup.Widgets;
-            int lastWidgetIndex = widgets.Count - 1;
+            Span<WidgetTreeData> treeRecursion = _treeData.AsSpan();
 
-            Widget? parentWidget = null;
+            using RentedStack<int> deferredLayouts = new RentedStack<int>();
 
-            // Measure widgets
-            for (int i = 0; i < widgets.Count; ++i)
+            for (int i = 1; i < treeRecursion.Length; ++i)
             {
-                WidgetData widgetData = widgets[i];
-                bool measurementsChanged = false;
+                bool isReturningAfterDefer = false;
 
-                if (forceRecalculate)
-                    widgetData.Widget.AddStateFlags(StateFlags.SelfInvalidLayout);
-
-                layoutReporter?.OnWidgetConsidered(widgetData.Widget, LayoutConsiderType.Measure);
-                if (i == 0 || widgetData.Widget.StateFlags.HasFlags(StateFlags.SelfInvalidLayout))
+                ref WidgetTreeData treeData = ref treeRecursion[i];
+                if (deferredLayouts.TryPeek(out int deferredLayoutIndex))
                 {
-                    LayoutContext context;
-                    if ((parentWidget = widgetData.Widget.Parent) != null)
+                    ref WidgetTreeData deferredLayoutData = ref treeRecursion[deferredLayoutIndex];
+                    if (deferredLayoutData.Depth <= treeData.Depth)
                     {
-                        Vector2 parentSize = parentWidget.ContentSize;
-                        switch (parentWidget.AutoResize)
-                        {
-                            case AutoResizeMode.ResizeX: parentSize.X = 0.0f; break;
-                            case AutoResizeMode.ResizeY: parentSize.Y = 0.0f; break;
-                            case AutoResizeMode.ResizeXY: parentSize = Vector2.Zero; break;
-                        }
+                        i = deferredLayoutData.TreeRange.Start;
+                        treeData = ref deferredLayoutData;
+                        deferredLayouts.Pop();
 
-                        context = new LayoutContext(parentSize, Vector2.Zero, parentWidget.SizeLockAxis);
-                    }
-                    else
-                    {
-                        context = new LayoutContext(Vector2.Zero, Vector2.Zero, LayoutLockAxis.None);
-                    }
-
-                    Vector128<float> previousSize = widgetData.Widget.LayoutState.Size;
-                    LayoutLockAxis previousPositionAxisLock = widgetData.Widget.PositionLockAxis;
-                    LayoutLockAxis previousSizeAxisLock = widgetData.Widget.SizeLockAxis;
-
-                    MeasureStatus status = widgetData.Widget.MeasureSelf(ref context);
-                    if (status == MeasureStatus.MissingPendingData)
-                    {
-                        _failedWidgets.Add(widgetData.Widget);
-                    }
-                    else
-                    {
-                        switch (widgetData.Widget.AutoResize)
-                        {
-                            case AutoResizeMode.ResizeX:
-                                {
-                                    widgetData.Widget.LayoutState.Size = Sse41.BlendVariable(
-                                        widgetData.Widget.LayoutState.Size,
-                                        previousSize,
-                                        Vector128.Create(Unsafe.BitCast<uint, float>(uint.MaxValue), 0.0f, Unsafe.BitCast<uint, float>(uint.MaxValue), 0.0f));
-                                    break;
-                                }
-                            case AutoResizeMode.ResizeY:
-                                {
-                                    widgetData.Widget.LayoutState.Size = Sse41.BlendVariable(
-                                        widgetData.Widget.LayoutState.Size,
-                                        previousSize,
-                                        Vector128.Create(0.0f, Unsafe.BitCast<uint, float>(uint.MaxValue), 0.0f, Unsafe.BitCast<uint, float>(uint.MaxValue)));
-                                    break;
-                                }
-                            case AutoResizeMode.ResizeXY:
-                                {
-                                    widgetData.Widget.LayoutState.Size = previousSize;
-                                    break;
-                                }
-                        }
-
-                        measurementsChanged =
-                            status == MeasureStatus.DontCheckChanges ||
-                            previousSize != widgetData.Widget.LayoutState.Size ||
-                            previousPositionAxisLock != widgetData.Widget.PositionLockAxis ||
-                            previousSizeAxisLock != widgetData.Widget.SizeLockAxis;
-
-                        if (!measurementsChanged)
-                        {
-                            widgetData.Widget.RemoveStateFlags(StateFlags.ThisLayout);
-                        }
-                        else
-                        {
-                            parentWidget = widgetData.Widget;
-                            while ((parentWidget = parentWidget?.Parent) != null)
-                            {
-                                if (parentWidget.AutoResize == AutoResizeMode.None && !parentWidget.LayoutBehaviour.ListenToChildren)
-                                    break;
-                                parentWidget.AddStateFlags(StateFlags.SelfInvalidLayout);
-                            }
-                        }
+                        isReturningAfterDefer = true;
                     }
                 }
+                
+                ref WidgetTreeData parentTreeData = ref treeRecursion[treeData.ParentIndex];
 
-                if (_forceRecalculateStack.Count > widgetData.Depth)
+                StateFlags stateFlags = treeData.Widget.StateFlags;
+
+                if (stateFlags.HasFlags(StateFlags.InvalidLayout))
                 {
-                    do
+                    if (stateFlags.HasFlags(StateFlags.ThisLayout))
                     {
-                        forceRecalculate = _forceRecalculateStack.Pop();
-                    } while (_forceRecalculateStack.Count > widgetData.Depth);
-                }
+                        Widget widget = treeData.Widget;
+                        LayoutChangeMask changeMask = widget.ChangeMask;
 
-                bool hasChildren = i < lastWidgetIndex && widgets[i + 1].Depth > widgetData.Depth;
-                if (hasChildren)
-                {
-                    if (widgetData.Widget.StateFlags.HasFlags(StateFlags.InvalidLayout) || widgetData.Widget.AutoResize != AutoResizeMode.None)
-                    {
-                        _forceRecalculateStack.Push(forceRecalculate);
-                        forceRecalculate = measurementsChanged;
-                    }
-                    // else
-                    // {
-                    //     // Skip all children as nothing has changed on their parent
-                    //     while (++i < widgets.Count && widgets[i].Depth > widgetData.Depth)
-                    //     {
-                    //         widgets[i].Widget.RemoveStateFlags(StateFlags.SelfInvalidLayout);
-                    //     }
-                    // 
-                    //     --i;
-                    // }
-                }
-            }
-        }
+                        if (!treeData.HasLayoutData)
+                            QueryLayoutDataFor(ref treeData);
 
-        private void LayoutWidgetsInGroup(ref LayoutGroup layoutGroup, ILayoutReporter? layoutReporter)
-        {
-            RentedList<WidgetData> widgets = layoutGroup.Widgets;
-            int lastWidgetIndex = widgets.Count - 1;
+                        WidgetLayout sourceLayout = treeData.Layout;
+                        WidgetLayout currentLayout = treeData.Layout;
 
-            Widget? parentWidget = null;
+                        bool hasChildren = treeData.TreeRange.IsEmpty;
+                        bool shouldSkipChildren = true;
 
-            // Layout widgets
-            for (int i = lastWidgetIndex; i >= 0; --i)
-            {
-                WidgetData widgetData = widgets[i];
-
-                layoutReporter?.OnWidgetConsidered(widgetData.Widget, LayoutConsiderType.Layout);
-                if (i == 0 || widgetData.Widget.StateFlags.HasFlags(StateFlags.SelfInvalidLayout))
-                {
-                    LayoutContext context;
-                    if ((parentWidget = widgetData.Widget.Parent) != null)
-                    {
-                        Vector2 parentSize = parentWidget.ContentSize;
-                        switch (parentWidget.AutoResize)
+                        if (changeMask.HasAny(LayoutChangeMask.Transform | LayoutChangeMask.Display | LayoutChangeMask.ChildLayout | LayoutChangeMask.Anchor | LayoutChangeMask.Position))
                         {
-                            case AutoResizeMode.ResizeX: parentSize.X = 0.0f; break;
-                            case AutoResizeMode.ResizeY: parentSize.Y = 0.0f; break;
-                            case AutoResizeMode.ResizeXY: parentSize = Vector2.Zero; break;
+                            InvalidateLayoutsAbove(ref i);
+                            continue;
                         }
 
-                        context = new LayoutContext(parentSize, Vector2.Zero, parentWidget.PositionLockAxis);
-                    }
-                    else
-                    {
-                        context = new LayoutContext(Vector2.Zero, Vector2.Zero, LayoutLockAxis.None);
-                    }
-
-                    Vector128<float> previousPosition = widgetData.Widget.LayoutState.Position;
-
-                    widgetData.Widget.RemoveStateFlags(StateFlags.SelfInvalidLayout);
-
-                    layoutReporter?.OnWidgetRelayout(widgetData.Widget);
-                    widgetData.Widget.LayoutSelf(ref context);
-
-                    switch (widgetData.Widget.AutoResize)
-                    {
-                        case AutoResizeMode.ResizeX:
-                            {
-                                float contentOffset = widgetData.Widget.ContentPosition.X - widgetData.Widget.IdealPosition.X;
-                                float maxWidth = 0.0f;
-                                foreach (Widget childWidget in widgetData.Widget.Children)
-                                {
-                                    maxWidth = Math.Max(maxWidth, contentOffset + childWidget.IdealPosition.X + childWidget.IdealSize.X);
-                                }
-
-                                ref WidgetLayoutState layoutState = ref widgetData.Widget.LayoutState;
-                                layoutState.IdealSize.X = maxWidth + widgetData.Widget.Padding.X;
-                                layoutState.ContentSize.X += layoutState.IdealSize.X;
-                                break;
-                            }
-                        case AutoResizeMode.ResizeY:
-                            {
-                                float contentOffset = widgetData.Widget.ContentPosition.Y - widgetData.Widget.IdealPosition.Y;
-                                float maxHeight = 0.0f;
-                                foreach (Widget childWidget in widgetData.Widget.Children)
-                                {
-                                    maxHeight = Math.Max(maxHeight, contentOffset + childWidget.IdealPosition.Y + childWidget.IdealSize.Y);
-                                }
-
-                                ref WidgetLayoutState layoutState = ref widgetData.Widget.LayoutState;
-                                layoutState.IdealSize.Y = maxHeight + widgetData.Widget.Padding.Y;
-                                layoutState.ContentSize.Y += layoutState.IdealSize.Y;
-                                break;
-                            }
-                        case AutoResizeMode.ResizeXY:
-                            {
-                                Vector2 contentOffset = widgetData.Widget.ContentPosition - widgetData.Widget.IdealPosition;
-                                Vector2 maxSize = Vector2.Zero;
-                                foreach (Widget childWidget in widgetData.Widget.Children)
-                                {
-                                    maxSize = Vector2.Max(maxSize, contentOffset + childWidget.IdealPosition + childWidget.IdealSize);
-                                }
-
-                                ref WidgetLayoutState layoutState = ref widgetData.Widget.LayoutState;
-                                layoutState.IdealSize = maxSize + widgetData.Widget.Padding.GetLower();
-                                layoutState.ContentSize = layoutState.IdealSize + layoutState.ContentSize;
-                                break;
-                            }
-                    }
-
-                    if (previousPosition != widgetData.Widget.LayoutState.Position)
-                    {
-                        parentWidget = widgetData.Widget;
-                        while ((parentWidget = parentWidget?.Parent) != null)
+                        if (changeMask.HasFlags(LayoutChangeMask.Display))
                         {
-                            if (parentWidget.AutoResize == AutoResizeMode.None && !parentWidget.LayoutBehaviour.ListenToChildren)
-                                break;
-                            parentWidget.AddStateFlags(StateFlags.SelfInvalidLayout);
+                            changeMask |= LayoutChangeMask.Transform | LayoutChangeMask.Overflow | LayoutChangeMask.ChildLayout;
                         }
+
+                        // Transform rect incase something changed
+                        if (changeMask.HasAny(LayoutChangeMask.Transform | LayoutChangeMask.Overflow))
+                        {
+                            PositionMode position = widget.Position;
+
+                            bool canHavePosition;
+                            bool canHaveSize;
+                            if (position == PositionMode.Absolute)
+                            {
+                                canHavePosition = true;
+                                canHaveSize = true;
+                            }
+                            else
+                            {
+                                canHavePosition = false;
+                                canHaveSize = IsParentResponsibleForSize(treeData);
+                            }
+
+                            if ((canHavePosition || canHaveSize) && !parentTreeData.HasLayoutData)
+                                QueryLayoutDataFor(ref parentTreeData);
+
+                            // If either left or right is defined they control the positioning
+                            // If both are set they represent insets from the parents width
+                            //    If width is defined the left position takes priority
+
+                            UIValue? left = widget.Left;
+                            UIValue? right = widget.Right;
+
+                            UIValue? width = widget.Width;
+                            UIValue? height = widget.Height;
+
+                            float? aspectRatio = widget.AspectRatio;
+
+                            ref Int2 clientOffset = ref currentLayout.ClientOffset;
+                            ref Int2 clientSize = ref currentLayout.ClientSize;
+
+                            clientOffset = Int2.Zero;
+                            clientSize = Int2.Zero;
+
+                            if (canHavePosition)
+                            {
+                                if (left.HasValue)
+                                {
+                                    int pixelsLeft = left.DangerousGetValueOrDefaultReference().Evaluate(parentTreeData.Layout.InteriorSize.X);
+                                    if (!width.HasValue && right.HasValue)
+                                    {
+                                        int pixelsRight = right.DangerousGetValueOrDefaultReference().Evaluate(parentTreeData.Layout.InteriorSize.X);
+
+                                        clientSize.X = parentTreeData.Layout.InteriorSize.X - pixelsLeft - pixelsRight;
+
+                                        // Collapse widget where left and right meet
+                                        if (clientSize.X < 0)
+                                        {
+                                            clientOffset.X = (int)(float.Lerp(pixelsLeft, pixelsRight, 0.5f) + 0.5f);
+                                            clientSize.X = 0;
+                                        }
+
+                                        clientOffset.X = pixelsLeft;
+                                    }
+                                    else
+                                    {
+                                        clientOffset.X = pixelsLeft;
+                                        clientSize.X = width.HasValue ? width.DangerousGetValueOrDefaultReference().Evaluate(parentTreeData.Layout.InteriorSize.X) : 0;
+                                    }
+                                }
+                                else if (right.HasValue)
+                                {
+                                    int pixelsRight = right.DangerousGetValueOrDefaultReference().Evaluate(parentTreeData.Layout.InteriorSize.X);
+
+                                    clientSize.X = width.HasValue ? width.DangerousGetValueOrDefaultReference().Evaluate(parentTreeData.Layout.InteriorSize.X) : 0;
+                                    clientOffset.X = parentTreeData.Layout.InteriorSize.X - pixelsRight - clientSize.X;
+                                }
+
+                                if (aspectRatio.HasValue && !height.HasValue && clientSize.X != clientSize.Y)
+                                {
+                                    clientSize.Y = (int)(clientSize.X / aspectRatio.DangerousGetValueOrDefaultReference());
+                                }
+                            }
+
+                            if (canHaveSize)
+                            {
+                                if (!canHavePosition)
+                                {
+                                    if (width.HasValue)
+                                        clientSize.X = width.DangerousGetValueOrDefaultReference().Evaluate(parentTreeData.Layout.InteriorSize.X);
+                                }
+
+                                if (height.HasValue)
+                                    clientSize.Y = width.DangerousGetValueOrDefaultReference().Evaluate(parentTreeData.Layout.InteriorSize.Y);
+
+                                if (aspectRatio.HasValue && clientSize.X != clientSize.Y)
+                                {
+                                    if (!width.HasValue || !height.HasValue)
+                                    {
+                                        if (width.HasValue)
+                                            clientSize.Y = (int)(clientSize.X / aspectRatio.DangerousGetValueOrDefaultReference());
+                                        else
+                                            clientSize.X = (int)(clientSize.Y * aspectRatio.DangerousGetValueOrDefaultReference());
+                                    }
+                                }
+                            }
+
+                            ref Int2 boxOffset = ref currentLayout.BoxPosition;
+                            ref Int2 boxSize = ref currentLayout.BoxSize;
+
+                            boxOffset = clientOffset;
+                            boxSize = clientSize;
+
+                            LayoutBox margins = widget.Margin;
+
+                            if (margins.Left.HasValue)
+                            {
+                                clientOffset.X += margins.Left.DangerousGetValueOrDefaultReference();
+                                boxSize.X += margins.Left.DangerousGetValueOrDefaultReference();
+                            }
+                            if (margins.Right.HasValue)
+                                boxSize.X += margins.Right.DangerousGetValueOrDefaultReference();
+
+                            if (margins.Top.HasValue)
+                            {
+                                clientOffset.X += margins.Left.DangerousGetValueOrDefaultReference();
+                                boxSize.Y += margins.Top.DangerousGetValueOrDefaultReference();
+                            }
+                            if (margins.Bottom.HasValue)
+                                boxSize.Y += margins.Bottom.DangerousGetValueOrDefaultReference();
+
+                            OverflowMode overflowX = widget.OverflowX;
+                            OverflowMode overflowY = widget.OverflowY;
+
+                            if (overflowX == OverflowMode.Scroll)
+                                clientSize.X -= 6;
+                            if (overflowY == OverflowMode.Scroll)
+                                clientSize.Y -= 6;
+
+                            boxSize = Int2.Max(boxSize, Int2.Zero);
+                            clientSize = Int2.Max(clientSize, Int2.Zero);
+
+                            if (currentLayout.HasChanged(sourceLayout))
+                            {
+                                if (hasChildren)
+                                    changeMask |= LayoutChangeMask.ChildLayout;
+
+                                sourceLayout = currentLayout;
+                            }
+                        }
+
+                        if (changeMask.HasFlags(LayoutChangeMask.ChildLayout))
+                        {
+                            ref Int2 interiorOffset = ref currentLayout.InteriorOffset;
+                            ref Int2 interiorSize = ref currentLayout.InteriorSize;
+
+                            interiorOffset = currentLayout.ClientOffset;
+                            interiorSize = currentLayout.ClientSize;
+
+                            if (Int2.GreaterThanAny(interiorSize, Int2.Zero))
+                            {
+                                LayoutBox padding = widget.Padding;
+
+                                if (padding.Left.HasValue)
+                                {
+                                    interiorOffset.X += padding.Left.DangerousGetValueOrDefaultReference();
+                                    interiorSize.X -= padding.Left.DangerousGetValueOrDefaultReference();
+                                }
+                                if (padding.Right.HasValue)
+                                    interiorSize.X -= padding.Right.DangerousGetValueOrDefaultReference();
+
+                                if (padding.Top.HasValue)
+                                {
+                                    interiorOffset.Y += padding.Top.DangerousGetValueOrDefaultReference();
+                                    interiorSize.Y -= padding.Top.DangerousGetValueOrDefaultReference();
+                                }
+                                if (padding.Bottom.HasValue)
+                                    interiorSize.Y -= padding.Bottom.DangerousGetValueOrDefaultReference();
+
+                                interiorSize = Int2.Max(interiorSize, Int2.Zero);
+                            }
+
+                            shouldSkipChildren = Int2.LessThanOrEqualAny(interiorSize, Int2.Zero);
+                        }
+
+                        if (hasChildren)
+                        {
+                            if (isReturningAfterDefer)
+                            {
+                                switch (widget.DisplayInside)
+                                {
+                                    case DisplayInside.Flow: ApplyFlowLayoutTo(ref treeData); break;
+                                    case DisplayInside.Flex: ApplyFlexLayoutTo(ref treeData); break;
+                                    case DisplayInside.Grid: ApplyGridLayoutTo(ref treeData); break;
+                                }
+                            }
+                            else if (!shouldSkipChildren)
+                            {
+                                deferredLayouts.Push(i);
+                            }
+                        }
+                        
+
+                        widget.ChangeMask = LayoutChangeMask.None;
                     }
                 }
                 else
                 {
-                    widgetData.Widget.RemoveStateFlags(StateFlags.InvalidLayout);
+                    // Skip this branch of the tree as there is nothing to do
+
+                    i = treeData.TreeRange.End;
                 }
             }
-        }
 
-        private void ComputeRectForWidgetsInGroup(ref LayoutGroup layoutGroup)
-        {
-            for (int i = 0; i < layoutGroup.Widgets.Count; ++i)
+            bool IsParentResponsibleForSize(WidgetTreeData widget)
             {
-                WidgetData widgetData = layoutGroup.Widgets[i];
+                Widget parentWidget = _treeData[widget.ParentIndex].Widget;
+                DisplayInside layoutRule = parentWidget.DisplayInside;
 
-                Vector2 parentOffset = Vector2.Zero;
-                if (widgetData.Widget.Parent != null)
+                switch (layoutRule)
                 {
-                    Widget parentWidget = widgetData.Widget.Parent;
-                    parentOffset = parentWidget.ComputedRect.Minimum + (parentWidget.LayoutState.ContentPosition - parentWidget.LayoutState.IdealPosition);
-                }
-
-                parentOffset += widgetData.Widget.IdealPosition;
-                widgetData.Widget.ComputedRect = new Boundaries(parentOffset, parentOffset + widgetData.Widget.IdealSize);
-                widgetData.Widget.AfterComputedRectSelf();
-            }
-        }
-
-        private void SetupLayoutGroups(Widget rootWidget, ILayoutReporter? layoutReporter)
-        {
-            using RentedQueue<GroupSearchData> widgetsWithGroups = new RentedQueue<GroupSearchData>();
-
-            int currentGroupId = 0;
-
-            widgetsWithGroups.Enqueue(new GroupSearchData(rootWidget, 0, -1, 0, LayoutBehaviour.Default));
-            while (widgetsWithGroups.TryDequeue(out GroupSearchData currentGroupOwner))
-            {
-                layoutReporter?.OnWidgetGrouped(currentGroupOwner.Widget);
-
-                RentedList<WidgetData> widgets = new RentedList<WidgetData>();
-
-                _searchDataStack.Push(new WidgetSearchData(currentGroupOwner.Widget, currentGroupOwner.Depth, currentGroupOwner.GroupId, currentGroupOwner.Behaviour));
-
-                while (_searchDataStack.TryPop(out WidgetSearchData result))
-                {
-                    widgets.Add(new WidgetData(result.Widget, result.Depth, result.Behaviour.ListenToChildren || result.Widget.AutoResize != AutoResizeMode.None));
-
-                    ROList<Widget> children = result.Widget.Children;
-                    if (children.Count > 0)
-                    {
-                        int depth = result.Depth + 1;
-
-                        for (int i = children.Count - 1; i >= 0; --i)
+                    case DisplayInside.Flow:
                         {
-                            Widget child = children[i];
-                            if (child.IsEnabled)
+                            return parentWidget.AlignItems switch
                             {
-                                LayoutBehaviour behaviour = child.LayoutBehaviour;
-                                if (behaviour.AsGroup && HasActualChildrenForGroup(child))
-                                    widgetsWithGroups.Enqueue(new GroupSearchData(child, depth, currentGroupOwner.GroupId, ++currentGroupId, behaviour));
-                                else
-                                    _searchDataStack.Push(new WidgetSearchData(child, depth, currentGroupOwner.GroupId, behaviour));
-                            }
+                                ItemAlignment.Stretch => true,
+                                _ => false,
+                            };
                         }
-                    }
-                }
-
-                Debug.Assert(_searchDataStack.Count == 0);
-
-                if (widgets.Count > 1)
-                {
-                    _layoutGroups.Add(new LayoutGroup(currentGroupOwner.Widget, currentGroupOwner.GroupId, currentGroupOwner.ParentGroupId, widgets, false));
-                }
-                else
-                {
-                    widgets.Dispose();
-                }
-            }
-
-            Debug.Assert(widgetsWithGroups.Count == 0);
-
-            static bool HasActualChildrenForGroup(Widget widget)
-            {
-                foreach (Widget child in widget.Children)
-                {
-                    if (!child.LayoutBehaviour.AsGroup)
-                        return true;
+                    case DisplayInside.Flex:
+                        {
+                            return parentWidget.FlexAlignItems switch
+                            {
+                                FlexItemAlignment.Stretch => true,
+                                _ => false,
+                            };
+                        }
+                    case DisplayInside.Grid:
+                        {
+                            return Flags.HasEither(~parentWidget.DisplayState.Grid.Value, 0b11 << (int)GridColumnsMethod.RowShift);
+                        }
                 }
 
                 return false;
             }
         }
 
-        private void ClearLayoutData()
+        private void ApplyFlowLayoutTo(ref WidgetTreeData treeData)
         {
-            foreach (LayoutGroup layoutGroup in _layoutGroups)
-            {
-                layoutGroup.Widgets.Dispose();
-            }
-
-            _layoutGroups.Clear();
+            FlowLayout layout = new FlowLayout();
+            layout.Layout(ref treeData, _treeData, this);
         }
 
-        private readonly record struct GroupSearchData(Widget Widget, int Depth, int ParentGroupId, int GroupId, LayoutBehaviour Behaviour);
-        private readonly record struct WidgetSearchData(Widget Widget, int Depth, int ParentGroupId, LayoutBehaviour Behaviour);
+        private void ApplyFlexLayoutTo(ref WidgetTreeData treeData)
+        {
 
-        private readonly record struct WidgetData(Widget Widget, int Depth, bool IsListeningToChildren);
+        }
 
-        private record struct LayoutGroup(Widget TreeOwner, int GroupId, int ParentGroupId, RentedList<WidgetData> Widgets, bool NeedsMeasure = false, bool NeedsRelayout = false);
+        private void ApplyGridLayoutTo(ref WidgetTreeData treeData)
+        {
+
+        }
+
+        private void GatherWidgetsForLayout(Widget rootWidget, ILayoutReporter? layoutReporter)
+        {
+            using RentedQueue<WidgetSearchData> widgetsToSearch = new RentedQueue<WidgetSearchData>();
+            using RentedStack<int> widgetTreeStartIndices = new RentedStack<int>();
+
+            widgetsToSearch.Enqueue(new WidgetSearchData(rootWidget, 0));
+            widgetTreeStartIndices.Push(0);
+
+            while (widgetsToSearch.TryDequeue(out WidgetSearchData searchData))
+            {
+                int stackDepth = searchData.Depth + 1;
+                if (widgetTreeStartIndices.Count > stackDepth)
+                {
+                    int treeEndIndex = _treeData.Count - 1;
+                    while (widgetTreeStartIndices.TryPop(out int index) && widgetTreeStartIndices.Count > stackDepth)
+                    {
+                        ref WidgetTreeData treeData = ref _treeData.GetRefAtIndex(index);
+                        treeData.TreeRange = new IndexRange(index, treeEndIndex);
+                    }
+                }
+
+                int thisIndex = _treeData.Count;
+                _treeData.Add(new WidgetTreeData(searchData.Widget, searchData.Depth, IndexRange.Empty, _treeData.Count == 0 ? -1 : widgetTreeStartIndices.Peek(), false, default));
+
+                ROList<Widget> children = searchData.Widget.Children;
+                if (children.Count > 0)
+                {
+                    widgetTreeStartIndices.Push(thisIndex);
+                    foreach (Widget child in children)
+                    {
+                        if (child.Children.Count == 0)
+                        {
+                            _treeData.Add(new WidgetTreeData(child, stackDepth, new IndexRange(_treeData.Count, _treeData.Count), thisIndex, false, default));
+                        }
+                        else
+                        {
+                            widgetsToSearch.Enqueue(new WidgetSearchData(child, stackDepth));
+                        }
+                    }
+                }
+            }
+        }
+
+        internal void QueryLayoutDataFor(ref WidgetTreeData treeData)
+        {
+            if (!treeData.HasLayoutData)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        internal int TryFindActualInteriorWidth(ref WidgetTreeData treeData)
+        {
+            Span<WidgetTreeData> treeRecursion = _treeData.AsSpan();
+            while (true)
+            {
+                if (!treeData.HasLayoutData)
+                    QueryLayoutDataFor(ref treeData);
+
+                if (treeData.Layout.HasWidth)
+                {
+                    return treeData.Layout.InteriorSize.X;
+                }
+                else
+                {
+                    if (treeData.ParentIndex == -1)
+                    {
+                        return 0;
+                    }
+                    else
+                    {
+                        treeData = ref treeRecursion[treeData.ParentIndex];
+                    }
+                }
+            }
+        }
+
+        internal void InvalidateLayoutsAbove(ref int i)
+        {
+
+        }
+
+        private enum LayoutChangeType : byte
+        {
+            None,
+            Child,
+            This
+        }
     }
+
+    internal readonly record struct WidgetSearchData(Widget Widget, int Depth);
+    internal record struct WidgetTreeData(Widget Widget, int Depth, IndexRange TreeRange, int ParentIndex, bool HasLayoutData, WidgetLayout Layout);
+
+    [StructLayout(LayoutKind.Explicit, Pack = 16)]
+    internal record struct WidgetLayout
+    {
+        [FieldOffset(0)] public Int2 BoxPosition;
+        [FieldOffset(8)] public Int2 BoxSize;
+        [FieldOffset(16)] public Int2 ClientOffset;
+        [FieldOffset(24)] public Int2 ClientSize;
+        [FieldOffset(32)] public Int2 InteriorOffset;
+        [FieldOffset(40)] public Int2 InteriorSize;
+
+        [FieldOffset(49)] public bool HasWidth;
+        [FieldOffset(50)] public bool HasHeight;
+
+        [FieldOffset(0)] public Rect Box;
+        [FieldOffset(16)] public Rect Client;
+        [FieldOffset(32)] public Rect Interior;
+
+        [FieldOffset(0)] private Vector256<int> _v256;
+        [FieldOffset(32)] private Vector128<int> _v128;
+
+        public WidgetLayout(WidgetLayout other) => this = other;
+
+        public readonly bool HasChanged(WidgetLayout layoutToCompare)
+        {
+            return _v256 != layoutToCompare._v256 && _v128 != layoutToCompare._v128;
+        }
+
+        public readonly bool HasBoxChanged(Rect other) => Box.Equals(other);
+        public readonly bool HasClientChanged(Rect other) => Client.Equals(other);
+        public readonly bool HasInteriorChanged(Rect other) => Interior.Equals(other);
+    }
+
+    internal readonly record struct WidgetMetricsForLayout(int LineEndIndex, int LineWidth, int LineHeight, int ItemsWithoutWidth);
 
     public readonly record struct MeasureReturnData(MeasureStatus Status, LayoutLockAxis LockAxis, Vector2? CustomSize = null)
     {

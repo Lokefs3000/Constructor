@@ -222,10 +222,12 @@ namespace EditorUI.Styling
             }
         }
 
-        public bool TryGetClassValue(ClassStyleKey styleKey, PropertyData propertyData, out object? value)
+        public bool TryGetClassValue(ClassStyleKey styleKey, PropertyData propertyData, out object? value, out int triggerIndex)
         {
             value = default;
-            if (!styleKey.Class.TryGetTriggerIndex(styleKey.Key, (ushort)styleKey.TriggerMask, out int triggerIndex))
+            triggerIndex = -1;
+
+            if (!styleKey.Class.TryGetTriggerIndex(styleKey.Key, (ushort)styleKey.TriggerMask, out triggerIndex))
                 return false;
 
             styleKey = new ClassStyleKey(styleKey.Class, styleKey.Key, triggerIndex);

@@ -163,8 +163,8 @@ namespace Editor.Processors.Texture
 
         public struct CompsiteChannel(TextureCompositeChannel sourceChannel)
         {
-            [TomlConverter(typeof(EarlyAssetIdTomlConverter))]
-            public AssetId Asset { get; set; } = AssetId.Invalid;
+            [TomlConverter(typeof(EarlyFileIdTomlConverter))]
+            public FileId Asset { get; set; } = FileId.Invalid;
             public TextureCompositeChannel Source { get; set; } = sourceChannel;
             public bool Invert { get; set; } = false;
         }
@@ -185,13 +185,13 @@ namespace Editor.Processors.Texture
 
         public struct Composited()
         {
-            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId PositiveX { get; set; }
-            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId PositiveY { get; set; }
-            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId PositiveZ { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyFileIdTomlConverter))] public FileId PositiveX { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyFileIdTomlConverter))] public FileId PositiveY { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyFileIdTomlConverter))] public FileId PositiveZ { get; set; }
 
-            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId NegativeX { get; set; }
-            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId NegativeY { get; set; }
-            [TomlRequired, TomlConverter(typeof(EarlyAssetIdTomlConverter))] public AssetId NegativeZ { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyFileIdTomlConverter))] public FileId NegativeX { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyFileIdTomlConverter))] public FileId NegativeY { get; set; }
+            [TomlRequired, TomlConverter(typeof(EarlyFileIdTomlConverter))] public FileId NegativeZ { get; set; }
         }
     }
 

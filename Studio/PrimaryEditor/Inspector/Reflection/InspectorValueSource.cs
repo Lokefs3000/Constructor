@@ -24,7 +24,7 @@ namespace PrimaryEditor.Inspector.Reflection
 
         public T? GetValueFromObject<T, TObject>(TObject obj)
         {
-            return ((GetValueAsObject<T, TObject>)GetDelegate)(obj);
+            return obj is null ? default : ((GetValueAsObject<T, TObject>)GetDelegate)(obj);
         }
     }
 

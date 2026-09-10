@@ -5,7 +5,6 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using EditorUI;
-using EditorUI.Demo;
 using EditorUI.Diagnostics.ImGui;
 using EditorUI.Dock;
 using EditorUI.Serialization.Value;

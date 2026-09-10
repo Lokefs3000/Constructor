@@ -13,7 +13,7 @@ using EditorUI.Widgets;
 using EditorUI.Windowing;
 using Primary.Assets;
 using Primary.Input.Devices;
-using Primary.Rendering.Debuggable;
+using Primary.Rendering.Diagnostics;
 using PrimaryEditor.Assets;
 using PrimaryEditor.Core;
 using PrimaryEditor.UI.Diagnostics;

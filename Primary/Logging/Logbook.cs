@@ -15,7 +15,7 @@ namespace Primary.Logging
 
         private Lock _lock;
 
-        internal Logbook()
+        public Logbook()
         {
             s_isLogbookEnabled = AppArguments.GetValueOrDefault("no-logbook", true);
 

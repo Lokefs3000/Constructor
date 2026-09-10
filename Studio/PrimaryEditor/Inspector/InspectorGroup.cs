@@ -23,7 +23,7 @@ namespace PrimaryEditor.Inspector
         {
             try
             {
-                InspectorManager inspector = EditorRuntime.Instance.InspectorManager;
+                InspectorManager inspector = InspectorManager.Instance;
 
                 _type = typeof(T);
 

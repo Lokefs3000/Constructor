@@ -31,8 +31,8 @@ namespace Primary.Common
         public readonly bool IsOverlappingRange(IndexRange range) => Start < range.End && End > range.Start;
         public readonly bool IsOverlappingFullRange(IndexRange range) => Start <= range.End && End >= range.Start;
 
-        public int Length => End - Start;
-        public bool IsEmpty => End <= Start;
+        public readonly int Length => End - Start;
+        public readonly bool IsEmpty => End <= Start;
 
         public static readonly IndexRange Empty = new IndexRange(0, 0);
 

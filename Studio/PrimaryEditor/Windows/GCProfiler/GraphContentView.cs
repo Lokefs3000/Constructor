@@ -12,7 +12,7 @@ namespace PrimaryEditor.Windows.GCProfiler
         private readonly GCProfilerWindow _window;
 
         private Widget? _contentWidget;
-        private LayoutFrame? _timingLabels;
+        private Widget? _timingLabels;
         private Widget? _memoryLabels;
         private GCGraphView? _primaryGraph;
 
@@ -29,7 +29,7 @@ namespace PrimaryEditor.Windows.GCProfiler
 
             if (_contentWidget != null)
             {
-                _timingLabels = _contentWidget.FindWidgetWithId<LayoutFrame>("timing");
+                _timingLabels = _contentWidget.FindWidgetWithId<Widget>("timing");
                 _memoryLabels = _contentWidget.FindWidgetWithId<Widget>("memory");
                 _primaryGraph = _contentWidget.FindWidgetWithId<GCGraphView>("graph");
             }
@@ -61,7 +61,7 @@ namespace PrimaryEditor.Windows.GCProfiler
                 Label currentLabel = (Label)_memoryLabels.Children[2];
 
                 currentLabel.Text = FileUtility.FormatSize((long)_primaryGraph.CurrentUsageValue, "F1");
-                currentLabel.Position = new UIValue2(0, Math.Clamp((int)verticalPosition, (int)currentLabel.IdealSize.Y, (int)(_memoryLabels.IdealSize.Y - currentLabel.IdealSize.Y)));
+                currentLabel.Top = Math.Clamp((int)verticalPosition, (int)currentLabel.IdealSize.Y, (int)(_memoryLabels.IdealSize.Y - currentLabel.IdealSize.Y));
             }
         }
     }

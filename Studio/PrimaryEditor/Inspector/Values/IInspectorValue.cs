@@ -15,6 +15,8 @@ namespace PrimaryEditor.Inspector.Values
         public void SetValueType<T>(T value) where T : unmanaged;
         public void SetObject<T>(T? value) where T : class;
 
+        public void UpdateSelf();
+
         public Type TargetType { get; }
         public IInspectorValue? OwningValue { get; }
 

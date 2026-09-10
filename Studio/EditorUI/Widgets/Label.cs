@@ -22,20 +22,20 @@ namespace EditorUI.Widgets
 
         private Vector2 _lastIdealSize;
 
-        protected IAssetProvider<FontFamily>? _fontFamily;
-        protected FontStyle _fontStyle;
-        protected FontWeight _fontWeight;
+        [StyleInclude] protected IAssetProvider<FontFamily>? _fontFamily;
+        [StyleInclude] protected FontStyle _fontStyle;
+        [StyleInclude] protected FontWeight _fontWeight;
 
-        protected float _fontSize;
+        [StyleInclude] protected float _fontSize;
 
-        protected TextWrapMode _wrapMode;
-        protected TextAlignment _alignment;
+        [StyleInclude] protected TextWrapMode _wrapMode;
+        [StyleInclude] protected TextAlignment _alignment;
 
-        protected bool _allowRichText;
+        [StyleInclude] protected bool _allowRichText;
 
-        protected UIColor _textColor;
+        [StyleInclude] protected UIColor _textColor;
 
-        protected string? _text;
+        [StyleSetup(IsEditable = true)] protected string? _text;
 
         public Label()
         {
@@ -66,50 +66,38 @@ namespace EditorUI.Widgets
             base.DestroySelf();
         }
 
-        protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
-        {
-            base.MeasureSelf(in context);
-
-            _hasBadShapingData = _hasBadShapingData || _lastIdealSize != _layoutState.IdealSize;
-
-            // cannot decide wrapping dimensions if this has any kind of auto resize in the X direction
-            if (_hasBadShapingData && _autoResize != AutoResizeMode.ResizeX && _autoResize != AutoResizeMode.ResizeXY)
-            {
-                if (_fontFamily != null)
-                {
-                    if (Vector2.EqualsAny(_layoutState.IdealSize, Vector2.Zero))
-                    {
-                        if (!_fontFamily.IsReadyToUse)
-                            return MeasureStatus.MissingPendingData;
-
-                        SetIdealSizeFor(context.LayoutLock);
-                    }
-                    else
-                    {
-                        if (!_fontFamily.IsReadyToUse)
-                            return MeasureStatus.MissingPendingData;
-
-                        SetIdealSizeFor(LayoutLockAxis.AxisXY);
-                    }
-                }
-
-                _hasBadShapingData = false;
-            }
-
-            return MeasureStatus.Success;
-        }
-
-        protected internal override LayoutReturnData LayoutSelf(ref readonly LayoutContext context)
-        {
-            if (_hasBadShapingData && _fontFamily != null && _fontFamily.IsReadyToUse)
-            {
-                SetIdealSizeFor(Parent?.SizeLockAxis ?? LayoutLockAxis.None);
-                _hasBadShapingData = false;
-            }
-
-            _lastIdealSize = _layoutState.IdealSize;
-            return base.LayoutSelf(in context);
-        }
+        // protected internal override MeasureStatus MeasureSelf(ref readonly LayoutContext context)
+        // {
+        //     base.MeasureSelf(in context);
+        // 
+        //     _hasBadShapingData = _hasBadShapingData || _lastIdealSize != _layoutState.IdealSize;
+        // 
+        //     // cannot decide wrapping dimensions if this has any kind of auto resize in the X direction
+        //     if (_hasBadShapingData && _autoResize != AutoResizeMode.ResizeX && _autoResize != AutoResizeMode.ResizeXY)
+        //     {
+        //         if (_fontFamily != null)
+        //         {
+        //             if (Vector2.EqualsAny(_layoutState.IdealSize, Vector2.Zero))
+        //             {
+        //                 if (!_fontFamily.IsReadyToUse)
+        //                     return MeasureStatus.MissingPendingData;
+        // 
+        //                 SetIdealSizeFor(context.LayoutLock);
+        //             }
+        //             else
+        //             {
+        //                 if (!_fontFamily.IsReadyToUse)
+        //                     return MeasureStatus.MissingPendingData;
+        // 
+        //                 SetIdealSizeFor(LayoutLockAxis.AxisXY);
+        //             }
+        //         }
+        // 
+        //         _hasBadShapingData = false;
+        //     }
+        // 
+        //     return MeasureStatus.Success;
+        // }
 
         protected internal override void PaintSelf(ref PainterContext context)
         {
@@ -154,7 +142,7 @@ namespace EditorUI.Widgets
         }
 
         [StyleUpdateCallback(nameof(FontFamily), nameof(FontStyle), nameof(FontWeight), nameof(FontSize), nameof(WrapMode),
-            nameof(Alignment), nameof(AllowRichText), nameof(Text), nameof(AutoResize), nameof(Size))]
+            nameof(Alignment), nameof(AllowRichText), nameof(Text), nameof(Size))]
         private void InvalidateCurrentTextData()
         {
             _hasBadShapingData = true;
@@ -162,20 +150,20 @@ namespace EditorUI.Widgets
         }
 
         #region Serializable
-        [Styled(nameof(_fontFamily))] public IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
-        [Styled(nameof(_fontStyle))] public FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
-        [Styled(nameof(_fontWeight))] public FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
+        public IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
+        public FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
+        public FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
 
-        [Styled(nameof(_fontSize))] public float FontSize { get => _fontSize; set => SetStyledField(value); }
+        public float FontSize { get => _fontSize; set => SetStyledField(value); }
 
-        [Styled(nameof(_wrapMode))] public TextWrapMode WrapMode { get => _wrapMode; set => SetStyledField(value); }
-        [Styled(nameof(_alignment))] public TextAlignment Alignment { get => _alignment; set => SetStyledField(value); }
+        public TextWrapMode WrapMode { get => _wrapMode; set => SetStyledField(value); }
+        public TextAlignment Alignment { get => _alignment; set => SetStyledField(value); }
 
-        [Styled(nameof(_allowRichText))] public bool AllowRichText { get => _allowRichText; set => SetStyledField(value); }
+        public bool AllowRichText { get => _allowRichText; set => SetStyledField(value); }
 
-        [Styled(nameof(_textColor))] public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
+        public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
 
-        [Styled(nameof(_text), isEditable: true)] public string? Text { get => _text; set => SetEditedField(value); }
+        public string? Text { get => _text; set => SetEditedField(value); }
         #endregion
     }
 }

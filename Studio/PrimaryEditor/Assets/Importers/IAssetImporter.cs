@@ -2,15 +2,21 @@
 using System.Collections.Generic;
 using System.Text;
 using Primary.Assets.Types;
+using Tomlyn.Serialization;
 
 namespace PrimaryEditor.Assets.Importers
 {
     public interface IAssetImporter
     {
-        public void ImportFile(AssetPipeline pipeline, AssetId id, Stream inputStream, Stream outputStream, string localPath, string localOutputPath, bool isTrialImport);
-        public void PreloadFile(AssetPipeline pipeline, AssetId id);
+        public void ImportFile(in ImportContext context);
         public bool ValidateFile(AssetPipeline pipeline, AssetId id, string localPath);
 
         public string UniqueId { get; }
+        public Type AssetDefinitionType { get; }
+
+        public string? DefaultConfigName { get; }
+        public Type? ConfigType { get; }
+
+        public TomlConverter[] Converters { get; }
     }
 }

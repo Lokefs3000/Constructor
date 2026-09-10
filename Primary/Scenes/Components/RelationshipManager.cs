@@ -33,6 +33,9 @@ namespace Primary.Scenes.Components
             //    AddToParent(ref relationship);
             //}
 
+            if (entity == newParent || entity == Entity.Null)
+                return false;
+
             ref EntityRelationships relationships = ref entity.TryGetRef<EntityRelationships>(out _);
             Debug.Assert(!Unsafe.IsNullRef(in relationships));
 

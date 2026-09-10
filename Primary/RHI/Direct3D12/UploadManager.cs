@@ -268,7 +268,9 @@ namespace Primary.RHI.Direct3D12
                         BarrierSync.Copy,
                         native->BarrierAccess,
                         BarrierAccess.CopyDest,
-                        (ID3D12Resource*)Unsafe.AsPointer(ref buffer.Resource.Get())));
+                        (ID3D12Resource*)Unsafe.AsPointer(ref buffer.Resource.Get()),
+                        null,
+                        ulong.MaxValue));
 
                     native->BarrierSync = BarrierSync.Copy;
                     native->BarrierAccess = BarrierAccess.CopyDest;

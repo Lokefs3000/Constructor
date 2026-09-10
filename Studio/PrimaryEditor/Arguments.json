@@ -19,6 +19,11 @@
             "name": "skip-asset-check",
             "shorthand": null,
             "type": null
+        },
+        {
+            "name": "detailed-asset-info",
+            "shorthand": null,
+            "type": null
         }
     ],
     "includes": [

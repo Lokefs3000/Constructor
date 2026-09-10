@@ -12,16 +12,16 @@ namespace EditorUI.Widgets.Stylists
     [UIWidget]
     public class TreeNodeStylist : Stylist
     {
-        protected IAssetProvider<FontFamily>? _fontFamily;
-        protected FontStyle _fontStyle;
-        protected FontWeight _fontWeight;
+        [StyleInclude] protected IAssetProvider<FontFamily>? _fontFamily;
+        [StyleInclude] protected FontStyle _fontStyle;
+        [StyleInclude] protected FontWeight _fontWeight;
 
-        protected bool _allowRichText;
+        [StyleInclude] protected bool _allowRichText;
 
-        protected float _fontSize;
+        [StyleInclude] protected float _fontSize;
 
-        protected UIColor _backgroundColor;
-        protected UIColor _textColor;
+        [StyleInclude] protected UIColor _backgroundColor;
+        [StyleInclude] protected UIColor _textColor;
 
         public TreeNodeStylist(Widget parent) : base(parent)
         {
@@ -38,16 +38,16 @@ namespace EditorUI.Widgets.Stylists
         }
 
         #region Serializable
-        [Styled(nameof(_fontFamily))] public IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
-        [Styled(nameof(_fontStyle))] public FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
-        [Styled(nameof(_fontWeight))] public FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
+        public IAssetProvider<FontFamily>? FontFamily { get => _fontFamily; set => SetStyledField(value); }
+        public FontStyle FontStyle { get => _fontStyle; set => SetStyledField(value); }
+        public FontWeight FontWeight { get => _fontWeight; set => SetStyledField(value); }
 
-        [Styled(nameof(_allowRichText))] public bool AllowRichText { get => _allowRichText; set => SetStyledField(value); }
+        public bool AllowRichText { get => _allowRichText; set => SetStyledField(value); }
 
-        [Styled(nameof(_fontSize))] public float FontSize { get => _fontSize; set => SetStyledField(value); }
+        public float FontSize { get => _fontSize; set => SetStyledField(value); }
 
-        [Styled(nameof(_backgroundColor))] public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
-        [Styled(nameof(_textColor))] public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
+        public UIColor BackgroundColor { get => _backgroundColor; set => SetStyledField(value); }
+        public UIColor TextColor { get => _textColor; set => SetStyledField(value); }
         #endregion
     }
 }

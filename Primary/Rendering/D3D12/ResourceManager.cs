@@ -347,6 +347,7 @@ namespace Primary.Rendering.D3D12
                 {
                     NRDResourceId.Texture => ((D3D12RHIBufferNative*)resource.Native)->Resource,
                     NRDResourceId.Buffer => ((D3D12RHITextureNative*)resource.Native)->Resource,
+                    NRDResourceId.Readback => ((D3D12RHIReadbackNative*)resource.Native)->Resource,
                     _ => throw new NotImplementedException(),
                 };
             }
@@ -543,6 +544,11 @@ namespace Primary.Rendering.D3D12
                             resDesc.Flags |= ResourceFlags.AllowDepthStencil;
                         }
 
+                        if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.UnorderedAccess))
+                        {
+                            resDesc.Flags |= ResourceFlags.AllowUnorderedAccess;
+                        }
+
                         break;
                     }
                 case FGResourceId.Buffer:
@@ -584,6 +590,34 @@ namespace Primary.Rendering.D3D12
                 SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
                 Layout = TextureLayout.LayoutRowMajor,
                 Flags = Unsafe.As<D3D12RHIDevice>(device.RHIDevice).Setup.UseTightAlignment ? ResourceFlags.UseTightAlignment : ResourceFlags.None
+            };
+
+            return resDesc;
+        }
+
+        internal static ResourceDesc1 GetTextureDescription(NRDDevice device, FrameGraphTexture texture)
+        {
+            FrameGraphTextureDesc texDesc = texture.Description;
+
+            ResourceDesc1 resDesc = new ResourceDesc1
+            {
+                Dimension = texDesc.Dimension switch
+                {
+                    FGTextureDimension._1D => ResourceDimension.Texture1D,
+                    FGTextureDimension._2D => ResourceDimension.Texture2D,
+                    FGTextureDimension._3D => ResourceDimension.Texture3D,
+                    FGTextureDimension.Cube => ResourceDimension.Texture2D,
+                },
+                Alignment = 0,
+                Width = (ulong)texDesc.Width,
+                Height = (uint)texDesc.Height,
+                DepthOrArraySize = (ushort)texDesc.Depth,
+                MipLevels = 1,
+                Format = texDesc.Format.ToTextureFormat(),
+                SampleDesc = new SampleDesc { Count = 1, Quality = 0 },
+                Layout = TextureLayout.LayoutUnknown,
+                Flags = ResourceFlags.None,
+                SamplerFeedbackMipRegion = default
             };
 
             return resDesc;

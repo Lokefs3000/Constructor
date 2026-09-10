@@ -28,7 +28,9 @@ namespace Primary.Assets.Types
             _asset.Target = null;
 
             _status = ResourceStatus.Disposed;
-            _name = string.Empty;
+            // _name = string.Empty;
+
+            GC.SuppressFinalize(this);
         }
 
         public virtual void UpdateAssetData(T asset)
@@ -46,6 +48,8 @@ namespace Primary.Assets.Types
             ++_loadIndex;
             _status = ResourceStatus.Error;
         }
+
+        void IInternalAssetData.UpdateAssetFailed(IAssetDefinition asset) => UpdateAssetFailed((T)asset);
 
         public virtual void SetAssetInternalName(string name) => _name = name;
         public virtual void SetAssetInternalStatus(ResourceStatus status) => _status = status;

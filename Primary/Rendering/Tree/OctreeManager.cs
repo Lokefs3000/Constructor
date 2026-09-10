@@ -32,6 +32,8 @@ namespace Primary.Rendering.Tree
             {
                 _pendingUpdates.Enqueue(new EntityUpdateData(EntityUpdateType.Removed, e));
             });
+
+            SceneEntityManager.Events |= EntityEvents.EntityComponents;
         }
 
         internal void QueryPending()
@@ -39,9 +41,6 @@ namespace Primary.Rendering.Tree
             using (new ProfilingScope("OctreeUpdate"))
             {
                 World world = Engine.GlobalSingleton.SceneManager.World;
-
-                QueryUpdatedBoundsJob job = new QueryUpdatedBoundsJob(this);
-                world.InlineEntityQuery<QueryUpdatedBoundsJob, RenderBounds, RenderOctantInfo>(QueryUpdatedBoundsJob.Query, ref job);
 
                 if (_pendingUpdates.Count > 0)
                 {
@@ -64,6 +63,9 @@ namespace Primary.Rendering.Tree
                         }
                     }
                 }
+
+                QueryUpdatedBoundsJob job = new QueryUpdatedBoundsJob(this);
+                world.InlineEntityQuery<QueryUpdatedBoundsJob, RenderBounds, RenderOctantInfo>(QueryUpdatedBoundsJob.Query, ref job);
             }
         }
 
@@ -156,5 +158,9 @@ namespace Primary.Rendering.Tree
         }
     }
 
-    public readonly record struct OctreePoint(int X, int Y, int Z);
+    public readonly record struct OctreePoint(int X, int Y, int Z) : IEquatable<OctreePoint>
+    {
+        public override int GetHashCode() => HashCode.Combine(X, Y, Z);
+        public override string ToString() => $"{X}x{Y}x{Z}";
+    }
 }

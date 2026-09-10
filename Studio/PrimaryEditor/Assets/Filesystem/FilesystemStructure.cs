@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Primary.Collections.ReadOnly;
+using Primary.Common;
 
 namespace PrimaryEditor.Assets.Filesystem
 {
@@ -73,6 +74,86 @@ namespace PrimaryEditor.Assets.Filesystem
 
             string name = Path.GetFileName(localPath);
             parentDir.RemoveEntry(name, false);
+        }
+
+        internal void RenameDirectory(string oldLocalPath, string newLocalPath)
+        {
+            if (_directories.TryGetValue(oldLocalPath, out FilesystemDirectory? directory))
+            {
+                _directories.Remove(oldLocalPath);
+                _directories.Add(newLocalPath, directory);
+
+                directory.Name = Path.GetDirectoryName(newLocalPath) ?? string.Empty;
+                directory.LocalPath = newLocalPath;
+
+                if (directory.Parent != null)
+                {
+                    FilesystemDirectory parentDir = directory.Parent;
+                    parentDir.RemoveEntry(directory.Name, false);
+                    parentDir.AddDirectory(directory.Name, directory);
+                }
+
+                RenameEntriesInDirectory(directory, oldLocalPath, newLocalPath);
+            }
+        }
+
+        internal void RenameFile(string oldLocalPath, string newLocalPath)
+        {
+            FilesystemDirectory? parentDir = FindParentDirectoryFor(oldLocalPath, false);
+            if (parentDir != null)
+            {
+                string fileName = Path.GetFileName(oldLocalPath);
+                FilesystemFile newFile = new FilesystemFile(Path.GetFileName(newLocalPath), newLocalPath);
+
+                parentDir.RemoveEntry(fileName, true);
+                parentDir.AddFile(newFile.Name, newFile);
+            }
+        }
+
+        private void RenameEntriesInDirectory(FilesystemDirectory directory, string oldLocalPath, string newLocalPath)
+        {
+            if (directory.Entries.Count > 0)
+            {
+                using RentedArray<KeyValuePair<FilesystemEntry, object>> entries = new RentedArray<KeyValuePair<FilesystemEntry, object>>(directory.Entries.Count);
+
+                int index = 0;
+                foreach (var (entry, file) in directory.Entries)
+                {
+                    entries[index++] = new KeyValuePair<FilesystemEntry, object>(entry, file);
+                }
+
+                if (index > 0)
+                {
+                    directory.ClearEntries();
+
+                    for (int i = 0; i < index; ++i)
+                    {
+                        KeyValuePair<FilesystemEntry, object> kvp = entries[i];
+                        
+                        if (kvp.Key.IsFile)
+                        {
+                            string updatedLocalPath = string.Concat(newLocalPath, ((FilesystemFile)kvp.Value).LocalPath.AsSpan(oldLocalPath.Length));
+                            directory.AddFile(kvp.Key.Name, new FilesystemFile(kvp.Key.Name, updatedLocalPath));
+                        }
+                        else
+                        {
+                            FilesystemDirectory dir = (FilesystemDirectory)kvp.Value;
+                            string updatedLocalPath = string.Concat(newLocalPath, dir.LocalPath.AsSpan(oldLocalPath.Length));
+
+                            _directories.Remove(dir.LocalPath);
+                            _directories.Add(updatedLocalPath, dir);
+
+                            dir.LocalPath = updatedLocalPath;
+                            directory.AddDirectory(kvp.Key.Name, dir);
+
+                            if (dir.Entries.Count > 0)
+                            {
+                                RenameEntriesInDirectory(dir, oldLocalPath, newLocalPath);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         private FilesystemDirectory? FindParentDirectoryFor(ReadOnlySpan<char> localPath, bool createIfNull = true)
@@ -165,10 +246,16 @@ namespace PrimaryEditor.Assets.Filesystem
             }
         }
 
+        internal void ClearEntries()
+        {
+            _entries?.Clear();
+            _entries = null;
+        }
+
         internal bool HasEntry(string name, bool isFile) => _entries?.ContainsKey(new FilesystemEntry(name, isFile)) ?? false;
 
-        public string Name => _name;
-        public string LocalPath => _localPath;
+        public string Name { get => _name; internal set => _name = value; }
+        public string LocalPath { get => _localPath; internal set => _localPath = value; }
         public FilesystemDirectory? Parent => _parent;
 
         public ROSortedList<FilesystemEntry, object> Entries => _entries ?? ROSortedList<FilesystemEntry, object>.Empty;

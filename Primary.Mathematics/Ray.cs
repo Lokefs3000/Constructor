@@ -38,6 +38,20 @@ namespace Primary.Mathematics
             return new Ray(worldspace, direction);
         }
 
+        public static Ray ViewportToWorldInverse(Matrix4x4 projection, Matrix4x4 view, Vector2 viewport)
+        {
+            Matrix4x4.Invert(projection, out Matrix4x4 invProj);
+            Matrix4x4.Invert(view, out Matrix4x4 invView);
+
+            Vector3 clipspace = new Vector3(viewport.X, viewport.Y, 0.0f);
+            Vector3 viewspace = Vector3.Transform(clipspace, invProj);
+            Vector3 worldspace = Vector3.Transform(viewspace, invView);
+
+            Vector3 direction = Vector3.Normalize(invView.Translation - worldspace);
+
+            return new Ray(worldspace, direction);
+        }
+
         // https://underdisc.net/blog/6_gizmos/index.html
         /// <summary>
         /// Find the closest distance on a ray from another ray.

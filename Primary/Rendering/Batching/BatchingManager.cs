@@ -1,4 +1,5 @@
-﻿using Primary.Profiling;
+﻿using Primary.Mathematics;
+using Primary.Profiling;
 using Primary.Rendering.Tree;
 
 namespace Primary.Rendering.Batching
@@ -31,7 +32,7 @@ namespace Primary.Rendering.Batching
             return list;
         }
 
-        public void BatchWorld(OctreeManager octree, RenderList output)
+        public void BatchWorld(RenderList output, in BatchWorldSetup setup)
         {
             using (new ProfilingScope("BatchWorld"))
             {
@@ -44,9 +45,9 @@ namespace Primary.Rendering.Batching
                     }
 
                     //TODO: multithreading
-                    foreach (var kvp in octree.Regions)
+                    foreach (var (_, tree) in setup.Octree.Regions)
                     {
-                        _subBatchers[0].Execute(output, kvp.Value);
+                        _subBatchers[0].Execute(output, tree, setup.CullingFrustrum);
                     }
                 }
 
@@ -112,4 +113,6 @@ namespace Primary.Rendering.Batching
             }
         }
     }
+
+    public readonly record struct BatchWorldSetup(OctreeManager Octree, Frustrum CullingFrustrum);
 }

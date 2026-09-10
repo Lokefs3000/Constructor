@@ -43,7 +43,10 @@ namespace Primary.Rendering.Assets
         internal void SetBuffer(string name, FrameGraphBuffer buffer)
         {
             if (!Flags.HasFlag(buffer.Description.Usage, FGBufferUsage.Global))
+            {
+                EngLog.Render.Warning("Trying to set global buffer '{buf}' with resource not marked as global ('{rname}')", name, buffer.ToString());
                 return;
+            }
 
             _globalProperties[name] = new PropertyData(ushort.MaxValue, buffer);
             _transitionalProperties[buffer.Index] = name;
@@ -57,7 +60,10 @@ namespace Primary.Rendering.Assets
         internal void SetTexture(string name, FrameGraphTexture texture, PropertyBindIntent intent = PropertyBindIntent.Default)
         {
             if (!Flags.HasFlag(texture.Description.Usage, FGTextureUsage.Global))
+            {
+                EngLog.Render.Warning("Trying to set global texture '{buf}' with resource not marked as global ('{rname}')", name, texture.ToString());
                 return;
+            }
 
             _globalProperties[name] = new PropertyData(ushort.MaxValue, texture, Intent: intent);
             _transitionalProperties[texture.Index] = name;

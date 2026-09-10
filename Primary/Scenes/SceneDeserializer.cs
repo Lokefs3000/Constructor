@@ -348,6 +348,9 @@ namespace Primary.Scenes
                 EngLog.Scene.Error("Failed to find component reflection: {c}", componentObject.Name);
         }
 
+        public ComponentReflectionCache ReflectionCache => _componentCache;
+        public SceneJsonSerializer JsonSerializer => _jsonSerializer;
+
         private static Dictionary<Type, ISceneTypeDeserializer> s_deserializers = new Dictionary<Type, ISceneTypeDeserializer>
         {
             { typeof(sbyte), new SByteDeserializer() },
@@ -369,7 +372,6 @@ namespace Primary.Scenes
             { typeof(Vector4), new Vector4Deserializer() },
             { typeof(Quaternion), new QuaternionDeserializer() },
             { typeof(IAssetDefinition), new AssetDefinitionDeserializer() },
-            { typeof(RenderMesh), new RenderMeshDeserializer() },
         };
 
         private readonly record struct SerializedEntity(SceneEntity Entity, int ParentId, int ComponentCount);

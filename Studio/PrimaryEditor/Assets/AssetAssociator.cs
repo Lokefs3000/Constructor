@@ -37,20 +37,23 @@ namespace PrimaryEditor.Assets
                 if (serializer.ReadVersionHeader() != CurrentVersion)
                     throw new Exception("Invalid version in registry data");
 
-                using RentedList<AssetId> dependencies = new RentedList<AssetId>();
                 while (!serializer.IsAtEndOfStream)
                 {
-                    AssetId assetId = (AssetId)serializer.ReadGuid()!.Value;
+                    FileId fileId = (FileId)serializer.ReadGuid()!.Value;
+                    int localId = serializer.ReadInt32()!.Value;
 
-                    dependencies.Clear();
+                    AssetId assetId = new AssetId(fileId, localId);
                     while (serializer.LeadingByte != '\n')
                     {
-                        dependencies.Add((AssetId)serializer.ReadGuid()!.Value);
+                        FileId localFileId = (FileId)serializer.ReadGuid()!.Value;
+                        int localLocalId = serializer.ReadInt32()!.Value;
+
+                        bool onlyOnReload = serializer.ReadBoolean()!.Value;
+
+                        MakeAssociation(assetId, new AssetId(localFileId, localLocalId), actAsReloadFlag: onlyOnReload);
                     }
 
                     serializer.ReadNewLine();
-
-                    MakeAssociations(assetId, dependencies.AsSpan());
                 }
             }
         }
@@ -75,11 +78,14 @@ namespace PrimaryEditor.Assets
                 {
                     if (data.Dependencies.Count > 0)
                     {
-                        serializer.WriteValue(id);
+                        serializer.WriteValue(id.FileId);
+                        serializer.WriteValue(id.LocalId);
 
-                        foreach (AssetId dependency in data.Dependencies)
+                        foreach (AssetAssocationInfo dependency in data.Dependencies)
                         {
-                            serializer.WriteValue(dependency);
+                            serializer.WriteValue(dependency.Target.FileId);
+                            serializer.WriteValue(dependency.Target.LocalId);
+                            serializer.WriteValue(dependency.OnlyOnReload);
                         }
 
                         serializer.FinishLine();
@@ -131,7 +137,7 @@ namespace PrimaryEditor.Assets
             }
         }
 
-        public void MakeAssociations(AssetId id, ReadOnlySpan<AssetId> assets, bool clearPrevious = false)
+        public void MakeAssociations(AssetId id, ReadOnlySpan<AssetId> assets, bool clearPrevious = false, bool actAsReloadFlag = false)
         {
             if (assets.IsEmpty)
             {
@@ -144,12 +150,18 @@ namespace PrimaryEditor.Assets
 
             AssociationData NewFactory(AssetId _, ReadOnlySpan<AssetId> assets)
             {
+                HashSet<AssetAssocationInfo> dependencies = new HashSet<AssetAssocationInfo>();
+                foreach (AssetId id in assets)
+                {
+                    dependencies.Add(new AssetAssocationInfo(id, actAsReloadFlag));
+                }
+
                 AssociationData associations = new AssociationData(
                     new Lock(),
-                    [.. assets],
+                    dependencies,
                     []);
 
-                associations.Dependencies.Remove(id);
+                associations.Dependencies.Remove(new AssetAssocationInfo(id, actAsReloadFlag));
                 for (int i = 0; i < assets.Length; i++)
                 {
                     if (assets[i] != id)
@@ -169,19 +181,19 @@ namespace PrimaryEditor.Assets
                     {
                         while (true)
                         {
-                            AssetId nextRemoval = AssetId.Invalid;
-                            foreach (AssetId dependency in associationData.Dependencies)
+                            AssetAssocationInfo nextRemoval = default;
+                            foreach (AssetAssocationInfo dependency in associationData.Dependencies)
                             {
-                                if (!assets.Contains(dependency))
+                                if (!assets.Contains(dependency.Target))
                                 {
                                     nextRemoval = dependency;
-                                    RemoveAssetAsDependent(dependency, id);
+                                    RemoveAssetAsDependent(dependency.Target, id);
 
                                     break;
                                 }
                             }
 
-                            if (nextRemoval.IsInvalid)
+                            if (nextRemoval.Target.IsInvalid)
                                 break;
 
                             associationData.Dependencies.Remove(nextRemoval);
@@ -190,8 +202,11 @@ namespace PrimaryEditor.Assets
 
                     for (int i = 0; i < assets.Length; i++)
                     {
-                        if (assets[i] != id && associationData.Dependencies.Add(assets[i]))
+                        if (assets[i] != id)
                         {
+                            associationData.Dependencies.Remove(new AssetAssocationInfo(assets[i], !actAsReloadFlag));
+                            associationData.Dependencies.Add(new AssetAssocationInfo(assets[i], actAsReloadFlag));
+
                             AddAssetAsDependent(assets[i], id);
                         }
                     }
@@ -201,7 +216,86 @@ namespace PrimaryEditor.Assets
             }
         }
 
-        public void MakeAssociation(AssetId id, AssetId asset, bool clearPrevious = false) => MakeAssociations(id, new ReadOnlySpan<AssetId>(ref asset), clearPrevious);
+        public void MakeAssociations(AssetId id, IEnumerable<AssetId> assets, bool clearPrevious = false, bool actAsReloadFlag = false)
+        {
+            if (!assets.Any())
+            {
+                if (clearPrevious)
+                    ClearAssociations(id);
+                return;
+            }
+
+            _assocations.AddOrUpdate(id, NewFactory, UpdateFactory, assets);
+
+            AssociationData NewFactory(AssetId _, IEnumerable<AssetId> assets)
+            {
+                HashSet<AssetAssocationInfo> dependencies = new HashSet<AssetAssocationInfo>();
+                foreach (AssetId id in assets)
+                {
+                    dependencies.Add(new AssetAssocationInfo(id, actAsReloadFlag));
+                }
+
+                AssociationData associations = new AssociationData(
+                    new Lock(),
+                    dependencies,
+                    []);
+
+                associations.Dependencies.Remove(new AssetAssocationInfo(id, actAsReloadFlag));
+                foreach (AssetId assetId in assets)
+                {
+                    if (assetId != id)
+                    {
+                        AddAssetAsDependent(assetId, id);
+                    }
+                }
+
+                return associations;
+            }
+
+            AssociationData UpdateFactory(AssetId _, AssociationData associationData, IEnumerable<AssetId> assets)
+            {
+                using (associationData.Lock.EnterScope())
+                {
+                    if (clearPrevious)
+                    {
+                        while (true)
+                        {
+                            AssetAssocationInfo nextRemoval = default;
+                            foreach (AssetAssocationInfo dependency in associationData.Dependencies)
+                            {
+                                if (!assets.Contains(dependency.Target))
+                                {
+                                    nextRemoval = dependency;
+                                    RemoveAssetAsDependent(dependency.Target, id);
+
+                                    break;
+                                }
+                            }
+
+                            if (nextRemoval.Target.IsInvalid)
+                                break;
+
+                            associationData.Dependencies.Remove(nextRemoval);
+                        }
+                    }
+
+                    foreach (AssetId assetId in assets)
+                    {
+                        if (assetId != id)
+                        {
+                            associationData.Dependencies.Remove(new AssetAssocationInfo(assetId, !actAsReloadFlag));
+                            associationData.Dependencies.Add(new AssetAssocationInfo(assetId, actAsReloadFlag));
+
+                            AddAssetAsDependent(assetId, id);
+                        }
+                    }
+
+                    return associationData;
+                }
+            }
+        }
+
+        public void MakeAssociation(AssetId id, AssetId asset, bool clearPrevious = false, bool actAsReloadFlag = false) => MakeAssociations(id, new ReadOnlySpan<AssetId>(ref asset), clearPrevious, actAsReloadFlag);
 
         public void ClearAssociations(AssetId id)
         {
@@ -209,9 +303,9 @@ namespace PrimaryEditor.Assets
             {
                 using (associationData.Lock.EnterScope())
                 {
-                    foreach (AssetId dependency in associationData.Dependencies)
+                    foreach (AssetAssocationInfo dependency in associationData.Dependencies)
                     {
-                        RemoveAssetAsDependent(dependency, id);
+                        RemoveAssetAsDependent(dependency.Target, id);
                     }
 
                     if (associationData.Dependencies.Count == 0 && associationData.Dependents.Count == 0)
@@ -220,6 +314,21 @@ namespace PrimaryEditor.Assets
                     }
                 }
             }
+        }
+
+        public bool DoesAssetHaveAssociations(AssetId id) => _assocations.ContainsKey(id);
+
+        internal bool IsAssetOnlyActingAsReload(AssetId id, AssetId actingAsReload)
+        {
+            if (_assocations.TryGetValue(actingAsReload, out AssociationData data))
+            {
+                using(data.Lock.EnterScope())
+                {
+                    return data.Dependencies.Contains(new AssetAssocationInfo(id, true));
+                }
+            }
+
+            return false;
         }
 
         internal Lock.Scope GetAssocationDataWithLockScope(AssetId id, out AssociationData associationData, out bool exists)
@@ -238,5 +347,9 @@ namespace PrimaryEditor.Assets
         private const int CurrentVersion = 1;
     }
 
-    public readonly record struct AssociationData(Lock Lock, HashSet<AssetId> Dependencies, HashSet<AssetId> Dependents);
+    public readonly record struct AssociationData(Lock Lock, HashSet<AssetAssocationInfo> Dependencies, HashSet<AssetId> Dependents);
+    public readonly record struct AssetAssocationInfo(AssetId Target, bool OnlyOnReload) : IEquatable<AssetAssocationInfo>
+    {
+        public override int GetHashCode() => HashCode.Combine(Target, OnlyOnReload);
+    }
 }

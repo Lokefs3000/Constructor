@@ -26,7 +26,7 @@ namespace PrimaryEditor.UI.Serialization
             }
             else if (source.StartsWith("id(") && indexOfEnd != -1)
             {
-                AssetId assetId = new AssetId(Guid.Parse(source[3..indexOfEnd], CultureInfo.InvariantCulture));
+                AssetId assetId = new AssetId((FileId)Guid.Parse(source[3..indexOfEnd], CultureInfo.InvariantCulture), AssetId.NoLocalId);
 
                 TextureAtlasAsset asset = AssetManager.LoadAsset<TextureAtlasAsset>(assetId);
                 return asset.Status == ResourceStatus.Bad ? null : asset.WaitIfNotLoaded().TryFindSpriteOrNull(source[(indexOfEnd + 1)..].Trim().ToString());

@@ -950,6 +950,7 @@ namespace Editor.Shaders.Processors
             {
                 int x = 0;
 
+                if ((x = (Usage != RawVariableUsage.Constants).CompareTo(other.Usage != RawVariableUsage.Constants)) != 0) return x;
                 if ((x = BindGroup.CompareTo(other.BindGroup)) != 0) return x;
                 if ((x = Usage.CompareTo(other.Usage)) != 0) return x;
                 if ((x = Type.CompareTo(other.Type)) != 0) return x;

@@ -153,6 +153,7 @@ namespace Primary.Rendering.D3D12
             CmdResourceType.Buffer => resource.IsExternal ? new NRDResource((D3D12RHIBufferNative*)resource.Resource) : new NRDResource((int)resource.Resource, NRDResourceId.Buffer),
             CmdResourceType.Texture => resource.IsExternal ? new NRDResource((D3D12RHITextureNative*)resource.Resource) : new NRDResource((int)resource.Resource, NRDResourceId.Texture),
             CmdResourceType.Sampler => new NRDResource((D3D12RHISamplerNative*)resource.Resource),
+            CmdResourceType.Readback => new NRDResource((D3D12RHIReadbackNative*)resource.Resource),
             _ => NRDResource.Null
         };
     }
