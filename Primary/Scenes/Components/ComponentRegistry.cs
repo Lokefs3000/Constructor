@@ -3,6 +3,7 @@ using Arch.Core.Extensions;
 using CommunityToolkit.HighPerformance;
 using Primary.Collections.ReadOnly;
 using Primary.Components;
+using Primary.Scenes.Json;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -15,10 +16,14 @@ namespace Primary.Scenes.Components
         private Dictionary<Type, ComponentRegistryEntry> _entries;
         private Dictionary<Assembly, AssemblyList> _assemblies;
 
+        private Dictionary<string, Type> _entryTypeLookups;
+
         internal ComponentRegistry()
         {
             _entries = new Dictionary<Type, ComponentRegistryEntry>();
             _assemblies = new Dictionary<Assembly, AssemblyList>();
+
+            _entryTypeLookups = new Dictionary<string, Type>();
         }
 
         /// <summary>Not thread-safe</summary>
@@ -30,6 +35,10 @@ namespace Primary.Scenes.Components
             ComponentType componentType = Component.GetComponentType(type);
 
             _entries.Add(type, new ComponentRegistryEntry(type, componentType, TryGetRefTemplated<T>, AddOrGetTemplated<T>, BoxTemplated<T>));
+
+            string? fullName = SceneJsonSerializer.GetComponentKey(type);
+            if (fullName != null)
+                _entryTypeLookups.Add(fullName, type);
 
             if (!_assemblies.TryGetValue(assembly, out AssemblyList list))
             {
@@ -49,6 +58,8 @@ namespace Primary.Scenes.Components
 
         /// <summary>Not thread-safe</summary>
         internal ref readonly ComponentRegistryEntry FindComponentEntry(Type type) => ref CollectionsMarshal.GetValueRefOrNullRef(_entries, type);
+
+        internal Type? FindComponentFromFullName(string fullName) => _entryTypeLookups.TryGetValue(fullName, out Type? type) ? type : null;
 
         public RODictionary<Type, ComponentRegistryEntry> Entries => _entries;
 

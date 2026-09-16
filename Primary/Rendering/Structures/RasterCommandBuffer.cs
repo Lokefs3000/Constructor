@@ -24,14 +24,14 @@ namespace Primary.Rendering.Structures
             _commandBuffer = commandBuffer;
         }
 
-        public void SetRenderTarget(int slot, FrameGraphTexture renderTarget) => _commandBuffer.SetRenderTarget(slot, renderTarget);
-        public void SetDepthStencil(FrameGraphTexture depthStencil) => _commandBuffer.SetDepthStencil(depthStencil);
+        public void SetRenderTarget(int slot, FGTexture renderTarget) => _commandBuffer.SetRenderTarget(slot, renderTarget);
+        public void SetDepthStencil(FGTexture depthStencil) => _commandBuffer.SetDepthStencil(depthStencil);
 
-        public void ClearRenderTarget(FrameGraphTexture renderTarget, FGRect? rect = null) => _commandBuffer.ClearRenderTarget(renderTarget, null, rect);
-        public void ClearDepthStencil(FrameGraphTexture depthStencil, FGClearFlags clearFlags, FGRect? rect = null) => _commandBuffer.ClearDepthStencil(depthStencil, clearFlags, null, null, rect);
+        public void ClearRenderTarget(FGTexture renderTarget, FGRect? rect = null) => _commandBuffer.ClearRenderTarget(renderTarget, null, rect);
+        public void ClearDepthStencil(FGTexture depthStencil, FGClearFlags clearFlags, FGRect? rect = null) => _commandBuffer.ClearDepthStencil(depthStencil, clearFlags, null, null, rect);
 
-        public void ClearRenderTarget(FrameGraphTexture renderTarget, Color color, FGRect? rect = null) => _commandBuffer.ClearRenderTarget(renderTarget, color, rect);
-        public void ClearDepthStencil(FrameGraphTexture depthStencil, FGClearFlags clearFlags, float depth = 1.0f, byte stencil = 0xff, FGRect? rect = null) => _commandBuffer.ClearDepthStencil(depthStencil, clearFlags, depth, stencil, rect);
+        public void ClearRenderTarget(FGTexture renderTarget, Color color, FGRect? rect = null) => _commandBuffer.ClearRenderTarget(renderTarget, color, rect);
+        public void ClearDepthStencil(FGTexture depthStencil, FGClearFlags clearFlags, float depth = 1.0f, byte stencil = 0xff, FGRect? rect = null) => _commandBuffer.ClearDepthStencil(depthStencil, clearFlags, depth, stencil, rect);
 
         public void SetViewport(int slot, FGViewport? viewport) => _commandBuffer.SetViewport(slot, viewport);
         public void SetScissor(int slot, FGRect? scissor) => _commandBuffer.SetScissor(slot, scissor);
@@ -54,7 +54,7 @@ namespace Primary.Rendering.Structures
         public void DrawIndexedInstanced(FGDrawIndexedInstancedDesc desc) => _commandBuffer.DrawIndexedInstanced(desc);
 
         public void Upload<T>(FGBufferUploadDesc desc, ReadOnlySpan<T> data) where T : unmanaged => _commandBuffer.Upload(desc, data);
-        public void Upload<T>(FrameGraphBuffer buffer, T data) where T : unmanaged => _commandBuffer.Upload(buffer, data);
+        public void Upload<T>(FGBuffer buffer, T data) where T : unmanaged => _commandBuffer.Upload(buffer, data);
 
         public void Upload<T>(FGTextureUploadDesc desc, Span<T> data) where T : unmanaged => _commandBuffer.Upload(desc, data);
 
@@ -65,7 +65,7 @@ namespace Primary.Rendering.Structures
         public void Read(FGReadTextureDesc desc) => _commandBuffer.Read(desc);
 
         public FGMappedSubresource<T> Map<T>(FGMapBufferDesc desc) where T : unmanaged => _commandBuffer.Map<T>(desc);
-        public FGMappedSubresource<T> Map<T>(FrameGraphTexture texture) where T : unmanaged => _commandBuffer.Map<T>(texture);
+        public FGMappedSubresource<T> Map<T>(FGTexture texture) where T : unmanaged => _commandBuffer.Map<T>(texture);
 
         internal void PresentOnWindow(Window window) => _commandBuffer.PresentOnWindow(window);
 

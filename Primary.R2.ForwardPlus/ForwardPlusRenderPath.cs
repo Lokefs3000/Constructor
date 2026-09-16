@@ -8,7 +8,7 @@ using System.Diagnostics;
 
 namespace Primary.R2.ForwardPlus
 {
-    public sealed class ForwardPlusRenderPath : IRenderPath
+    public sealed class ForwardPlusRenderPath : IRenderStage
     {
         private bool _isInstalled;
 

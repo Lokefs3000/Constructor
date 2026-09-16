@@ -40,7 +40,7 @@ namespace Primary.Rendering.Assets
             }
         }
 
-        internal void SetBuffer(string name, FrameGraphBuffer buffer)
+        internal void SetBuffer(string name, FGBuffer buffer)
         {
             if (!Flags.HasFlag(buffer.Description.Usage, FGBufferUsage.Global))
             {
@@ -54,10 +54,10 @@ namespace Primary.Rendering.Assets
 
         internal void SetBuffer(string name, RHIBuffer buffer)
         {
-            _globalProperties[name] = new PropertyData(ushort.MaxValue, new FrameGraphResource(buffer, null));
+            _globalProperties[name] = new PropertyData(ushort.MaxValue, new FGResource(buffer, null));
         }
 
-        internal void SetTexture(string name, FrameGraphTexture texture, PropertyBindIntent intent = PropertyBindIntent.Default)
+        internal void SetTexture(string name, FGTexture texture, PropertyBindIntent intent = PropertyBindIntent.Default)
         {
             if (!Flags.HasFlag(texture.Description.Usage, FGTextureUsage.Global))
             {
@@ -71,12 +71,12 @@ namespace Primary.Rendering.Assets
 
         internal void SetTexture(string name, RHITexture texture, PropertyBindIntent intent = PropertyBindIntent.Default)
         {
-            _globalProperties[name] = new PropertyData(ushort.MaxValue, new FrameGraphResource(texture, null), Intent: intent);
+            _globalProperties[name] = new PropertyData(ushort.MaxValue, new FGResource(texture, null), Intent: intent);
         }
 
         internal void SetTexture(string name, TextureAsset texture)
         {
-            _globalProperties[name] = new PropertyData(ushort.MaxValue, FrameGraphResource.Invalid, texture);
+            _globalProperties[name] = new PropertyData(ushort.MaxValue, FGResource.Invalid, texture);
         }
 
         internal bool TryGetPropertyValue(string propertyName, out PropertyData data)
@@ -85,10 +85,10 @@ namespace Primary.Rendering.Assets
         }
 
         #region Public
-        public static void SetGlobalBuffer(string name, FrameGraphBuffer buffer) => Instance.SetBuffer(name, buffer);
+        public static void SetGlobalBuffer(string name, FGBuffer buffer) => Instance.SetBuffer(name, buffer);
         public static void SetGlobalBuffer(string name, RHIBuffer buffer) => Instance.SetBuffer(name, buffer);
 
-        public static void SetGlobalTexture(string name, FrameGraphTexture texture) => Instance.SetTexture(name, texture);
+        public static void SetGlobalTexture(string name, FGTexture texture) => Instance.SetTexture(name, texture);
         public static void SetGlobalTexture(string name, RHITexture texture) => Instance.SetTexture(name, texture);
         public static void SetGlobalTexture(string name, TextureAsset texture) => Instance.SetTexture(name, texture);
         #endregion

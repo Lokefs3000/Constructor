@@ -125,10 +125,10 @@ namespace Primary.R2.ForwardPlus.Passes
 
         private class PassData : IPassData
         {
-            public FrameGraphTexture RtColor;
-            public FrameGraphTexture DsDepth;
+            public FGTexture RtColor;
+            public FGTexture DsDepth;
 
-            public FrameGraphBuffer DynamicDataBuffer;
+            public FGBuffer DynamicDataBuffer;
 
             public RenderList? RenderList;
 
@@ -136,10 +136,10 @@ namespace Primary.R2.ForwardPlus.Passes
 
             public void Clear()
             {
-                RtColor = FrameGraphTexture.Invalid;
-                DsDepth = FrameGraphTexture.Invalid;
+                RtColor = FGTexture.Invalid;
+                DsDepth = FGTexture.Invalid;
 
-                DynamicDataBuffer = FrameGraphBuffer.Invalid;
+                DynamicDataBuffer = FGBuffer.Invalid;
 
                 RenderList = null;
 

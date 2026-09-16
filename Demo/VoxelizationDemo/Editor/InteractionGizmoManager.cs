@@ -41,7 +41,7 @@ namespace VoxelizationDemo.Editor
                     int indexCount = indices.Count - startIdxCount;
                     if (indexCount > 0)
                     {
-                        draws.Add(new InteractionGizmoDraw(model, startVtxCount, indexCount, startIdxCount));
+                        draws.Add(new InteractionGizmoDraw(model, 0, indexCount, startIdxCount));
                     }
                 }
             }
@@ -50,6 +50,14 @@ namespace VoxelizationDemo.Editor
         internal TranslateGizmo CreateTranslation()
         {
             TranslateGizmo gizmo = new TranslateGizmo();
+            _gizmos.Add(gizmo);
+
+            return gizmo;
+        }
+
+        internal RotateGizmo CreateRotatation()
+        {
+            RotateGizmo gizmo = new RotateGizmo();
             _gizmos.Add(gizmo);
 
             return gizmo;

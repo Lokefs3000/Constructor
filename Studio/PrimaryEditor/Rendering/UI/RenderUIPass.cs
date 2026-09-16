@@ -71,28 +71,28 @@ namespace EditorUI.Visual.Passes
                         //     Usage = FGTextureUsage.DepthStencil
                         // }, "UIDepthTexture");
 
-                        passData.VertexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                        passData.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
                         {
                             Width = (uint)(Unsafe.SizeOf<UIVertex>() * painter.VertexCount),
                             Stride = Unsafe.SizeOf<UIVertex>(),
                             Usage = FGBufferUsage.VertexBuffer
                         }, "UIVertexInput");
 
-                        passData.IndexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                        passData.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
                         {
                             Width = (uint)(Unsafe.SizeOf<ushort>() * painter.IndexCount),
                             Stride = Unsafe.SizeOf<ushort>(),
                             Usage = FGBufferUsage.IndexBuffer
                         }, "UIIndexInput");
 
-                        passData.GlobalsBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                        passData.GlobalsBuffer = desc.CreateBuffer(new FGBufferDesc
                         {
                             Width = (uint)Unsafe.SizeOf<GlobalDataBuffer>(),
                             Stride = Unsafe.SizeOf<GlobalDataBuffer>(),
                             Usage = FGBufferUsage.ConstantBuffer | FGBufferUsage.GenericShader
                         }, "UIGlobalData");
 
-                        passData.DataBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                        passData.DataBuffer = desc.CreateBuffer(new FGBufferDesc
                         {
                             Width = (uint)meshBuilder.DataBuffer.Length,
                             Stride = 1,
@@ -254,15 +254,15 @@ namespace EditorUI.Visual.Passes
 
         private sealed class PassData : IPassData
         {
-            public FrameGraphTexture OutColor;
+            public FGTexture OutColor;
 
-            public FrameGraphTexture Depth;
+            public FGTexture Depth;
 
-            public FrameGraphBuffer VertexBuffer;
-            public FrameGraphBuffer IndexBuffer;
+            public FGBuffer VertexBuffer;
+            public FGBuffer IndexBuffer;
 
-            public FrameGraphBuffer GlobalsBuffer;
-            public FrameGraphBuffer DataBuffer;
+            public FGBuffer GlobalsBuffer;
+            public FGBuffer DataBuffer;
 
             public ShaderPack Shaders;
 
@@ -274,15 +274,15 @@ namespace EditorUI.Visual.Passes
 
             public void Clear()
             {
-                OutColor = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
 
-                Depth = FrameGraphTexture.Invalid;
+                Depth = FGTexture.Invalid;
 
-                VertexBuffer = FrameGraphBuffer.Invalid;
-                IndexBuffer = FrameGraphBuffer.Invalid;
+                VertexBuffer = FGBuffer.Invalid;
+                IndexBuffer = FGBuffer.Invalid;
 
-                GlobalsBuffer = FrameGraphBuffer.Invalid;
-                DataBuffer = FrameGraphBuffer.Invalid;
+                GlobalsBuffer = FGBuffer.Invalid;
+                DataBuffer = FGBuffer.Invalid;
 
                 Shaders = default;
 

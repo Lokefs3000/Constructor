@@ -48,11 +48,11 @@ namespace Primary.R2.ForwardPlus.Passes
 
         private class PassData : IPassData
         {
-            public FrameGraphTexture OutColor;
+            public FGTexture OutColor;
 
             public void Clear()
             {
-                OutColor = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
             }
         }
     }

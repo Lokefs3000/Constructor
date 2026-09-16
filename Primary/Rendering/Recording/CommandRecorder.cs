@@ -19,7 +19,7 @@ namespace Primary.Rendering.Recording
         private LinearResizingAllocator _allocator;
         private int _commandCount;
 
-        private HashSet<FrameGraphResource> _resourceSet;
+        private HashSet<FGResource> _resourceSet;
 
         private bool _disposedValue;
 
@@ -30,7 +30,7 @@ namespace Primary.Rendering.Recording
             _allocator = new LinearResizingAllocator(2048);
             _commandCount = 0;
 
-            _resourceSet = new HashSet<FrameGraphResource>();
+            _resourceSet = new HashSet<FGResource>();
         }
 
         private void Dispose(bool disposing)
@@ -108,7 +108,7 @@ namespace Primary.Rendering.Recording
             *(uint*)ptr = s_commandValidationHeader;
         }
 
-        internal void AddResourceToSet(FrameGraphResource resource) => _resourceSet.Add(resource);
+        internal void AddResourceToSet(FGResource resource) => _resourceSet.Add(resource);
 
         public nint GetPointerAtOffset(int offset)
         {
@@ -142,7 +142,7 @@ namespace Primary.Rendering.Recording
         public int BufferSize => _allocator.CurrentOffset;
         public int TotalCommandCount => _commandCount;
 
-        public IReadOnlySet<FrameGraphResource> UsedResources => _resourceSet;
+        public IReadOnlySet<FGResource> UsedResources => _resourceSet;
 
         private const uint s_commandValidationHeader = 0x54444d43;
     }

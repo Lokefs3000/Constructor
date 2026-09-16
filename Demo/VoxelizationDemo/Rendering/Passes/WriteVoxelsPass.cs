@@ -49,7 +49,7 @@ namespace VoxelizationDemo.Rendering.Passes
             {
                 passData.RenderList = pathBlackboard.RenderList;
 
-                passData.VoxelBuffer = desc.CreateTexture(new FrameGraphTextureDesc
+                passData.VoxelBuffer = desc.CreateTexture(new FGTextureDesc
                 {
                     Width = (int)VoxelSpaceX,
                     Height = (int)VoxelSpaceY,
@@ -62,21 +62,21 @@ namespace VoxelizationDemo.Rendering.Passes
                     Swizzle = FGTextureSwizzle.RGBA
                 }, "VoxelBuffer");
 
-                passData.VoxelInfo = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.VoxelInfo = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<VoxelSpaceInfo>(),
                     Stride = Unsafe.SizeOf<VoxelSpaceInfo>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.ConstantBuffer
                 }, "VoxelInfo");
 
-                passData.ProjectedView = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.ProjectedView = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<Matrix4x4>(),
                     Stride = Unsafe.SizeOf<Matrix4x4>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.ConstantBuffer
                 }, "ProjectedView");
 
-                passData.OutColor = desc.CreateTexture(new FrameGraphTextureDesc
+                passData.OutColor = desc.CreateTexture(new FGTextureDesc
                 {
                     Width = (int)VoxelSpaceX,
                     Height = (int)VoxelSpaceY,
@@ -203,11 +203,11 @@ namespace VoxelizationDemo.Rendering.Passes
         {
             public RenderList? RenderList;
 
-            public FrameGraphBuffer VoxelInfo;
-            public FrameGraphTexture VoxelBuffer;
-            public FrameGraphBuffer ProjectedView;
+            public FGBuffer VoxelInfo;
+            public FGTexture VoxelBuffer;
+            public FGBuffer ProjectedView;
 
-            public FrameGraphTexture OutColor;
+            public FGTexture OutColor;
 
             public ShaderAsset? WriteVoxels;
             public PropertyBlock? WriteVoxelsBlock;
@@ -216,11 +216,11 @@ namespace VoxelizationDemo.Rendering.Passes
             {
                 RenderList = null;
 
-                VoxelInfo = FrameGraphBuffer.Invalid;
-                VoxelBuffer = FrameGraphTexture.Invalid;
-                ProjectedView = FrameGraphBuffer.Invalid;
+                VoxelInfo = FGBuffer.Invalid;
+                VoxelBuffer = FGTexture.Invalid;
+                ProjectedView = FGBuffer.Invalid;
 
-                OutColor = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
 
                 WriteVoxels = null;
                 WriteVoxelsBlock = null;
@@ -232,13 +232,13 @@ namespace VoxelizationDemo.Rendering.Passes
 
     public sealed class VoxelBlackboard : IBlackboardData
     {
-        public FrameGraphBuffer VoxelInfo;
-        public FrameGraphTexture VoxelBuffer;
+        public FGBuffer VoxelInfo;
+        public FGTexture VoxelBuffer;
 
         public void Clear()
         {
-            VoxelInfo = FrameGraphBuffer.Invalid;
-            VoxelBuffer = FrameGraphTexture.Invalid;
+            VoxelInfo = FGBuffer.Invalid;
+            VoxelBuffer = FGTexture.Invalid;
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using Primary.Assets;
 using Primary.Collections;
 using Primary.Common;
@@ -13,10 +14,14 @@ using VoxelizationDemo.Rendering.Passes;
 
 namespace VoxelizationDemo.Rendering
 {
-    internal sealed class CoreRenderPath : IRenderPath
+    internal sealed class WorldRenderStage : IRenderStage
     {
         private RenderList? _renderList;
         private LightCollector? _lightCollector;
+
+        private SetupDataPass? _setupDataPass;
+        private ClusterLightsPass? _clusterLightsPass;
+        private WorldOpaquePass? _worldOpaquePass;
 
         public void Install(RenderingManager manager)
         {
@@ -25,12 +30,9 @@ namespace VoxelizationDemo.Rendering
 
             _lightCollector = new LightCollector();
 
-            manager.RenderPassManager.AddRenderPass<SetupDataPass>();
-            manager.RenderPassManager.AddRenderPass<ClusterLightsPass>();
-            manager.RenderPassManager.AddRenderPass<WorldOpaquePass>();
-
-            // manager.RenderPassManager.AddRenderPass<LightHeatmapPass>();
-            manager.RenderPassManager.AddRenderPass<ImGuiRenderPass>();
+            _setupDataPass = new SetupDataPass();
+            _clusterLightsPass = new ClusterLightsPass();
+            _worldOpaquePass = new WorldOpaquePass();
         }
 
         public void Uninstall(RenderingManager manager)
@@ -40,12 +42,9 @@ namespace VoxelizationDemo.Rendering
 
             _lightCollector = null;
 
-            manager.RenderPassManager.RemoveRenderPass<SetupDataPass>();
-            manager.RenderPassManager.RemoveRenderPass<ClusterLightsPass>();
-            manager.RenderPassManager.RemoveRenderPass<WorldOpaquePass>();
-
-            // manager.RenderPassManager.RemoveRenderPass<LightHeatmapPass>();
-            manager.RenderPassManager.RemoveRenderPass<ImGuiRenderPass>();
+            _setupDataPass = null;
+            _clusterLightsPass = null;
+            _worldOpaquePass = null;
         }
 
         public void PreRenderPassSetup(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
@@ -82,6 +81,25 @@ namespace VoxelizationDemo.Rendering
 
             // Draw debug stuff
             // OctreeVisualizer.Visualize(manager.OctreeManager, cameraData.ViewFrustrum);
+        }
+
+        public void FlushPassesForCamera(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
+        {
+            RenderCameraData cameraData = context.Get<RenderCameraData>();
+
+            manager.RequestBatch(_renderList!, new BatchingOptions
+            {
+                ViewFrustrum = cameraData.ViewFrustrum,
+                Center = cameraData.Transform.Position
+            });
+
+            manager.PushRenderPass(_setupDataPass!);
+            manager.PushRenderPass(_clusterLightsPass!);
+            manager.PushRenderPass(_worldOpaquePass!);
+        }
+
+        public void FlushPassesForWindow(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
+        {
         }
 
         public RenderList? RenderList => _renderList;

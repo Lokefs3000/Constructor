@@ -105,7 +105,7 @@ namespace Primary.Rendering.Commands
             });
         }
 
-        public unsafe void Upload<T>(FrameGraphBuffer buffer, T data) where T : unmanaged
+        public unsafe void Upload<T>(FGBuffer buffer, T data) where T : unmanaged
         {
             if (!buffer.IsExternal && !_stateData.ContainsResource(buffer, FGResourceUsage.Write))
             {
@@ -578,8 +578,19 @@ namespace Primary.Rendering.Commands
             CmdDataTextureSource destination = new CmdDataTextureSource
             {
                 Resource = desc.Destination,
-                Type = CmdDataTextureSourceType.SubresourceIndex,
-                SubresourceIndex = 0
+                Type = CmdDataTextureSourceType.Footprint,
+                Footprint = new CmdDataTextureFootprint
+                {
+                    Offset = desc.DstFootprint.Offset,
+
+                    Format = desc.DstFootprint.Format,
+
+                    Width = desc.DstFootprint.Width,
+                    Height = desc.DstFootprint.Height,
+                    Depth = desc.DstFootprint.Depth,
+
+                    RowPitch = desc.DstFootprint.RowPitch
+                }
             };
 
             _recorder.AddCommand(RecCommandType.CopyTexture, new CmdCopyTexture
@@ -672,7 +683,7 @@ namespace Primary.Rendering.Commands
             return new FGMappedSubresource<T>(this, desc, ptr, new Span<T>(ptr.ToPointer(), (int)totalElementCount));
         }
 
-        public unsafe FGMappedSubresource<T> Map<T>(FrameGraphTexture texture) where T : unmanaged
+        public unsafe FGMappedSubresource<T> Map<T>(FGTexture texture) where T : unmanaged
         {
             throw new NotImplementedException();
         }
@@ -741,22 +752,22 @@ namespace Primary.Rendering.Commands
         }
     }
 
-    public readonly record struct FGBufferUploadDesc(FrameGraphBuffer Buffer, uint Offset)
+    public readonly record struct FGBufferUploadDesc(FGBuffer Buffer, uint Offset)
     {
-        public static implicit operator FGBufferUploadDesc(FrameGraphBuffer buffer) => new FGBufferUploadDesc(buffer, 0);
+        public static implicit operator FGBufferUploadDesc(FGBuffer buffer) => new FGBufferUploadDesc(buffer, 0);
     }
 
-    public readonly record struct FGTextureUploadDesc(FrameGraphTexture Texture, FGBox? DestinationBox, uint SubresourceIndex, int DataRowPitch)
+    public readonly record struct FGTextureUploadDesc(FGTexture Texture, FGBox? DestinationBox, uint SubresourceIndex, int DataRowPitch)
     {
-        public static implicit operator FGTextureUploadDesc(FrameGraphTexture texture) => new FGTextureUploadDesc(texture, null, 0, 0);
+        public static implicit operator FGTextureUploadDesc(FGTexture texture) => new FGTextureUploadDesc(texture, null, 0, 0);
     }
 
-    public readonly record struct FGBufferCopyDesc(FrameGraphBuffer Source, uint SrcOffset, FrameGraphBuffer Destination, uint DstOffset, uint NumBytes);
+    public readonly record struct FGBufferCopyDesc(FGBuffer Source, uint SrcOffset, FGBuffer Destination, uint DstOffset, uint NumBytes);
     public readonly record struct FGTextureCopyDesc(FGTextureCopySource Source, FGBox? SourceBox, FGTextureCopySource Destination, uint DstX, uint DstY, uint DstZ);
 
     public readonly record struct FGTextureCopySource
     {
-        public FrameGraphResource Resource { get; init; }
+        public FGResource Resource { get; init; }
         public FGTextureCopySourceType Type { get; init; }
 
         public uint SubresourceIndex => _union.SubresourceIndex;
@@ -764,21 +775,21 @@ namespace Primary.Rendering.Commands
 
         private __Union _union { get; init; }
 
-        public FGTextureCopySource(FrameGraphTexture Resource, uint SubresourceIndex)
+        public FGTextureCopySource(FGTexture Resource, uint SubresourceIndex)
         {
             this.Resource = Resource;
             this.Type = FGTextureCopySourceType.SubresourceIndex;
             _union = new __Union(SubresourceIndex);
         }
 
-        public FGTextureCopySource(FrameGraphResource Resource, FGTextureFootprint Footprint)
+        public FGTextureCopySource(FGResource Resource, FGTextureFootprint Footprint)
         {
             this.Resource = Resource;
             this.Type = FGTextureCopySourceType.Footprint;
             _union = new __Union(Footprint);
         }
 
-        public static implicit operator FGTextureCopySource(FrameGraphTexture texture) => new FGTextureCopySource(texture, 0);
+        public static implicit operator FGTextureCopySource(FGTexture texture) => new FGTextureCopySource(texture, 0);
 
         [StructLayout(LayoutKind.Explicit)]
         private readonly record struct __Union
@@ -795,17 +806,17 @@ namespace Primary.Rendering.Commands
 
     public readonly record struct FGTextureFootprint(uint Offset, RHIFormat Format, uint Width, uint Height, uint Depth, uint RowPitch);
 
-    public readonly record struct FGReadBufferDesc(FrameGraphBuffer Source, uint SrcOffset, RHIReadback Destination, uint DstOffset, uint NumBytes);
-    public readonly record struct FGReadTextureDesc(FGTextureCopySource Source, FGBox? SourceBox, RHIReadback Destination, uint DstOffset, uint DstX, uint DstY, uint DstZ);
+    public readonly record struct FGReadBufferDesc(FGBuffer Source, uint SrcOffset, RHIReadback Destination, uint DstOffset, uint NumBytes);
+    public readonly record struct FGReadTextureDesc(FGTextureCopySource Source, FGBox? SourceBox, RHIReadback Destination, FGTextureFootprint DstFootprint, uint DstX, uint DstY, uint DstZ);
 
-    public readonly record struct FGMapBufferDesc(FrameGraphBuffer Buffer, uint Offset, uint ElementCount)
+    public readonly record struct FGMapBufferDesc(FGBuffer Buffer, uint Offset, uint ElementCount)
     {
-        public static implicit operator FGMapBufferDesc(FrameGraphBuffer buffer) => new FGMapBufferDesc(buffer, 0, 0);
+        public static implicit operator FGMapBufferDesc(FGBuffer buffer) => new FGMapBufferDesc(buffer, 0, 0);
     }
 
-    public readonly record struct FGMapTextureDesc(FrameGraphTexture Texture, FGBox? Box)
+    public readonly record struct FGMapTextureDesc(FGTexture Texture, FGBox? Box)
     {
-        public static implicit operator FGMapTextureDesc(FrameGraphTexture texture) => new FGMapTextureDesc(texture, null);
+        public static implicit operator FGMapTextureDesc(FGTexture texture) => new FGMapTextureDesc(texture, null);
     }
 
     public readonly ref struct FGMappedSubresource<T> : IDisposable where T : unmanaged

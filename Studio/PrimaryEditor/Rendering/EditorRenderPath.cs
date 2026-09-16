@@ -9,7 +9,7 @@ using PrimaryEditor.Rendering.UI;
 
 namespace PrimaryEditor.Rendering
 {
-    public sealed class EditorRenderPath : IRenderPath
+    public sealed class EditorRenderPath : IRenderStage
     {
         public void PreRenderPassSetup(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
         {

@@ -3,16 +3,19 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Text;
 using Hexa.NET.ImGui;
+using Primary.Collections;
 using Primary.Common;
 using Primary.Input;
 using Primary.IO;
 using Primary.Scenes;
+using Primary.Streams;
 using Primary.Threading;
 using Primary.Windowing;
 using PrimaryEditor.Assets;
 using PrimaryEditor.Inspector.Contexts.Entity;
 using PrimaryEditor.Project;
 using VoxelizationDemo.Core;
+using VoxelizationDemo.Editor.Serialization.Special;
 using VoxelizationDemo.Editor.Utility;
 
 namespace VoxelizationDemo.Editor.Windows
@@ -71,6 +74,28 @@ namespace VoxelizationDemo.Editor.Windows
 
                         ImGui.EndMenu();
                     }
+
+                    if (_currentHoveredEntity.HasValue || Select.ActiveEntity != SceneEntity.Null)
+                    {
+                        ImGui.Separator();
+
+                        if (ImGui.MenuItem("Cut"u8))
+                        {
+
+                        }
+
+                        if (ImGui.MenuItem("Copy"u8))
+                        {
+                            AddSelectionToClipboard(_currentHoveredEntity);
+                        }
+
+                        if (ImGui.MenuItem("Paste"u8))
+                        {
+
+                        }
+                    }
+
+                    ImGui.Separator();
 
                     if (ImGui.BeginMenu("Load scene"u8))
                     {
@@ -282,6 +307,24 @@ namespace VoxelizationDemo.Editor.Windows
             }
 
             return isOpened;
+        }
+
+        private static void AddSelectionToClipboard(SceneEntity? additional)
+        {
+            using RentedList<SceneEntity> entities = new RentedList<SceneEntity>();
+            foreach (object obj in Select.Objects)
+            {
+                if (obj is SceneEntity entity)
+                    entities.Add(entity);
+            }
+
+            if (additional.HasValue && !entities.Contains(additional.Value))
+                entities.Add(additional.Value);
+
+            using PooledMemoryStream stream = new PooledMemoryStream();
+            EntitySerializer.Serialize(stream, entities.AsSpan());
+
+            AppLog.Editor.Information(Encoding.UTF8.GetString(stream.AsSpan()));
         }
     }
 }

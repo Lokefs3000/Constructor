@@ -152,8 +152,8 @@ namespace Primary.Rendering.D3D12
                             }
                             else
                             {
-                                FrameGraphTexture fg = _device.ResourceManager.FindFGTexture(resource);
-                                ref readonly FrameGraphTextureDesc texDesc = ref fg.Description;
+                                FGTexture fg = _device.ResourceManager.FindFGTexture(resource);
+                                ref readonly FGTextureDesc texDesc = ref fg.Description;
 
                                 desc = new UnorderedAccessViewDesc
                                 {
@@ -237,8 +237,8 @@ namespace Primary.Rendering.D3D12
                             }
                             else
                             {
-                                FrameGraphTexture fg = _device.ResourceManager.FindFGTexture(resource);
-                                ref readonly FrameGraphTextureDesc texDesc = ref fg.Description;
+                                FGTexture fg = _device.ResourceManager.FindFGTexture(resource);
+                                ref readonly FGTextureDesc texDesc = ref fg.Description;
 
                                 RHIFormat format = texDesc.Format;
                                 if (Flags.HasFlag(texDesc.Usage, FGTextureUsage.DepthStencil))
@@ -404,8 +404,8 @@ namespace Primary.Rendering.D3D12
                         }
                         else
                         {
-                            FrameGraphBuffer fg = _device.ResourceManager.FindFGBuffer(resource);
-                            ref readonly FrameGraphBufferDesc bufDesc = ref fg.Description;
+                            FGBuffer fg = _device.ResourceManager.FindFGBuffer(resource);
+                            ref readonly FGBufferDesc bufDesc = ref fg.Description;
 
                             if (Flags.HasFlag(bufDesc.Usage, FGBufferUsage.ConstantBuffer))
                             {

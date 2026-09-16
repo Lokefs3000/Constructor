@@ -31,32 +31,32 @@ namespace Primary.R2.ForwardPlus.Passes
 
             using (RasterPassDescription desc = renderPass.SetupRasterPass("FP-Resources", out PassData passData))
             {
-                resources.MatrixBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                resources.MatrixBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)(list.TotalFlagCount * Unsafe.SizeOf<RenderFlag>()),
                     Stride = Unsafe.SizeOf<RenderFlag>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.Structured | FGBufferUsage.Global,
                 }, "FP-RenderFlagBuffer");
 
-                resources.RawDataBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                resources.RawDataBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Math.Max(CountRawDataSize(list), 4),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.Raw | FGBufferUsage.Global
                 }, "FP-RawDataBuffer");
 
-                resources.GlobalMatricies = desc.CreateBuffer(new FrameGraphBufferDesc
+                resources.GlobalMatricies = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<GlobalMatriciesData>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer | FGBufferUsage.Global
                 }, "FP-GlobalResources");
 
-                resources.CameraData = desc.CreateBuffer(new FrameGraphBufferDesc
+                resources.CameraData = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<CameraData>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer | FGBufferUsage.Global
                 }, "FP-CameraData");
 
-                resources.DynamicDataBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                resources.DynamicDataBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<DynamicDataData>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer | FGBufferUsage.Global
@@ -163,18 +163,18 @@ namespace Primary.R2.ForwardPlus.Passes
 
         private class PassData : IPassData
         {
-            public FrameGraphBuffer MatrixBuffer;
-            public FrameGraphBuffer RawDataBuffer;
-            public FrameGraphBuffer GlobalMatricies;
-            public FrameGraphBuffer CameraData;
+            public FGBuffer MatrixBuffer;
+            public FGBuffer RawDataBuffer;
+            public FGBuffer GlobalMatricies;
+            public FGBuffer CameraData;
             public RenderList? RenderList;
 
             public void Clear()
             {
-                MatrixBuffer = FrameGraphBuffer.Invalid;
-                RawDataBuffer = FrameGraphBuffer.Invalid;
-                GlobalMatricies = FrameGraphBuffer.Invalid;
-                CameraData = FrameGraphBuffer.Invalid;
+                MatrixBuffer = FGBuffer.Invalid;
+                RawDataBuffer = FGBuffer.Invalid;
+                GlobalMatricies = FGBuffer.Invalid;
+                CameraData = FGBuffer.Invalid;
                 RenderList = null;
             }
         }
@@ -193,19 +193,19 @@ namespace Primary.R2.ForwardPlus.Passes
 
     internal class GenericResources : IBlackboardData
     {
-        public FrameGraphBuffer MatrixBuffer;
-        public FrameGraphBuffer RawDataBuffer;
-        public FrameGraphBuffer GlobalMatricies;
-        public FrameGraphBuffer CameraData;
-        public FrameGraphBuffer DynamicDataBuffer;
+        public FGBuffer MatrixBuffer;
+        public FGBuffer RawDataBuffer;
+        public FGBuffer GlobalMatricies;
+        public FGBuffer CameraData;
+        public FGBuffer DynamicDataBuffer;
 
         public void Clear()
         {
-            MatrixBuffer = FrameGraphBuffer.Invalid;
-            RawDataBuffer = FrameGraphBuffer.Invalid;
-            GlobalMatricies = FrameGraphBuffer.Invalid;
-            CameraData = FrameGraphBuffer.Invalid;
-            DynamicDataBuffer = FrameGraphBuffer.Invalid;
+            MatrixBuffer = FGBuffer.Invalid;
+            RawDataBuffer = FGBuffer.Invalid;
+            GlobalMatricies = FGBuffer.Invalid;
+            CameraData = FGBuffer.Invalid;
+            DynamicDataBuffer = FGBuffer.Invalid;
         }
     }
 }

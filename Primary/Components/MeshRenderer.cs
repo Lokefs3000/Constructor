@@ -15,12 +15,13 @@ namespace Primary.Components
         [IgnoreDataMember]
         private SceneEntity _self;
 
-        private IRawRenderMesh? _mesh;
+        private MeshAsset? _mesh;
         private MaterialAsset? _material;
 
+        [IgnoreDataMember]
         private int _frameIndex;
 
-        public IRawRenderMesh? Mesh
+        public MeshAsset? Mesh
         {
             get => _mesh;
             set
@@ -43,11 +44,12 @@ namespace Primary.Components
             }
         }
 
+        [IgnoreDataMember]
         public readonly int UpdateIndex => _frameIndex;
     }
 
     [ComponentUsage(CanBeAdded: false)]
-    [InspectorHidden]
+    [InspectorHidden, DontSerializeComponent]
     internal record struct RenderableAdditionalData : IComponent
     {
         public uint BatchId;

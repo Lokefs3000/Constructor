@@ -68,8 +68,8 @@ namespace VoxelizationDemo.Rendering.Passes
                         if (currentMeshSource == null)
                             continue;
 
-                        cmd.SetVertexBuffer((FrameGraphBuffer)currentMeshSource.VertexBuffer!);
-                        cmd.SetIndexBuffer((FrameGraphBuffer)currentMeshSource.IndexBuffer!);
+                        cmd.SetVertexBuffer((FGBuffer)currentMeshSource.VertexBuffer!);
+                        cmd.SetIndexBuffer((FGBuffer)currentMeshSource.IndexBuffer!);
                     }
                     else
                     {
@@ -92,15 +92,15 @@ namespace VoxelizationDemo.Rendering.Passes
         {
             public RenderList? RenderList;
 
-            public FrameGraphTexture OutColor;
-            public FrameGraphTexture OutDepth;
+            public FGTexture OutColor;
+            public FGTexture OutDepth;
 
             public void Clear()
             {
                 RenderList = null;
 
-                OutColor = FrameGraphTexture.Invalid;
-                OutDepth = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
+                OutDepth = FGTexture.Invalid;
             }
         }
     }

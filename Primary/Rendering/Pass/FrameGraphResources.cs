@@ -20,17 +20,17 @@ namespace Primary.Rendering.Pass
         private PooledList<FGResourceEvent> _events;
 
         private PooledList<IndexRange> _virtualFreeSpace;
-        private Dictionary<FrameGraphResource, MemoryRange> _allocatedResources;
+        private Dictionary<FGResource, MemoryRange> _allocatedResources;
         private int _currentMemoryExtent;
         private int _highestMemoryUsage;
 
-        private Dictionary<FrameGraphResource, NRDResourceInfo> _cachedResourceInfo;
+        private Dictionary<FGResource, NRDResourceInfo> _cachedResourceInfo;
         private int _uploadBufferLength;
 
         private PooledList<FGResourceLocation> _locations;
         private PooledList<FGResourceUpload> _uploads;
 
-        private FrameGraphResource[] _resourceArray;
+        private FGResource[] _resourceArray;
 
         private Dictionary<object, int> _usedPipelinesDict;
         private List<object> _usedPipelines;
@@ -46,17 +46,17 @@ namespace Primary.Rendering.Pass
             _events = new PooledList<FGResourceEvent>();
 
             _virtualFreeSpace = new PooledList<IndexRange>();
-            _allocatedResources = new Dictionary<FrameGraphResource, MemoryRange>();
+            _allocatedResources = new Dictionary<FGResource, MemoryRange>();
             _currentMemoryExtent = 0;
             _highestMemoryUsage = 0;
 
-            _cachedResourceInfo = new Dictionary<FrameGraphResource, NRDResourceInfo>();
+            _cachedResourceInfo = new Dictionary<FGResource, NRDResourceInfo>();
             _uploadBufferLength = 0;
 
             _locations = new PooledList<FGResourceLocation>();
             _uploads = new PooledList<FGResourceUpload>();
 
-            _resourceArray = Array.Empty<FrameGraphResource>();
+            _resourceArray = Array.Empty<FGResource>();
 
             _usedPipelinesDict = new Dictionary<object, int>();
             _usedPipelines = new List<object>();
@@ -92,7 +92,7 @@ namespace Primary.Rendering.Pass
 
         internal void ClearNewFrame()
         {
-            Array.Fill(_resourceArray, FrameGraphResource.Invalid);
+            Array.Fill(_resourceArray, FGResource.Invalid);
 
             ClearResources();
         }
@@ -138,7 +138,7 @@ namespace Primary.Rendering.Pass
                     {
                         case FGResourceId.Texture:
                             {
-                                FrameGraphTexture texture = @event.Resource.AsTexture();
+                                FGTexture texture = @event.Resource.AsTexture();
                                 Debug.Assert(!texture.Description.Format.IsBlockCompressed(), "BC formats not supported yet");
 
                                 NRDResourceInfo resourceInfo = _manager.NRDDevice.QueryResourceInfo(texture);
@@ -151,7 +151,7 @@ namespace Primary.Rendering.Pass
                             }
                         case FGResourceId.Buffer:
                             {
-                                FrameGraphBuffer buffer = @event.Resource.AsBuffer();
+                                FGBuffer buffer = @event.Resource.AsBuffer();
 
                                 NRDResourceInfo resourceInfo = _manager.NRDDevice.QueryResourceInfo(buffer);
                                 MemoryRange range = AllocateVirtualSpace(resourceInfo.SizeInBytes, resourceInfo.Alignment);
@@ -251,7 +251,7 @@ namespace Primary.Rendering.Pass
             _virtualFreeSpace.Add(usedRange.AsIndexRange());
         }
 
-        internal void AddResourceWithLifetime(FrameGraphResource resource, IndexRange passLifetimeRange)
+        internal void AddResourceWithLifetime(FGResource resource, IndexRange passLifetimeRange)
         {
             Debug.Assert(resource.IsValidAndRenderGraph);
 
@@ -259,7 +259,7 @@ namespace Primary.Rendering.Pass
             _events.Add(new FGResourceEvent(FGResourceAction.Destroy, passLifetimeRange.End + 1, resource));
         }
 
-        internal int AddBufferUpload(FrameGraphBuffer buffer, int uploadOffset, int uploadSize)
+        internal int AddBufferUpload(FGBuffer buffer, int uploadOffset, int uploadSize)
         {
             if (!_cachedResourceInfo.TryGetValue(buffer, out NRDResourceInfo info))
             {
@@ -274,7 +274,7 @@ namespace Primary.Rendering.Pass
             return _uploads.Count - 1;
         }
 
-        internal int AddTextureUpload(FrameGraphTexture texture, int uploadOffset, int uploadSize)
+        internal int AddTextureUpload(FGTexture texture, int uploadOffset, int uploadSize)
         {
             if (!_cachedResourceInfo.TryGetValue(texture, out NRDResourceInfo info))
             {
@@ -289,7 +289,7 @@ namespace Primary.Rendering.Pass
             return _uploads.Count - 1;
         }
 
-        internal void AddFGResource(FrameGraphResource resource)
+        internal void AddFGResource(FGResource resource)
         {
             if (resource.Index >= _resourceArray.Length)
                 Array.Resize(ref _resourceArray, (int)BitOperations.RoundUpToPowerOf2((uint)resource.Index + 1));
@@ -322,26 +322,26 @@ namespace Primary.Rendering.Pass
             return index;
         }
 
-        internal FrameGraphResource FindFGResource(int index)
+        internal FGResource FindFGResource(int index)
         {
             if (index >= _resourceArray.Length || index < 0)
-                return FrameGraphResource.Invalid;
+                return FGResource.Invalid;
 
             return _resourceArray[index];
         }
 
-        internal FrameGraphBuffer FindFGBuffer(int index)
+        internal FGBuffer FindFGBuffer(int index)
         {
             if (index >= _resourceArray.Length || index < 0)
-                return FrameGraphBuffer.Invalid;
+                return FGBuffer.Invalid;
 
             return _resourceArray[index].AsBuffer();
         }
 
-        internal FrameGraphTexture FindFGTexture(int index)
+        internal FGTexture FindFGTexture(int index)
         {
             if (index >= _resourceArray.Length || index < 0)
-                return FrameGraphTexture.Invalid;
+                return FGTexture.Invalid;
 
             return _resourceArray[index].AsTexture();
         }
@@ -370,13 +370,13 @@ namespace Primary.Rendering.Pass
         }
     }
 
-    public readonly record struct FGResourceEvent(FGResourceAction Action, int PassIndex, FrameGraphResource Resource) : IComparable<FGResourceEvent>
+    public readonly record struct FGResourceEvent(FGResourceAction Action, int PassIndex, FGResource Resource) : IComparable<FGResourceEvent>
     {
         public int CompareTo(FGResourceEvent other) => PassIndex.CompareTo(other.PassIndex);
     }
 
-    public readonly record struct FGResourceLocation(FrameGraphResource Resource, int MemoryOffset, int MemorySize, int Alignment);
-    public readonly record struct FGResourceUpload(FrameGraphResource Resource, int BufferOffset, int BufferLength);
+    public readonly record struct FGResourceLocation(FGResource Resource, int MemoryOffset, int MemorySize, int Alignment);
+    public readonly record struct FGResourceUpload(FGResource Resource, int BufferOffset, int BufferLength);
 
     public enum FGResourceAction : byte
     {

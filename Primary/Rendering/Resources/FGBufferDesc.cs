@@ -1,13 +1,13 @@
 ﻿namespace Primary.Rendering.Resources
 {
-    public struct FrameGraphBufferDesc
+    public struct FGBufferDesc
     {
         public uint Width;
         public int Stride;
 
         public FGBufferUsage Usage;
 
-        public FrameGraphBufferDesc()
+        public FGBufferDesc()
         {
             Width = 0;
             Stride = 0;

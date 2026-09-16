@@ -10,7 +10,7 @@ using Primary.Scenes;
 using PrimaryEditor.Assets;
 using PrimaryEditor.Project;
 using VoxelizationDemo.Core;
-using VoxelizationDemo.Editor.Serialization;
+using VoxelizationDemo.Editor.Serialization.Special;
 
 namespace VoxelizationDemo.Editor
 {
@@ -59,6 +59,9 @@ namespace VoxelizationDemo.Editor
                             
                             foreach (Scene scene in sceneManager.Scenes)
                             {
+                                if (scene.Name == "Unique")
+                                    continue;
+
                                 if (!sceneTracker.SceneSourcePaths.TryGetValue(scene, out string? localPath))
                                 {
                                 TrySaveSceneAgain:

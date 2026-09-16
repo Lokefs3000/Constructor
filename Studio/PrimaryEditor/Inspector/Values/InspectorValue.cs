@@ -33,14 +33,26 @@ namespace PrimaryEditor.Inspector.Values
         public void UpdateValueFromValueType(ref OpaqueRef valueType)
         {
             if (_hasModifiedValue)
+            {
                 _valueSource.SetValueFromValueType<T, TObject>(ref Unsafe.As<OpaqueRef, TObject>(ref valueType), _value);
+                _hasModifiedValue = false;
+
+                _parentObject?.UpdateSelf();
+            }
+
             _value = _valueSource.GetValueFromValueType<T, TObject>(ref Unsafe.As<OpaqueRef, TObject>(ref valueType));
         }
 
         public void UpdateValueFromObject(object obj)
         {
             if (_hasModifiedValue)
+            {
                 _valueSource.SetValueFromObject<T, TObject>((TObject)obj, _value);
+                _hasModifiedValue = false;
+
+                _parentObject?.UpdateSelf();
+            }
+
             _value = _valueSource.GetValueFromObject<T, TObject>((TObject)obj);
         }
 

@@ -65,20 +65,20 @@ namespace Editor.Rendering.Passes
             {
                 passData.OutColor = windowData.ColorTexture;
 
-                passData.VertexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)(drawData.TotalVtxCount * Unsafe.SizeOf<ImDrawVert>()),
                     Stride = Unsafe.SizeOf<ImDrawVert>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.VertexBuffer
                 }, "DearImGui-Vtx");
-                passData.IndexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)(drawData.TotalIdxCount * Unsafe.SizeOf<ushort>()),
                     Stride = Unsafe.SizeOf<ushort>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.IndexBuffer
                 }, "DearImGui-Idx");
 
-                passData.VertexData = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.VertexData = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<Matrix4x4>(),
                     Stride = Unsafe.SizeOf<Matrix4x4>(),
@@ -273,12 +273,12 @@ namespace Editor.Rendering.Passes
 
         private class PassData : IPassData
         {
-            public FrameGraphTexture OutColor;
+            public FGTexture OutColor;
 
-            public FrameGraphBuffer VertexBuffer;
-            public FrameGraphBuffer IndexBuffer;
+            public FGBuffer VertexBuffer;
+            public FGBuffer IndexBuffer;
 
-            public FrameGraphBuffer VertexData;
+            public FGBuffer VertexData;
 
             public ShaderAsset? Shader;
             public PropertyBlock? Block;
@@ -287,12 +287,12 @@ namespace Editor.Rendering.Passes
 
             public void Clear()
             {
-                OutColor = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
 
-                VertexBuffer = FrameGraphBuffer.Invalid;
-                IndexBuffer = FrameGraphBuffer.Invalid;
+                VertexBuffer = FGBuffer.Invalid;
+                IndexBuffer = FGBuffer.Invalid;
 
-                VertexData = FrameGraphBuffer.Invalid;
+                VertexData = FGBuffer.Invalid;
 
                 Shader = null;
                 Block = null;

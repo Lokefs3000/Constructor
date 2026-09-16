@@ -2,7 +2,7 @@
 {
     public sealed class RenderStateData : IContextItem
     {
-        public IRenderPath Path { get; internal set; }
+        public IRenderStage Path { get; internal set; }
 
         internal RenderStateData()
         {

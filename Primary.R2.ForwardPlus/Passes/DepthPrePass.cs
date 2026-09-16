@@ -38,11 +38,11 @@ namespace Primary.R2.ForwardPlus.Passes
 
         private class PassData : IPassData
         {
-            public FrameGraphTexture OutDepth;
+            public FGTexture OutDepth;
 
             public void Clear()
             {
-                OutDepth = FrameGraphTexture.Invalid;
+                OutDepth = FGTexture.Invalid;
             }
         }
     }

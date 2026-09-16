@@ -71,14 +71,14 @@ namespace VoxelizationDemo.Rendering.Diagnostics
 
         private sealed class PassData : IPassData
         {
-            public FrameGraphTexture OutColor;
+            public FGTexture OutColor;
 
             public ShaderAsset? Shader;
             public PropertyBlock? Block;
 
             public void Clear()
             {
-                OutColor = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
 
                 Shader = null;
                 Block = null;

@@ -40,6 +40,8 @@ namespace VoxelizationDemo.Logic
         private Vector2 _clientSize;
         private Vector2 _halfClientSize;
 
+        private WorldTransform _transform;
+
         private Vector2 _mouseViewport;
 
         internal CameraManager()
@@ -161,6 +163,8 @@ namespace VoxelizationDemo.Logic
                 Matrix4x4.Invert(_view, out _invView);
             }
 
+            _transform = worldTransform;
+
             _position = worldTransform.Position;
             _mouseViewport = InputSystem.Pointer.MousePosition / WindowManager.Instance.PrimaryWindow!.ClientSize.AsVector2() * 2.0f - Vector2.One;
 
@@ -206,5 +210,9 @@ namespace VoxelizationDemo.Logic
 
         public Vector2 ClientSize => _clientSize;
         public Vector2 HalfClientSize => _halfClientSize;
+
+        public Vector3 ForwardVector => _transform.ForwardVector;
+        public Vector3 RightVector => _transform.RightVector;
+        public Vector3 UpVector => _transform.UpVector;
     }
 }

@@ -59,6 +59,7 @@
         TessFactor,
         SV_InstanceId,
         SV_VertexId,
-        SV_Position
+        SV_Position,
+        SV_Target
     }
 }

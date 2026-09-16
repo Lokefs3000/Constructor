@@ -23,28 +23,28 @@ namespace VoxelizationDemo.Rendering.Passes
 
             using (RasterPassDescription desc = renderPass.SetupRasterPass("SetupData", out PassData data))
             {
-                data.RenderFlagBuffer = pathBlackboard.RenderList == null ? FrameGraphBuffer.Invalid : desc.CreateBuffer(new FrameGraphBufferDesc
+                data.RenderFlagBuffer = pathBlackboard.RenderList == null ? FGBuffer.Invalid : desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)(Unsafe.SizeOf<RenderFlag>() * pathBlackboard.RenderList.TotalFlagCount),
                     Stride = Unsafe.SizeOf<RenderFlag>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.Structured | FGBufferUsage.Global
                 }, "RenderFlagBuffer");
 
-                data.WorldMatriciesBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                data.WorldMatriciesBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<WorldMatrixData>(),
                     Stride = Unsafe.SizeOf<WorldMatrixData>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.ConstantBuffer | FGBufferUsage.Global
                 }, "WorldMatriciesBuffer");
 
-                data.CameraDataBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                data.CameraDataBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<CameraData>(),
                     Stride = Unsafe.SizeOf<CameraData>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer | FGBufferUsage.Global
                 }, "CameraDataBuffer");
 
-                data.PointLightsBuffer = pathBlackboard.LightCollector == null ? FrameGraphBuffer.Invalid : desc.CreateBuffer(new FrameGraphBufferDesc
+                data.PointLightsBuffer = pathBlackboard.LightCollector == null ? FGBuffer.Invalid : desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)(Unsafe.SizeOf<PointLightData>() * (pathBlackboard.LightCollector.PointLights.Count + 1)),
                     Stride = Unsafe.SizeOf<PointLightData>(),
@@ -125,26 +125,26 @@ namespace VoxelizationDemo.Rendering.Passes
             public RenderList? RenderList;
             public LightCollector? LightCollector;
 
-            public FrameGraphBuffer RenderFlagBuffer;
-            public FrameGraphBuffer MaterialDataBuffer;
+            public FGBuffer RenderFlagBuffer;
+            public FGBuffer MaterialDataBuffer;
 
-            public FrameGraphBuffer WorldMatriciesBuffer;
-            public FrameGraphBuffer CameraDataBuffer;
+            public FGBuffer WorldMatriciesBuffer;
+            public FGBuffer CameraDataBuffer;
 
-            public FrameGraphBuffer PointLightsBuffer;
+            public FGBuffer PointLightsBuffer;
 
             public void Clear()
             {
                 RenderList = null;
                 LightCollector = null;
 
-                RenderFlagBuffer = FrameGraphBuffer.Invalid;
-                MaterialDataBuffer = FrameGraphBuffer.Invalid;
+                RenderFlagBuffer = FGBuffer.Invalid;
+                MaterialDataBuffer = FGBuffer.Invalid;
 
-                WorldMatriciesBuffer = FrameGraphBuffer.Invalid;
-                CameraDataBuffer = FrameGraphBuffer.Invalid;
+                WorldMatriciesBuffer = FGBuffer.Invalid;
+                CameraDataBuffer = FGBuffer.Invalid;
 
-                PointLightsBuffer = FrameGraphBuffer.Invalid;
+                PointLightsBuffer = FGBuffer.Invalid;
             }
         }
 
@@ -154,17 +154,17 @@ namespace VoxelizationDemo.Rendering.Passes
 
     public sealed class BufferDataBlackboard : IBlackboardData
     {
-        public FrameGraphBuffer RenderFlagBuffer;
-        public FrameGraphBuffer WorldMatriciesBuffer;
-        public FrameGraphBuffer CameraDataBuffer;
-        public FrameGraphBuffer PointLightsBuffer;
+        public FGBuffer RenderFlagBuffer;
+        public FGBuffer WorldMatriciesBuffer;
+        public FGBuffer CameraDataBuffer;
+        public FGBuffer PointLightsBuffer;
 
         public void Clear()
         {
-            RenderFlagBuffer = FrameGraphBuffer.Invalid;
-            WorldMatriciesBuffer = FrameGraphBuffer.Invalid;
-            CameraDataBuffer = FrameGraphBuffer.Invalid;
-            PointLightsBuffer = FrameGraphBuffer.Invalid;
+            RenderFlagBuffer = FGBuffer.Invalid;
+            WorldMatriciesBuffer = FGBuffer.Invalid;
+            CameraDataBuffer = FGBuffer.Invalid;
+            PointLightsBuffer = FGBuffer.Invalid;
         }
     }
 }

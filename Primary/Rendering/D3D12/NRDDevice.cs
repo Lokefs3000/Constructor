@@ -390,8 +390,8 @@ namespace Primary.Rendering.D3D12
                                             NRDResource destinationResource = ResourceUtility.AsNRDResource(cmd.Destination);
                                             ID3D12Resource* destinationNative = (ID3D12Resource*)_resourceManager.GetResource(destinationResource);
 
-                                            _barrierManager.AddBufferBarrier(sourceNative, BarrierSync.Copy, BarrierAccess.CopySource);
-                                            _barrierManager.AddBufferBarrier(destinationNative, BarrierSync.Copy, BarrierAccess.CopyDest);
+                                            _barrierManager.AddBufferBarrier(sourceResource, BarrierSync.Copy, BarrierAccess.CopySource);
+                                            _barrierManager.AddBufferBarrier(destinationResource, BarrierSync.Copy, BarrierAccess.CopyDest);
                                             _barrierManager.FlushBarriers(ref cmds.Cmds.Get(), BarrierFlushTypes.Buffer);
 
                                             cmds.Cmds.CopyBufferRegion(destinationNative, cmd.DestinationOffset, sourceNative, cmd.SourceOffset, cmd.NumBytes);
@@ -475,7 +475,7 @@ namespace Primary.Rendering.D3D12
                                             if (cmd.SourceBox.HasValue)
                                             {
                                                 FGBox val = cmd.SourceBox.Value;
-                                                box = new Box((uint)val.X, (uint)val.Y, (uint)val.Z, (uint)val.Width, (uint)val.Height, (uint)val.Depth);
+                                                box = new Box((uint)val.X, (uint)val.Y, (uint)val.Z, (uint)(val.X + val.Width), (uint)(val.Y + val.Height), (uint)(val.Z + val.Depth));
                                             }
 
                                             {
@@ -489,9 +489,9 @@ namespace Primary.Rendering.D3D12
 
                                             {
                                                 if (sourceResource.Id == NRDResourceId.Buffer)
-                                                    _barrierManager.AddBufferBarrier(sourceNative, BarrierSync.Copy, BarrierAccess.CopySource);
+                                                    _barrierManager.AddBufferBarrier(sourceResource, BarrierSync.Copy, BarrierAccess.CopySource);
                                                 else
-                                                    _barrierManager.AddTextureBarrier(sourceNative, BarrierSync.Copy, BarrierAccess.CopySource, BarrierLayout.CopySource);
+                                                    _barrierManager.AddTextureBarrier(sourceResource, BarrierSync.Copy, BarrierAccess.CopySource, BarrierLayout.CopySource);
 
                                                 if (destinationResource.Id == NRDResourceId.Buffer || destinationResource.Id == NRDResourceId.Readback)
                                                     _barrierManager.AddBufferBarrier(destinationResource, BarrierSync.Copy, BarrierAccess.CopyDest);
@@ -1238,7 +1238,7 @@ namespace Primary.Rendering.D3D12
             }
         }
 
-        public NRDResourceInfo QueryResourceInfo(FrameGraphResource resource)
+        public NRDResourceInfo QueryResourceInfo(FGResource resource)
         {
             ResourceDesc1 desc = ResourceManager.GetResourceDescription(this, resource);
             ResourceAllocationInfo allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);
@@ -1252,7 +1252,7 @@ namespace Primary.Rendering.D3D12
             return new NRDResourceInfo((int)allocInfo.SizeInBytes, (int)allocInfo.Alignment);
         }
 
-        public NRDResourceInfo QueryBufferInfo(FrameGraphBuffer buffer, int offset, int size)
+        public NRDResourceInfo QueryBufferInfo(FGBuffer buffer, int offset, int size)
         {
             ResourceDesc1 desc = ResourceManager.GetBufferDescription(this, size);
             ResourceAllocationInfo allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);
@@ -1266,7 +1266,7 @@ namespace Primary.Rendering.D3D12
             return new NRDResourceInfo((int)allocInfo.SizeInBytes, (int)allocInfo.Alignment);
         }
 
-        public NRDResourceInfo QueryTextureInfo(FrameGraphTexture texture, int offset, int size)
+        public NRDResourceInfo QueryTextureInfo(FGTexture texture, int offset, int size)
         {
             ResourceDesc1 desc = ResourceManager.GetTextureDescription(this, texture);
             ResourceAllocationInfo allocInfo = _device->GetResourceAllocationInfo2(0, 1, &desc, null);

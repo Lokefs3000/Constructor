@@ -10,6 +10,7 @@ using PrimaryEditor.Selection;
 using VoxelizationDemo.Core;
 using VoxelizationDemo.Editor.Rendering;
 using VoxelizationDemo.Editor.Rendering.Icons;
+using VoxelizationDemo.Editor.Serialization;
 using VoxelizationDemo.Editor.Tools;
 using VoxelizationDemo.Editor.Windows;
 
@@ -31,6 +32,7 @@ namespace VoxelizationDemo.Editor
         private readonly HandleAllocator _handleAllocator;
         private readonly ToolManager _toolManager;
         private readonly PickingManager _pickingManager;
+        private readonly SerializationManager _serializationManager;
 
         private bool _isEnabled;
 
@@ -52,6 +54,7 @@ namespace VoxelizationDemo.Editor
             _handleAllocator = new HandleAllocator();
             _toolManager = new ToolManager();
             _pickingManager = new PickingManager();
+            _serializationManager = new SerializationManager();
 
             _isEnabled = false;
 
@@ -96,8 +99,11 @@ namespace VoxelizationDemo.Editor
         private void OnActiveEntityChangedCallback(SceneEntity oldEntity, SceneEntity newEntity)
         {
             InspectorManager inspectorManager = VoxelRuntime.Instance.InspectorManager;
-            inspectorManager.StopInspect(ref oldEntity);
-            inspectorManager.StartInspect<EntityInspectorContext, SceneEntity>(ref newEntity);
+
+            if (!oldEntity.IsNull)
+                inspectorManager.StopInspect(ref oldEntity);
+            if (!newEntity.IsNull)
+                inspectorManager.StartInspect<EntityInspectorContext, SceneEntity>(ref newEntity);
         }
 
         internal void Enable()
@@ -165,6 +171,7 @@ namespace VoxelizationDemo.Editor
         public HandleAllocator HandleAllocator => _handleAllocator;
         public ToolManager ToolManager => _toolManager;
         public PickingManager PickingManager => _pickingManager;
+        public SerializationManager SerializationManager => _serializationManager;
 
         public SearchManager SearchManager => _searchManager;
         public SelectionManager SelectionManager => _selectionManager;

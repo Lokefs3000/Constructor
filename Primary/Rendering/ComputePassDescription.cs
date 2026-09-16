@@ -52,7 +52,7 @@ namespace Primary.Rendering
             }
         }
 
-        public FrameGraphTexture CreateTexture(FrameGraphTextureDesc desc, [CallerMemberName] string? debugName = null)
+        public FGTexture CreateTexture(FGTextureDesc desc, [CallerMemberName] string? debugName = null)
         {
             //validate
             {
@@ -65,7 +65,7 @@ namespace Primary.Rendering
                         if (Flags.HasFlag(desc.Usage, ~s_textureUsageMap.DangerousGetReferenceAt(i)))
                         {
                             _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.IncompatibleUsage, debugName);
-                            return FrameGraphTexture.Invalid;
+                            return FGTexture.Invalid;
                         }
 
                         switch (usage)
@@ -88,19 +88,19 @@ namespace Primary.Rendering
                                     if (desc.Dimension != FGTextureDimension._2D)
                                     {
                                         _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.InvalidDimension, debugName);
-                                        return FrameGraphTexture.Invalid;
+                                        return FGTexture.Invalid;
                                     }
 
                                     if (desc.Depth != 1)
                                     {
                                         _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.InvalidSize, debugName);
-                                        return FrameGraphTexture.Invalid;
+                                        return FGTexture.Invalid;
                                     }
 
                                     if (!desc.Format.IsRenderTargetCapable())
                                     {
                                         _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.IncompatibleFormat, debugName);
-                                        return FrameGraphTexture.Invalid;
+                                        return FGTexture.Invalid;
                                     }
 
                                     break;
@@ -110,19 +110,19 @@ namespace Primary.Rendering
                                     if (desc.Dimension != FGTextureDimension._2D)
                                     {
                                         _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.InvalidDimension, debugName);
-                                        return FrameGraphTexture.Invalid;
+                                        return FGTexture.Invalid;
                                     }
 
                                     if (desc.Depth != 1)
                                     {
                                         _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.InvalidSize, debugName);
-                                        return FrameGraphTexture.Invalid;
+                                        return FGTexture.Invalid;
                                     }
 
                                     if (!desc.Format.IsDepthStencilCapable())
                                     {
                                         _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.IncompatibleFormat, debugName);
-                                        return FrameGraphTexture.Invalid;
+                                        return FGTexture.Invalid;
                                     }
 
                                     break;
@@ -138,7 +138,7 @@ namespace Primary.Rendering
                             if (!IsWithinRange(desc.Width) || desc.Height != 1 || !IsWithinRangeLayers(desc.Depth))
                             {
                                 _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.InvalidSize, debugName);
-                                return FrameGraphTexture.Invalid;
+                                return FGTexture.Invalid;
                             }
                             break;
                         }
@@ -147,7 +147,7 @@ namespace Primary.Rendering
                             if (!IsWithinRange(desc.Width) || !IsWithinRange(desc.Height) || !IsWithinRangeLayers(desc.Depth))
                             {
                                 _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.InvalidSize, debugName);
-                                return FrameGraphTexture.Invalid;
+                                return FGTexture.Invalid;
                             }
                             break;
                         }
@@ -156,14 +156,14 @@ namespace Primary.Rendering
                             if (!IsWithinRange3D(desc.Width) || !IsWithinRange3D(desc.Height) || !IsWithinRange3D(desc.Depth))
                             {
                                 _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.InvalidSize, debugName);
-                                return FrameGraphTexture.Invalid;
+                                return FGTexture.Invalid;
                             }
                             break;
                         }
                     default:
                         {
                             _renderPass.ReportError(RPErrorSource.CreateTexture, RPErrorType.InvalidDimension, debugName);
-                            return FrameGraphTexture.Invalid;
+                            return FGTexture.Invalid;
                         }
                 }
 
@@ -172,26 +172,26 @@ namespace Primary.Rendering
                 static bool IsWithinRangeLayers(int dim) => (uint)dim <= 2048;
             }
 
-            FrameGraphTexture texture = new FrameGraphResource(_renderPass.GetNewResourceIndex(), desc, debugName).AsTexture();
+            FGTexture texture = new FGResource(_renderPass.GetNewResourceIndex(), desc, debugName).AsTexture();
             _renderPass.Manager.Resources.AddFGResource(texture);
 
             return texture;
         }
 
-        public FrameGraphBuffer CreateBuffer(FrameGraphBufferDesc desc, [CallerMemberName] string? debugName = null)
+        public FGBuffer CreateBuffer(FGBufferDesc desc, [CallerMemberName] string? debugName = null)
         {
             //validate
             {
                 if (desc.Width == 0)
                 {
                     _renderPass.ReportError(RPErrorSource.CreateBuffer, RPErrorType.InvalidSize, debugName);
-                    return FrameGraphBuffer.Invalid;
+                    return FGBuffer.Invalid;
                 }
 
                 if (desc.Stride > desc.Width)
                 {
                     _renderPass.ReportError(RPErrorSource.CreateBuffer, RPErrorType.StrideTooLarge, debugName);
-                    return FrameGraphBuffer.Invalid;
+                    return FGBuffer.Invalid;
                 }
 
                 //if (desc.Stride > 1 && ExMath.FastIntergralSqrt(desc.Width) != desc.Stride)
@@ -209,7 +209,7 @@ namespace Primary.Rendering
                         if (Flags.HasFlag(desc.Usage, ~s_bufferUsageMap.DangerousGetReferenceAt(i)))
                         {
                             _renderPass.ReportError(RPErrorSource.CreateBuffer, RPErrorType.IncompatibleUsage, debugName);
-                            return FrameGraphBuffer.Invalid;
+                            return FGBuffer.Invalid;
                         }
                     }
                 }
@@ -219,13 +219,13 @@ namespace Primary.Rendering
             if (Flags.HasFlag(desc.Usage, FGBufferUsage.ConstantBuffer))
                 desc.Width = Math.Max(desc.Width, 256);
 
-            FrameGraphBuffer buffer = new FrameGraphResource(_renderPass.GetNewResourceIndex(), desc, debugName).AsBuffer();
+            FGBuffer buffer = new FGResource(_renderPass.GetNewResourceIndex(), desc, debugName).AsBuffer();
             _renderPass.Manager.Resources.AddFGResource(buffer);
 
             return buffer;
         }
 
-        public void UseResource(FGResourceUsage usage, FrameGraphTexture resource)
+        public void UseResource(FGResourceUsage usage, FGTexture resource)
         {
             //validate
             {
@@ -255,7 +255,7 @@ namespace Primary.Rendering
             _array.AddResource(new UsedResourceData(usage, resource));
         }
 
-        public void UseResource(FGResourceUsage usage, FrameGraphBuffer resource)
+        public void UseResource(FGResourceUsage usage, FGBuffer resource)
         {
             //validate
             {
@@ -286,7 +286,7 @@ namespace Primary.Rendering
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void UseResource(FGResourceUsage usage, FrameGraphResource resource)
+        public void UseResource(FGResourceUsage usage, FGResource resource)
         {
             if (resource.ResourceId == FGResourceId.Texture)
             {
@@ -299,7 +299,7 @@ namespace Primary.Rendering
             }
         }
 
-        public void UseRenderTarget(FrameGraphTexture renderTarget)
+        public void UseRenderTarget(FGTexture renderTarget)
         {
             //validate
             {
@@ -319,7 +319,7 @@ namespace Primary.Rendering
             _array.AddRenderTarget(new UsedRenderTargetData(FGRenderTargetType.RenderTarget, renderTarget));
         }
 
-        public void UseDepthStencil(FrameGraphTexture depthStencil)
+        public void UseDepthStencil(FGTexture depthStencil)
         {
             //validate
             {

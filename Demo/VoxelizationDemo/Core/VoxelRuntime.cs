@@ -46,7 +46,7 @@ namespace VoxelizationDemo.Core
         {
             Window window = _windowManager.CreateWindow("Voxel", new Int2(1600, 900), CreateWindowFlags.Resizable);
 
-            _renderingManager.SetNewRenderPath(new CoreRenderPath());
+            _renderingManager.SetNewRenderPath(new WorldRenderStage());
 
             {
                 SceneEntityManager.Instance.RegisterComponent<PointLight>();

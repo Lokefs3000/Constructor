@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace Primary.Rendering.Resources
 {
-    public struct FrameGraphTextureDesc
+    public struct FGTextureDesc
     {
         public int Width;
         public int Height;
@@ -15,7 +15,7 @@ namespace Primary.Rendering.Resources
 
         public FGTextureSwizzle Swizzle;
 
-        public FrameGraphTextureDesc()
+        public FGTextureDesc()
         {
             Width = 0;
             Height = 0;
@@ -28,7 +28,7 @@ namespace Primary.Rendering.Resources
             Swizzle = FGTextureSwizzle.RGBA;
         }
 
-        public FrameGraphTextureDesc(FrameGraphTextureDesc @base)
+        public FGTextureDesc(FGTextureDesc @base)
         {
             Width = @base.Width;
             Height = @base.Height;

@@ -18,7 +18,7 @@ namespace Primary.Rendering.Pass
 
         private int[] _pooledDependencyArray;
 
-        private Dictionary<FrameGraphResource, IndexRange> _resourceLifetimeDict;
+        private Dictionary<FGResource, IndexRange> _resourceLifetimeDict;
 
         internal RenderPassCompiler()
         {
@@ -31,7 +31,7 @@ namespace Primary.Rendering.Pass
 
             _pooledDependencyArray = new int[16];
 
-            _resourceLifetimeDict = new Dictionary<FrameGraphResource, IndexRange>();
+            _resourceLifetimeDict = new Dictionary<FGResource, IndexRange>();
         }
 
         internal void Compile(ReadOnlySpan<RenderPassDescription> passes, ReadOnlySpan<RenderPassGroup> groups, FrameGraphTimeline timeline, FrameGraphResources resources, FrameGraphState stateManager)
@@ -216,13 +216,13 @@ namespace Primary.Rendering.Pass
 
         private class RenderPassContainer
         {
-            private HashSet<FrameGraphTexture> _outputs;
-            private Dictionary<FrameGraphResource, FGResourceUsage> _resources;
+            private HashSet<FGTexture> _outputs;
+            private Dictionary<FGResource, FGResourceUsage> _resources;
 
             internal RenderPassContainer()
             {
-                _outputs = new HashSet<FrameGraphTexture>();
-                _resources = new Dictionary<FrameGraphResource, FGResourceUsage>();
+                _outputs = new HashSet<FGTexture>();
+                _resources = new Dictionary<FGResource, FGResourceUsage>();
             }
 
             internal void Initialize(ref readonly RenderPassDescription desc)
@@ -249,10 +249,10 @@ namespace Primary.Rendering.Pass
                 _resources.Clear();
             }
 
-            internal bool HasOutput(FrameGraphTexture texture) => _outputs.Contains(texture);
-            internal bool HasResource(FrameGraphResource resource) => _resources.ContainsKey(resource);
+            internal bool HasOutput(FGTexture texture) => _outputs.Contains(texture);
+            internal bool HasResource(FGResource resource) => _resources.ContainsKey(resource);
 
-            internal bool HasResourceWithUsage(FrameGraphResource resource, FGResourceUsage usage)
+            internal bool HasResourceWithUsage(FGResource resource, FGResourceUsage usage)
             {
                 if (_resources.TryGetValue(resource, out FGResourceUsage resUsage))
                     return Flags.HasEither(resUsage, usage);
@@ -260,7 +260,7 @@ namespace Primary.Rendering.Pass
                 return false;
             }
 
-            internal Dictionary<FrameGraphResource, FGResourceUsage> Resources => _resources;
+            internal Dictionary<FGResource, FGResourceUsage> Resources => _resources;
 
             internal readonly record struct PoolingPolicy : IObjectPoolPolicy<RenderPassContainer>
             {

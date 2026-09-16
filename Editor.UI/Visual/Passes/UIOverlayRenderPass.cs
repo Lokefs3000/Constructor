@@ -62,7 +62,7 @@ namespace Editor.UI.Visual.Passes
                         UIManager.Logger?.Warning("Incompatible size between source and destination: {src} >? {dst} (offset: {off})", new Int2(src.Description.Width, src.Description.Height), new Int2(windowData.ColorTexture.Description.Width, windowData.ColorTexture.Description.Height), baseOffset);
                     }
                     else
-                        cmd.Copy(new FGTextureCopyDesc((FrameGraphTexture)renderableHost.HostTexture, null, windowData.ColorTexture, (uint)baseOffset.X, (uint)baseOffset.Y, 0));
+                        cmd.Copy(new FGTextureCopyDesc((FGTexture)renderableHost.HostTexture, null, windowData.ColorTexture, (uint)baseOffset.X, (uint)baseOffset.Y, 0));
 
                     foreach (IWindowHost child in hosts)
                     {
@@ -71,7 +71,7 @@ namespace Editor.UI.Visual.Passes
                 }
             }
 
-            void RecursiveHostCopy(RasterCommandBuffer cmd, FrameGraphTexture dest, IWindowHost host)
+            void RecursiveHostCopy(RasterCommandBuffer cmd, FGTexture dest, IWindowHost host)
             {
                 if (host.HostTexture != null)
                 {
@@ -90,7 +90,7 @@ namespace Editor.UI.Visual.Passes
                         UIManager.Logger?.Warning("Incompatible size between source and destination: {src} >? {dst} (offset: {off})", new Int2(src.Description.Width, src.Description.Height), new Int2(windowData.ColorTexture.Description.Width, windowData.ColorTexture.Description.Height), baseOffset);
                     }
                     else
-                        cmd.Copy(new FGTextureCopyDesc((FrameGraphTexture)src, null, dest, (uint)baseOffset.X, (uint)baseOffset.Y, 0));
+                        cmd.Copy(new FGTextureCopyDesc((FGTexture)src, null, dest, (uint)baseOffset.X, (uint)baseOffset.Y, 0));
 
                     foreach (UIDockHost child in hosts)
                     {

@@ -15,8 +15,8 @@ namespace Primary.Rendering.State
 {
     internal sealed class RasterState : RenderState
     {
-        private DirtyArray<FrameGraphTexture> _renderTargets;
-        private DirtyValue<FrameGraphTexture> _depthStencil;
+        private DirtyArray<FGTexture> _renderTargets;
+        private DirtyValue<FGTexture> _depthStencil;
 
         private DirtyArray<NullableUnique<FGViewport>> _viewports;
         private DirtyArray<NullableUnique<FGRect>> _scissors;
@@ -30,8 +30,8 @@ namespace Primary.Rendering.State
 
         internal RasterState() : base()
         {
-            _renderTargets = new DirtyArray<FrameGraphTexture>(8, FrameGraphTexture.Invalid);
-            _depthStencil = new DirtyValue<FrameGraphTexture>(FrameGraphTexture.Invalid);
+            _renderTargets = new DirtyArray<FGTexture>(8, FGTexture.Invalid);
+            _depthStencil = new DirtyValue<FGTexture>(FGTexture.Invalid);
 
             _viewports = new DirtyArray<NullableUnique<FGViewport>>(8, null);
             _scissors = new DirtyArray<NullableUnique<FGRect>>(8, null);
@@ -50,8 +50,8 @@ namespace Primary.Rendering.State
         {
             base.ClearState();
 
-            _renderTargets.Fill(FrameGraphTexture.Invalid, false);
-            _depthStencil.Reset(FrameGraphTexture.Invalid);
+            _renderTargets.Fill(FGTexture.Invalid, false);
+            _depthStencil.Reset(FGTexture.Invalid);
 
             _viewports.Fill(null, false);
             _scissors.Fill(null, false);
@@ -68,8 +68,8 @@ namespace Primary.Rendering.State
         {
             base.SoftResetForNextPass();
 
-            _renderTargets.FillNew(FrameGraphTexture.Invalid);
-            _depthStencil.Value = FrameGraphTexture.Invalid;
+            _renderTargets.FillNew(FGTexture.Invalid);
+            _depthStencil.Value = FGTexture.Invalid;
 
             _viewports.FillNew(null);
             _scissors.FillNew(null);
@@ -94,7 +94,7 @@ namespace Primary.Rendering.State
 
                 for (int i = 0; i < count; ++i)
                 {
-                    ref FrameGraphTexture texture = ref _renderTargets.GetWithoutDirty(i);
+                    ref FGTexture texture = ref _renderTargets.GetWithoutDirty(i);
 
                     if (_renderTargets.IsDirty(i))
                     {
@@ -107,31 +107,35 @@ namespace Primary.Rendering.State
                         if (!texture.IsNull)
                         {
                             recorder.AddResourceToSet(texture);
-                            if (!_viewports.GetWithoutDirty(i).HasValue)
-                            {
-                                if (texture.IsExternal)
-                                {
-                                    ref readonly RHITextureDescription desc = ref texture.Resource!.Description;
-                                    _viewports[i] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
-                                }
-                                else
-                                {
-                                    ref readonly FrameGraphTextureDesc desc = ref texture.Description;
-                                    _viewports[i] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
-                                }
-                            }
 
-                            if (!_scissors.GetWithoutDirty(i).HasValue)
+                            if (i == 0)
                             {
-                                if (texture.IsExternal)
+                                if (!_viewports.GetWithoutDirty(i).HasValue)
                                 {
-                                    ref readonly RHITextureDescription desc = ref texture.Resource!.Description;
-                                    _scissors[i] = new FGRect(0, 0, desc.Width, desc.Height);
+                                    if (texture.IsExternal)
+                                    {
+                                        ref readonly RHITextureDescription desc = ref texture.Resource!.Description;
+                                        _viewports[i] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
+                                    }
+                                    else
+                                    {
+                                        ref readonly FGTextureDesc desc = ref texture.Description;
+                                        _viewports[i] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
+                                    }
                                 }
-                                else
+
+                                if (!_scissors.GetWithoutDirty(i).HasValue)
                                 {
-                                    ref readonly FrameGraphTextureDesc desc = ref texture.Description;
-                                    _scissors[i] = new FGRect(0, 0, desc.Width, desc.Height);
+                                    if (texture.IsExternal)
+                                    {
+                                        ref readonly RHITextureDescription desc = ref texture.Resource!.Description;
+                                        _scissors[i] = new FGRect(0, 0, desc.Width, desc.Height);
+                                    }
+                                    else
+                                    {
+                                        ref readonly FGTextureDesc desc = ref texture.Description;
+                                        _scissors[i] = new FGRect(0, 0, desc.Width, desc.Height);
+                                    }
                                 }
                             }
                         }
@@ -152,7 +156,7 @@ namespace Primary.Rendering.State
 
             if (_depthStencil.IsDirty)
             {
-                FrameGraphTexture texture = _depthStencil.Value;
+                FGTexture texture = _depthStencil.Value;
                 if (!texture.IsNull)
                 {
                     recorder.AddResourceToSet(texture);
@@ -166,7 +170,7 @@ namespace Primary.Rendering.State
                         }
                         else
                         {
-                            ref readonly FrameGraphTextureDesc desc = ref texture.Description;
+                            ref readonly FGTextureDesc desc = ref texture.Description;
                             _viewports[0] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
                         }
                     }
@@ -180,7 +184,7 @@ namespace Primary.Rendering.State
                         }
                         else
                         {
-                            ref readonly FrameGraphTextureDesc desc = ref texture.Description;
+                            ref readonly FGTextureDesc desc = ref texture.Description;
                             _scissors[0] = new FGRect(0, 0, desc.Width, desc.Height);
                         }
                     }
@@ -206,7 +210,7 @@ namespace Primary.Rendering.State
                     {
                         if (!viewport.HasValue)
                         {
-                            ref FrameGraphTexture rtTex = ref _renderTargets.GetWithoutDirty(i);
+                            ref FGTexture rtTex = ref _renderTargets.GetWithoutDirty(i);
                             if (!rtTex.IsNull)
                             {
                                 (int width, int height, _) = FGResourceUtility.GetTextureSize(rtTex);
@@ -251,7 +255,7 @@ namespace Primary.Rendering.State
                     {
                         if (!scissor.HasValue)
                         {
-                            ref FrameGraphTexture rtTex = ref _renderTargets.GetWithoutDirty(i);
+                            ref FGTexture rtTex = ref _renderTargets.GetWithoutDirty(i);
                             if (!rtTex.IsNull)
                             {
                                 (int width, int height, _) = FGResourceUtility.GetTextureSize(rtTex);
@@ -341,8 +345,8 @@ namespace Primary.Rendering.State
             return base.CommitState(allocator, recorder);
         }
 
-        internal void SetRenderTarget(int slot, FrameGraphTexture texture) => _renderTargets[slot] = texture;
-        internal void SetDepthStencil(FrameGraphTexture texture) => _depthStencil.Value = texture;
+        internal void SetRenderTarget(int slot, FGTexture texture) => _renderTargets[slot] = texture;
+        internal void SetDepthStencil(FGTexture texture) => _depthStencil.Value = texture;
 
         internal void SetViewport(int slot, FGViewport? viewport) => _viewports[slot] = viewport;
         internal void SetScissor(int slot, FGRect? scissor) => _scissors[slot] = scissor;
@@ -373,12 +377,12 @@ namespace Primary.Rendering.State
         }
     }
 
-    internal readonly record struct SetVertexBufferData(FrameGraphBuffer Buffer, uint Stride)
+    internal readonly record struct SetVertexBufferData(FGBuffer Buffer, uint Stride)
     {
-        public static readonly SetVertexBufferData Invalid = new SetVertexBufferData(FrameGraphBuffer.Invalid, 0xffffffff);
+        public static readonly SetVertexBufferData Invalid = new SetVertexBufferData(FGBuffer.Invalid, 0xffffffff);
     }
-    internal readonly record struct SetIndexBufferData(FrameGraphBuffer Buffer, uint Stride)
+    internal readonly record struct SetIndexBufferData(FGBuffer Buffer, uint Stride)
     {
-        public static readonly SetIndexBufferData Invalid = new SetIndexBufferData(FrameGraphBuffer.Invalid, 0xffffffff);
+        public static readonly SetIndexBufferData Invalid = new SetIndexBufferData(FGBuffer.Invalid, 0xffffffff);
     }
 }

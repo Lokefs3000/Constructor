@@ -12,8 +12,8 @@ namespace Primary.Rendering.Data
 
         public WorldTransform Transform { get; private set; }
 
-        public FrameGraphTexture ColorTexture { get; internal set; }
-        public FrameGraphTexture DepthTexture { get; internal set; }
+        public FGTexture ColorTexture { get; internal set; }
+        public FGTexture DepthTexture { get; internal set; }
 
         public Matrix4x4 View { get; private set; }
         public Matrix4x4 Projection { get; private set; }

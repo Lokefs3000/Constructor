@@ -40,7 +40,7 @@ namespace Editor.Rendering.Passes
 
                             if (false && scene.Container.NewVertexCount > 0)
                             {
-                                passData.TransientBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                                passData.TransientBuffer = desc.CreateBuffer(new FGBufferDesc
                                 {
                                     Width = (uint)(Unsafe.SizeOf<BrushVertex>() * scene.Container.NewVertexCount),
                                     Stride = Unsafe.SizeOf<BrushVertex>(),
@@ -50,7 +50,7 @@ namespace Editor.Rendering.Passes
                                 desc.UseResource(FGResourceUsage.ReadWrite, passData.TransientBuffer);
                             }
                             else
-                                passData.TransientBuffer = FrameGraphBuffer.Invalid;
+                                passData.TransientBuffer = FGBuffer.Invalid;
 
                             desc.AllowPassCulling(false);
                             desc.SetRenderFunction<PassData>(static (x, y) => PassFunction(x, y));
@@ -130,14 +130,14 @@ namespace Editor.Rendering.Passes
             public GeoSceneAsset? Asset;
             public GeoScene? Scene;
 
-            public FrameGraphBuffer TransientBuffer;
+            public FGBuffer TransientBuffer;
 
             public void Clear()
             {
                 Asset = null;
                 Scene = null;
 
-                TransientBuffer = FrameGraphBuffer.Invalid;
+                TransientBuffer = FGBuffer.Invalid;
             }
         }
     }

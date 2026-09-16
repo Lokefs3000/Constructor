@@ -4,8 +4,15 @@ using System.Text.Json.Serialization;
 
 namespace Primary.Assets.Types
 {
+    public abstract class BaseAssetDefinition : IAssetDefinition
+    {
+        public abstract AssetId Id { get; }
+        public abstract ResourceStatus Status { get; }
+        public abstract string Name { get; }
+    }
+
     [JsonConverter(typeof(AssetJsonConverter))]
-    public abstract class BaseAssetDefinition<TSelf, T> : IAssetDefinition where TSelf : class, IAssetDefinition where T : class, IInternalAssetData
+    public abstract class BaseAssetDefinition<TSelf, T> : BaseAssetDefinition where TSelf : class, IAssetDefinition where T : class, IInternalAssetData
     {
         private readonly T _assetData;
 
@@ -24,9 +31,9 @@ namespace Primary.Assets.Types
         internal T InternalAssetData => _assetData;
         protected T AssetData => _assetData;
 
-        public AssetId Id => _assetData.Id;
-        public ResourceStatus Status => _assetData.Status;
-        public string Name => _assetData.Name;
+        public override AssetId Id => _assetData.Id;
+        public override ResourceStatus Status => _assetData.Status;
+        public override string Name => _assetData.Name;
 
         public bool IsLoaded => _assetData.Status > ResourceStatus.Running;
 

@@ -11,7 +11,7 @@ using Primary.Scenes;
 using Primary.Scenes.Json;
 using VoxelizationDemo.Core;
 
-namespace VoxelizationDemo.Editor.Serialization
+namespace VoxelizationDemo.Editor.Serialization.Special
 {
     internal static class SceneSerializer
     {
@@ -23,7 +23,7 @@ namespace VoxelizationDemo.Editor.Serialization
                 IndentSize = 4
             };
 
-            Utf8JsonWriter writer = new Utf8JsonWriter(stream, writerOptions);
+            using Utf8JsonWriter writer = new Utf8JsonWriter(stream, writerOptions);
             writer.WriteStartObject();
 
             using RentedList<ComponentToSerialize> componentsToSerialize = new RentedList<ComponentToSerialize>();

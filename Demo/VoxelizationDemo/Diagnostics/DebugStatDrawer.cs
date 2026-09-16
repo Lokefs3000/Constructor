@@ -22,7 +22,7 @@ namespace VoxelizationDemo.Diagnostics
                 windowState.DrawList.DrawFilledRect(windowState.Position, windowState.Position + windowState.Size, 0x80000000);
 
                 RenderStatistics statistics = VoxelRuntime.Instance.RenderingManager.Statistics;
-                CoreRenderPath renderPath = (CoreRenderPath)VoxelRuntime.Instance.RenderingManager.CurrentRenderPath!;
+                WorldRenderStage renderPath = (WorldRenderStage)VoxelRuntime.Instance.RenderingManager.CurrentRenderPath!;
 
                 IMGUI.Text($"Delta time: {Time.DeltaTimeDouble * 1000.0:f4} ms ({1.0 / Time.DeltaTimeDouble:f1} fps)");
                 

@@ -181,7 +181,7 @@ namespace Primary.Rendering.D3D12
                     {
                         case FGResourceId.Texture:
                             {
-                                ref readonly FrameGraphTextureDesc texDesc = ref location.Resource.TextureDesc;
+                                ref readonly FGTextureDesc texDesc = ref location.Resource.TextureDesc;
 
                                 Debug.Assert(texDesc.Width > 0 && texDesc.Height > 0 && texDesc.Depth > 0);
 
@@ -235,7 +235,7 @@ namespace Primary.Rendering.D3D12
                             }
                         case FGResourceId.Buffer:
                             {
-                                ref readonly FrameGraphBufferDesc bufDesc = ref location.Resource.BufferDesc;
+                                ref readonly FGBufferDesc bufDesc = ref location.Resource.BufferDesc;
 
                                 Debug.Assert(bufDesc.Width > 0);
 
@@ -358,20 +358,20 @@ namespace Primary.Rendering.D3D12
             return null;
         }
 
-        internal FrameGraphBuffer FindFGBuffer(NRDResource resource)
+        internal FGBuffer FindFGBuffer(NRDResource resource)
         {
             if (resource.EncId != NRDResourceId.Buffer)
-                return FrameGraphBuffer.Invalid;
+                return FGBuffer.Invalid;
 
-            return _frameResourceData?.FindFGBuffer(resource.Index) ?? FrameGraphBuffer.Invalid;
+            return _frameResourceData?.FindFGBuffer(resource.Index) ?? FGBuffer.Invalid;
         }
 
-        internal FrameGraphTexture FindFGTexture(NRDResource resource)
+        internal FGTexture FindFGTexture(NRDResource resource)
         {
             if (resource.EncId != NRDResourceId.Texture)
-                return FrameGraphTexture.Invalid;
+                return FGTexture.Invalid;
 
-            return _frameResourceData?.FindFGTexture(resource.Index) ?? FrameGraphTexture.Invalid;
+            return _frameResourceData?.FindFGTexture(resource.Index) ?? FGTexture.Invalid;
         }
 
         internal void EnsureInitialized(NRDResource resource)
@@ -431,8 +431,8 @@ namespace Primary.Rendering.D3D12
                 }
                 else if (resource.EncId == NRDResourceId.Texture)
                 {
-                    FrameGraphTexture fgTexture = FindFGTexture(resource);
-                    ref readonly FrameGraphTextureDesc desc = ref fgTexture.Description;
+                    FGTexture fgTexture = FindFGTexture(resource);
+                    ref readonly FGTextureDesc desc = ref fgTexture.Description;
 
                     if (Flags.HasFlag(desc.Usage, FGTextureUsage.RenderTarget))
                     {
@@ -476,8 +476,8 @@ namespace Primary.Rendering.D3D12
                 }
                 else if (resource.EncId == NRDResourceId.Texture)
                 {
-                    FrameGraphTexture fgTexture = FindFGTexture(resource);
-                    ref readonly FrameGraphTextureDesc desc = ref fgTexture.Description;
+                    FGTexture fgTexture = FindFGTexture(resource);
+                    ref readonly FGTextureDesc desc = ref fgTexture.Description;
 
                     if (Flags.HasFlag(desc.Usage, FGTextureUsage.RenderTarget))
                     {
@@ -504,7 +504,7 @@ namespace Primary.Rendering.D3D12
             _pendingInitializes.Clear();
         }
 
-        internal static ResourceDesc1 GetResourceDescription(NRDDevice device, FrameGraphResource resource)
+        internal static ResourceDesc1 GetResourceDescription(NRDDevice device, FGResource resource)
         {
             ResourceDesc1 resDesc = default;
 
@@ -512,7 +512,7 @@ namespace Primary.Rendering.D3D12
             {
                 case FGResourceId.Texture:
                     {
-                        ref readonly FrameGraphTextureDesc texDesc = ref resource.TextureDesc;
+                        ref readonly FGTextureDesc texDesc = ref resource.TextureDesc;
 
                         resDesc = new ResourceDesc1
                         {
@@ -553,7 +553,7 @@ namespace Primary.Rendering.D3D12
                     }
                 case FGResourceId.Buffer:
                     {
-                        ref readonly FrameGraphBufferDesc bufDesc = ref resource.BufferDesc;
+                        ref readonly FGBufferDesc bufDesc = ref resource.BufferDesc;
 
                         resDesc = new ResourceDesc1
                         {
@@ -595,9 +595,9 @@ namespace Primary.Rendering.D3D12
             return resDesc;
         }
 
-        internal static ResourceDesc1 GetTextureDescription(NRDDevice device, FrameGraphTexture texture)
+        internal static ResourceDesc1 GetTextureDescription(NRDDevice device, FGTexture texture)
         {
-            FrameGraphTextureDesc texDesc = texture.Description;
+            FGTextureDesc texDesc = texture.Description;
 
             ResourceDesc1 resDesc = new ResourceDesc1
             {

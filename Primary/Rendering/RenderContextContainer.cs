@@ -23,10 +23,9 @@ namespace Primary.Rendering
             return Unsafe.As<T>(item);
         }
 
-        public T? Get<T>() where T : class, IContextItem
+        public T Get<T>() where T : class, IContextItem
         {
-            _items.TryGetValue(typeof(T), out IContextItem? item);
-            return Unsafe.As<T>(item);
+            return Unsafe.As<T>(_items[typeof(T)]);
         }
     }
 }

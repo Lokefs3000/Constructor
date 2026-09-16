@@ -8,10 +8,10 @@ namespace Primary.Rendering.Resources
 {
     public static class FGResourceUtility
     {
-        public static uint GetWidth(FrameGraphBuffer buffer) => buffer.IsExternal ? Unsafe.As<RHIBuffer>(buffer.Resource!).Description.Width : buffer.Description.Width;
-        public static uint GetStride(FrameGraphBuffer buffer) => (uint)(buffer.IsExternal ? buffer.Resource!.Description.Stride : buffer.Description.Stride);
+        public static uint GetWidth(FGBuffer buffer) => buffer.IsExternal ? Unsafe.As<RHIBuffer>(buffer.Resource!).Description.Width : buffer.Description.Width;
+        public static uint GetStride(FGBuffer buffer) => (uint)(buffer.IsExternal ? buffer.Resource!.Description.Stride : buffer.Description.Stride);
 
-        public static (int, int, int) GetTextureSize(FrameGraphTexture texture)
+        public static (int, int, int) GetTextureSize(FGTexture texture)
         {
             if (texture.IsExternal)
             {
@@ -30,7 +30,7 @@ namespace Primary.Rendering.Resources
             return ((int)(width / subresource), (int)(height / subresource), (int)(depth / subresource));
         }
     
-        public static int GetMaxSubresources(FrameGraphResource resource)
+        public static int GetMaxSubresources(FGResource resource)
         {
             if (resource.ResourceId == FGResourceId.Buffer)
                 return 1;
@@ -38,6 +38,6 @@ namespace Primary.Rendering.Resources
             return resource.IsExternal ? Unsafe.As<RHITexture>(resource.Resource!).Description.MipLevels : 1;
         }
 
-        public static RHIFormat GetFormat(FrameGraphTexture texture) => texture.IsExternal ? Unsafe.As<RHITexture>(texture.Resource!).Description.Format : texture.Description.Format;
+        public static RHIFormat GetFormat(FGTexture texture) => texture.IsExternal ? Unsafe.As<RHITexture>(texture.Resource!).Description.Format : texture.Description.Format;
     }
 }

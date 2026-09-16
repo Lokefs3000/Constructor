@@ -47,26 +47,26 @@ namespace VoxelizationDemo.Rendering.Passes
 
             RenderCameraData cameraData = context.Get<RenderCameraData>()!;
 
-            FrameGraphBuffer clusterBoundsBuffer;
-            FrameGraphBuffer screenToViewLight;
+            FGBuffer clusterBoundsBuffer;
+            FGBuffer screenToViewLight;
 
             using (ComputePassDescription desc = renderPass.SetupComputePass("BuildClusters", out BuildClustersPassData passData))
             {
-                passData.ScreenToViewDataBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.ScreenToViewDataBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<ScreenToViewData>(),
                     Stride = Unsafe.SizeOf<ScreenToViewData>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.ConstantBuffer
                 }, "ScreenToView");
 
-                passData.ScreenToViewLightBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.ScreenToViewLightBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<ScreenToViewLight>(),
                     Stride = Unsafe.SizeOf<ScreenToViewLight>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer | FGBufferUsage.Global
                 }, "ScreenToViewLight");
 
-                passData.ClustersBoundsBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.ClustersBoundsBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)(Unsafe.SizeOf<ClusterAABB>() * (ClustersWidth * ClustersHeight * ClustersDepth)),
                     Stride = Unsafe.SizeOf<ClusterAABB>(),
@@ -87,28 +87,28 @@ namespace VoxelizationDemo.Rendering.Passes
                 screenToViewLight = passData.ScreenToViewLightBuffer;
             }
 
-            FrameGraphBuffer lightIndexList;
-            FrameGraphBuffer lightGridBuffer;
+            FGBuffer lightIndexList;
+            FGBuffer lightGridBuffer;
 
             using (ComputePassDescription desc = renderPass.SetupComputePass("BinLights", out BinLightsPassData passData))
             {
                 passData.ClustersBoundsBuffer = clusterBoundsBuffer;
 
-                passData.LightIndexCount = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.LightIndexCount = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<uint>(),
                     Stride = Unsafe.SizeOf<uint>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.Raw | FGBufferUsage.UnorderedAccess
                 }, "LightIndexCount");
 
-                passData.LightIndexList = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.LightIndexList = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)(Unsafe.SizeOf<uint>() * Math.Clamp(pathBlackboard.LightCollector.PointLights.Count, 1, 128) * (ClustersWidth * ClustersHeight * ClustersDepth)),
                     Stride = Unsafe.SizeOf<uint>(),
                     Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.Raw | FGBufferUsage.UnorderedAccess | FGBufferUsage.Global
                 }, "LightIndexList");
 
-                passData.LightGrid = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.LightGrid = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)(Unsafe.SizeOf<LightGrid>() * (ClustersWidth * ClustersHeight * ClustersDepth)),
                     Stride = Unsafe.SizeOf<LightGrid>(),
@@ -211,18 +211,18 @@ namespace VoxelizationDemo.Rendering.Passes
 
         private sealed class BuildClustersPassData : IPassData
         {
-            public FrameGraphBuffer ScreenToViewDataBuffer;
-            public FrameGraphBuffer ScreenToViewLightBuffer;
-            public FrameGraphBuffer ClustersBoundsBuffer;
+            public FGBuffer ScreenToViewDataBuffer;
+            public FGBuffer ScreenToViewLightBuffer;
+            public FGBuffer ClustersBoundsBuffer;
 
             public ComputeShaderKernel? BuildClusters;
             public PropertyBlock? BuildClustersBlock;
 
             public void Clear()
             {
-                ScreenToViewDataBuffer = FrameGraphBuffer.Invalid;
-                ScreenToViewLightBuffer = FrameGraphBuffer.Invalid;
-                ClustersBoundsBuffer = FrameGraphBuffer.Invalid;
+                ScreenToViewDataBuffer = FGBuffer.Invalid;
+                ScreenToViewLightBuffer = FGBuffer.Invalid;
+                ClustersBoundsBuffer = FGBuffer.Invalid;
 
                 BuildClusters = null;
                 BuildClustersBlock = null;
@@ -231,20 +231,20 @@ namespace VoxelizationDemo.Rendering.Passes
 
         private sealed class BinLightsPassData : IPassData
         {
-            public FrameGraphBuffer ClustersBoundsBuffer;
-            public FrameGraphBuffer LightIndexCount;
-            public FrameGraphBuffer LightIndexList;
-            public FrameGraphBuffer LightGrid;
+            public FGBuffer ClustersBoundsBuffer;
+            public FGBuffer LightIndexCount;
+            public FGBuffer LightIndexList;
+            public FGBuffer LightGrid;
 
             public ComputeShaderKernel? BinLights;
             public PropertyBlock? BinLightsBlock;
 
             public void Clear()
             {
-                ClustersBoundsBuffer = FrameGraphBuffer.Invalid;
-                LightIndexCount = FrameGraphBuffer.Invalid;
-                LightIndexList = FrameGraphBuffer.Invalid;
-                LightGrid = FrameGraphBuffer.Invalid;
+                ClustersBoundsBuffer = FGBuffer.Invalid;
+                LightIndexCount = FGBuffer.Invalid;
+                LightIndexList = FGBuffer.Invalid;
+                LightGrid = FGBuffer.Invalid;
 
                 BinLights = null;
                 BinLightsBlock = null;

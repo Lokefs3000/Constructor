@@ -8,13 +8,13 @@ namespace Primary.Rendering.Recording
 {
     internal sealed class RenderPassStateData
     {
-        private Dictionary<FrameGraphTexture, FGRenderTargetType> _outputDict;
-        private Dictionary<FrameGraphResource, FGResourceStateData> _resourceDict;
+        private Dictionary<FGTexture, FGRenderTargetType> _outputDict;
+        private Dictionary<FGResource, FGResourceStateData> _resourceDict;
 
         internal RenderPassStateData()
         {
-            _outputDict = new Dictionary<FrameGraphTexture, FGRenderTargetType>();
-            _resourceDict = new Dictionary<FrameGraphResource, FGResourceStateData>();
+            _outputDict = new Dictionary<FGTexture, FGRenderTargetType>();
+            _resourceDict = new Dictionary<FGResource, FGResourceStateData>();
         }
 
         internal void Reset()
@@ -23,8 +23,8 @@ namespace Primary.Rendering.Recording
             _resourceDict.Clear();
         }
 
-        internal void AddOutput(FrameGraphTexture idx, FGRenderTargetType type) => _outputDict[idx] = type;
-        internal void AddResource(FrameGraphResource idx, FGResourceStateData data) => _resourceDict[idx] = data;
+        internal void AddOutput(FGTexture idx, FGRenderTargetType type) => _outputDict[idx] = type;
+        internal void AddResource(FGResource idx, FGResourceStateData data) => _resourceDict[idx] = data;
 
         internal void SetupState(ref readonly RenderPassDescription desc)
         {
@@ -38,14 +38,14 @@ namespace Primary.Rendering.Recording
 
             foreach (ref readonly UsedRenderTargetData data in desc.RenderTargets.AsSpan())
             {
-                if (((FrameGraphResource)data.Target).ResourceId != FGResourceId.Global)
+                if (((FGResource)data.Target).ResourceId != FGResourceId.Global)
                 {
                     AddOutput(data.Target, data.Type);
                 }
             }
         }
 
-        internal bool ContainsOutput(FrameGraphTexture texture, FGRenderTargetType outputType)
+        internal bool ContainsOutput(FGTexture texture, FGRenderTargetType outputType)
         {
             ref FGRenderTargetType val = ref CollectionsMarshal.GetValueRefOrNullRef(_outputDict, texture);
             if (Unsafe.IsNullRef(ref val))
@@ -54,7 +54,7 @@ namespace Primary.Rendering.Recording
             return val == outputType;
         }
 
-        internal bool ContainsResource(FrameGraphResource resource, FGResourceUsage resourceAccess)
+        internal bool ContainsResource(FGResource resource, FGResourceUsage resourceAccess)
         {
             ref FGResourceStateData val = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceDict, resource);
             if (Unsafe.IsNullRef(ref val))

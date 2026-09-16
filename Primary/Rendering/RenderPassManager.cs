@@ -183,7 +183,7 @@ namespace Primary.Rendering
         }
 
         /// <summary>Not thread-safe</summary>
-        internal void PushCurrentPassGroup(FrameGraphTexture finalTexture, RenderPassRunContext runContext, RenderContextContainer context) => _renderPass.PushCurrentPassGroup(finalTexture, runContext, context);
+        internal void PushCurrentPassGroup(FGTexture finalTexture, RenderPassRunContext runContext, RenderContextContainer context) => _renderPass.PushCurrentPassGroup(finalTexture, runContext, context);
         /// <summary>Not thread-safe</summary>
         internal void ClearCurrentPassGroup() => _renderPass.ClearCurrentPassGroup();
 

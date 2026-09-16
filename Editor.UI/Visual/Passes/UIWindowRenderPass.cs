@@ -76,7 +76,7 @@ namespace Editor.UI.Visual.Passes
 
                         data.Redraw = redraw;
 
-                        data.OutColor = redraw.Host.HostTexture ?? FrameGraphTexture.Invalid;
+                        data.OutColor = redraw.Host.HostTexture ?? FGTexture.Invalid;
 
                         if (data.OutColor.IsNull)
                         {
@@ -84,33 +84,33 @@ namespace Editor.UI.Visual.Passes
                             continue;
                         }
 
-                        data.VertexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                        data.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
                         {
                             Width = (uint)(Unsafe.SizeOf<UIVertex>() * drawCtx.Mesh.VertexCount),
                             Stride = Unsafe.SizeOf<UIVertex>(),
                             Usage = FGBufferUsage.VertexBuffer | FGBufferUsage.GenericShader
                         }, "UI-VertexBuf");
 
-                        data.IndexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                        data.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
                         {
                             Width = (uint)(Unsafe.SizeOf<ushort>() * drawCtx.Mesh.IndexCount),
                             Stride = Unsafe.SizeOf<ushort>(),
                             Usage = FGBufferUsage.IndexBuffer | FGBufferUsage.GenericShader
                         }, "UI-IndexBuf");
 
-                        data.GlobalBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                        data.GlobalBuffer = desc.CreateBuffer(new FGBufferDesc
                         {
                             Width = (uint)Unsafe.SizeOf<GlobalBufferData>(),
                             Usage = FGBufferUsage.ConstantBuffer | FGBufferUsage.GenericShader | FGBufferUsage.PixelShader
                         }, "UI-GlobalData");
 
-                        data.MetadataBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                        data.MetadataBuffer = desc.CreateBuffer(new FGBufferDesc
                         {
                             Width = (uint)drawCtx.Builder.Metadata.Length,
                             Usage = FGBufferUsage.Raw | FGBufferUsage.GenericShader | FGBufferUsage.PixelShader
                         }, "UI-Metadata");
 
-                        data.GradientsTexture = gradientsBlackboard?.Gradients ?? FrameGraphTexture.Invalid;
+                        data.GradientsTexture = gradientsBlackboard?.Gradients ?? FGTexture.Invalid;
 
                         desc.UseResource(FGResourceUsage.ReadWrite, data.VertexBuffer);
                         desc.UseResource(FGResourceUsage.ReadWrite, data.IndexBuffer);
@@ -250,15 +250,15 @@ namespace Editor.UI.Visual.Passes
             public PropertyBlock[]? DataBlocks;
 
             public HostRedrawData Redraw;
-            public FrameGraphTexture OutColor;
+            public FGTexture OutColor;
 
-            public FrameGraphBuffer VertexBuffer;
-            public FrameGraphBuffer IndexBuffer;
+            public FGBuffer VertexBuffer;
+            public FGBuffer IndexBuffer;
 
-            public FrameGraphBuffer GlobalBuffer;
-            public FrameGraphBuffer MetadataBuffer;
+            public FGBuffer GlobalBuffer;
+            public FGBuffer MetadataBuffer;
 
-            public FrameGraphTexture GradientsTexture;
+            public FGTexture GradientsTexture;
 
             public void Clear()
             {
@@ -268,15 +268,15 @@ namespace Editor.UI.Visual.Passes
                 DataBlocks = null;
 
                 Redraw = default;
-                OutColor = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
 
-                VertexBuffer = FrameGraphBuffer.Invalid;
-                IndexBuffer = FrameGraphBuffer.Invalid;
+                VertexBuffer = FGBuffer.Invalid;
+                IndexBuffer = FGBuffer.Invalid;
 
-                GlobalBuffer = FrameGraphBuffer.Invalid;
-                MetadataBuffer = FrameGraphBuffer.Invalid;
+                GlobalBuffer = FGBuffer.Invalid;
+                MetadataBuffer = FGBuffer.Invalid;
 
-                GradientsTexture = FrameGraphTexture.Invalid;
+                GradientsTexture = FGTexture.Invalid;
             }
         }
 
@@ -318,5 +318,5 @@ namespace Editor.UI.Visual.Passes
         }
     }
 
-    internal readonly record struct UICompositeRegion(IWindowHost Host, FrameGraphTexture Texture, Boundaries Region);
+    internal readonly record struct UICompositeRegion(IWindowHost Host, FGTexture Texture, Boundaries Region);
 }

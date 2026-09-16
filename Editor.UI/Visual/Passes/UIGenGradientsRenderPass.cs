@@ -42,7 +42,7 @@ namespace Editor.UI.Visual.Passes
                     data.Shader = _shader;
                     data.DataBlock = _dataBlock;
 
-                    data.LinearGradients = desc.CreateBuffer(new FrameGraphBufferDesc
+                    data.LinearGradients = desc.CreateBuffer(new FGBufferDesc
                     {
                         Width = (uint)(Unsafe.SizeOf<LinearGradientData>() * gradientManager.Gradients.Length),
                         Stride = Unsafe.SizeOf<LinearGradientData>(),
@@ -53,13 +53,13 @@ namespace Editor.UI.Visual.Passes
                     foreach (ref readonly UIComputedGradient gradient in gradientManager.Gradients)
                         keyCount += gradient.Gradient.Keys.Length;
 
-                    data.GradientKeys = desc.CreateBuffer(new FrameGraphBufferDesc
+                    data.GradientKeys = desc.CreateBuffer(new FGBufferDesc
                     {
                         Width = (uint)(Unsafe.SizeOf<GradientKey>() * keyCount),
                         Usage = FGBufferUsage.GenericShader | FGBufferUsage.Raw
                     }, "UI-GradKeys");
 
-                    data.Texture = desc.CreateTexture(new FrameGraphTextureDesc
+                    data.Texture = desc.CreateTexture(new FGTextureDesc
                     {
                         Width = gradientManager.GradientTextureSize.X,
                         Height = gradientManager.GradientTextureSize.Y,
@@ -132,10 +132,10 @@ namespace Editor.UI.Visual.Passes
             public ComputeShaderAsset? Shader;
             public PropertyBlock? DataBlock;
 
-            public FrameGraphBuffer LinearGradients;
-            public FrameGraphBuffer GradientKeys;
+            public FGBuffer LinearGradients;
+            public FGBuffer GradientKeys;
 
-            public FrameGraphTexture Texture;
+            public FGTexture Texture;
 
             public void Clear()
             {
@@ -144,17 +144,17 @@ namespace Editor.UI.Visual.Passes
                 Shader = null;
                 DataBlock = null;
 
-                Texture = FrameGraphTexture.Invalid;
+                Texture = FGTexture.Invalid;
             }
         }
 
         internal class BlackboardData : IBlackboardData
         {
-            public FrameGraphTexture Gradients;
+            public FGTexture Gradients;
 
             public void Clear()
             {
-                Gradients = FrameGraphTexture.Invalid;
+                Gradients = FGTexture.Invalid;
             }
         }
 

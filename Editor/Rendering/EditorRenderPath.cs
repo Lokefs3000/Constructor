@@ -7,7 +7,7 @@ using Primary.Rendering;
 
 namespace Editor.Rendering
 {
-    internal sealed class EditorRenderPath : IRenderPath
+    internal sealed class EditorRenderPath : IRenderStage
     {
         private ForwardPlusRenderPath? _forwardPlusRenderPath;
 

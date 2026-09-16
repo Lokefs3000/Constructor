@@ -85,7 +85,7 @@ namespace Primary.Rendering
 
         internal void AddNewRenderPass(RenderPassDescription desc) => _passes.Add(desc);
 
-        internal void PushCurrentPassGroup(FrameGraphTexture finalTexture, RenderPassRunContext runContext, RenderContextContainer context)
+        internal void PushCurrentPassGroup(FGTexture finalTexture, RenderPassRunContext runContext, RenderContextContainer context)
         {
             if (_groups.Count == 0)
             {
@@ -147,8 +147,8 @@ namespace Primary.Rendering
         }
 
         [ThreadStatic]
-        private static HashSet<FrameGraphResource> t_globalResourceHash = new HashSet<FrameGraphResource>();
+        private static HashSet<FGResource> t_globalResourceHash = new HashSet<FGResource>();
     }
 
-    public readonly record struct RenderPassGroup(IndexRange Range, FrameGraphTexture FinalTexture, RenderPassRunContext RunContext, RenderContextContainer Context);
+    public readonly record struct RenderPassGroup(IndexRange Range, FGTexture FinalTexture, RenderPassRunContext RunContext, RenderContextContainer Context);
 }

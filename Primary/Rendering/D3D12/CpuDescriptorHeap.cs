@@ -206,7 +206,7 @@ namespace Primary.Rendering.D3D12
                 {
                     case DescriptorHeapType.Rtv:
                         {
-                            FrameGraphTexture texture = resources.FindFGTexture(resource);
+                            FGTexture texture = resources.FindFGTexture(resource);
 
                             Debug.Assert(texture.Index >= 0);
                             Debug.Assert(Flags.HasFlag(texture.Description.Usage, FGTextureUsage.RenderTarget));
@@ -227,7 +227,7 @@ namespace Primary.Rendering.D3D12
                         }
                     case DescriptorHeapType.Dsv:
                         {
-                            FrameGraphTexture texture = resources.FindFGTexture(resource);
+                            FGTexture texture = resources.FindFGTexture(resource);
 
                             Debug.Assert(texture.Index >= 0);
                             Debug.Assert(Flags.HasFlag(texture.Description.Usage, FGTextureUsage.DepthStencil));

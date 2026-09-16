@@ -141,7 +141,7 @@ namespace Editor.UI.Visual.Passes
             public UICompositeRegion[]? Regions;
             public int RegionCount;
 
-            public FrameGraphTexture OutColor;
+            public FGTexture OutColor;
 
             public void Clear()
             {
@@ -155,7 +155,7 @@ namespace Editor.UI.Visual.Passes
                 Regions = null;
                 RegionCount = 0;
 
-                OutColor = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
             }
         }
 

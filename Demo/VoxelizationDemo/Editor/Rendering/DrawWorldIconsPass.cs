@@ -41,7 +41,7 @@ namespace VoxelizationDemo.Editor.Rendering
 
             using (RasterPassDescription desc = renderPass.SetupRasterPass("DrawWorldIcons", out PassData passData))
             {
-                passData.IconBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.IconBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)(Unsafe.SizeOf<WorldIconData>() * iconManager.TotalIconCount),
                     Stride = Unsafe.SizeOf<WorldIconData>(),
@@ -103,10 +103,10 @@ namespace VoxelizationDemo.Editor.Rendering
             public WorldIconManager? IconManager;
             public TextureAsset? Texture;
 
-            public FrameGraphTexture OutColor;
-            public FrameGraphTexture OutDepth;
+            public FGTexture OutColor;
+            public FGTexture OutDepth;
 
-            public FrameGraphBuffer IconBuffer;
+            public FGBuffer IconBuffer;
 
             public ShaderAsset? Shader;
             public PropertyBlock? Block;
@@ -115,10 +115,10 @@ namespace VoxelizationDemo.Editor.Rendering
             {
                 IconManager = null;
 
-                OutColor = FrameGraphTexture.Invalid;
-                OutDepth = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
+                OutDepth = FGTexture.Invalid;
 
-                IconBuffer = FrameGraphBuffer.Invalid;
+                IconBuffer = FGBuffer.Invalid;
 
                 Shader = null;
                 Block = null;

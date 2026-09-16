@@ -52,20 +52,20 @@ namespace Primary.Rendering.Diagnostics.Passes
 
                 using (RasterPassDescription desc = renderPass.SetupRasterPass("Gizmos", out PassData data))
                 {
-                    data.GlobalBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                    data.GlobalBuffer = desc.CreateBuffer(new FGBufferDesc
                     {
                         Width = (uint)Unsafe.SizeOf<Matrix4x4>(),
                         Usage = FGBufferUsage.ConstantBuffer
                     }, "GizmoGlobals");
 
-                    data.VertexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                    data.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
                     {
                         Width = (uint)vtxSize,
                         Stride = 0,
                         Usage = FGBufferUsage.VertexBuffer
                     }, "GizmoVertices");
 
-                    data.IndexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                    data.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
                     {
                         Width = (uint)idxSize,
                         Stride = 0,
@@ -205,11 +205,11 @@ namespace Primary.Rendering.Diagnostics.Passes
 
         private class PassData : IPassData
         {
-            public FrameGraphTexture OutColor;
+            public FGTexture OutColor;
 
-            public FrameGraphBuffer GlobalBuffer;
-            public FrameGraphBuffer IndexBuffer;
-            public FrameGraphBuffer VertexBuffer;
+            public FGBuffer GlobalBuffer;
+            public FGBuffer IndexBuffer;
+            public FGBuffer VertexBuffer;
 
             public ShaderAsset? LineShader;
             public ShaderAsset? TriangleShader;
@@ -221,9 +221,9 @@ namespace Primary.Rendering.Diagnostics.Passes
 
             public void Clear()
             {
-                GlobalBuffer = FrameGraphBuffer.Invalid;
-                IndexBuffer = FrameGraphBuffer.Invalid;
-                VertexBuffer = FrameGraphBuffer.Invalid;
+                GlobalBuffer = FGBuffer.Invalid;
+                IndexBuffer = FGBuffer.Invalid;
+                VertexBuffer = FGBuffer.Invalid;
 
                 LineShader = null;
                 TriangleShader = null;

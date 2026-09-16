@@ -169,7 +169,7 @@ namespace Primary.Rendering.State
                                         ref readonly PropertyData parentData = ref block.GetPropertyValue(data.ParentIndex);
                                         if (parentData.Aux is TextureAsset asset)
                                         {
-                                            data = new PropertyData(data.ParentIndex, FrameGraphResource.Invalid, asset.RawRHISampler);
+                                            data = new PropertyData(data.ParentIndex, FGResource.Invalid, asset.RawRHISampler);
                                         }
                                     }
                                 }
@@ -333,7 +333,7 @@ namespace Primary.Rendering.State
             _changeFlags |= PropertyChangeFlags.Constants;
         }
 
-        private readonly record struct PropertyResourceData(FrameGraphResource Resource, ShPropertyStages Stages, ShPropertyFlags Flags);
+        private readonly record struct PropertyResourceData(FGResource Resource, ShPropertyStages Stages, ShPropertyFlags Flags);
 
         private enum PropertyChangeFlags : byte
         {

@@ -34,7 +34,7 @@ namespace Primary.Rendering.Structures
         public void Dispatch(uint threadGroupX, uint threadGroupY, uint threadGroupZ) => _commandBuffer.Dispatch(threadGroupX, threadGroupY, threadGroupZ);
 
         public void Upload<T>(FGBufferUploadDesc desc, ReadOnlySpan<T> data) where T : unmanaged => _commandBuffer.Upload(desc, data);
-        public void Upload<T>(FrameGraphBuffer buffer, T data) where T : unmanaged => _commandBuffer.Upload(buffer, data);
+        public void Upload<T>(FGBuffer buffer, T data) where T : unmanaged => _commandBuffer.Upload(buffer, data);
 
         public void Upload<T>(FGTextureUploadDesc desc, Span<T> data) where T : unmanaged => _commandBuffer.Upload(desc, data);
 
@@ -42,6 +42,6 @@ namespace Primary.Rendering.Structures
         public void Copy(FGTextureCopyDesc desc) => _commandBuffer.Copy(desc);
 
         public FGMappedSubresource<T> Map<T>(FGMapBufferDesc desc) where T : unmanaged => _commandBuffer.Map<T>(desc);
-        public FGMappedSubresource<T> Map<T>(FrameGraphTexture texture) where T : unmanaged => _commandBuffer.Map<T>(texture);
+        public FGMappedSubresource<T> Map<T>(FGTexture texture) where T : unmanaged => _commandBuffer.Map<T>(texture);
     }
 }

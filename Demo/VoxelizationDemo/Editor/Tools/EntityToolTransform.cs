@@ -81,7 +81,7 @@ namespace VoxelizationDemo.Editor.Tools
                     delta *= Quaternion.CreateFromRotationMatrix(parentWorld.Transformation);
             }
 
-            transform.Rotation = _storedRotation * delta;
+            transform.Rotation = delta * _storedRotation;
         }
 
         public void UpdateScale(Vector3 delta)

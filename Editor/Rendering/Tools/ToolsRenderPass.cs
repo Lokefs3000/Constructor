@@ -53,14 +53,14 @@ namespace Editor.Rendering.Tools
                     {
                         case ToolHandleType.Translate:
                             {
-                                passData.VertexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                                passData.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
                                 {
                                     Width = (uint)(Unsafe.SizeOf<TranslateVertex>() * 15),
                                     Stride = Unsafe.SizeOf<TranslateVertex>(),
                                     Usage = FGBufferUsage.VertexBuffer
                                 }, "HandleVertices");
 
-                                passData.IndexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                                passData.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
                                 {
                                     Width = (uint)(Unsafe.SizeOf<ushort>() * 24),
                                     Stride = Unsafe.SizeOf<ushort>(),
@@ -224,9 +224,9 @@ namespace Editor.Rendering.Tools
             public ShaderAsset? LineShader;
             public PropertyBlock? Properties;
 
-            public FrameGraphTexture OutColor;
-            public FrameGraphBuffer VertexBuffer;
-            public FrameGraphBuffer IndexBuffer;
+            public FGTexture OutColor;
+            public FGBuffer VertexBuffer;
+            public FGBuffer IndexBuffer;
 
             public void Clear()
             {
@@ -236,9 +236,9 @@ namespace Editor.Rendering.Tools
                 LineShader = null;
                 Properties = null;
 
-                OutColor = FrameGraphTexture.Invalid;
-                VertexBuffer = FrameGraphBuffer.Invalid;
-                IndexBuffer = FrameGraphBuffer.Invalid;
+                OutColor = FGTexture.Invalid;
+                VertexBuffer = FGBuffer.Invalid;
+                IndexBuffer = FGBuffer.Invalid;
             }
         }
 

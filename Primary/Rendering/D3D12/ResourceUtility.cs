@@ -27,7 +27,7 @@ namespace Primary.Rendering.D3D12
             }
             else
             {
-                FrameGraphTexture fg = resources.FindFGTexture(texture);
+                FGTexture fg = resources.FindFGTexture(texture);
                 return RHIFormatInfo.Query(fg.Description.Format).BytesPerPixel * fg.Description.Width;
             }
         }
@@ -54,7 +54,7 @@ namespace Primary.Rendering.D3D12
             }
             else
             {
-                FrameGraphTexture fg = resources.FindFGTexture(texture);
+                FGTexture fg = resources.FindFGTexture(texture);
                 return new FGBox(0, 0, 0,
                     fg.Description.Width,
                     fg.Description.Height,
@@ -141,7 +141,7 @@ namespace Primary.Rendering.D3D12
             new NRDResource(((D3D12RHITextureNative*)ptr.ToPointer())) :
             new NRDResource((int)ptr, NRDResourceId.Texture);
 
-        internal static NRDResource AsNRDResource(FrameGraphResource resource) => resource.ResourceId switch
+        internal static NRDResource AsNRDResource(FGResource resource) => resource.ResourceId switch
         {
             FGResourceId.Texture => resource.IsExternal ? new NRDResource((D3D12RHITextureNative*)Unsafe.As<D3D12RHITexture>(resource.Resource!).GetAsNative()) : new NRDResource(resource.Index, NRDResourceId.Texture),
             FGResourceId.Buffer => resource.IsExternal ? new NRDResource((D3D12RHIBufferNative*)Unsafe.As<D3D12RHIBuffer>(resource.Resource!).GetAsNative()) : new NRDResource(resource.Index, NRDResourceId.Buffer),

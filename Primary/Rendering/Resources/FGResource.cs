@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace Primary.Rendering.Resources
 {
-    public readonly record struct FrameGraphResource : IEquatable<FrameGraphResource>
+    public readonly record struct FGResource : IEquatable<FGResource>
     {
         private readonly int _index;
         private readonly FGResourceId _resourceId;
@@ -14,7 +14,7 @@ namespace Primary.Rendering.Resources
 
         private readonly string? _debugName;
 
-        public FrameGraphResource()
+        public FGResource()
         {
             _index = -1;
             _resourceId = FGResourceId.Undefined;
@@ -24,7 +24,7 @@ namespace Primary.Rendering.Resources
             _debugName = null;
         }
 
-        internal FrameGraphResource(int index, FGResourceId resourceId = FGResourceId.Global)
+        internal FGResource(int index, FGResourceId resourceId = FGResourceId.Global)
         {
             _index = index;
             _resourceId = resourceId;
@@ -34,7 +34,7 @@ namespace Primary.Rendering.Resources
             _debugName = null;
         }
 
-        internal FrameGraphResource(int index, FrameGraphTextureDesc res, string? debugName)
+        internal FGResource(int index, FGTextureDesc res, string? debugName)
         {
             _index = index;
             _resourceId = FGResourceId.Texture;
@@ -44,7 +44,7 @@ namespace Primary.Rendering.Resources
             _debugName = debugName;
         }
 
-        internal FrameGraphResource(int index, FrameGraphBufferDesc res, string? debugName)
+        internal FGResource(int index, FGBufferDesc res, string? debugName)
         {
             _index = index;
             _resourceId = FGResourceId.Buffer;
@@ -54,7 +54,7 @@ namespace Primary.Rendering.Resources
             _debugName = debugName;
         }
 
-        internal FrameGraphResource(RHIBuffer buffer, string? debugName)
+        internal FGResource(RHIBuffer buffer, string? debugName)
         {
             _index = -1;
             _resourceId = FGResourceId.Buffer | FGResourceId.External;
@@ -64,7 +64,7 @@ namespace Primary.Rendering.Resources
             _debugName = debugName;
         }
 
-        internal FrameGraphResource(RHITexture texture, string? debugName)
+        internal FGResource(RHITexture texture, string? debugName)
         {
             _index = -1;
             _resourceId = FGResourceId.Texture | FGResourceId.External;
@@ -74,7 +74,7 @@ namespace Primary.Rendering.Resources
             _debugName = debugName;
         }
 
-        internal FrameGraphResource(RHIResource resource, string? debugName)
+        internal FGResource(RHIResource resource, string? debugName)
         {
             _index = -1;
             _resourceId = (resource.Type == RHIResourceType.Texture ? FGResourceId.Texture : FGResourceId.Buffer) | FGResourceId.External;
@@ -84,32 +84,32 @@ namespace Primary.Rendering.Resources
             _debugName = debugName;
         }
 
-        public FrameGraphTexture AsTexture()
+        public FGTexture AsTexture()
         {
             if (ResourceId != FGResourceId.Texture)
                 throw new InvalidCastException(_resourceId.ToString());
-            return new FrameGraphTexture(this);
+            return new FGTexture(this);
         }
 
-        public FrameGraphBuffer AsBuffer()
+        public FGBuffer AsBuffer()
         {
             if (ResourceId != FGResourceId.Buffer)
                 throw new InvalidCastException(_resourceId.ToString());
-            return new FrameGraphBuffer(this);
+            return new FGBuffer(this);
         }
 
         public override int GetHashCode() => (IsExternal ? Resource!.GetHashCode() : Index.GetHashCode()) ^ (int)_resourceId;
         public override string ToString() => _debugName ?? _resource?.ToString() ?? (_index == -1 ? "Invalid" : $"{_resourceId}:{_index}");
 
-        public bool Equals(FrameGraphResource other) => _resourceId == other._resourceId && (IsExternal ? (other._resource == _resource) : (other._index == _index));
+        public bool Equals(FGResource other) => _resourceId == other._resourceId && (IsExternal ? (other._resource == _resource) : (other._index == _index));
 
         public int Index => _index;
         public string? DebugName => _debugName;
 
         [UnscopedRef]
-        internal ref readonly FrameGraphTextureDesc TextureDesc => ref _union.Texture;
+        internal ref readonly FGTextureDesc TextureDesc => ref _union.Texture;
         [UnscopedRef]
-        internal ref readonly FrameGraphBufferDesc BufferDesc => ref _union.Buffer;
+        internal ref readonly FGBufferDesc BufferDesc => ref _union.Buffer;
 
         internal RHIResource? Resource => _resource;
 
@@ -119,18 +119,18 @@ namespace Primary.Rendering.Resources
         internal bool IsValidAndRenderGraph => _resource == null && _index >= 0;
         internal bool IsNull => IsExternal ? _resource == null : _index == -1;
 
-        public static readonly FrameGraphResource Invalid = new FrameGraphResource();
+        public static readonly FGResource Invalid = new FGResource();
 
         [StructLayout(LayoutKind.Explicit)]
         private readonly struct ResourceUnion
         {
             [FieldOffset(0)]
-            public readonly FrameGraphTextureDesc Texture;
+            public readonly FGTextureDesc Texture;
             [FieldOffset(0)]
-            public readonly FrameGraphBufferDesc Buffer;
+            public readonly FGBufferDesc Buffer;
 
-            public ResourceUnion(FrameGraphTextureDesc res) => Texture = res;
-            public ResourceUnion(FrameGraphBufferDesc res) => Buffer = res;
+            public ResourceUnion(FGTextureDesc res) => Texture = res;
+            public ResourceUnion(FGBufferDesc res) => Buffer = res;
         }
     }
 

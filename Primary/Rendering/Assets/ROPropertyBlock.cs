@@ -13,9 +13,9 @@ namespace Primary.Rendering.Assets
             _block = block;
         }
 
-        public FrameGraphBuffer GetFrameGraphBuffer(string id) => _block?.GetFrameGraphBuffer(id) ?? FrameGraphBuffer.Invalid;
+        public FGBuffer GetFrameGraphBuffer(string id) => _block?.GetFrameGraphBuffer(id) ?? FGBuffer.Invalid;
         public RHIBuffer? GetRHIBuffer(string id) => _block?.GetRHIBuffer(id);
-        public FrameGraphTexture GetFrameGraphTexture(string id) => _block?.GetFrameGraphTexture(id) ?? FrameGraphTexture.Invalid;
+        public FGTexture GetFrameGraphTexture(string id) => _block?.GetFrameGraphTexture(id) ?? FGTexture.Invalid;
         public RHITexture? GetRHITexture(string id) => _block?.GetRHITexture(id);
         public TextureAsset? GetTextureAsset(string id) => _block?.GetTextureAsset(id);
 

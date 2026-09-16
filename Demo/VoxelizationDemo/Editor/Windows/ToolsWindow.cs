@@ -33,7 +33,8 @@ namespace VoxelizationDemo.Editor.Windows
 
                 if (ToolButton("TRANSLATE"u8, 'T', _toolIconsAtlas.TryFindSpriteOrNull("Translate"), tools.ActiveTool is TranslateTool))
                     tools.ChangeTool<TranslateTool>();
-                ToolButton("ROTATE"u8, 'E', _toolIconsAtlas.TryFindSpriteOrNull("Rotate"), false);
+                if (ToolButton("ROTATE"u8, 'E', _toolIconsAtlas.TryFindSpriteOrNull("Rotate"), tools.ActiveTool is RotateTool))
+                    tools.ChangeTool<RotateTool>();
                 ToolButton("SCALE"u8, 'R', _toolIconsAtlas.TryFindSpriteOrNull("Scale"), false);
 
                 ImGui.Separator();

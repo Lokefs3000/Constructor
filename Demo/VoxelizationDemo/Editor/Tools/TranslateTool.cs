@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Text;
+using Hexa.NET.ImGui;
 using VoxelizationDemo.Core;
 using VoxelizationDemo.Editor.Gizmo;
 

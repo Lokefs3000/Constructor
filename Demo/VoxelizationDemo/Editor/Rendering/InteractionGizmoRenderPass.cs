@@ -54,14 +54,14 @@ namespace VoxelizationDemo.Editor.Rendering
             {
                 passData.OutColor = cameraData.ColorTexture;
 
-                passData.VertexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)(Unsafe.SizeOf<InteractionGizmoVertex>() * vertices.Count),
                     Stride = Unsafe.SizeOf<InteractionGizmoVertex>(),
                     Usage = FGBufferUsage.VertexBuffer
                 }, "VertexBuffer");
 
-                passData.IndexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)(Unsafe.SizeOf<ushort>() * indices.Count),
                     Stride = Unsafe.SizeOf<ushort>(),
@@ -110,10 +110,10 @@ namespace VoxelizationDemo.Editor.Rendering
 
         private sealed class PassData : IPassData
         {
-            public FrameGraphTexture OutColor;
+            public FGTexture OutColor;
 
-            public FrameGraphBuffer VertexBuffer;
-            public FrameGraphBuffer IndexBuffer;
+            public FGBuffer VertexBuffer;
+            public FGBuffer IndexBuffer;
 
             public ShaderAsset? Shader;
             public PropertyBlock? Block;
@@ -124,10 +124,10 @@ namespace VoxelizationDemo.Editor.Rendering
 
             public void Clear()
             {
-                OutColor = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
 
-                VertexBuffer = FrameGraphBuffer.Invalid;
-                IndexBuffer = FrameGraphBuffer.Invalid;
+                VertexBuffer = FGBuffer.Invalid;
+                IndexBuffer = FGBuffer.Invalid;
 
                 Shader = null;
                 Block = null;

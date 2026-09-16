@@ -27,7 +27,7 @@ namespace Primary.Reflection
             if (_componentCaches.TryGetValue(fullName, out ComponentReflection reflectionCache))
                 return reflectionCache;
 
-            Type? type = null;//SceneEntityManager.FindComponentFromFullName(fullName);
+            Type? type = SceneEntityManager.Instance.FindComponentFromFullName(fullName);
             if (type == null)
             {
                 return _emptyCache;

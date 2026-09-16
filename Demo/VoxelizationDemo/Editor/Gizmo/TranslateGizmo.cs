@@ -273,8 +273,8 @@ namespace VoxelizationDemo.Editor.Gizmo
 
             const float MaxScreenMarginDistance = 12.0f;
 
-            float maxDistance = MaxScreenMarginDistance * (camera.ClientSize.X / 900.0f);
-            float maxSqrDistance = (MaxScreenMarginDistance * MaxScreenMarginDistance) * (camera.ClientSize.X / 900.0f);
+            float maxDistance = MaxScreenMarginDistance * (camera.ClientSize.Y / 900.0f * 1.7777f);
+            float maxSqrDistance = (MaxScreenMarginDistance * MaxScreenMarginDistance) * (camera.ClientSize.Y / 900.0f * 1.7777f);
 
             Ray ray = camera.ProjectViewportToRayInverse(camera.MouseViewport);
 
@@ -481,6 +481,10 @@ namespace VoxelizationDemo.Editor.Gizmo
 
         PlaneX = Y | Z,
         PlaneY = X | Z,
-        PlaneZ = X | Y
+        PlaneZ = X | Y,
+
+        Axis = 1 << 3,
+
+        All = X | Y | Z
     }
 }

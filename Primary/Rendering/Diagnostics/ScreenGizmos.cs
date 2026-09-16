@@ -143,7 +143,7 @@ namespace Primary.Rendering.Diagnostics
                 float rad = i * IndexToRad;
 
                 (float sin, float cos) = MathF.SinCos(rad);
-                if (i > 0)
+                if (i < 11)
                 {
                     self._indices.Add((ushort)self._vertices.Count);
                     self._indices.Add((ushort)(self._vertices.Count + 1));
@@ -224,7 +224,7 @@ namespace Primary.Rendering.Diagnostics
                 float rad = i * IndexToRad;
 
                 (float sin, float cos) = MathF.SinCos(rad);
-                if (i > 0)
+                if (i < 11)
                 {
                     self._indices.Add((ushort)self._vertices.Count);
                     self._indices.Add(i0);

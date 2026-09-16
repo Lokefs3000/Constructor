@@ -55,7 +55,11 @@ namespace Primary.Serialization.Json
 
         public override void Write(Utf8JsonWriter writer, AssetId value, JsonSerializerOptions options)
         {
-            if (value.LocalId != AssetId.NoLocalId)
+            if (value.IsInvalid)
+            {
+                writer.WriteNullValue();
+            }
+            else if (value.LocalId != AssetId.NoLocalId)
             {
                 writer.WriteStartArray();
                 writer.WriteStringValue(value.FileId.Guid);

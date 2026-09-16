@@ -1429,7 +1429,8 @@ namespace Editor.Shaders.Processors
             "tessfactor".GetDjb2HashCode(),
             "sv_instanceid".GetDjb2HashCode(),
             "sv_vertexid".GetDjb2HashCode(),
-            "sv_position".GetDjb2HashCode()
+            "sv_position".GetDjb2HashCode(),
+            "sv_target".GetDjb2HashCode()
             ];
 
         private static readonly FrozenDictionary<Type, Func<ReadOnlySpan<char>, object?>> s_numericalConverters = new Dictionary<Type, Func<ReadOnlySpan<char>, object?>>

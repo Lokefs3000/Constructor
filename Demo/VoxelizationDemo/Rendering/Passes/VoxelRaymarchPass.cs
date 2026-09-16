@@ -45,7 +45,7 @@ namespace VoxelizationDemo.Rendering.Passes
                 passData.VoxelBuffer = voxelBlackboard.VoxelBuffer;
                 passData.OutColor = cameraData.ColorTexture;
 
-                passData.ProjectionData = desc.CreateBuffer(new FrameGraphBufferDesc
+                passData.ProjectionData = desc.CreateBuffer(new FGBufferDesc
                 {
                     Width = (uint)Unsafe.SizeOf<ProjectionData>(),
                     Stride = Unsafe.SizeOf<ProjectionData>(),
@@ -99,22 +99,22 @@ namespace VoxelizationDemo.Rendering.Passes
 
         private sealed class PassData : IPassData
         {
-            public FrameGraphBuffer VoxelInfo;
-            public FrameGraphTexture VoxelBuffer;
-            public FrameGraphBuffer ProjectionData;
+            public FGBuffer VoxelInfo;
+            public FGTexture VoxelBuffer;
+            public FGBuffer ProjectionData;
 
-            public FrameGraphTexture OutColor;
+            public FGTexture OutColor;
 
             public ShaderAsset? RaymarchVoxels;
             public PropertyBlock? RaymarchVoxelsBlock;
 
             public void Clear()
             {
-                VoxelInfo = FrameGraphBuffer.Invalid;
-                VoxelBuffer = FrameGraphTexture.Invalid;
-                ProjectionData = FrameGraphBuffer.Invalid;
+                VoxelInfo = FGBuffer.Invalid;
+                VoxelBuffer = FGTexture.Invalid;
+                ProjectionData = FGBuffer.Invalid;
 
-                OutColor = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
 
                 RaymarchVoxels = null;
                 RaymarchVoxelsBlock = null;

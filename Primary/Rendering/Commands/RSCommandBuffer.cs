@@ -18,9 +18,9 @@ namespace Primary.Rendering.Commands
         {
         }
 
-        public unsafe void SetRenderTarget(int slot, FrameGraphTexture renderTarget)
+        public unsafe void SetRenderTarget(int slot, FGTexture renderTarget)
         {
-            if (!renderTarget.IsExternal && !_stateData.ContainsOutput(renderTarget, FGRenderTargetType.RenderTarget))
+            if (!renderTarget.IsNull && !renderTarget.IsExternal && !_stateData.ContainsOutput(renderTarget, FGRenderTargetType.RenderTarget))
             {
                 _errorReporter.ReportError(RPErrorSource.SetRenderTarget, RPErrorType.InvalidOutput, renderTarget.ToString());
                 return;
@@ -35,7 +35,7 @@ namespace Primary.Rendering.Commands
             Raster.SetRenderTarget(slot, renderTarget);
         }
 
-        public void SetDepthStencil(FrameGraphTexture depthStencil)
+        public void SetDepthStencil(FGTexture depthStencil)
         {
             if (!depthStencil.IsNull && !depthStencil.IsExternal && !_stateData.ContainsOutput(depthStencil, FGRenderTargetType.DepthStencil))
             {
@@ -46,7 +46,7 @@ namespace Primary.Rendering.Commands
             Raster.SetDepthStencil(depthStencil);
         }
 
-        public void ClearRenderTarget(FrameGraphTexture renderTarget, Color? color, FGRect? rect = null)
+        public void ClearRenderTarget(FGTexture renderTarget, Color? color, FGRect? rect = null)
         {
             if (!renderTarget.IsExternal && !_stateData.ContainsOutput(renderTarget, FGRenderTargetType.RenderTarget))
             {
@@ -72,7 +72,7 @@ namespace Primary.Rendering.Commands
             });
         }
 
-        public void ClearDepthStencil(FrameGraphTexture depthStencil, FGClearFlags clearFlags, float? depth, byte? stencil, FGRect? rect = null)
+        public void ClearDepthStencil(FGTexture depthStencil, FGClearFlags clearFlags, float? depth, byte? stencil, FGRect? rect = null)
         {
             if (!depthStencil.IsExternal && !_stateData.ContainsOutput(depthStencil, FGRenderTargetType.DepthStencil))
             {
@@ -201,9 +201,9 @@ namespace Primary.Rendering.Commands
         private RasterState Raster => Unsafe.As<RasterState>(_state);
     }
 
-    public readonly record struct FGSetBufferDesc(FrameGraphBuffer Buffer, int Stride = 0)
+    public readonly record struct FGSetBufferDesc(FGBuffer Buffer, int Stride = 0)
     {
-        public static implicit operator FGSetBufferDesc(FrameGraphBuffer buffer) => new FGSetBufferDesc(buffer);
+        public static implicit operator FGSetBufferDesc(FGBuffer buffer) => new FGSetBufferDesc(buffer);
     }
 
     public readonly record struct FGDrawInstancedDesc(uint VertexCountPerInstance, uint InstanceCount = 1, uint StartVertexLocation = 0, uint StartInstanceLocation = 0);

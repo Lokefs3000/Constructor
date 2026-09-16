@@ -94,7 +94,7 @@ namespace Editor.Geo.Passes
                     {
                         passData.OutColor = cameraData.ColorTexture;
 
-                        passData.OutlineStencil = desc.CreateTexture(new FrameGraphTextureDesc()
+                        passData.OutlineStencil = desc.CreateTexture(new FGTextureDesc()
                         {
                             Width = cameraData.ClientSize.X,
                             Height = cameraData.ClientSize.Y,
@@ -116,14 +116,14 @@ namespace Editor.Geo.Passes
 
                     if ((geoSceneManager.ToolsSnippet.IsEditBrushActive || geoSceneManager.ToolsSnippet.IsEditFaceActive) && requiredDynamicVertexCount > 0)
                     {
-                        passData.DynamicVertexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                        passData.DynamicVertexBuffer = desc.CreateBuffer(new FGBufferDesc
                         {
                             Width = (uint)(Unsafe.SizeOf<Vector3>() * requiredDynamicVertexCount),
                             Stride = Unsafe.SizeOf<Vector3>(),
                             Usage = FGBufferUsage.GenericShader | FGBufferUsage.VertexBuffer
                         }, "SelGeoVertexBuffer");
 
-                        passData.DynamicIndexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                        passData.DynamicIndexBuffer = desc.CreateBuffer(new FGBufferDesc
                         {
                             Width = (uint)(Unsafe.SizeOf<ushort>() * requiredDynamicIndexCount),
                             Stride = Unsafe.SizeOf<ushort>(),
@@ -138,7 +138,7 @@ namespace Editor.Geo.Passes
 
                     if (geoSceneManager.ToolsSnippet.IsEditVertexActive && totalBrushVertexCount > 0)
                     {
-                        passData.BrushVertexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                        passData.BrushVertexBuffer = desc.CreateBuffer(new FGBufferDesc
                         {
                             Width = (uint)(Unsafe.SizeOf<BrushVertexInstanceData>() * totalBrushVertexCount),
                             Stride = Unsafe.SizeOf<BrushVertexInstanceData>(),
@@ -261,7 +261,7 @@ namespace Editor.Geo.Passes
                 // sample depth
                 {
                     cmd.SetRenderTarget(0, passData.OutColor);
-                    cmd.SetDepthStencil(FrameGraphTexture.Invalid);
+                    cmd.SetDepthStencil(FGTexture.Invalid);
 
                     passData.OutlineProperties!.SetResource("txStencil", passData.OutlineStencil, PropertyBindIntent.AsStencil);
 
@@ -275,10 +275,10 @@ namespace Editor.Geo.Passes
 
         private sealed class PassData : IPassData
         {
-            public FrameGraphTexture OutColor;
-            public FrameGraphTexture OutDepth;
+            public FGTexture OutColor;
+            public FGTexture OutDepth;
 
-            public FrameGraphTexture OutlineStencil;
+            public FGTexture OutlineStencil;
 
             public ShaderAsset? OutlineWrite;
             public ShaderAsset? OutlineSample;
@@ -288,10 +288,10 @@ namespace Editor.Geo.Passes
             public PropertyBlock? OutlineProperties;
             public PropertyBlock? VertexProperties;
 
-            public FrameGraphBuffer DynamicVertexBuffer;
-            public FrameGraphBuffer DynamicIndexBuffer;
+            public FGBuffer DynamicVertexBuffer;
+            public FGBuffer DynamicIndexBuffer;
 
-            public FrameGraphBuffer BrushVertexBuffer;
+            public FGBuffer BrushVertexBuffer;
 
             public List<(Brush Brush, byte ActiveVertices, byte ActiveFaces)> Meshes = [];
 
@@ -299,10 +299,10 @@ namespace Editor.Geo.Passes
 
             public void Clear()
             {
-                OutColor = FrameGraphTexture.Invalid;
-                OutDepth = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
+                OutDepth = FGTexture.Invalid;
 
-                OutlineStencil = FrameGraphTexture.Invalid;
+                OutlineStencil = FGTexture.Invalid;
 
                 OutlineWrite = null;
                 OutlineSample = null;
@@ -312,10 +312,10 @@ namespace Editor.Geo.Passes
                 OutlineProperties = null;
                 VertexProperties = null;
 
-                DynamicVertexBuffer = FrameGraphBuffer.Invalid;
-                DynamicIndexBuffer = FrameGraphBuffer.Invalid;
+                DynamicVertexBuffer = FGBuffer.Invalid;
+                DynamicIndexBuffer = FGBuffer.Invalid;
 
-                BrushVertexBuffer = FrameGraphBuffer.Invalid;
+                BrushVertexBuffer = FGBuffer.Invalid;
 
                 Meshes.Clear();
 

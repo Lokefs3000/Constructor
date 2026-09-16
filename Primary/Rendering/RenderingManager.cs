@@ -16,6 +16,8 @@ using Primary.Rendering.Structures;
 using Primary.Rendering.Tree;
 using Primary.RHI;
 using Primary.Scenes;
+using Primary.Threading;
+using Primary.Utility;
 using Primary.Windowing;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -39,7 +41,7 @@ namespace Primary.Rendering
         private readonly RenderPrimitives _renderPrimitives;
         private readonly RenderStatistics _statistics;
 
-        private IRenderPath? _currentPath;
+        private List<IRenderStage> _renderStages;
 
         private ShaderAsset _finalBlitSwapChain;
         private PropertyBlock _finalBlitSwapChainPB;
@@ -64,7 +66,7 @@ namespace Primary.Rendering
             _renderPrimitives = new RenderPrimitives();
             _statistics = new RenderStatistics();
 
-            _currentPath = null;
+            _renderStages = new List<IRenderStage>();
 
             _finalBlitSwapChain = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Core/BlitToSwapChain.shader").WaitIfNotLoaded();
             _finalBlitSwapChainPB = new PropertyBlock(_finalBlitSwapChain);
@@ -80,8 +82,12 @@ namespace Primary.Rendering
             {
                 if (disposing)
                 {
-                    _currentPath?.Uninstall(this);
-                    _currentPath = null;
+                    foreach (IRenderStage stage in _renderStages)
+                    {
+                        stage.Uninstall(this);
+                    }
+
+                    _renderStages.Clear();
 
                     _finalBlitSwapChainPB.Dispose();
 
@@ -104,12 +110,21 @@ namespace Primary.Rendering
         }
 
         /// <summary>Not thread-safe</summary>
-        public void SetNewRenderPath(IRenderPath path)
+        public void InstallRenderStage(IRenderStage stage)
         {
-            _currentPath?.Uninstall(this);
-            path.Install(this);
+            if (_renderStages.AddUnique(stage))
+            {
+                stage.Install(this);
+            }
+        }
 
-            _currentPath = path;
+        /// <summary>Not thread-safe</summary>
+        public void UninstallRenderStage(IRenderStage stage)
+        {
+            if (_renderStages.Remove(stage))
+            {
+                stage.Uninstall(this);
+            }
         }
 
         public void Render()
@@ -134,7 +149,7 @@ namespace Primary.Rendering
                         {
                             RenderOutputData outputData = _renderWorld.Outputs[i];
 
-                            FrameGraphTexture currentTexture = FrameGraphTexture.Invalid;
+                            FGTexture currentTexture = FGTexture.Invalid;
                             if (_currentPath != null)
                             {
                                 RenderFromPerspective(outputData, out currentTexture);
@@ -143,7 +158,7 @@ namespace Primary.Rendering
                             if (i + 1 == _renderWorld.Outputs.Length || _renderWorld.Outputs[i + 1].Window != outputData.Window)
                             {
                                 if (currentTexture.IsExternal)
-                                    currentTexture = FrameGraphTexture.Invalid;
+                                    currentTexture = FGTexture.Invalid;
 
                                 RenderFromWindow(outputData.Window, currentTexture);
 
@@ -156,7 +171,7 @@ namespace Primary.Rendering
                             Window window = kvp.Value;
                             if (window.IsShown && _renderedWindows.Add(window))
                             {
-                                RenderFromWindow(window, FrameGraphTexture.Invalid);
+                                RenderFromWindow(window, FGTexture.Invalid);
                             }
                         }
 
@@ -185,13 +200,13 @@ namespace Primary.Rendering
             }
         }
 
-        private void RenderFromPerspective(RenderOutputData outputData, out FrameGraphTexture usedTexture)
+        private void RenderFromPerspective(RenderOutputData outputData, out FGTexture usedTexture)
         {
             Guard.IsNotNull(_currentPath);
 
             using (new ProfilingScope(Engine.IsDebugBuild ? $"Cam-{outputData.Entity.Name}" : "Cam-Default"))
             {
-                usedTexture = FrameGraphTexture.Invalid;
+                usedTexture = FGTexture.Invalid;
 
                 int previousPassCount = _renderPassManager.RenderPass.Passes.Length;
 
@@ -202,7 +217,7 @@ namespace Primary.Rendering
 
                 if (_renderPassManager.RenderPass.Passes.Length > previousPassCount)
                 {
-                    FrameGraphTexture currentTexture = context.Get<RenderCameraData>()!.ColorTexture;
+                    FGTexture currentTexture = context.Get<RenderCameraData>()!.ColorTexture;
                     if (!currentTexture.IsExternal)
                         SetupPresentForOutput(outputData.Window, currentTexture);
 
@@ -210,13 +225,15 @@ namespace Primary.Rendering
                     _renderPassManager.PushCurrentPassGroup(usedTexture, RenderPassRunContext.PerCamera, context);
                 }
                 else
+                {
                     _renderPassManager.ClearCurrentPassGroup();
+                }
 
                 //_renderPassManager.ClearLocalData();
             }
         }
 
-        private void RenderFromWindow(Window outputWindow, FrameGraphTexture outputTexture)
+        private void RenderFromWindow(Window outputWindow, FGTexture outputTexture)
         {
             Guard.IsNotNull(_currentPath);
 
@@ -230,13 +247,15 @@ namespace Primary.Rendering
 
                 if (_renderPassManager.RenderPass.Passes.Length > previousPassCount)
                 {
-                    FrameGraphTexture currentTexture = context.Get<RenderWindowData>()!.ColorTexture;
+                    FGTexture currentTexture = context.Get<RenderWindowData>()!.ColorTexture;
                     SetupPresentForOutput(outputWindow, currentTexture);
 
                     _renderPassManager.PushCurrentPassGroup(currentTexture, RenderPassRunContext.PerWindow, context);
                 }
                 else
+                {
                     _renderPassManager.ClearCurrentPassGroup();
+                }
 
                 //_renderPassManager.ClearLocalData();
             }
@@ -269,7 +288,7 @@ namespace Primary.Rendering
                     //TODO: Get the NRD to wait on gpu work before resizing
                     //swapChain.ResizeBuffersToNewSize();
 
-                    FrameGraphTextureDesc baseDesc = new FrameGraphTextureDesc
+                    FGTextureDesc baseDesc = new FGTextureDesc
                     {
                         Width = Math.Min((int)outputData.ProjectionData.ClientSize.X, (int)swapChain.Description.WindowSize.X),
                         Height = Math.Min((int)outputData.ProjectionData.ClientSize.Y, (int)swapChain.Description.WindowSize.Y),
@@ -278,16 +297,16 @@ namespace Primary.Rendering
                     if (outputData.TargetTexture != null && Flags.HasFlag(outputData.TargetTexture.Description.Usage, RHIResourceUsage.RenderTarget))
                         cameraData.ColorTexture = outputData.TargetTexture;
                     else
-                        cameraData.ColorTexture = desc.CreateTexture(new FrameGraphTextureDesc(baseDesc) { Format = RHIFormat.RGB10A2_UNorm, Usage = FGTextureUsage.RenderTarget | FGTextureUsage.ShaderResource | FGTextureUsage.PixelShader }, "CamColor");
+                        cameraData.ColorTexture = desc.CreateTexture(new FGTextureDesc(baseDesc) { Format = RHIFormat.RGB10A2_UNorm, Usage = FGTextureUsage.RenderTarget | FGTextureUsage.ShaderResource | FGTextureUsage.PixelShader }, "CamColor");
 
-                    cameraData.DepthTexture = desc.CreateTexture(new FrameGraphTextureDesc(baseDesc) { Format = RHIFormat.D24_UNorm_S8_UInt, Usage = FGTextureUsage.DepthStencil | FGTextureUsage.ShaderResource | FGTextureUsage.PixelShader }, "CamDepth");
+                    cameraData.DepthTexture = desc.CreateTexture(new FGTextureDesc(baseDesc) { Format = RHIFormat.D24_UNorm_S8_UInt, Usage = FGTextureUsage.DepthStencil | FGTextureUsage.ShaderResource | FGTextureUsage.PixelShader }, "CamDepth");
 
                     cameraData.Setup(outputData);
                 }
             }
         }
 
-        private void SetupContextForWindow(Window window, ref FrameGraphTexture outputTexture, out RenderContextContainer context)
+        private void SetupContextForWindow(Window window, ref FGTexture outputTexture, out RenderContextContainer context)
         {
             RenderPass renderPass = _renderPassManager.RenderPass;
             using (RasterPassDescription desc = renderPass.SetupRasterPass(string.Empty, out GenericPassData _))
@@ -303,7 +322,7 @@ namespace Primary.Rendering
                     RenderWindowData windowData = context.GetOrCreate(() => new RenderWindowData());
                     RHISwapChain swapChain = _swapChainCache.GetForWindow(window, true)!;
 
-                    FrameGraphTextureDesc baseDesc = new FrameGraphTextureDesc
+                    FGTextureDesc baseDesc = new FGTextureDesc
                     {
                         Width = window.ClientSize.X,
                         Height = window.ClientSize.Y,
@@ -311,7 +330,7 @@ namespace Primary.Rendering
 
                     if (outputTexture.IsNull)
                     {
-                        outputTexture = desc.CreateTexture(new FrameGraphTextureDesc(baseDesc) { Format = RHIFormat.RGB10A2_UNorm, Usage = FGTextureUsage.RenderTarget | FGTextureUsage.ShaderResource | FGTextureUsage.PixelShader }, "WndColor");
+                        outputTexture = desc.CreateTexture(new FGTextureDesc(baseDesc) { Format = RHIFormat.RGB10A2_UNorm, Usage = FGTextureUsage.RenderTarget | FGTextureUsage.ShaderResource | FGTextureUsage.PixelShader }, "WndColor");
                     }
 
                     windowData.Window = window;
@@ -320,7 +339,7 @@ namespace Primary.Rendering
             }
         }
 
-        private void SetupPresentForOutput(Window window, FrameGraphTexture outputTexture)
+        private void SetupPresentForOutput(Window window, FGTexture outputTexture)
         {
             RenderPass renderPass = _renderPassManager.RenderPass;
             using (RasterPassDescription desc = renderPass.SetupRasterPass("CorePresent", out PresentForOutputData passData))
@@ -357,14 +376,24 @@ namespace Primary.Rendering
             }
         }
 
+        public void PushRenderPass<T>(T renderPass) where T : IRenderPass
+        {
+
+        }
+
+        public JobHandle RequestBatch(RenderList renderList, in BatchingOptions options)
+        {
+
+        }
+
         private sealed class PresentForOutputData : IPassData
         {
             public ShaderAsset? Shader;
             public PropertyBlock? Block;
 
             public Window? PresentWindow;
-            public FrameGraphTexture Texture;
-            public FrameGraphTexture Source;
+            public FGTexture Texture;
+            public FGTexture Source;
 
             public void Clear()
             {
@@ -372,8 +401,8 @@ namespace Primary.Rendering
                 Block = null;
 
                 PresentWindow = null;
-                Texture = FrameGraphTexture.Invalid;
-                Source = FrameGraphTexture.Invalid;
+                Texture = FGTexture.Invalid;
+                Source = FGTexture.Invalid;
             }
         }
 
@@ -389,7 +418,7 @@ namespace Primary.Rendering
         public RenderPrimitives RenderPrimitives => _renderPrimitives;
         public RenderStatistics Statistics => _statistics;
 
-        public IRenderPath? CurrentRenderPath => _currentPath;
+        public IRenderStage? CurrentRenderPath => _currentPath;
 
         ///<summary>Not thread-safe</summary>
         public Action? SubmitTransitionalPasses;

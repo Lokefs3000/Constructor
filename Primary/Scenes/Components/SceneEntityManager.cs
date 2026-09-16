@@ -74,6 +74,8 @@ namespace Primary.Scenes.Components
         /// <inheritdoc cref="ComponentCallbacks.RemoveComponentAddedCallback{T}(ComponentCallback)"/>
         public void RemoveComponentRemovedCallback<T>(ComponentCallback callback) where T : IComponent, new() => _callbacks.RemoveComponentRemovedCallback<T>(callback);
 
+        public Type? FindComponentFromFullName(string fullName) => _registry.FindComponentFromFullName(fullName);
+
         private ref GenericComponent AddComponentImpl(ref readonly Entity entity, Type type)
         {
             ref readonly ComponentRegistryEntry entry = ref _registry.FindComponentEntry(type);

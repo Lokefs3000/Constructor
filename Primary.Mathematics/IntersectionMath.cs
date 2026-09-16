@@ -57,6 +57,23 @@ namespace Primary.Mathematics
             return tmax >= tmin && tmax >= 0.0f;
         }
 
+        public static float IntersectRaySphere(Ray ray, Vector3 center, float radius)
+        {
+            Vector3 m = ray.Origin - center;
+            float b = Vector3.Dot(m, ray.Direction);
+            float c = Vector3.Dot(m, m) - radius * radius;
+
+            if (c > 0.0f && b > 0.0f)
+                return -1.0f;
+
+            float discr = b * b - c;
+            if (discr < 0.0f)
+                return -1.0f;
+
+            float t = -b - float.Sqrt(discr);
+            return t < 0.0f ? 0.0f : t;
+        }
+
         // https://iquilezles.org/articles/intersectors/
         public static (float Distance, float Unknown) IntersectRayCylinder(Ray ray, Vector3 basePoint, Vector3 normal, float radius)
         {

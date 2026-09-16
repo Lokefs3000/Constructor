@@ -158,7 +158,7 @@ namespace Primary.Rendering.D3D12
         {
             if (_needsNewBarrier)
             {
-                _device.BarrierManager.AddBufferBarrier(ref _uploadResource.Get(), BarrierSync.Copy, BarrierAccess.CopySource);
+                _device.BarrierManager.AddBufferBarrier(ref _uploadResource.Get(), BarrierSync.Copy, BarrierAccess.CopySource, false);
                 _needsNewBarrier = false;
             }
 
@@ -189,7 +189,7 @@ namespace Primary.Rendering.D3D12
         {
             if (_needsNewBarrier)
             {
-                _device.BarrierManager.AddBufferBarrier(ref _uploadResource.Get(), BarrierSync.Copy, BarrierAccess.CopySource);
+                _device.BarrierManager.AddBufferBarrier(ref _uploadResource.Get(), BarrierSync.Copy, BarrierAccess.CopySource, false);
                 _needsNewBarrier = false;
             }
 
@@ -214,7 +214,7 @@ namespace Primary.Rendering.D3D12
                 }
                 else
                 {
-                    FrameGraphTexture fg = resources.FindFGTexture(texture.Index);
+                    FGTexture fg = resources.FindFGTexture(texture.Index);
                     actualRowPitch = RHIFormatInfo.Query(fg.Description.Format).BytesPerPixel * destBox.Width;
                 }
 

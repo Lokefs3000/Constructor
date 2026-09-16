@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Text;
 using Primary.Assets;
+using Primary.Common;
 using Primary.Mathematics;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
@@ -29,7 +30,7 @@ namespace VoxelizationDemo.Editor.Rendering
 
         public PickingRenderPass()
         {
-            _singleReadSize = (int)RHIFormatInfo.Query(RHIFormat.RGB32_Float).CalculateSize(32, 32);
+            _singleReadSize = (int)RHIFormatInfo.Query(RHIFormat.RGBA16_Float).CalculateSize(32, 32);
 
             _readbackTexture = RHIDevice.Instance!.CreateReadback(new RHIReadbackDescription
             {
@@ -53,9 +54,16 @@ namespace VoxelizationDemo.Editor.Rendering
             PickingManager picking = EditorManager.Instance.PickingManager;
             if (picking.WantsNewPickingData)
             {
-                if (_isWaitingOnRead && _readbackTexture.IsDataReady)
+                if (_isWaitingOnRead)
                 {
-                    _readbackTexture.Read(picking.ReadbackSpan);
+                    if (_readbackTexture.IsDataReady)
+                    {
+                        _readbackTexture.Read(picking.ReadbackSpan);
+                        _isWaitingOnRead = false;
+
+                        picking.ConsumePickRequest();
+                    }
+
                     return;
                 }
 
@@ -66,7 +74,7 @@ namespace VoxelizationDemo.Editor.Rendering
                 Int2 pickingResolution = picking.Resolution;
                 using (RasterPassDescription desc = renderPass.SetupRasterPass("Picking", out PassData passData))
                 {
-                    passData.OutDepth = desc.CreateTexture(new FrameGraphTextureDesc
+                    passData.OutDepth = desc.CreateTexture(new FGTextureDesc
                     {
                         Width = pickingResolution.X,
                         Height = pickingResolution.Y,
@@ -75,23 +83,25 @@ namespace VoxelizationDemo.Editor.Rendering
                         Usage = FGTextureUsage.DepthStencil
                     }, "Pick Depth");
 
-                    passData.OutPosition = desc.CreateTexture(new FrameGraphTextureDesc
+                    passData.OutPosition = desc.CreateTexture(new FGTextureDesc
                     {
                         Width = pickingResolution.X,
                         Height = pickingResolution.Y,
                         Dimension = FGTextureDimension._2D,
-                        Format = RHIFormat.RGB32_Float,
-                        Usage = FGTextureUsage.RenderTarget
+                        Format = RHIFormat.RGBA16_Float,
+                        Usage = FGTextureUsage.RenderTarget | FGTextureUsage.ShaderResource
                     }, "Pick Position");
 
-                    passData.OutNormal = desc.CreateTexture(new FrameGraphTextureDesc
+                    passData.OutNormal = desc.CreateTexture(new FGTextureDesc
                     {
                         Width = pickingResolution.X,
                         Height = pickingResolution.Y,
                         Dimension = FGTextureDimension._2D,
-                        Format = RHIFormat.RGB32_Float,
-                        Usage = FGTextureUsage.RenderTarget
+                        Format = RHIFormat.RGBA16_Float,
+                        Usage = FGTextureUsage.RenderTarget | FGTextureUsage.ShaderResource
                     }, "Pick Normal");
+
+                    passData.OutCameraColor = FGTexture.Invalid; // context.Get<RenderCameraData>()!.ColorTexture;
 
                     passData.RenderList = renderPathBlackboard.RenderList;
                     passData.Scissor = picking.FocusArea;
@@ -100,9 +110,15 @@ namespace VoxelizationDemo.Editor.Rendering
                     passData.Shader = _pickingShader;
                     passData.Block = _pickingShaderBlock;
 
+                    desc.UseResource(FGResourceUsage.Read | FGResourceUsage.NoShaderAccess, passData.OutPosition);
+                    desc.UseResource(FGResourceUsage.Read | FGResourceUsage.NoShaderAccess, passData.OutNormal);
+
                     desc.UseDepthStencil(passData.OutDepth);
                     desc.UseRenderTarget(passData.OutPosition);
                     desc.UseRenderTarget(passData.OutNormal);
+
+                    if (!passData.OutCameraColor.IsNull)
+                        desc.UseRenderTarget(passData.OutCameraColor);
 
                     desc.AllowPassCulling(false);
                     desc.SetRenderFunction<PassData>(PassFunction);
@@ -119,40 +135,31 @@ namespace VoxelizationDemo.Editor.Rendering
             cmd.ClearDepthStencil(passData.OutDepth, FGClearFlags.Depth, null);
             cmd.SetDepthStencil(passData.OutDepth);
 
+            cmd.ClearRenderTarget(passData.OutPosition, Color.TransparentBlack);
+            cmd.ClearRenderTarget(passData.OutNormal, Color.TransparentBlack);
+
             cmd.SetRenderTarget(0, passData.OutPosition);
             cmd.SetRenderTarget(1, passData.OutNormal);
 
-            cmd.SetScissor(0, passData.Scissor);
+            //cmd.SetScissor(0, passData.Scissor);
 
             cmd.SetPipeline(passData.Shader!);
             cmd.SetProperties(passData.Block!);
 
-            MaterialAsset? currentMaterial = null;
             IRenderMeshSource? currentMeshSource = null;
 
             foreach (ShaderRenderBatcher renderBatcher in passData.RenderList!.ShaderBatchers)
             {
-                cmd.SetPipeline(renderBatcher.ActiveShader!);
-
                 foreach (RenderSegment segment in renderBatcher.Segments)
                 {
-                    if (!segment.Material.IsLoaded)
-                        continue;
-
-                    if (currentMaterial != segment.Material)
-                    {
-                        currentMaterial = segment.Material;
-                        cmd.SetProperties(segment.Material.PropertyBlock);
-                    }
-
                     if (currentMeshSource != segment.Mesh.MeshSource)
                     {
                         currentMeshSource = segment.Mesh.MeshSource;
                         if (currentMeshSource == null)
                             continue;
 
-                        cmd.SetVertexBuffer((FrameGraphBuffer)currentMeshSource.VertexBuffer!);
-                        cmd.SetIndexBuffer((FrameGraphBuffer)currentMeshSource.IndexBuffer!);
+                        cmd.SetVertexBuffer((FGBuffer)currentMeshSource.VertexBuffer!);
+                        cmd.SetIndexBuffer((FGBuffer)currentMeshSource.IndexBuffer!);
                     }
                     else
                     {
@@ -175,17 +182,30 @@ namespace VoxelizationDemo.Editor.Rendering
             FGTextureCopySource positionSource = new FGTextureCopySource(passData.OutPosition, 0);
             FGTextureCopySource normalSource = new FGTextureCopySource(passData.OutNormal, 0);
 
-            cmd.Read(new FGReadTextureDesc(positionSource, sourceBox, passData.Readback!, 0, 0, 0, 0));
-            cmd.Read(new FGReadTextureDesc(normalSource, sourceBox, passData.Readback!, (uint)passData.NormalByteOffset, 0, 0, 0));
+            FGTextureFootprint positionFootprint = new FGTextureFootprint(0, RHIFormat.RGBA16_Float, (uint)sourceBox.Width, (uint)sourceBox.Height, 1, (uint)RHIFormatInfo.Query(RHIFormat.RGBA16_Float).CalculatePitch(sourceBox.Width));
+            FGTextureFootprint normalFootprint = new FGTextureFootprint((uint)passData.NormalByteOffset, positionFootprint.Format, positionFootprint.Width, positionFootprint.Height, positionFootprint.Depth, positionFootprint.RowPitch);
+
+            cmd.Read(new FGReadTextureDesc(positionSource, sourceBox, passData.Readback!, positionFootprint, 0, 0, 0));
+            cmd.Read(new FGReadTextureDesc(normalSource, sourceBox, passData.Readback!, normalFootprint, 0, 0, 0));
+
+            if (!passData.OutCameraColor.IsNull)
+            {
+                cmd.SetRenderTarget(0, passData.OutCameraColor);
+                cmd.SetRenderTarget(1, FGTexture.Invalid);
+
+                Blitter.Blit(in cmd, passData.OutNormal);
+            }
         }
 
         private sealed class PassData : IPassData
         {
             public RenderList? RenderList;
 
-            public FrameGraphTexture OutDepth;
-            public FrameGraphTexture OutPosition;
-            public FrameGraphTexture OutNormal;
+            public FGTexture OutDepth;
+            public FGTexture OutPosition;
+            public FGTexture OutNormal;
+
+            public FGTexture OutCameraColor;
 
             public FGRect Scissor;
 
@@ -197,7 +217,21 @@ namespace VoxelizationDemo.Editor.Rendering
 
             public void Clear()
             {
-                throw new NotImplementedException();
+                RenderList = null;
+
+                OutDepth = FGTexture.Invalid;
+                OutPosition = FGTexture.Invalid;
+                OutNormal = FGTexture.Invalid;
+
+                OutCameraColor = FGTexture.Invalid;
+
+                Scissor = default;
+
+                Readback = null;
+                NormalByteOffset = 0;
+
+                Shader = null;
+                Block = null;
             }
         }
     }

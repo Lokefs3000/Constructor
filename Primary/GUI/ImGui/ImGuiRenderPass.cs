@@ -70,13 +70,13 @@ namespace Primary.GUI.ImGui
 
                     data.OutColor = windowData.ColorTexture;
 
-                    data.VertexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                    data.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
                     {
                         Width = (uint)(Unsafe.SizeOf<ImGuiVertex>() * totalVtxCount),
                         Stride = Unsafe.SizeOf<ImGuiVertex>(),
                         Usage = FGBufferUsage.VertexBuffer | FGBufferUsage.GenericShader
                     });
-                    data.IndexBuffer = desc.CreateBuffer(new FrameGraphBufferDesc
+                    data.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
                     {
                         Width = (uint)(Unsafe.SizeOf<ushort>() * totalIdxCount),
                         Stride = Unsafe.SizeOf<ushort>(),
@@ -188,20 +188,20 @@ namespace Primary.GUI.ImGui
 
         private sealed class PassData : IPassData
         {
-            public FrameGraphTexture OutColor;
+            public FGTexture OutColor;
 
-            public FrameGraphBuffer VertexBuffer;
-            public FrameGraphBuffer IndexBuffer;
+            public FGBuffer VertexBuffer;
+            public FGBuffer IndexBuffer;
 
             public ShaderAsset? Shader;
             public PropertyBlock? Properties;
 
             public void Clear()
             {
-                OutColor = FrameGraphTexture.Invalid;
+                OutColor = FGTexture.Invalid;
 
-                VertexBuffer = FrameGraphBuffer.Invalid;
-                IndexBuffer = FrameGraphBuffer.Invalid;
+                VertexBuffer = FGBuffer.Invalid;
+                IndexBuffer = FGBuffer.Invalid;
 
                 Shader = null;
                 Properties = null;

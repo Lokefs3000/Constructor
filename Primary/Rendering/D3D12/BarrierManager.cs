@@ -52,26 +52,11 @@ namespace Primary.Rendering.D3D12
             _textureBarriers.Clear();
         }
 
-        internal void TransitionAllToStandard()
-        {
-            foreach (var kvp in _resourceStates)
-            {
-                if (kvp.Value.Id == FGResourceId.Buffer)
-                {
-                    AddBufferBarrier((ID3D12Resource*)kvp.Key, BarrierSync.All, BarrierAccess.Common);
-                }
-                else
-                {
-                    AddTextureBarrier((ID3D12Resource*)kvp.Key, BarrierSync.All, BarrierAccess.Common, BarrierLayout.Common);
-                }
-            }
-        }
-
         internal void TransitionToCompatible(ref ID3D12GraphicsCommandList10 cmdList, CommandListType listType, CommandRecorder recorder)
         {
             BarrierFlushTypes flushTypes = 0;
 
-            foreach (FrameGraphResource fg in recorder.UsedResources)
+            foreach (FGResource fg in recorder.UsedResources)
             {
                 NRDResource nrd = ResourceUtility.AsNRDResource(fg);
                 ID3D12Resource* resource = (ID3D12Resource*)_device.ResourceManager.GetResource(nrd);
@@ -88,7 +73,7 @@ namespace Primary.Rendering.D3D12
                             if (!IsStateFlagsCompatible(listType, in state, NRDResourceId.Buffer, out IncompatibleBarrierFlags flags))
                             {
                                 GetCompatibleBarrierLayout(in state, flags, out BarrierSync newSync, out BarrierAccess newAccess);
-                                AddBufferBarrier(resource, newSync, newAccess);
+                                AddBufferBarrier(nrd, newSync, newAccess);
 
                                 flushTypes |= BarrierFlushTypes.Buffer;
                             }
@@ -154,9 +139,18 @@ namespace Primary.Rendering.D3D12
 
                                     if (!state.Native.IsNull)
                                     {
-                                        D3D12RHIBufferNative* native = (D3D12RHIBufferNative*)state.Native.Pointer;
-                                        native->BarrierSync = state.RequestedSync;
-                                        native->BarrierAccess = state.RequestedAccess;
+                                        if (state.IsReadback)
+                                        {
+                                            D3D12RHIReadbackNative* native = (D3D12RHIReadbackNative*)state.Native.Pointer;
+                                            native->BarrierSync = state.RequestedSync;
+                                            native->BarrierAccess = state.RequestedAccess;
+                                        }
+                                        else
+                                        {
+                                            D3D12RHIBufferNative* native = (D3D12RHIBufferNative*)state.Native.Pointer;
+                                            native->BarrierSync = state.RequestedSync;
+                                            native->BarrierAccess = state.RequestedAccess;
+                                        }
                                     }
                                 }
 
@@ -241,18 +235,18 @@ namespace Primary.Rendering.D3D12
             if (buffer.IsNull)
                 return;
 
-            Debug.Assert(buffer.Id == NRDResourceId.Buffer);
+            Debug.Assert(buffer.Id == NRDResourceId.Buffer || buffer.Id == NRDResourceId.Readback);
             ID3D12Resource* resource = (ID3D12Resource*)buffer.GetNativeResource(_device.ResourceManager);
 
-            AddBufferBarrier(resource, sync, access, buffer.GetRHINative());
+            AddBufferBarrier(resource, sync, access, buffer.Id == NRDResourceId.Readback, buffer.GetRHINative());
         }
 
-        internal void AddBufferBarrier(ref ID3D12Resource2 resource, BarrierSync sync, BarrierAccess access, RHIResourceNative* native = null)
+        internal void AddBufferBarrier(ref ID3D12Resource2 resource, BarrierSync sync, BarrierAccess access, bool isReadback, RHIResourceNative* native = null)
         {
-            AddBufferBarrier((ID3D12Resource*)Unsafe.AsPointer(ref resource), sync, access, native);
+            AddBufferBarrier((ID3D12Resource*)Unsafe.AsPointer(ref resource), sync, access, isReadback, native);
         }
 
-        internal void AddBufferBarrier(ID3D12Resource* resource, BarrierSync sync, BarrierAccess access, RHIResourceNative* native = null)
+        internal void AddBufferBarrier(ID3D12Resource* resource, BarrierSync sync, BarrierAccess access, bool isReadback, RHIResourceNative* native = null)
         {
             ref NRDResourceState state = ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
 
@@ -260,11 +254,29 @@ namespace Primary.Rendering.D3D12
             {
                 if (native != null)
                 {
-                    D3D12RHIBufferNative* bufferNative = (D3D12RHIBufferNative*)native;
-                    if (bufferNative->BarrierSync == sync && bufferNative->BarrierAccess == access)
-                        return;
+                    BarrierSync currentSync;
+                    BarrierAccess currentAccess;
 
-                    _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Buffer, native, bufferNative->BarrierSync, bufferNative->BarrierAccess)
+                    if (isReadback)
+                    {
+                        D3D12RHIReadbackNative* bufferNative = (D3D12RHIReadbackNative*)native;
+                        if (bufferNative->BarrierSync == sync && bufferNative->BarrierAccess == access)
+                            return;
+
+                        currentSync = bufferNative->BarrierSync;
+                        currentAccess = bufferNative->BarrierAccess;
+                    }
+                    else
+                    {
+                        D3D12RHIBufferNative* bufferNative = (D3D12RHIBufferNative*)native;
+                        if (bufferNative->BarrierSync == sync && bufferNative->BarrierAccess == access)
+                            return;
+
+                        currentSync = bufferNative->BarrierSync;
+                        currentAccess = bufferNative->BarrierAccess;
+                    }
+
+                    _resourceStates[(nint)resource] = new NRDResourceState(FGResourceId.Buffer, native, currentSync, currentAccess, IsReadback: isReadback)
                     {
                         RequestedSync = sync,
                         RequestedAccess = access
@@ -371,10 +383,10 @@ namespace Primary.Rendering.D3D12
 
         internal void SetResourceState(ref ID3D12Resource2 resource, NRDResourceState state) => _resourceStates[(nint)Unsafe.AsPointer(ref resource)] = state;
         internal void SetResourceState(ID3D12Resource* resource, NRDResourceState state) => _resourceStates[(nint)resource] = state;
-        
+
         internal ref readonly NRDResourceState GetResourceState(ref ID3D12Resource2 resource) => ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)Unsafe.AsPointer(ref resource));
         internal ref readonly NRDResourceState GetResourceState(ID3D12Resource* resource) => ref CollectionsMarshal.GetValueRefOrNullRef(_resourceStates, (nint)resource);
-        
+
         internal bool HasResourceState(ref ID3D12Resource2 resource) => _resourceStates.ContainsKey((nint)Unsafe.AsPointer(ref resource));
         internal bool HasResourceState(ID3D12Resource* resource) => _resourceStates.ContainsKey((nint)resource);
 
@@ -456,8 +468,8 @@ namespace Primary.Rendering.D3D12
             }
             else
             {
-                FrameGraphBuffer fg = resources.FindFGBuffer(buffer);
-                ref readonly FrameGraphBufferDesc desc = ref fg.Description;
+                FGBuffer fg = resources.FindFGBuffer(buffer);
+                ref readonly FGBufferDesc desc = ref fg.Description;
 
                 if (Flags.HasFlag(desc.Usage, FGBufferUsage.ConstantBuffer))
                     access = BarrierAccess.ConstantBuffer;
@@ -503,8 +515,8 @@ namespace Primary.Rendering.D3D12
             }
             else
             {
-                FrameGraphTexture fg = resources.FindFGTexture(texture);
-                ref readonly FrameGraphTextureDesc desc = ref fg.Description;
+                FGTexture fg = resources.FindFGTexture(texture);
+                ref readonly FGTextureDesc desc = ref fg.Description;
 
                 if (Flags.HasFlag(desc.Usage, FGTextureUsage.UnorderedAccess) && Flags.HasFlag(flags, ShPropertyFlags.ReadWrite))
                 {
@@ -718,9 +730,11 @@ namespace Primary.Rendering.D3D12
         Buffer = 1 << 2,
     }
 
-    internal struct NRDResourceState(FGResourceId Id, Ptr<RHIResourceNative> Native, BarrierSync StartSync, BarrierAccess StartAccess, BarrierLayout StartLayout = BarrierLayout.Common)
+    internal struct NRDResourceState(FGResourceId Id, Ptr<RHIResourceNative> Native, BarrierSync StartSync, BarrierAccess StartAccess, BarrierLayout StartLayout = BarrierLayout.Common, bool IsReadback = false)
     {
         public readonly FGResourceId Id = Id;
+        public readonly bool IsReadback = IsReadback;
+
         public readonly Ptr<RHIResourceNative> Native = Native;
 
         public BarrierSync PreviousSync = StartSync;
