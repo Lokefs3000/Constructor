@@ -5,7 +5,7 @@ using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Mathematics;
 using Primary.Memory.Native;
-using Primary.Rendering.Assets;
+using Primary.Rendering.Ancient.Assets;
 using Primary.RHI;
 using System.Runtime.CompilerServices;
 

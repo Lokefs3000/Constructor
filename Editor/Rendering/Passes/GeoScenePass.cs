@@ -2,12 +2,12 @@
 using Editor.Geo;
 using Editor.Geometry;
 using Editor.Geometry.Mesh;
-using Primary.Rendering;
+using Primary.Rendering.Ancient;
+using Primary.Rendering.Ancient.Recording;
+using Primary.Rendering.Ancient.Resources;
+using Primary.Rendering.Ancient.Structures;
 using Primary.Rendering.Commands;
 using Primary.Rendering.Pass;
-using Primary.Rendering.Recording;
-using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
 using Primary.RHI;
 using Primary.Timing;
 using System;

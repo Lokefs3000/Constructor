@@ -10,6 +10,7 @@ namespace PrimaryEditor.Selection
     public sealed class SelectionManager : IDisposable
     {
         private readonly HashSet<object> _objects;
+        private readonly HashSet<SceneEntity> _entities;
 
         private object? _activeContext;
 
@@ -21,6 +22,7 @@ namespace PrimaryEditor.Selection
         public SelectionManager()
         {
             _objects = new HashSet<object>();
+            _entities = new HashSet<SceneEntity>();
 
             _activeContext = null;
 
@@ -108,6 +110,10 @@ namespace PrimaryEditor.Selection
                 _objects.Clear();
                 _objects.Add(obj);
 
+                _entities.Clear();
+                if (obj is SceneEntity entity2)
+                    _entities.Add(entity2);
+
                 foreach (object wasSelectedObj in toDeselect)
                 {
                     OnObjectDeselected?.Invoke(wasSelectedObj);
@@ -135,6 +141,8 @@ namespace PrimaryEditor.Selection
                 OnObjectDeselected?.Invoke(val);
                 _objects.Remove(val);
             }
+
+            _entities.Clear();
         }
 
         public void Select(object obj, bool allowDeselect = false, SelectMode mode = SelectMode.Clear)
@@ -159,10 +167,12 @@ namespace PrimaryEditor.Selection
             }
 
             _objects.Add(obj);
+            if (obj is SceneEntity entity2)
+                _entities.Add(entity2);
 
             OnObjectSelected?.Invoke(obj);
 
-            if (obj is SceneEntity entity && _activeEntity != entity)
+            if (obj is SceneEntity entity)
             {
                 OnActiveEntityChanged?.Invoke(_activeEntity, entity);
                 _activeEntity = entity;
@@ -179,6 +189,9 @@ namespace PrimaryEditor.Selection
         {
             if (_objects.Remove(obj))
             {
+                if (obj is SceneEntity entity2)
+                    _entities.Remove(entity2);
+
                 OnObjectDeselected?.Invoke(obj);
 
                 if (obj is SceneEntity entity && _activeEntity == entity)
@@ -200,6 +213,7 @@ namespace PrimaryEditor.Selection
         }
 
         public bool IsSelected(object obj) => _objects.Contains(obj);
+        public bool IsSelected(SceneEntity entity) => _entities.Contains(entity);
 
         public object? ActiveObject
         {

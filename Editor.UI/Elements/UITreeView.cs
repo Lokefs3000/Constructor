@@ -12,7 +12,7 @@ using Primary.Common;
 using Primary.Input;
 using Primary.Input.Devices;
 using Primary.Mathematics;
-using Primary.Rendering.Assets;
+using Primary.Rendering.Ancient.Assets;
 using Primary.Utility;
 using System.Numerics;
 using System.Runtime.InteropServices;

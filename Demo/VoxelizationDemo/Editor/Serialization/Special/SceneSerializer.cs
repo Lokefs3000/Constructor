@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Arch.Core;
@@ -42,15 +43,18 @@ namespace VoxelizationDemo.Editor.Serialization.Special
                     {
                         writer.WriteStartObject();
 
-                        writer.WriteNumber("Id"u8, currentEntityInfo.Id);
+                        writer.WriteNumber("Id"u8, thisId);
                         if (currentEntityInfo.Id != -1)
-                            writer.WriteNumber("Parent"u8, thisId);
+                            writer.WriteNumber("Parent"u8, currentEntityInfo.Id);
                         writer.WriteBoolean("Enabled"u8, currentEntityInfo.Entity.Enabled);
                         writer.WriteString("Name"u8, currentEntityInfo.Entity.Name);
 
                         writer.WriteStartArray("Components"u8);
                         foreach (ComponentType type in currentEntityInfo.Entity.ComponentTypes)
                         {
+                            if (type.Type.GetCustomAttribute<DontSerializeComponentAttribute>() != null)
+                                continue;
+
                             writer.WriteStringValue(SceneJsonSerializer.GetComponentKey(type.Type));
                             componentsToSerialize.Add(new ComponentToSerialize(currentEntityInfo.Entity, type));
                         }
@@ -74,6 +78,9 @@ namespace VoxelizationDemo.Editor.Serialization.Special
                 SceneDeserializer deserializer = VoxelRuntime.Instance.SceneManager.Deserializer;
                 foreach (ComponentToSerialize toSerialize in componentsToSerialize)
                 {
+                    if (toSerialize.ComponentType.GetCustomAttribute<DontSerializeComponentAttribute>() != null)
+                        continue;
+
                     SceneEntity entity = toSerialize.Entity;
 
                     IComponent? boxedComponent = toSerialize.Entity.GetComponent(toSerialize.ComponentType);
@@ -83,7 +90,7 @@ namespace VoxelizationDemo.Editor.Serialization.Special
                     Guard.IsNotNull(fullName, $"Failed to get component key for type '{toSerialize.ComponentType}'");
 
                     ComponentReflection reflection = deserializer.ReflectionCache.GetReflection(fullName);
-
+                    
                     writer.WriteStartObject();
                     writer.WriteString("Key"u8, fullName);
                     
@@ -102,6 +109,8 @@ namespace VoxelizationDemo.Editor.Serialization.Special
 
                 writer.WriteEndArray();
             }
+
+            writer.WriteEndObject();
         }
 
         private readonly record struct ComponentToSerialize(SceneEntity Entity, Type ComponentType);

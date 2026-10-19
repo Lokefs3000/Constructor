@@ -295,29 +295,33 @@ namespace Primary.Assets.Loaders
 
             static bool TryParseGenericSpan(string serialized, ref Span<float> values)
             {
-                TomlReader reader = TomlReader.Create(serialized);
-
-                reader.Read();
-                if (reader.TokenType != TomlTokenType.StartArray)
+                ReadOnlySpan<char> span = serialized.AsSpan();
+                if (span.Length < 3 || span[0] != '[' || span[^1] != ']')
                     return false;
 
+                int currentIndex = 1;
                 for (int i = 0; i < values.Length; ++i)
                 {
-                    reader.Read();
-                    if (reader.TokenType != TomlTokenType.Float)
-                        return false;
+                    while (char.IsWhiteSpace(span[currentIndex]))
+                    {
+                        if (++currentIndex >= span.Length)
+                            return false;
+                    }
 
-                    TomlSourceSpan sourceSpan = reader.CurrentSpan!.Value;
+                    int start = currentIndex;
+                    while (span[currentIndex] != ',' && span[currentIndex] != ']')
+                    {
+                        if (++currentIndex >= span.Length)
+                            return false;
+                    }
 
-                    if (!float.TryParse(serialized.AsSpan(sourceSpan.Start.Offset, sourceSpan.Length), CultureInfo.InvariantCulture, out float value))
+                    ReadOnlySpan<char> valueSpan = span[start..currentIndex];
+                    if (!float.TryParse(valueSpan, CultureInfo.InvariantCulture, out float value))
                         return false;
 
                     values[i] = value;
+                    ++currentIndex;
                 }
-
-                reader.Read();
-                if (reader.TokenType != TomlTokenType.EndArray)
-                    return false;
 
                 return true;
             }

@@ -81,6 +81,21 @@ namespace Primary.Scenes.Json
             }
             else
             {
+                if (type == typeof(bool)) { writer.WriteBooleanValue(Unsafe.Unbox<bool>(value)); return true; }
+                if (type == typeof(sbyte)) { writer.WriteNumberValue(Unsafe.Unbox<sbyte>(value)); return true; }
+                if (type == typeof(byte)) { writer.WriteNumberValue(Unsafe.Unbox<byte>(value)); return true; }
+                if (type == typeof(short)) { writer.WriteNumberValue(Unsafe.Unbox<short>(value)); return true; }
+                if (type == typeof(ushort)) { writer.WriteNumberValue(Unsafe.Unbox<ushort>(value)); return true; }
+                if (type == typeof(int)) { writer.WriteNumberValue(Unsafe.Unbox<int>(value)); return true; }
+                if (type == typeof(uint)) { writer.WriteNumberValue(Unsafe.Unbox<uint>(value)); return true; }
+                if (type == typeof(long)) { writer.WriteNumberValue(Unsafe.Unbox<long>(value)); return true; }
+                if (type == typeof(ulong)) { writer.WriteNumberValue(Unsafe.Unbox<ulong>(value)); return true; }
+
+                if (type == typeof(float)) { writer.WriteNumberValue(Unsafe.Unbox<float>(value)); return true; }
+                if (type == typeof(double)) { writer.WriteNumberValue(Unsafe.Unbox<double>(value)); return true; }
+
+                if (type == typeof(string)) { writer.WriteStringValue((string)value); return true; }
+
                 if (type == typeof(Vector2)) return Vector2Converter.TrySerialize(writer, ref Unsafe.Unbox<Vector2>(value));
                 if (type == typeof(Vector3)) return Vector3Converter.TrySerialize(writer, ref Unsafe.Unbox<Vector3>(value));
                 if (type == typeof(Vector4)) return Vector4Converter.TrySerialize(writer, ref Unsafe.Unbox<Vector4>(value));

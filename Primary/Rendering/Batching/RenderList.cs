@@ -26,6 +26,8 @@ namespace Primary.Rendering.Batching
         private readonly Dictionary<IRenderMeshSource, ushort> _modelIds;
         private readonly Dictionary<MaterialAsset, uint> _materialIds;
 
+        private uint _materialByteSize;
+
         private readonly Lock _shaderIdsLock;
         private readonly Lock _modelIdsLock;
         private readonly Lock _materialIdsLock;
@@ -47,6 +49,8 @@ namespace Primary.Rendering.Batching
             _shaderIds = new Dictionary<ShaderAsset, ushort>();
             _modelIds = new Dictionary<IRenderMeshSource, ushort>();
             _materialIds = new Dictionary<MaterialAsset, uint>();
+
+            _materialByteSize = 0;
 
             _shaderIdsLock = new Lock();
             _modelIdsLock = new Lock();
@@ -91,6 +95,8 @@ namespace Primary.Rendering.Batching
             _shaderIds.Clear();
             _modelIds.Clear();
             _materialIds.Clear();
+
+            _materialByteSize = 0;
 
             _usedBatchers.Clear();
 
@@ -176,6 +182,11 @@ namespace Primary.Rendering.Batching
             else
                 throw new NotSupportedException();
 
+            if (typeof(TKey) == typeof(MaterialAsset))
+            {
+                _materialByteSize += (uint)Unsafe.As<MaterialAsset>(key).PropertyBlock.BlockSize;
+            }
+
             return id;
         }
 
@@ -198,6 +209,8 @@ namespace Primary.Rendering.Batching
         public RODictionary<IRenderMeshSource, ushort> ModelIds => _modelIds;
         public RODictionary<MaterialAsset, uint> MaterialIds => _materialIds;
 
+        public uint MaterialByteSize => _materialByteSize;
+
         public bool IsEmpty => _rentedKeyCount == 0 || _shaderIds.Count == 0 || _modelIds.Count == 0 || _materialIds.Count == 0;
     }
 
@@ -215,10 +228,10 @@ namespace Primary.Rendering.Batching
         public ulong Key = Create(ShaderId, ModelId, MaterialId, MeshId);
         public uint ListIndex = (((uint)BatcherIndex) << 31) | ((uint)ListIndex);
 
-        public readonly ushort ShaderId => (ushort)((Key >> 48) & 0xffffu);
-        public readonly ushort ModelId => (ushort)((Key >> 32) & 0xffffu);
-        public readonly uint MaterialId => (uint)((Key >> 15) & 0x1ffffu);
-        public readonly ushort MeshId => (ushort)((Key >> 5) & 0x400u);
+        public readonly ushort ShaderId => (ushort)((Key >> 43) & 0xffffu);
+        public readonly ushort ModelId => (ushort)((Key >> 27) & 0xffffu);
+        public readonly uint MaterialId => (uint)((Key >> 10) & 0x1ffffu);
+        public readonly ushort MeshId => (ushort)(Key & 0x3ffu);
 
         public readonly int Index => (int)((ListIndex) & 0x1ffffffu);
         public readonly int Batcher => (byte)((ListIndex >> 31) & 0x1u);
@@ -229,7 +242,7 @@ namespace Primary.Rendering.Batching
 
         public static ulong Create(ushort shaderId, ushort modelId, uint materialId, ushort meshId)
         {
-            return (((ulong)shaderId) << 48) | (((ulong)modelId) << 32) | (((ulong)materialId) << 15) | (((ulong)meshId) << 5);
+            return (((ulong)shaderId) << 43) | (((ulong)modelId) << 27) | (((ulong)materialId) << 10) | (ulong)meshId;
         }
     }
 
@@ -244,5 +257,5 @@ namespace Primary.Rendering.Batching
     }
 
     public readonly record struct RenderFlag(Matrix4x4 Matrix, uint DataId);
-    public readonly record struct RenderSegment(MaterialAsset Material, IRawRenderMesh Mesh, int FlagIndexStart, int FlagIndexEnd);
+    public readonly record struct RenderSegment(MaterialAsset Material, uint MaterialIndex, IRawRenderMesh Mesh, int FlagIndexStart, int FlagIndexEnd);
 }

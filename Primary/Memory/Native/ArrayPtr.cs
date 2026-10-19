@@ -138,6 +138,14 @@ namespace Primary.Memory.Native
             return retVal;
         }
 
+        public void Clear()
+        {
+            if (_length > 0 && _ptr != null)
+            {
+                NativeMemory.Clear(_ptr, (nuint)(_length * Unsafe.SizeOf<T>()));
+            }
+        }
+
         public ref T this[int index]
         {
             get

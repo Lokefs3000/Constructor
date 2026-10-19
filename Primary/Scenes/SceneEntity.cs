@@ -4,6 +4,7 @@ using CommunityToolkit.HighPerformance;
 using Primary.Common;
 using Primary.Components;
 using Primary.Scenes.Components;
+using Primary.Scenes.Entities;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
@@ -69,6 +70,19 @@ namespace Primary.Scenes
             if (IsNull)
                 throw new NullReferenceException();
             return _entity.Has<T>();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public CRef<T> AddComponentAsCRef<T>() where T : struct, IComponent
+        {
+            AddComponent<T>();
+            return SceneEntityManager.Instance.ComponentReferences.CreateForComponent<T>(this);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public CRef<T> GetComponentAsCRef<T>() where T : struct, IComponent
+        {
+            return SceneEntityManager.Instance.ComponentReferences.CreateForComponent<T>(this);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

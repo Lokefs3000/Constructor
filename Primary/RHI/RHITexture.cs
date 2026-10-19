@@ -7,8 +7,10 @@
         public ref readonly RHITextureDescription Description => ref _description;
 
         public abstract RHITextureNative* GetAsNative();
-    }
 
+        public abstract ref readonly RHIAlignmentInfo AlignmentInfo { get; }
+    }
+    
     public struct RHITextureNative
     {
         public RHITextureDescription Description;

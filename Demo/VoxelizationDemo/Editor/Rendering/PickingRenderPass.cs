@@ -9,12 +9,12 @@ using Primary.Rendering;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Batching;
 using Primary.Rendering.Commands;
-using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
+using Primary.Rendering.Data;
 using Primary.RHI;
 using VoxelizationDemo.Rendering;
+using Primary.Rendering.Datatypes;
 
 namespace VoxelizationDemo.Editor.Rendering
 {
@@ -46,9 +46,11 @@ namespace VoxelizationDemo.Editor.Rendering
             _readbackTexture.Dispose();
         }
 
-        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
+        public void SetupPasses(FrameGraphBuilder frameGraph)
         {
-            if (!_pickingShader.IsLoaded)
+            return;
+
+            /*if (!_pickingShader.IsLoaded)
                 return;
 
             PickingManager picking = EditorManager.Instance.PickingManager;
@@ -125,12 +127,12 @@ namespace VoxelizationDemo.Editor.Rendering
                 }
 
                 _isWaitingOnRead = true;
-            }
+            }*/
         }
 
         private static void PassFunction(RasterPassContext context, PassData passData)
         {
-            RasterCommandBuffer cmd = context.CommandBuffer;
+            /*RasterCommandBuffer cmd = context.CommandBuffer;
 
             cmd.ClearDepthStencil(passData.OutDepth, FGClearFlags.Depth, null);
             cmd.SetDepthStencil(passData.OutDepth);
@@ -194,18 +196,18 @@ namespace VoxelizationDemo.Editor.Rendering
                 cmd.SetRenderTarget(1, FGTexture.Invalid);
 
                 Blitter.Blit(in cmd, passData.OutNormal);
-            }
+            }*/
         }
 
         private sealed class PassData : IPassData
         {
             public RenderList? RenderList;
 
-            public FGTexture OutDepth;
-            public FGTexture OutPosition;
-            public FGTexture OutNormal;
+            public TextureHandle OutDepth;
+            public TextureHandle OutPosition;
+            public TextureHandle OutNormal;
 
-            public FGTexture OutCameraColor;
+            public TextureHandle OutCameraColor;
 
             public FGRect Scissor;
 
@@ -219,11 +221,11 @@ namespace VoxelizationDemo.Editor.Rendering
             {
                 RenderList = null;
 
-                OutDepth = FGTexture.Invalid;
-                OutPosition = FGTexture.Invalid;
-                OutNormal = FGTexture.Invalid;
+                OutDepth = TextureHandle.Null;
+                OutPosition = TextureHandle.Null;
+                OutNormal = TextureHandle.Null;
 
-                OutCameraColor = FGTexture.Invalid;
+                OutCameraColor = TextureHandle.Null;
 
                 Scissor = default;
 

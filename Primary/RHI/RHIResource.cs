@@ -1,7 +1,10 @@
-﻿namespace Primary.RHI
+﻿using Primary.Rendering;
+
+namespace Primary.RHI
 {
     public abstract class RHIResource : IDisposable
     {
+        protected RHIBarrierState _barrierState;
         protected string? _debugName;
 
         protected bool _disposedValue;
@@ -33,6 +36,8 @@
             }
         }
 
+        internal ref RHIBarrierState BarrierState => ref _barrierState;
+
         public abstract RHIResourceType Type { get; }
     }
 
@@ -40,4 +45,7 @@
     {
 
     }
+
+    public readonly record struct RHIAlignmentInfo(int Alignment, int SizeInBytes);
+    public readonly record struct RHIBarrierState(ResourceBarrierSync Sync, ResourceBarrierAccess Access, BarrierQueueSpec QueueSpec);
 }

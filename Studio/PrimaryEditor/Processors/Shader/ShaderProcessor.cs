@@ -385,10 +385,10 @@ namespace PrimaryEditor.Processors.Shader
                             PropertyDefault.NumOne => SBCPropertyDefault.NumOne,
                             PropertyDefault.NumZero => SBCPropertyDefault.NumZero,
                             PropertyDefault.NumIdentity => SBCPropertyDefault.NumIdentity,
-                            PropertyDefault.TexWhite => SBCPropertyDefault.TexWhite,
-                            PropertyDefault.TexBlack => SBCPropertyDefault.TexBlack,
-                            PropertyDefault.TexMask => SBCPropertyDefault.TexMask,
-                            PropertyDefault.TexNormal => SBCPropertyDefault.TexNormal,
+                            PropertyDefault.TexWhite => SBCPropertyDefault.NumOne,
+                            PropertyDefault.TexBlack => SBCPropertyDefault.NumZero,
+                            PropertyDefault.TexMask => SBCPropertyDefault.NumZero,
+                            PropertyDefault.TexNormal => SBCPropertyDefault.NumZero,
                             _ => throw new NotImplementedException()
                         },
                         HasCustomName = customName != null
@@ -660,7 +660,7 @@ namespace PrimaryEditor.Processors.Shader
 
             void TravelForStageRecursive(ShPropertyStages stage, FunctionIncludeData includes)
             {
-                foreach (ref readonly ReferenceIndex index in includes.Indices)
+                foreach (ReferenceIndex index in includes.Indices)
                 {
                     switch (index.Type)
                     {

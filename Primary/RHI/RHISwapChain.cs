@@ -42,6 +42,9 @@ namespace Primary.RHI
 
         public ref RHISwapChainDescription Description => ref _description;
 
+        public abstract ReadOnlySpan<RHISwapChainBackbuffer> Backbuffers { get; }
+        public abstract int CurrentBackbufferIndex { get; }
+
         public abstract RHISwapChainNative* GetAsNative();
     }
 

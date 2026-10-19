@@ -4,7 +4,7 @@ using Primary.Assets;
 using Primary.Common;
 using Primary.Polling;
 using Primary.Profiling;
-using Primary.Rendering;
+using Primary.Rendering.Ancient;
 using Primary.Windowing;
 using SDL;
 using System.Numerics;

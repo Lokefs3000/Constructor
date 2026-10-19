@@ -49,13 +49,16 @@ namespace PrimaryEditor.Search.Providers
                 if (!exists || matcher == null)
                     matcher = new StringMatcher();
 
-                matcher.AddString(new StringMatchKey(entry.Key, entry.Id));
+                if (pipeline != null && pipeline.AssetRegistry.TryGetLocalPathForId(entry.Id, out string? localPath))
+                {
+                    matcher.AddString(new StringMatchKey($"{localPath}-{entry.Key}", entry.Id));
+                }
             }
             else
             {
                 if (pipeline != null &&
-                pipeline.AssetRegistry.TryGetLocalPathForId(entry.Id, out string? localPath) &&
-                pipeline.ImporterRegistry.TryGetImporterForPath(localPath, out AssetImporterData importerData))
+                    pipeline.AssetRegistry.TryGetLocalPathForId(entry.Id, out string? localPath) &&
+                    pipeline.ImporterRegistry.TryGetImporterForPath(localPath, out AssetImporterData importerData))
                 {
                     ref StringMatcher? matcher = ref CollectionsMarshal.GetValueRefOrAddDefault(_stringMatchers, importerData.Importer.AssetDefinitionType, out bool exists);
                     if (!exists || matcher == null)
@@ -75,7 +78,10 @@ namespace PrimaryEditor.Search.Providers
                 if (!exists || matcher == null)
                     matcher = new StringMatcher();
 
-                matcher.RemoveString(new StringMatchKey(entry.Key, entry.Id));
+                if (pipeline != null && pipeline.AssetRegistry.TryGetLocalPathForId(entry.Id, out string? localPath))
+                {
+                    matcher.RemoveString(new StringMatchKey($"{localPath}-{entry.Key}", entry.Id));
+                }
             }
             else
             {

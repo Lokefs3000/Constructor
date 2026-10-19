@@ -120,6 +120,28 @@ namespace VoxelizationDemo.Editor
             }
         }
 
+        public bool HasWindowOpen<T>() where T : IEditorWindow
+        {
+            foreach (IEditorWindow window in _windows)
+            {
+                if (window is T)
+                    return true;
+            }
+
+            return false;
+        }
+
+        public bool HasPopupOpen<T>() where T : EditorPopup
+        {
+            foreach (EditorPopup popup in _popups)
+            {
+                if (popup is T)
+                    return true;
+            }
+
+            return false;
+        }
+
         public ROList<IEditorWindow> Windows => _windows;
         public ROList<EditorPopup> Popups => _popups;
     }

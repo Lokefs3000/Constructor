@@ -5,41 +5,46 @@ using Primary.Assets;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Batching;
-using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
+using Primary.Rendering.Commands;
 
 namespace VoxelizationDemo.Rendering.Passes
 {
     public sealed class WorldOpaquePass : IRenderPass
     {
-        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
+        public void SetupPasses(FrameGraphBuilder frameGraph)
         {
-            RenderPathBlackboard pathBlackboard = renderPass.Blackboard.Get<RenderPathBlackboard>()!;
+            RenderStageBlackboard pathBlackboard = frameGraph.GetBlackboard<RenderStageBlackboard>()!;
             if (pathBlackboard.RenderList == null)
                 return;
 
-            RenderCameraData cameraData = context.Get<RenderCameraData>()!;
+            RenderCameraData cameraData = frameGraph.GetContext<RenderCameraData>()!;
 
-            using (RasterPassDescription desc = renderPass.SetupRasterPass("WorldOpaque", out PassData passData))
+            using (RasterPassBuilder desc = frameGraph.AddRasterPass("WorldOpaque", out PassData passData))
             {
                 passData.RenderList = pathBlackboard.RenderList;
 
                 passData.OutColor = cameraData.ColorTexture;
                 passData.OutDepth = cameraData.DepthTexture;
 
-                desc.UseRenderTarget(cameraData.ColorTexture);
-                desc.UseDepthStencil(cameraData.DepthTexture);
+                desc.Write(cameraData.ColorTexture);
+                desc.Write(cameraData.DepthTexture);
 
-                desc.SetRenderFunction<PassData>(PassFunction);
+                desc.SetFunction(PassFunction);
             }
         }
 
-        private static void PassFunction(RasterPassContext context, PassData passData)
+        private static void PassFunction(RasterPassContext context)
         {
+            PassData passData = context.GetPassData<PassData>()!;
             RasterCommandBuffer cmd = context.CommandBuffer;
+
+            BufferDataBlackboard bufferData = context.GetBlackboard<BufferDataBlackboard>();
+
+            cmd.ClearRenderTarget(passData.OutColor);
+            cmd.ClearDepthStencil(passData.OutDepth);
 
             cmd.SetRenderTarget(0, passData.OutColor);
             cmd.SetDepthStencil(passData.OutDepth);
@@ -47,9 +52,10 @@ namespace VoxelizationDemo.Rendering.Passes
             MaterialAsset? currentMaterial = null;
             IRenderMeshSource? currentMeshSource = null;
 
+            int currentAppendOffset = 0;
             foreach (ShaderRenderBatcher renderBatcher in passData.RenderList!.ShaderBatchers)
             {
-                cmd.SetPipeline(renderBatcher.ActiveShader!);
+                cmd.SetShader(renderBatcher.ActiveShader!);
 
                 foreach (RenderSegment segment in renderBatcher.Segments)
                 {
@@ -68,23 +74,28 @@ namespace VoxelizationDemo.Rendering.Passes
                         if (currentMeshSource == null)
                             continue;
 
-                        cmd.SetVertexBuffer((FGBuffer)currentMeshSource.VertexBuffer!);
-                        cmd.SetIndexBuffer((FGBuffer)currentMeshSource.IndexBuffer!);
+                        cmd.SetVertexBuffer(currentMeshSource.VertexBuffer);
+                        cmd.SetIndexBuffer(currentMeshSource.IndexBuffer);
                     }
                     else
                     {
                         if (currentMeshSource == null)
                             continue;
                     }
-             
-                    cmd.SetConstants((uint)segment.FlagIndexStart);
+
+                    ConstantsData constantsData = new ConstantsData(
+                        (uint)(segment.FlagIndexStart + currentAppendOffset),
+                        bufferData.MaterialOffsets[segment.MaterialIndex]);
+                    cmd.SetConstants(constantsData);
 
                     ref readonly RenderMeshDrawArgs drawArgs = ref segment.Mesh.Args;
                     if (drawArgs.NeedsIndexedDraw)
-                        cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc(drawArgs.VertexOrIndexCount, (uint)(segment.FlagIndexEnd - segment.FlagIndexStart), drawArgs.IndexOffset, (int)drawArgs.VertexOffset));
+                        cmd.DrawIndexedInstanced(drawArgs.VertexOrIndexCount, (uint)(segment.FlagIndexEnd - segment.FlagIndexStart), drawArgs.IndexOffset, (int)drawArgs.VertexOffset, 0);
                     else
-                        cmd.DrawInstanced(new FGDrawInstancedDesc(drawArgs.VertexOrIndexCount, (uint)(segment.FlagIndexEnd - segment.FlagIndexStart), drawArgs.VertexOffset));
+                        cmd.DrawInstanced(drawArgs.VertexOrIndexCount, (uint)(segment.FlagIndexEnd - segment.FlagIndexStart), drawArgs.VertexOffset, 0);
                 }
+
+                currentAppendOffset += renderBatcher.Flags.Length;
             }
         }
 
@@ -92,16 +103,18 @@ namespace VoxelizationDemo.Rendering.Passes
         {
             public RenderList? RenderList;
 
-            public FGTexture OutColor;
-            public FGTexture OutDepth;
+            public TextureHandle OutColor;
+            public TextureHandle OutDepth;
 
             public void Clear()
             {
                 RenderList = null;
 
-                OutColor = FGTexture.Invalid;
-                OutDepth = FGTexture.Invalid;
+                OutColor = TextureHandle.Null;
+                OutDepth = TextureHandle.Null;
             }
         }
+
+        private readonly record struct ConstantsData(uint FlagOffset, uint MaterialOffset);
     }
 }

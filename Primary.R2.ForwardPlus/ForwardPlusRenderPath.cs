@@ -1,9 +1,9 @@
 ﻿using Primary.Assets;
 using Primary.R2.ForwardPlus.Passes;
 using Primary.R2.ForwardPlus.Statistics;
-using Primary.Rendering;
+using Primary.Rendering.Ancient;
+using Primary.Rendering.Ancient.Batching;
 using Primary.Rendering.Assets;
-using Primary.Rendering.Batching;
 using System.Diagnostics;
 
 namespace Primary.R2.ForwardPlus

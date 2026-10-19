@@ -2,6 +2,7 @@
 using Arch.Core.Extensions;
 using Primary.Common;
 using Primary.Components;
+using Primary.Scenes.Entities;
 using Primary.Scripting;
 using System.Diagnostics;
 using System.Reflection;
@@ -13,10 +14,13 @@ namespace Primary.Scenes.Components
     {
         private static readonly WeakReference s_instance = new WeakReference(null);
 
-        private ComponentRegistry _registry;
-        private ComponentDependencyGraph _dependencyGraph;
-        private RelationshipManager _relationshipManager;
-        private ComponentCallbacks _callbacks;
+        private readonly ComponentRegistry _registry;
+        private readonly ComponentDependencyGraph _dependencyGraph;
+        private readonly RelationshipManager _relationshipManager;
+        private readonly ComponentCallbacks _callbacks;
+        private readonly BehaviourManager _behaviourManager;
+
+        private readonly ComponentReferences _componentReferences;
 
         private HashSet<SceneEntity> _entitiesToRemove;
 
@@ -26,10 +30,13 @@ namespace Primary.Scenes.Components
         {
             s_instance.Target = this;
 
-            _registry = new ComponentRegistry();
+            _registry = new ComponentRegistry(this);
             _dependencyGraph = new ComponentDependencyGraph(_registry);
             _relationshipManager = new RelationshipManager();
             _callbacks = new ComponentCallbacks();
+            _behaviourManager = new BehaviourManager();
+
+            _componentReferences = new ComponentReferences();
 
             _entitiesToRemove = new HashSet<SceneEntity>();
 
@@ -50,6 +57,8 @@ namespace Primary.Scenes.Components
             {
                 foreach (SceneEntity entity in _entitiesToRemove)
                 {
+                    _behaviourManager.DestroyEntity(entity);
+                    _componentReferences.DestroyEntity(entity);
                     EntityDestroyed?.Invoke(entity);
                     entity.Scene.World.Destroy(entity.WrappedEntity);
                 }
@@ -101,7 +110,10 @@ namespace Primary.Scenes.Components
                 {
                     if (connection.Type == ConnectionType.DependsOn || connection.Type == ConnectionType.Connected)
                     {
-                        AddComponentImpl(in entity, connection.Component);
+                        if (connection.Component.IsClass)
+                            AddComponentClassImpl(in entity, connection.Component);
+                        else
+                            AddComponentImpl(in entity, connection.Component);
                         addedNewComponents = true;
                     }
                 }
@@ -116,6 +128,48 @@ namespace Primary.Scenes.Components
             }
 
             return ref comp;
+        }
+
+        private IComponent? AddComponentClassImpl(ref readonly Entity entity, Type type)
+        {
+            ref readonly ComponentRegistryEntry entry = ref _registry.FindComponentEntry(type);
+            if (Unsafe.IsNullRef(in entry))
+            {
+                return null;
+            }
+
+            ref readonly ComponentDependency dependency = ref _dependencyGraph.FindDependencyGraph(type);
+            if (Unsafe.IsNullRef(in dependency))
+            {
+                EngLog.Script.Error("Failed to find dependency graph for component: {c}", type);
+                return null;
+            }
+
+            IComponent? comp = (IComponent?)entity.Get(entry.NativeType);
+            if (comp == null)
+            {
+                comp = entry.AddClassImpl(in entity);
+
+                foreach (ComponentConnection connection in dependency.Connections)
+                {
+                    if (connection.Type == ConnectionType.DependsOn || connection.Type == ConnectionType.Connected)
+                    {
+                        if (connection.Component.IsClass)
+                            AddComponentClassImpl(in entity, connection.Component);
+                        else
+                            AddComponentImpl(in entity, connection.Component);
+                    }
+                }
+
+                if (comp is EntityBehaviour behaviour)
+                    _behaviourManager.SetupBehaviour(entity, behaviour);
+                _callbacks.InvokeAdded(entity, type);
+
+                if (Flags.HasFlag(_events, EntityEvents.EntityComponents))
+                    ComponentAdded?.Invoke(entity, type);
+            }
+
+            return comp;
         }
 
         private bool RemoveComponentImpl(ref readonly Entity entity, Type type)
@@ -147,24 +201,123 @@ namespace Primary.Scenes.Components
                     if (Unsafe.IsNullRef(in entry))
                         continue;
 
-                    dependentEntry.TryGetRefImpl(in entity, out exists);
-                    if (exists)
-                        return false;
+                    if (connection.Component.IsClass)
+                    {
+                        if (entity.Has(dependentEntry.NativeType))
+                            return false;
+                    }
+                    else
+                    {
+                        dependentEntry.TryGetRefImpl(in entity, out exists);
+                        if (exists)
+                            return false;
+                    }
                 }
             }
+
+            entry.RemoveImpl(in entity);
+            _componentReferences.DestroyComponent(entity, Arch.Core.ComponentRegistry.TypeToComponentType[type]);
 
             // TODO: improve so if other components also have this connection dont remove it until they also are
             foreach (ComponentConnection connection in dependency.Connections)
             {
                 if (connection.Type == ConnectionType.Connected)
                 {
-                    if (!RemoveComponentImpl(in entity, connection.Component))
+                    if (connection.Component.IsClass)
                     {
-                        throw new Exception();
+                        if (!RemoveComponentClassImpl(in entity, connection.Component))
+                        {
+                            throw new Exception();
+                        }
+                    }
+                    else
+                    {
+                        if (!RemoveComponentImpl(in entity, connection.Component))
+                        {
+                            throw new Exception();
+                        }
                     }
                 }
             }
 
+            _callbacks.InvokeRemoved(entity, type);
+
+            if (Flags.HasFlag(_events, EntityEvents.EntityComponents))
+                ComponentRemoved?.Invoke(entity, type);
+
+            return true;
+        }
+
+        private bool RemoveComponentClassImpl(ref readonly Entity entity, Type type)
+        {
+            ref readonly ComponentRegistryEntry entry = ref _registry.FindComponentEntry(type);
+            if (Unsafe.IsNullRef(in entry))
+            {
+                return false;
+            }
+
+            IComponent? comp = (IComponent?)entity.Get(entry.NativeType);
+            if (comp == null)
+            {
+                return false;
+            }
+
+            ref readonly ComponentDependency dependency = ref _dependencyGraph.FindDependencyGraph(type);
+            if (Unsafe.IsNullRef(in dependency))
+            {
+                EngLog.Script.Error("Failed to find dependency graph for component: {c}", type);
+                return false;
+            }
+
+            foreach (ComponentConnection connection in dependency.Connections)
+            {
+                if (connection.Type == ConnectionType.DependentOf)
+                {
+                    ref readonly ComponentRegistryEntry dependentEntry = ref _registry.FindComponentEntry(type);
+                    if (Unsafe.IsNullRef(in entry))
+                        continue;
+
+                    if (connection.Component.IsClass)
+                    {
+                        if (entity.Has(dependentEntry.NativeType))
+                            return false;
+                    }
+                    else
+                    {
+                        dependentEntry.TryGetRefImpl(in entity, out bool exists);
+                        if (exists)
+                            return false;
+                    }
+                }
+            }
+
+            entry.RemoveImpl(in entity);
+            _componentReferences.DestroyComponent(entity, Arch.Core.ComponentRegistry.TypeToComponentType[type]);
+
+            // TODO: improve so if other components also have this connection dont remove it until they also are
+            foreach (ComponentConnection connection in dependency.Connections)
+            {
+                if (connection.Type == ConnectionType.Connected)
+                {
+                    if (connection.Component.IsClass)
+                    {
+                        if (!RemoveComponentClassImpl(in entity, connection.Component))
+                        {
+                            throw new Exception();
+                        }
+                    }
+                    else
+                    {
+                        if (!RemoveComponentImpl(in entity, connection.Component))
+                        {
+                            throw new Exception();
+                        }
+                    }
+                }
+            }
+
+            if (comp is EntityBehaviour behaviour)
+                _behaviourManager.DestroyBehaviour(entity, behaviour);
             _callbacks.InvokeRemoved(entity, type);
 
             if (Flags.HasFlag(_events, EntityEvents.EntityComponents))
@@ -213,7 +366,7 @@ namespace Primary.Scenes.Components
         {
             if (!entity.Has(type))
                 AddComponentImpl(in entity, type);
-            entity.Set(type, value);
+            entity.Set((object)value);
 
             return value;
         }
@@ -280,6 +433,9 @@ namespace Primary.Scenes.Components
 
         public ComponentRegistry Registry => _registry;
         public ComponentDependencyGraph DependencyGraph => _dependencyGraph;
+        internal BehaviourManager BehaviourManager => _behaviourManager;
+
+        internal ComponentReferences ComponentReferences => _componentReferences;
 
         public static EntityEvents Events { get => Instance._events; set => Instance._events = value; }
 

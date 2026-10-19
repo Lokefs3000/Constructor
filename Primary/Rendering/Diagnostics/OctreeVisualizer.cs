@@ -1,11 +1,11 @@
 ﻿using Primary.Common;
-using Primary.Rendering.Tree;
 using Primary.Mathematics;
 using System.Numerics;
 using Primary.Scenes;
 using Primary.Components;
 using System.Runtime.CompilerServices;
 using Primary.Timing;
+using Primary.Rendering.Tree;
 
 namespace Primary.Rendering.Diagnostics
 {

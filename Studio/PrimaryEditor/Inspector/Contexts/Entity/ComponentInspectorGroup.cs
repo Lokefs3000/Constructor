@@ -20,7 +20,7 @@ namespace PrimaryEditor.Inspector.Contexts.Entity
 
         internal ComponentInspectorGroup(SceneEntity entity, Type type)
         {
-            _uniqueHash = HashCode.Combine(entity, type);
+            _uniqueHash = type.GetHashCode();
 
             SetupValuesFor<TComponent>();
         }

@@ -39,7 +39,7 @@ namespace VoxelizationDemo.Editor.Tools
         {
             if (_isBusy)
             {
-                if (_gizmo.TryUpdateDrag(out Quaternion delta))
+                if (_gizmo.TryUpdateDrag(EditorManager.Instance.ToolManager.IsSnappingActive ? EditorManager.Instance.ToolManager.SnapAngularScale : 0.0f, out Quaternion delta))
                 {
                     _gizmo.Rotation = delta * _gizmoStartRotation;
 
@@ -161,7 +161,7 @@ namespace VoxelizationDemo.Editor.Tools
 
         public override void TryUseTool()
         {
-            if (_gizmo.TryStartDrag())
+            if (_gizmo.TryStartDrag(EditorManager.Instance.ToolManager.IsSnappingActive ? EditorManager.Instance.ToolManager.SnapAngularScale : 0.0f))
             {
                 _isBusy = true;
                 _gizmoStartOrigin = _gizmo.Origin;

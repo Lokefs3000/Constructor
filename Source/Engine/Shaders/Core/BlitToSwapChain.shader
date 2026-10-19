@@ -29,5 +29,5 @@ static SamplerState ssDefaultLinear : defaultPoint;
 [pixel]
 float4 PixelMain(PsInput input) : SV_Target
 {
-	return txFinalTexture.Sample(ssDefaultLinear, input.UV);
+	return float4(txFinalTexture.Sample(ssDefaultLinear, input.UV).rgb, 1.0);
 }

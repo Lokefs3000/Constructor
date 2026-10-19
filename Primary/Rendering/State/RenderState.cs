@@ -1,18 +1,21 @@
-﻿using CommunityToolkit.HighPerformance;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using CommunityToolkit.HighPerformance;
 using Primary.Assets;
 using Primary.Common;
-using Primary.Common.Memory;
-using Primary.Rendering.Assets;
-using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
+using Primary.Rendering.Assets;
+using Primary.Rendering.Commands;
+using Primary.Rendering.Recording;
 using Primary.RHI;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+using Primary.Rendering.Statistics;
 
 namespace Primary.Rendering.State
 {
     internal unsafe abstract class RenderState : IDisposable
     {
+        private readonly FrameGraph _frameGraph;
+
         private DirtyClassValue<PropertyBlock> _dataBlock;
         private long _lastDataBlockUpdateIndex;
 
@@ -20,13 +23,22 @@ namespace Primary.Rendering.State
         private int _constantsDataSetSize;
         private int _constantsDataSize;
 
+        private nint _resourcesData;
+        private int _resourcesDataSize;
+
         private PropertyChangeFlags _changeFlags;
         private bool _hasConstantsSeparated;
 
+        private List<ActiveResourceData> _activeResources;
+
+        protected bool _couldBarriersHaveChanged;
+
         private bool _disposedValue;
 
-        internal RenderState()
+        internal RenderState(FrameGraph frameGraph)
         {
+            _frameGraph = frameGraph;
+
             _dataBlock = new DirtyClassValue<PropertyBlock>(null);
             _lastDataBlockUpdateIndex = long.MinValue;
 
@@ -34,8 +46,15 @@ namespace Primary.Rendering.State
             _constantsDataSetSize = 0;
             _constantsDataSize = 0;
 
+            _resourcesData = nint.Zero;
+            _resourcesDataSize = 0;
+
             _changeFlags = PropertyChangeFlags.None;
             _hasConstantsSeparated = false;
+
+            _activeResources = new List<ActiveResourceData>();
+
+            _couldBarriersHaveChanged = false;
         }
 
         protected abstract void DisposeInternal(bool disposing);
@@ -49,6 +68,10 @@ namespace Primary.Rendering.State
                 if (_constantsData != nint.Zero)
                     NativeMemory.Free(_constantsData.ToPointer());
                 _constantsData = nint.Zero;
+
+                if (_resourcesData != nint.Zero)
+                    NativeMemory.Free(_resourcesData.ToPointer());
+                _resourcesData = nint.Zero;
 
                 _disposedValue = true;
             }
@@ -68,6 +91,9 @@ namespace Primary.Rendering.State
         internal virtual void ClearState()
         {
             _dataBlock.Clear();
+            _couldBarriersHaveChanged = false;
+
+            _activeResources.Clear();
         }
 
         internal virtual void SoftResetForNextPass()
@@ -100,12 +126,12 @@ namespace Primary.Rendering.State
             _changeFlags |= PropertyChangeFlags.All;
         }
 
-        internal virtual bool CommitState(LinearBlockAllocator allocator, CommandRecorder recorder)
+        internal virtual bool TryCommitState(ref RenderPassStats stats, BarrierGroup barrierGroup, DescriptorAllocator descriptorAllocator, CommandRecorder commandRecorder, ObjectsCache objectsCache)
         {
-            PropertyChangeFlags changeFlags = PropertyChangeFlags.None;
-            bool hasSetResourcesInfo = false;
+            PropertyChangeFlags changeFlags = _changeFlags;
+            bool wantsToCommitNewShaderInput = false;
 
-            if (_dataBlock.Value != null && (_dataBlock.IsDirty || (_dataBlock.Value.IsOutOfDate || _dataBlock.Value.UpdateIndex != _lastDataBlockUpdateIndex)))
+            if (_dataBlock.Value != null && (_dataBlock.IsDirty || _dataBlock.Value.IsOutOfDate || _dataBlock.Value.UpdateIndex != _lastDataBlockUpdateIndex))
             {
                 PropertyBlock block = _dataBlock.Value!;
 
@@ -115,204 +141,272 @@ namespace Primary.Rendering.State
                         return false;
                 }
                 if (_dataBlock.IsDirty)
+                {
                     _lastDataBlockUpdateIndex = long.MinValue;
+                }
+
+                int blockSize = block.HeaderFlags.HasFlags(ShHeaderFlags.ExternalProperties) ? 0 : block.BlockSize;
+                int resourceDataSize = blockSize + block.ResourceCount * sizeof(uint);
 
                 if (block.UpdateIndex != _lastDataBlockUpdateIndex)
                 {
-                    recorder.AddCommand(RecCommandType.SetResourcesInfo, new CmdSetResourcesInfo
+                    if (_resourcesDataSize < resourceDataSize)
                     {
-                        HeaderFlags = block.Shader?.HeaderFlags ?? ShHeaderFlags.None,
-                        ConstantsSize = _constantsDataSize,
-                        DataSizeRequired = block.ResourceCount * sizeof(uint) + block.BlockSize + (_hasConstantsSeparated ? 0 : _constantsDataSize)
-                    });
+                        if (_resourcesData != nint.Zero)
+                            NativeMemory.Free(_resourcesData.ToPointer());
 
-                    hasSetResourcesInfo = true;
+                        _resourcesData = (nint)NativeMemory.Alloc((nuint)resourceDataSize);
+                        _resourcesDataSize = resourceDataSize;
+                    }
                 }
+
+                // if (block.UpdateIndex != _lastDataBlockUpdateIndex)
+                // {
+                //     recorder.AddCommand(RecCommandType.SetResourcesInfo, new CmdSetResourcesInfo
+                //     {
+                //         HeaderFlags = block.Shader?.HeaderFlags ?? ShHeaderFlags.None,
+                //         ConstantsSize = _constantsDataSize,
+                //         DataSizeRequired = block.ResourceCount * sizeof(uint) + blockSize + (_hasConstantsSeparated ? 0 : _constantsDataSize)
+                //     });
+                // 
+                //     hasSetResourcesInfo = true;
+                // }
 
                 _lastDataBlockUpdateIndex = block.UpdateIndex;
                 changeFlags |= PropertyChangeFlags.Block;
 
-                if (block.BlockSize > 0)
+                if (blockSize > 0)
                 {
-                    nint blockPointer = allocator.Allocate(block.BlockSize);
-                    block.CopyBlockDataTo(blockPointer);
-
-                    recorder.AddCommand(RecCommandType.SetRawData, new CmdSetRawData
-                    {
-                        DataOffset = _hasConstantsSeparated ? 0 : _constantsDataSize,
-                        DataSize = block.BlockSize,
-                        DataPointer = blockPointer
-                    });
+                    Span<byte> span = new Span<byte>(_resourcesData.ToPointer(), blockSize);
+                    block.CopyBlockDataTo(span);
                 }
+
+                _activeResources.Clear();
 
                 IShaderResourceSource? resourceSource = block.Shader;
                 if (resourceSource != null)
                 {
                     //TODO: Add validation to ensure a non read write resource gets bound to a read write property
 
-                    int dataBaseOffset = block.BlockSize + (_hasConstantsSeparated ? 0 : _constantsDataSize);
+                    int dataBaseOffset = blockSize;
+
+                    Span<uint> resourceDataSpan = new Span<uint>((_resourcesData + dataBaseOffset).ToPointer(), block.ResourceCount);
+                    int resourceDataIndex = 0;
 
                     ShaderGlobalsManager globalsManager = ShaderGlobalsManager.Instance;
-                    foreach (ref readonly ShaderProperty property in resourceSource.Properties)
+
+                    ReadOnlySpan<ShaderProperty> properties = resourceSource.Properties;
+                    for (int i = 0; i < properties.Length; ++i)
                     {
+                        ref readonly ShaderProperty property = ref properties[i];
+
                         if (property.Type == ShPropertyType.Texture || property.Type == ShPropertyType.Buffer || property.Type == ShPropertyType.Sampler)
                         {
-                            PropertyData data = default;
-                            if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
+                            PropertyData data = block.GetPropertyValue(property.IndexOrByteOffset);
+                            if (property.Type != ShPropertyType.Sampler && data.FGResource.IsNull && data.ObjResource == null)
                             {
-                                data = block.GetPropertyValue(property.IndexOrByteOffset);
-
+                                globalsManager.TryGetPropertyValue(property.Name, out data);
+                            }
+                            else
+                            {
                                 if (data.ParentIndex != ushort.MaxValue)
                                 {
-                                    if (data.Aux == null && property.Type == ShPropertyType.Sampler)
+                                    if (data.ObjResource == null && property.Type == ShPropertyType.Sampler)
                                     {
                                         ref readonly PropertyData parentData = ref block.GetPropertyValue(data.ParentIndex);
-                                        if (parentData.Aux is TextureAsset asset)
+                                        if (parentData.ObjResource is TextureAsset asset)
                                         {
-                                            data = new PropertyData(data.ParentIndex, FGResource.Invalid, asset.RawRHISampler);
+                                            data = new PropertyData(data.ParentIndex, ResourceHandle.Null, asset.RawRHISampler);
                                         }
                                     }
                                 }
                             }
-                            else if (!globalsManager.TryGetPropertyValue(property.Name, out data))
+
+                            ResourceHandle resource = data.FGResource;
+                            RHISampler? sampler = Engine.GlobalSingleton.RenderingManager.DefaultSampler;
+
+                            if (resource.IsNull)
                             {
-                                recorder.AddCommand(RecCommandType.SetResource, new CmdSetResource
+                                switch (property.Type)
                                 {
-                                    Stages = property.Stages,
-                                    Flags = property.Flags,
-
-                                    DataOffset = dataBaseOffset,
-                                    Resource = property.Type switch
-                                    {
-                                        ShPropertyType.Buffer => CmdDataResource.NullBuffer,
-                                        ShPropertyType.Texture => CmdDataResource.NullTexture,
-                                        ShPropertyType.Sampler => CmdDataResource.NullSampler,
-                                        _ => throw new NotSupportedException()
-                                    },
-
-                                    Intent = PropertyBindIntent.Default
-                                });
-
-                                dataBaseOffset += 4;
-                                continue;
-                            }
-
-                            CmdDataResource resource = default;
-
-                            switch (property.Type)
-                            {
-                                case ShPropertyType.Buffer:
-                                    {
-                                        if (data.Resource.IsNull)
-                                            resource = CmdDataResource.NullBuffer;
-                                        else
-                                            resource = data.Resource.AsBuffer();
-
-                                        break;
-                                    }
-                                case ShPropertyType.Texture:
-                                    {
-                                        if (data.Aux != null)
+                                    case ShPropertyType.Buffer:
                                         {
-                                            TextureAsset asset = Unsafe.As<TextureAsset>(data.Aux);
-                                            resource = new CmdDataResource(CmdResourceType.Texture, true, asset.RawRHITexture == null ? nint.Zero : (nint)asset.RawRHITexture.GetAsNative());
+                                            if (data.ObjResource != null)
+                                            {
+                                                resource = _frameGraph.ImportBufferAsPure((RHIBuffer)data.ObjResource);
+                                            }
+
+                                            break;
                                         }
-                                        else
+                                    case ShPropertyType.Texture:
                                         {
-                                            if (data.Resource.IsNull)
-                                                resource = CmdDataResource.NullTexture;
-                                            else
-                                                resource = data.Resource.AsTexture();
+                                            if (data.ObjResource != null)
+                                            {
+                                                if (data.ObjResource is TextureAsset texture)
+                                                {
+                                                    if (texture.IsLoaded && texture.RawRHITexture != null)
+                                                    {
+                                                        resource = _frameGraph.ImportTextureAsPure(texture.RawRHITexture!);
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    resource = _frameGraph.ImportTextureAsPure((RHITexture)data.ObjResource);
+                                                }
+                                            }
+
+                                            break;
                                         }
+                                    case ShPropertyType.Sampler:
+                                        {
+                                            if (data.ObjResource != null)
+                                            {
+                                                sampler = (RHISampler)data.ObjResource;
+                                            }
 
-                                        break;
-                                    }
-                                case ShPropertyType.Sampler:
-                                    {
-                                        if (data.Aux != null)
-                                            resource = Unsafe.As<RHISampler>(data.Aux);
-                                        else
-                                            resource = CmdDataResource.NullSampler;
-
-                                        break;
-                                    }
+                                            break;
+                                        }
+                                }
                             }
 
                             if (resource.IsNull)
                             {
-                                if (property.Type == ShPropertyType.Texture)
+                                if (property.Type == ShPropertyType.Buffer)
+                                {
+                                    // No fallback exists for buffers
+                                    return false;
+                                }
+                                else if (property.Type == ShPropertyType.Texture)
                                 {
                                     switch (property.Default)
                                     {
                                         case ShPropertyDefault.NumOne:
                                         case ShPropertyDefault.NumIdentity:
-                                        case ShPropertyDefault.TexWhite: resource = new CmdDataResource(CmdResourceType.Texture, true, (nint)AssetManager.Static.DefaultWhite.RawRHITexture!.GetAsNative()); break;
+                                        case ShPropertyDefault.TexWhite: resource = _frameGraph.ImportTextureAsPure(AssetManager.Static.DefaultWhite.RawRHITexture!); break;
                                         case ShPropertyDefault.NumZero:
-                                        case ShPropertyDefault.TexBlack: resource = new CmdDataResource(CmdResourceType.Texture, true, (nint)AssetManager.Static.DefaultBlack.RawRHITexture!.GetAsNative()); break;
-                                        case ShPropertyDefault.TexNormal: resource = new CmdDataResource(CmdResourceType.Texture, true, (nint)AssetManager.Static.DefaultNormal.RawRHITexture!.GetAsNative()); break;
-                                        case ShPropertyDefault.TexMask: resource = new CmdDataResource(CmdResourceType.Texture, true, (nint)AssetManager.Static.DefaultMask.RawRHITexture!.GetAsNative()); break;
+                                        case ShPropertyDefault.TexBlack: resource = _frameGraph.ImportTextureAsPure(AssetManager.Static.DefaultBlack.RawRHITexture!); break;
+                                        case ShPropertyDefault.TexNormal: resource = _frameGraph.ImportTextureAsPure(AssetManager.Static.DefaultNormal.RawRHITexture!); break;
+                                        case ShPropertyDefault.TexMask: resource = _frameGraph.ImportTextureAsPure(AssetManager.Static.DefaultMask.RawRHITexture!); break;
                                     }
-                                }
-                                else if (property.Type == ShPropertyType.Sampler)
-                                {
-                                    resource = new CmdDataResource(CmdResourceType.Sampler, true, nint.Zero);
                                 }
                             }
 
-                            recorder.AddResourceToSet(data.Resource);
-                            recorder.AddCommand(RecCommandType.SetResource, new CmdSetResource
+                            if (property.Type == ShPropertyType.Sampler)
                             {
-                                Stages = property.Stages,
-                                Flags = property.Flags,
+                                resourceDataSpan[resourceDataIndex++] = (uint)descriptorAllocator.GetDescriptorForSampler(sampler).GPULocalIndex;
+                            }
+                            else
+                            {
+                                DescriptorHeapType heapType;
+                                if (property.Flags.HasFlags(ShPropertyFlags.ReadWrite))
+                                {
+                                    heapType = DescriptorHeapType.UnorderedAccessView;
+                                }
+                                else
+                                {
+                                    heapType = DescriptorHeapType.ShaderResourceView;
 
-                                DataOffset = dataBaseOffset,
-                                Resource = resource,
+                                    if (resource.ResourceType == FGResourceType.Buffer)
+                                    {
+                                        if (resource.IsImported)
+                                        {
+                                            RHIBuffer buffer = _frameGraph.ResourceManager.GetRHIResource(resource.AsBuffer());
+                                            ref readonly RHIBufferDescription bufferDesc = ref buffer.Description;
 
-                                Intent = data.Intent
-                            });
+                                            if (bufferDesc.Usage.HasFlags(RHIResourceUsage.ConstantBuffer))
+                                                heapType = DescriptorHeapType.ConstantBufferView;
+                                        }
+                                        else
+                                        {
+                                            ref readonly FGBufferDesc bufferDesc = ref _frameGraph.ResourceManager.GetDescription(resource.AsBuffer());
 
-                            dataBaseOffset += 4;
+                                            if (bufferDesc.Target.HasFlags(FGBufferTarget.Constant))
+                                                heapType = DescriptorHeapType.ConstantBufferView;
+                                        }
+                                    }
+                                }
+
+                                resourceDataSpan[resourceDataIndex++] = (uint)descriptorAllocator.GetDescriptorForResourceViewGPU(heapType, resource, out bool updateDescriptorHeaps).GPULocalIndex;
+
+                                if (updateDescriptorHeaps)
+                                {
+                                    descriptorAllocator.RecordDescriptorSets(commandRecorder);
+
+                                    _activeResources.Clear();
+                                    resourceDataIndex = 0;
+                                    i = -1;
+
+                                    continue;
+                                }
+
+                                ResourceBarrierSync sync = property.Stages switch
+                                {
+                                    ShPropertyStages.None => ResourceBarrierSync.None,
+                                    ShPropertyStages.VertexShading => ResourceBarrierSync.VertexShading,
+                                    ShPropertyStages.PixelShading => ResourceBarrierSync.PixelShading,
+                                    ShPropertyStages.ComputeShading => ResourceBarrierSync.ComputeShading,
+                                    ShPropertyStages.AllShading => ResourceBarrierSync.AllShading,
+
+                                    _ => throw new NotSupportedException()
+                                };
+
+                                ResourceBarrierAccess access = property.Flags.HasFlags(ShPropertyFlags.ReadWrite) ? ResourceBarrierAccess.UnorderedAccess : ResourceBarrierAccess.ShaderResource;
+                                barrierGroup.RequestBarrier(resource, commandRecorder.CommandOffset, sync, access);
+
+                                _activeResources.Add(new ActiveResourceData(resource, sync, access));
+                            }
                         }
                     }
                 }
 
+                commandRecorder.RecordCommand(CmdCommandType.SetResourcesData, new CmdSetResourcesData
+                {
+                    ResourcesByteOffset = (ushort)(_hasConstantsSeparated ? 0 : _constantsDataSize),
+                    ResourcesDataSize = (ushort)resourceDataSize,
+                    DescriptorsByteOffset = (ushort)blockSize,
+                    UseDedicatedBuffer = _hasConstantsSeparated
+                });
+
+                commandRecorder.RecordCommandData(new Span<byte>(_resourcesData.ToPointer(), resourceDataSize));
+
+                wantsToCommitNewShaderInput = true;
+
                 _dataBlock.IsDirty = false;
             }
-            else
+            else if (_couldBarriersHaveChanged)
             {
-                recorder.AddCommand(RecCommandType.SetResourcesInfo, new CmdSetResourcesInfo
+                foreach (ActiveResourceData resourceData in _activeResources)
                 {
-                    HeaderFlags = _hasConstantsSeparated ? ShHeaderFlags.HeaderIsBuffer : ShHeaderFlags.None,
-                    ConstantsSize = _constantsDataSize,
-                    DataSizeRequired = _hasConstantsSeparated ? 0 : _constantsDataSize
-                });
+                    barrierGroup.RequestBarrier(resourceData.Handle, commandRecorder.CommandOffset, resourceData.Sync, resourceData.Access);
+                }
             }
 
-            if (Flags.HasFlag(_changeFlags, PropertyChangeFlags.Constants) && _constantsDataSetSize > 0)
+            if (_changeFlags.HasFlags(PropertyChangeFlags.Constants) && _constantsDataSetSize > 0)
             {
-                nint dataPtr = allocator.Allocate(_constantsDataSize);
-                NativeMemory.Copy(_constantsData.ToPointer(), dataPtr.ToPointer(), (nuint)_constantsDataSize);
-
-#if DEBUG
-                Span<uint> debugView = new Span<uint>(dataPtr.ToPointer(), _constantsDataSize / Unsafe.SizeOf<uint>());
-#endif
-
-                recorder.AddCommand(RecCommandType.SetConstants, new CmdSetConstants
+                int setSizeClamped = Math.Min(_constantsDataSize, _constantsDataSetSize);
+                if (setSizeClamped > 0)
                 {
-                    DataOffset = 0,
-                    DataSize = _constantsDataSize,
-                    DataPointer = dataPtr
-                });
+                    commandRecorder.RecordCommand(CmdCommandType.SetConstantsData, new CmdSetConstantsData
+                    {
+                        ConstantsDataSize = (ushort)_constantsDataSetSize
+                    });
 
-                changeFlags |= PropertyChangeFlags.Constants;
+                    commandRecorder.RecordCommandData(new Span<byte>(_constantsData.ToPointer(), _constantsDataSetSize));
+                    wantsToCommitNewShaderInput = true;
+                }
             }
 
-            if (changeFlags > 0)
+            if (wantsToCommitNewShaderInput)
             {
-                recorder.AddBlankCommand(RecCommandType.CommitResources);
+                commandRecorder.RecordCommand(CmdCommandType.CommitShaderInput);
             }
+
+            if (_couldBarriersHaveChanged)
+                ++stats.BarrierRefreshes;
 
             _changeFlags = PropertyChangeFlags.None;
+            _couldBarriersHaveChanged = false;
+
             return true;
         }
 
@@ -333,7 +427,13 @@ namespace Primary.Rendering.State
             _changeFlags |= PropertyChangeFlags.Constants;
         }
 
-        private readonly record struct PropertyResourceData(FGResource Resource, ShPropertyStages Stages, ShPropertyFlags Flags);
+        internal void NotifyOfPossibleBarrierChange()
+        {
+            _couldBarriersHaveChanged = true;
+        }
+
+        private readonly record struct PropertyResourceData(ResourceHandle Resource, ShPropertyStages Stages, ShPropertyFlags Flags);
+        private readonly record struct ActiveResourceData(ResourceHandle Handle, ResourceBarrierSync Sync, ResourceBarrierAccess Access);
 
         private enum PropertyChangeFlags : byte
         {

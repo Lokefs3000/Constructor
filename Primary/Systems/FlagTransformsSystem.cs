@@ -20,7 +20,7 @@ namespace Primary.Systems
             SceneEntityManager.EntityParentChange += OnEntityParentChanged;
         }
 
-        public void Dispose()
+        public readonly void Dispose()
         {
             SceneEntityManager.EntityParentChange -= OnEntityParentChanged;
         }

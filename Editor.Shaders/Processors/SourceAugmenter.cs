@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Editor.Shaders.Attributes;
 using Editor.Shaders.Data;
+using Primary.Collections;
 using Primary.Common;
 using System;
 using System.Diagnostics;
@@ -253,6 +254,9 @@ namespace Editor.Shaders.Processors
 
                 foreach (ref readonly RawVariableData varData in span)
                 {
+                    if (varData.Usage == RawVariableUsage.Property && varData.Type == RawVariableDataType.Property && !_data.GeneratePropertiesInHeader)
+                        continue;
+
                     if (!usedReferences.Contains(varData.AsReferenceIndex()))
                     {
                         if (varData.Usage == RawVariableUsage.Constants)
@@ -440,24 +444,28 @@ namespace Editor.Shaders.Processors
                 vars.Clear();
 
                 ReadOnlySpan<char> interestingPortion = @string.AsSpan().Slice(function.BodyRange.Start + additionalOffset, function.BodyRange.End - function.BodyRange.Start);
-                SearchForVariables(_data, span, interestingPortion);
+                SearchForVariables(_data, span, interestingPortion, false);
 
                 if (_data.PropertySourceTemplate != null)
                 {
                     if (Array.Exists(function.Attributes, (x) => x.Signature is AttributePixel))
                     {
+                        int byteOffset = 0;
+
                         sb2.Clear();
                         foreach (ref readonly RawVariableData varData in span)
                         {
                             if (varData.Type == RawVariableDataType.Property)
                             {
-                                string template = ResolvePropertyTemplate(_data.PropertySourceTemplate, in varData, in function);
-                                SearchForVariables(_data, span, template);
+                                string template = ResolvePropertyTemplate(_data.PropertySourceTemplate, in varData, in function, byteOffset);
+                                SearchForVariables(_data, span, template, true);
 
                                 sb2.Append(varData.Name);
                                 sb2.Append(" = ");
                                 sb2.Append(template);
                                 sb2.Append(';');
+
+                                byteOffset += _data.CalculateSize(varData.Generic);
                             }
                         }
                     }
@@ -537,7 +545,7 @@ namespace Editor.Shaders.Processors
 
             return @string;
 
-            void SearchForVariables(ShaderData data, Span<RawVariableData> span, ReadOnlySpan<char> interestingPortion)
+            void SearchForVariables(ShaderData data, Span<RawVariableData> span, ReadOnlySpan<char> interestingPortion, bool addAsReference)
             {
                 for (int i = 0; i < interestingPortion.Length;)
                 {
@@ -547,7 +555,10 @@ namespace Editor.Shaders.Processors
                     if (char.IsLetter(c))
                     {
                         while (char.IsLetterOrDigit(interestingPortion[i]) || interestingPortion[i] == '_')
-                            ++i;
+                        {
+                            if (++i >= interestingPortion.Length)
+                                return;
+                        }
 
                         ReadOnlySpan<char> identifier = interestingPortion.Slice(start, i - start);
 
@@ -577,6 +588,8 @@ namespace Editor.Shaders.Processors
                                 if (rvd.Type == RawVariableDataType.Resource && rvd.Index == index.Index)
                                 {
                                     vars.Add((int)index.Data, rvd);
+                                    if (addAsReference)
+                                        usedReferences.Add(rvd.AsReferenceIndex());
                                     eventuallyFound = true;
                                     break;
                                 }
@@ -672,9 +685,15 @@ namespace Editor.Shaders.Processors
                 }
 
                 if (usage == RawVariableUsage.Property)
+                {
+                    if (!_data.GeneratePropertiesInHeader)
+                        continue;
                     variableDatas[offset++] = new RawVariableData(RawVariableDataType.Property, usage, propId++, resource.Name, bindGroup, resource.Value);
+                }
                 else
+                {
                     variableDatas[offset++] = new RawVariableData(RawVariableDataType.Resource, usage, resId++, resource.Name, bindGroup, resource.Value);
+                }
             }
 
             foreach (ref readonly PropertyData property in _data.Properties)
@@ -752,15 +771,102 @@ namespace Editor.Shaders.Processors
         private HashSet<ReferenceIndex> CreateReferenceIndexSet(int primaryFunctionIndex)
         {
             HashSet<ReferenceIndex> indices = new HashSet<ReferenceIndex>();
+            HashSet<ReferenceIndex> entrypointIndices = new HashSet<ReferenceIndex>();
+
+            ReadOnlySpan<PropertyData> properties = _data.Properties;
+            for (int i = 0; i < properties.Length; ++i)
+            {
+                indices.Add(new ReferenceIndex(ReferenceType.Property, i));
+                entrypointIndices.Add(new ReferenceIndex(ReferenceType.Property, i));
+            }
+
+            if (_data.PropertySourceTemplate != null)
+            {
+                SearchForVariables(_data, _data.PropertySourceTemplate);
+            }
 
             if (primaryFunctionIndex == -1)
             {
-                foreach (ref readonly FunctionData function in _data.Functions)
+                foreach (ref FunctionData function in _data.Functions)
                 {
                     foreach (AttributeData attribute in function.Attributes)
                     {
                         if (attribute.Signature is AttributeVertex or AttributePixel)
                         {
+                            if (entrypointIndices.Count > 0)
+                            {
+                                FunctionIncludeData includeData = function.IncludeData;
+
+                                HashSet<ReferenceIndex> copyIndices = [.. entrypointIndices];
+                                foreach (ReferenceIndex index in includeData.Indices)
+                                {
+                                    copyIndices.Remove(index);
+                                }
+
+                                if (copyIndices.Count > 0)
+                                {
+                                    ReferenceIndex[] newArray = new ReferenceIndex[includeData.Indices.Length + copyIndices.Count];
+
+                                    IndexRange functionRange = default;
+                                    IndexRange resourceRange = default;
+                                    IndexRange propertyRange = default;
+
+                                    int currentOffset = 0;
+                                    {
+                                        functionRange.Start = currentOffset;
+
+                                        includeData.UsedFunctionIndices.CopyTo(newArray.AsSpan(currentOffset));
+                                        currentOffset += includeData.UsedFunctionIndices.Length;
+
+                                        foreach (ReferenceIndex index in copyIndices)
+                                        {
+                                            if (index.Type == ReferenceType.Function)
+                                            {
+                                                newArray[currentOffset++] = index;
+                                            }
+                                        }
+
+                                        functionRange.End = currentOffset;
+                                    }
+
+                                    {
+                                        resourceRange.Start = currentOffset;
+
+                                        includeData.UsedResourceIndices.CopyTo(newArray.AsSpan(currentOffset));
+                                        currentOffset += includeData.UsedResourceIndices.Length;
+
+                                        foreach (ReferenceIndex index in copyIndices)
+                                        {
+                                            if (index.Type == ReferenceType.Resource)
+                                            {
+                                                newArray[currentOffset++] = index;
+                                            }
+                                        }
+
+                                        resourceRange.End = currentOffset;
+                                    }
+
+                                    {
+                                        propertyRange.Start = currentOffset;
+
+                                        includeData.UsedPropertyIndices.CopyTo(newArray.AsSpan(currentOffset));
+                                        currentOffset += includeData.UsedPropertyIndices.Length;
+
+                                        foreach (ReferenceIndex index in copyIndices)
+                                        {
+                                            if (index.Type == ReferenceType.Property)
+                                            {
+                                                newArray[currentOffset++] = index;
+                                            }
+                                        }
+
+                                        propertyRange.End = currentOffset;
+                                    }
+
+                                    function.IncludeData = new FunctionIncludeData(newArray, functionRange, resourceRange, propertyRange);
+                                }
+                            }
+
                             RecursiveIncludeTravel(_data, function.IncludeData);
                             break;
                         }
@@ -769,7 +875,8 @@ namespace Editor.Shaders.Processors
             }
             else
             {
-                RecursiveIncludeTravel(_data, _data.Functions[primaryFunctionIndex].IncludeData);
+                ref FunctionData function = ref _data.Functions[primaryFunctionIndex];
+                RecursiveIncludeTravel(_data, function.IncludeData);
             }
 
             return indices;
@@ -790,9 +897,84 @@ namespace Editor.Shaders.Processors
                     }
                 }
             }
+
+            void SearchForVariables(ShaderData data, ReadOnlySpan<char> interestingPortion)
+            {
+                for (int i = 0; i < interestingPortion.Length;)
+                {
+                    int start = i;
+                    char c = interestingPortion[i++];
+
+                    if (char.IsLetter(c))
+                    {
+                        while (char.IsLetterOrDigit(interestingPortion[i]) || interestingPortion[i] == '_')
+                        {
+                            if (++i >= interestingPortion.Length)
+                                return;
+                        }
+
+                        ReadOnlySpan<char> identifier = interestingPortion.Slice(start, i - start);
+
+                        bool found = false;
+
+                        start = i;
+                        while (char.IsWhiteSpace(interestingPortion[i]))
+                        {
+                            if (++i >= interestingPortion.Length)
+                                break;
+
+                            if (interestingPortion[i] == '/')
+                            {
+                                MoveUntilOutOfComment(interestingPortion, ref i);
+                            }
+                        }
+
+                        if (i < interestingPortion.Length)
+                            found = interestingPortion[i] == '=';
+
+                        if (!found && data.TryFindReference(identifier.ToString(), out ReferenceIndex index) && index.Type == ReferenceType.Resource)
+                        {
+                            indices.Add(index);
+                            entrypointIndices.Add(index);
+                        }
+                    }
+                }
+
+                static void MoveUntilOutOfComment(ReadOnlySpan<char> source, ref int index)
+                {
+                    int followingIndex = index + 1;
+                    if (followingIndex >= source.Length)
+                        return;
+
+                    char nextChar = source[followingIndex];
+                    if (nextChar == '/')
+                    {
+                        index = followingIndex;
+                        do
+                        {
+                            index++;
+                        } while (index < source.Length && source[index] != '\n');
+                    }
+                    else if (nextChar == '*')
+                    {
+                        index = followingIndex;
+                        do
+                        {
+                            if (source[index] == '*')
+                            {
+                                followingIndex = index + 1;
+                                if (followingIndex < source.Length && source[followingIndex] == '/')
+                                    break;
+                            }
+
+                            index++;
+                        } while (index < source.Length);
+                    }
+                }
+            }
         }
 
-        private string ResolvePropertyTemplate(string template, ref readonly RawVariableData varData, ref readonly FunctionData function)
+        private string ResolvePropertyTemplate(string template, ref readonly RawVariableData varData, ref readonly FunctionData function, int byteOffset)
         {
             //TODO: improve this with "PooledStringBuilder" in append mode
 
@@ -830,6 +1012,11 @@ namespace Editor.Shaders.Processors
                 {
                     copy = copy.Remove(index, subsection.Length + 2);
                     copy = copy.Insert(index, varData.Name);
+                }
+                else if (subsection.Equals("BYTEOFFSET", StringComparison.OrdinalIgnoreCase))
+                {
+                    copy = copy.Remove(index, subsection.Length + 2);
+                    copy = copy.Insert(index, byteOffset.ToString());
                 }
             }
 
@@ -985,6 +1172,7 @@ namespace Editor.Shaders.Processors
             Resource,
         }
 
+        [Flags]
         private enum HeaderFeatures : byte
         {
             None = 0,

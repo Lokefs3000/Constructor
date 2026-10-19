@@ -8,7 +8,7 @@ namespace Primary.Scenes
     public sealed class Scene : IDisposable
     {
         private readonly int _id;
-        private readonly string _name;
+        private string _name;
 
         private readonly World _world;
         private readonly Components.SceneEntityManager _entityManager;
@@ -66,6 +66,6 @@ namespace Primary.Scenes
 
         internal World World => _world;
 
-        public string Name => _name;
+        public string Name { get => _name; set => _name = value; }
     }
 }

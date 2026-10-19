@@ -1,0 +1,33 @@
+﻿using Primary.Assets;
+using Primary.Rendering.Ancient.Resources;
+using Primary.RHI;
+
+namespace Primary.Rendering.Ancient.Assets
+{
+    public readonly record struct ROPropertyBlock
+    {
+        private readonly PropertyBlock? _block;
+
+        public ROPropertyBlock(PropertyBlock? block)
+        {
+            _block = block;
+        }
+
+        public FGBuffer GetFrameGraphBuffer(string id) => _block?.GetFrameGraphBuffer(id) ?? FGBuffer.Invalid;
+        public RHIBuffer? GetRHIBuffer(string id) => _block?.GetRHIBuffer(id);
+        public FGTexture GetFrameGraphTexture(string id) => _block?.GetFrameGraphTexture(id) ?? FGTexture.Invalid;
+        public RHITexture? GetRHITexture(string id) => _block?.GetRHITexture(id);
+        public TextureAsset? GetTextureAsset(string id) => _block?.GetTextureAsset(id);
+
+        public void CopyBlockDataTo(nint nativePtr) => _block?.CopyBlockDataTo(nativePtr);
+
+        public IShaderResourceSource? Shader => _block?.Shader;
+        public int BlockSize => _block?.BlockSize ?? 0;
+
+        public bool IsNull => _block == null;
+
+        internal PropertyBlock? InternalBlock => _block;
+
+        public static implicit operator ROPropertyBlock(PropertyBlock? block) => new ROPropertyBlock(block);
+    }
+}

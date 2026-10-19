@@ -7,11 +7,10 @@ using Primary.Assets;
 using Primary.Collections;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
-using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
+using Primary.Rendering.Commands;
 using VoxelizationDemo.Core;
 using VoxelizationDemo.Editor.Gizmo;
 
@@ -28,12 +27,12 @@ namespace VoxelizationDemo.Editor.Rendering
             _gizmoHandlesBlock = _gizmoHandlesShader.CreatePropertyBlock();
         }
 
-        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
+        public void SetupPasses(FrameGraphBuilder frameGraph)
         {
             if (!_gizmoHandlesShader.IsLoaded)
                 return;
 
-            RenderCameraData cameraData = context.Get<RenderCameraData>()!;
+            RenderCameraData cameraData = frameGraph.GetContext<RenderCameraData>();
 
             InteractionGizmoManager gizmoManager = VoxelRuntime.Instance.EditorManager.InteractionGizmoManager;
 
@@ -50,23 +49,25 @@ namespace VoxelizationDemo.Editor.Rendering
                 return;
             }
 
-            using (RasterPassDescription desc = renderPass.SetupRasterPass("InteractionGizmos", out PassData passData))
+            using (RasterPassBuilder desc = frameGraph.AddRasterPass("InteractionGizmos", out PassData passData))
             {
                 passData.OutColor = cameraData.ColorTexture;
 
                 passData.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)(Unsafe.SizeOf<InteractionGizmoVertex>() * vertices.Count),
+                    Name = "VertexBuffer",
+                    ElementCount = vertices.Count,
                     Stride = Unsafe.SizeOf<InteractionGizmoVertex>(),
-                    Usage = FGBufferUsage.VertexBuffer
-                }, "VertexBuffer");
+                    Target = FGBufferTarget.VertexInput
+                });
 
                 passData.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)(Unsafe.SizeOf<ushort>() * indices.Count),
+                    Name = "IndexBuffer",
+                    ElementCount = indices.Count,
                     Stride = Unsafe.SizeOf<ushort>(),
-                    Usage = FGBufferUsage.IndexBuffer
-                }, "VertexBuffer");
+                    Target = FGBufferTarget.IndexInput
+                });
 
                 passData.Shader = _gizmoHandlesShader;
                 passData.Block = _gizmoHandlesBlock;
@@ -75,27 +76,28 @@ namespace VoxelizationDemo.Editor.Rendering
                 passData.Indices = indices;
                 passData.Draws = draws;
 
-                desc.UseResource(FGResourceUsage.ReadWrite, passData.VertexBuffer);
-                desc.UseResource(FGResourceUsage.ReadWrite, passData.IndexBuffer);
+                desc.ReadWrite(passData.VertexBuffer);
+                desc.ReadWrite(passData.IndexBuffer);
 
-                desc.UseRenderTarget(passData.OutColor);
+                desc.Write(passData.OutColor);
 
-                desc.SetRenderFunction<PassData>(PassFunction);
+                desc.SetFunction(PassFunction);
             }
         }
 
-        private static void PassFunction(RasterPassContext context, PassData passData)
+        private static void PassFunction(RasterPassContext context)
         {
+            PassData passData = context.GetPassData<PassData>()!;
             RasterCommandBuffer cmd = context.CommandBuffer;
 
-            RenderCameraData cameraData = context.Container.Get<RenderCameraData>()!;
+            RenderCameraData cameraData = context.GetContext<RenderCameraData>()!;
 
-            cmd.Upload(passData.VertexBuffer, passData.Vertices.AsSpan());
-            cmd.Upload(passData.IndexBuffer, passData.Indices.AsSpan());
+            cmd.UploadBuffer(passData.VertexBuffer, 0, passData.Vertices.AsSpan());
+            cmd.UploadBuffer(passData.IndexBuffer, 0, passData.Indices.AsSpan());
 
             cmd.SetRenderTarget(0, passData.OutColor);
 
-            cmd.SetPipeline(passData.Shader!);
+            cmd.SetShader(passData.Shader!);
             cmd.SetProperties(passData.Block!);
 
             cmd.SetVertexBuffer(passData.VertexBuffer);
@@ -104,16 +106,16 @@ namespace VoxelizationDemo.Editor.Rendering
             foreach (InteractionGizmoDraw draw in passData.Draws)
             {
                 cmd.SetConstants(draw.Model);
-                cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc((uint)draw.IndexCount, StartIndexLocation: (uint)draw.IndexOffset, BaseVertexLocation: draw.BaseVertex));
+                cmd.DrawIndexedInstanced((uint)draw.IndexCount, 1, (uint)draw.IndexOffset, draw.BaseVertex, 0);
             }
         }
 
         private sealed class PassData : IPassData
         {
-            public FGTexture OutColor;
+            public TextureHandle OutColor;
 
-            public FGBuffer VertexBuffer;
-            public FGBuffer IndexBuffer;
+            public BufferHandle VertexBuffer;
+            public BufferHandle IndexBuffer;
 
             public ShaderAsset? Shader;
             public PropertyBlock? Block;
@@ -124,10 +126,10 @@ namespace VoxelizationDemo.Editor.Rendering
 
             public void Clear()
             {
-                OutColor = FGTexture.Invalid;
+                OutColor = TextureHandle.Null;
 
-                VertexBuffer = FGBuffer.Invalid;
-                IndexBuffer = FGBuffer.Invalid;
+                VertexBuffer = BufferHandle.Null;
+                IndexBuffer = BufferHandle.Null;
 
                 Shader = null;
                 Block = null;

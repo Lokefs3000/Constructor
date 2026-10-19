@@ -64,7 +64,7 @@ namespace Primary.Serialization.Toml
                     guid = fileId.Guid;
                 }
 
-                return new AssetId((FileId)guid, 0);
+                return new AssetId((FileId)guid);
             }
             else
             {

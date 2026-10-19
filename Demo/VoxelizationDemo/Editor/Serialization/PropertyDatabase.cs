@@ -32,7 +32,7 @@ namespace VoxelizationDemo.Editor.Serialization
             // TODO: Implement predefined property providers from fx. source generators
             provider ??= new ReflectionPropertyProvider(type);
 
-            Dictionary<byte[], ValueSource> propertySources = new Dictionary<byte[], ValueSource>();
+            Dictionary<Utf8TableKey, ValueSource> propertySources = new Dictionary<Utf8TableKey, ValueSource>();
 
             SerializationBag bag = provider.Properties;
             foreach (SerializationProperty property in bag.Properties)

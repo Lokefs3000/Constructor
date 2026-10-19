@@ -34,12 +34,12 @@ namespace Primary.Mathematics
             this = Unsafe.ReadUnaligned<Boundaries>(ref Unsafe.As<Vector128<float>, byte>(ref vector));
         }
 
-        public bool IsWithin(Vector2 point)
+        public readonly bool IsWithin(Vector2 point)
         {
             return Vector128.GreaterThanOrEqualAll(Vector128.Create(point.X, point.Y, Maximum.X, Maximum.Y), Vector128.Create(Minimum.X, Minimum.Y, point.X, point.Y));
         }
 
-        public bool IsIntersecting(Boundaries boundaries)
+        public readonly bool IsIntersecting(Boundaries boundaries)
         {
             Vector128<float> a = Vector128.Xor(AsVector128(), Vector128.Create(0.0f, 0.0f, -0.0f, -0.0f));
             Vector128<float> b = Vector128.Xor(boundaries.AsVector128(), Vector128.Create(-0.0f, -0.0f, 0.0f, 0.0f));
@@ -49,26 +49,26 @@ namespace Primary.Mathematics
             return Vector128.LessThanAll(a, b);
         }
 
-        public bool Equals(Boundaries other)
+        public readonly bool Equals(Boundaries other)
         {
             return Vector128.EqualsAll(AsVector128(), other.AsVector128());
         }
 
-        public override int GetHashCode()
+        public readonly override int GetHashCode()
         {
             return Minimum.GetHashCode() ^ Maximum.GetHashCode();
         }
 
-        public string ToString([StringSyntax(StringSyntaxAttribute.NumericFormat)] string? format, IFormatProvider? formatProvider)
+        public readonly string ToString([StringSyntax(StringSyntaxAttribute.NumericFormat)] string? format, IFormatProvider? formatProvider)
         {
             return $"{{Minimum:{Minimum.ToString(format, formatProvider)} Maximum:{Maximum.ToString(format, formatProvider)}}}";
         }
 
-        public override string ToString() => ToString("G", CultureInfo.CurrentCulture);
-        public string ToString([StringSyntax(StringSyntaxAttribute.NumericFormat)] string? format) => ToString(format, CultureInfo.CurrentCulture);
+        public readonly override string ToString() => ToString("G", CultureInfo.CurrentCulture);
+        public readonly string ToString([StringSyntax(StringSyntaxAttribute.NumericFormat)] string? format) => ToString(format, CultureInfo.CurrentCulture);
 
-        public Vector4 AsVector4() => new Vector4(Minimum.X, Minimum.Y, Maximum.X, Maximum.Y);
-        public Vector128<float> AsVector128() => Vector128.Create(Minimum.X, Minimum.Y, Maximum.X, Maximum.Y);
+        public readonly Vector4 AsVector4() => new Vector4(Minimum.X, Minimum.Y, Maximum.X, Maximum.Y);
+        public readonly Vector128<float> AsVector128() => Vector128.Create(Minimum.X, Minimum.Y, Maximum.X, Maximum.Y);
 
         public static Boundaries Grow(Boundaries boundaries, Vector2 amount)
         {
@@ -115,8 +115,13 @@ namespace Primary.Mathematics
             return Vector2.Min(Vector2.Max(position, boundaries.Minimum), boundaries.Maximum);
         }
 
-        public Vector2 Size => Maximum - Minimum;
-        public Vector2 Center => Vector2.Lerp(Minimum, Maximum, 0.5f);
+        public static Boundaries FromRect(Vector2 position, Vector2 size)
+        {
+            return new Boundaries(position, position + size);
+        }
+
+        public readonly Vector2 Size => Maximum - Minimum;
+        public readonly Vector2 Center => Vector2.Lerp(Minimum, Maximum, 0.5f);
 
         public static Boundaries operator +(Boundaries left, Vector2 right) => Offset(left, right);
         public static Boundaries operator *(Boundaries left, float right) => new Boundaries(left.AsVector128() * right);

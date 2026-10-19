@@ -46,7 +46,7 @@ namespace VoxelizationDemo.Core
         {
             Window window = _windowManager.CreateWindow("Voxel", new Int2(1600, 900), CreateWindowFlags.Resizable);
 
-            _renderingManager.SetNewRenderPath(new WorldRenderStage());
+            _renderingManager.InstallRenderStage(new WorldRenderStage());
 
             {
                 SceneEntityManager.Instance.RegisterComponent<PointLight>();
@@ -55,8 +55,6 @@ namespace VoxelizationDemo.Core
 
             Scene scene = _sceneManager.CreateScene("Unique", LoadSceneMode.Single);
             _cameraManager.SetupWithinScene(scene);
-
-            _sceneManager.CreateScene("Untitiled", LoadSceneMode.Additive);
 
             _editorManager.Enable();
 

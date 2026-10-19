@@ -3,7 +3,7 @@ using Editor.UI;
 using Editor.UI.Visual;
 using Primary.Profiling;
 using Primary.R2.ForwardPlus;
-using Primary.Rendering;
+using Primary.Rendering.Ancient;
 
 namespace Editor.Rendering
 {

@@ -2,12 +2,14 @@
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Collections;
+using Primary.Common;
 using Primary.Editor;
 using Primary.Rendering.Assets;
 using PrimaryEditor.Inspector.Setup;
@@ -129,6 +131,12 @@ namespace PrimaryEditor.Inspector.Reflection
             typeof(float),
             typeof(double),
             typeof(string),
+
+            typeof(Vector2),
+            typeof(Vector3),
+            typeof(Vector4),
+            typeof(Quaternion),
+            typeof(Color)
         }.ToFrozenSet();
     }
 }

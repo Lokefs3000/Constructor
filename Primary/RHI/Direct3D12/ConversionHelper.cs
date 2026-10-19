@@ -1,10 +1,10 @@
 ﻿using System.Runtime.Versioning;
+using Silk.NET.Core.Native;
 using Silk.NET.Direct3D12;
 using Silk.NET.DXGI;
 
 namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe static class ConversionHelper
     {
         public static Format ToTextureFormat(this RHIFormat format) => format switch
@@ -334,6 +334,15 @@ namespace Primary.RHI.Direct3D12
             RHIPrimitiveTopologyType.Point => PrimitiveTopologyType.Point,
             RHIPrimitiveTopologyType.Patch => PrimitiveTopologyType.Patch,
             _ => PrimitiveTopologyType.Triangle,
+        };
+
+        public static D3DPrimitiveTopology ToD3DTopologyType(this RHIPrimitiveTopologyType primitiveTopologyType) => primitiveTopologyType switch
+        {
+            RHIPrimitiveTopologyType.Triangle => D3DPrimitiveTopology.D3DPrimitiveTopologyTrianglelist,
+            RHIPrimitiveTopologyType.Line => D3DPrimitiveTopology.D3DPrimitiveTopologyLinelist,
+            RHIPrimitiveTopologyType.Point => D3DPrimitiveTopology.D3DPrimitiveTopologyPointlist,
+            RHIPrimitiveTopologyType.Patch => throw new NotSupportedException(),
+            _ => D3DPrimitiveTopology.D3DPrimitiveTopologyTrianglelist,
         };
 
         public static Blend ToBlend(this RHIBlend blend) => blend switch

@@ -10,7 +10,6 @@ using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
 using VoxelizationDemo.Core;
 using VoxelizationDemo.Editor.Rendering.Icons;
 
@@ -27,7 +26,7 @@ namespace VoxelizationDemo.Editor.Rendering
             _worldIconsBlock = _worldIconsShader.CreatePropertyBlock();
         }
 
-        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
+        public void SetupPasses(FrameGraphBuilder frameGraph)
         {
             WorldIconManager iconManager = VoxelRuntime.Instance.EditorManager.WorldIconManager;
             if (iconManager.TotalIconCount == 0 || !_worldIconsShader.IsLoaded)
@@ -37,16 +36,17 @@ namespace VoxelizationDemo.Editor.Rendering
             if (texture == null)
                 return;
 
-            RenderCameraData cameraData = context.Get<RenderCameraData>()!;
+            RenderCameraData cameraData = frameGraph.GetContext<RenderCameraData>();
 
-            using (RasterPassDescription desc = renderPass.SetupRasterPass("DrawWorldIcons", out PassData passData))
+            using (RasterPassBuilder desc = frameGraph.AddRasterPass("DrawWorldIcons", out PassData passData))
             {
                 passData.IconBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)(Unsafe.SizeOf<WorldIconData>() * iconManager.TotalIconCount),
+                    Name = "IconsBuffer",
+                    ElementCount = iconManager.TotalIconCount,
                     Stride = Unsafe.SizeOf<WorldIconData>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.Structured
-                }, "IconsBuffer");
+                    Target = FGBufferTarget.Structured
+                });
 
                 passData.OutColor = cameraData.ColorTexture;
                 passData.OutDepth = cameraData.DepthTexture;
@@ -57,16 +57,17 @@ namespace VoxelizationDemo.Editor.Rendering
                 passData.IconManager = iconManager;
                 passData.Texture = texture;
 
-                desc.UseResource(FGResourceUsage.ReadWrite, passData.IconBuffer);
-                desc.UseRenderTarget(passData.OutColor);
-                desc.UseDepthStencil(passData.OutDepth);
+                desc.ReadWrite(passData.IconBuffer);
+                desc.Write(passData.OutColor);
+                desc.Read(passData.OutDepth);
 
-                desc.SetRenderFunction<PassData>(PassFunction);
+                desc.SetFunction(PassFunction);
             }
         }
 
-        private static void PassFunction(RasterPassContext context, PassData passData)
+        private static void PassFunction(RasterPassContext context)
         {
+            PassData passData = context.GetPassData<PassData>()!;
             RasterCommandBuffer cmd = context.CommandBuffer;
 
             using (FGMappedSubresource<WorldIconData> mapped = cmd.Map<WorldIconData>(passData.IconBuffer))
@@ -82,12 +83,13 @@ namespace VoxelizationDemo.Editor.Rendering
                 }
             }
 
-            Vector2 scale = Vector2.One / new Vector2(passData.OutColor.Description.Width, passData.OutColor.Description.Height) * 32.0f;
+            ref readonly FGTextureDesc outColorDesc = ref context.GetDescription(passData.OutColor);
+            Vector2 scale = Vector2.One / new Vector2(outColorDesc.Width, outColorDesc.Height) * 32.0f;
 
             cmd.SetRenderTarget(0, passData.OutColor);
             cmd.SetDepthStencil(passData.OutDepth);
 
-            cmd.SetPipeline(passData.Shader!);
+            cmd.SetShader(passData.Shader!);
             cmd.SetProperties(passData.Block!);
 
             cmd.SetConstants(scale);
@@ -95,7 +97,7 @@ namespace VoxelizationDemo.Editor.Rendering
             passData.Block!.SetResource("sbIcons", passData.IconBuffer);
             passData.Block!.SetResource("txIconAtlas", passData.Texture!);
 
-            cmd.DrawInstanced(new FGDrawInstancedDesc(6, (uint)passData.IconManager.TotalIconCount));
+            cmd.DrawInstanced(6, (uint)passData.IconManager.TotalIconCount, 0, 0);
         }
 
         private sealed class PassData : IPassData
@@ -103,10 +105,10 @@ namespace VoxelizationDemo.Editor.Rendering
             public WorldIconManager? IconManager;
             public TextureAsset? Texture;
 
-            public FGTexture OutColor;
-            public FGTexture OutDepth;
+            public TextureHandle OutColor;
+            public TextureHandle OutDepth;
 
-            public FGBuffer IconBuffer;
+            public BufferHandle IconBuffer;
 
             public ShaderAsset? Shader;
             public PropertyBlock? Block;
@@ -115,10 +117,10 @@ namespace VoxelizationDemo.Editor.Rendering
             {
                 IconManager = null;
 
-                OutColor = FGTexture.Invalid;
-                OutDepth = FGTexture.Invalid;
+                OutColor = TextureHandle.Null;
+                OutDepth = TextureHandle.Null;
 
-                IconBuffer = FGBuffer.Invalid;
+                IconBuffer = BufferHandle.Null;
 
                 Shader = null;
                 Block = null;

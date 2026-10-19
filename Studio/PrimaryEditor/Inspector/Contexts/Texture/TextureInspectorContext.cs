@@ -53,5 +53,8 @@ namespace PrimaryEditor.Inspector.Contexts.Texture
             inspectorConfig.TargetAssetId = assetId;
             return inspectorConfig;
         }
+
+        public override event Action<InspectorGroup>? OnGroupAdded;
+        public override event Action<InspectorGroup>? OnGroupRemoved;
     }
 }

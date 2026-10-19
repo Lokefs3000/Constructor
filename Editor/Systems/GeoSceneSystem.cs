@@ -5,7 +5,7 @@ using Editor.Components;
 using Editor.Geometry;
 using Primary.Components;
 using Primary.Profiling;
-using Primary.Rendering.Assets;
+using Primary.Rendering.Ancient.Assets;
 using Primary.Scenes;
 using Primary.Systems;
 using Primary.Threading;

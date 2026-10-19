@@ -425,7 +425,7 @@ namespace VoxelizationDemo.Editor.Gizmo
             return true;
         }
 
-        public bool TryUpdateDrag(out Vector3 delta)
+        public bool TryUpdateDrag(float snapScale, out Vector3 delta)
         {
             CameraManager camera = VoxelRuntime.Instance.CameraManager;
 
@@ -448,6 +448,8 @@ namespace VoxelizationDemo.Editor.Gizmo
                 delta = worldHit - _startWorldHit;
                 _lastWorldHit = worldHit;
 
+                if (snapScale > 0.0f)
+                    delta = Vector3.Round(delta / snapScale) * snapScale;
                 return true;
             }
 

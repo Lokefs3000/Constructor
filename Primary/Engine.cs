@@ -8,13 +8,13 @@ using Primary.Scenes;
 using Primary.Systems;
 using Primary.Threading;
 using Primary.Timing;
-using Primary.Rendering;
 using System.Runtime.CompilerServices;
 using Primary.GUI.ImGui;
 using Primary.Scripting;
 using Primary.Windowing;
 using Primary.Logging;
 using System.Diagnostics;
+using Primary.Rendering;
 
 namespace Primary
 {

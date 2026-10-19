@@ -5,9 +5,15 @@
 		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<FileVersion>1.0.499.0</FileVersion>
+		<FileVersion>1.0.813.0</FileVersion>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	</PropertyGroup>
+
+	<ItemGroup>
+	  <Compile Remove="Source\Content\Editor\**" />
+	  <EmbeddedResource Remove="Source\Content\Editor\**" />
+	  <None Remove="Source\Content\Editor\**" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\Primary\Primary.csproj" />

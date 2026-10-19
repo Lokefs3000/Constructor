@@ -10,14 +10,13 @@ using Primary.Rendering;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
+using Primary.Rendering.Datatypes;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
 using Primary.RHI;
 
 namespace VoxelizationDemo.Editor.Rendering
 {
-    [RenderPassSetup(RunContext = RenderPassRunContext.PerWindow)]
     internal sealed class DearImGuiRenderPass : IRenderPass, IDisposable
     {
         private ShaderAsset _dearImGuiShader;
@@ -52,58 +51,68 @@ namespace VoxelizationDemo.Editor.Rendering
             _primaryTexture = null;
         }
 
-        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
+        public void SetupPasses(FrameGraphBuilder frameGraph)
         {
             if (!_dearImGuiShader.IsLoaded)
                 return;
 
-            RenderWindowData windowData = context.Get<RenderWindowData>()!;
+            RenderWindowData windowData = frameGraph.GetContext<RenderWindowData>();
             ImDrawDataPtr drawData = ImGui.GetDrawData();
 
             if (!drawData.Valid || drawData.TotalVtxCount <= 0 || drawData.TotalIdxCount <= 0 || !windowData.Window.IsPrimary)
                 return;
 
-            using (RasterPassDescription desc = renderPass.SetupRasterPass("DearImGui", out PassData passData))
+            using (RasterPassBuilder desc = frameGraph.AddRasterPass("DearImGui", out PassData passData))
             {
                 passData.OutColor = windowData.ColorTexture;
 
                 passData.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)(drawData.TotalVtxCount * Unsafe.SizeOf<ImDrawVert>()),
+                    Name = "DearImGui-Vtx",
+                    ElementCount = drawData.TotalVtxCount,
                     Stride = Unsafe.SizeOf<ImDrawVert>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.VertexBuffer
-                }, "DearImGui-Vtx");
+                    Target = FGBufferTarget.VertexInput
+                });
                 passData.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)(drawData.TotalIdxCount * Unsafe.SizeOf<ushort>()),
+                    Name = "DearImGui-Idx",
+                    ElementCount = drawData.TotalIdxCount,
                     Stride = Unsafe.SizeOf<ushort>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.IndexBuffer
-                }, "DearImGui-Idx");
+                    Target = FGBufferTarget.IndexInput
+                });
 
                 passData.VertexData = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)Unsafe.SizeOf<Matrix4x4>(),
+                    Name = "DearImGui-Cb",
+                    ElementCount = 1,
                     Stride = Unsafe.SizeOf<Matrix4x4>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.ConstantBuffer
-                }, "DearImGui-Cb");
+                    Target = FGBufferTarget.Constant
+                });
 
                 passData.Shader = _dearImGuiShader;
                 passData.Block = _propertyBlock;
 
-                passData.ActiveTextures = _activeTextures;
+                foreach (var (key, texture) in _activeTextures)
+                {
+                    passData.ActiveTextures.Add(key, desc.ImportTexture(texture));
+                }
 
-                desc.UseResource(FGResourceUsage.ReadWrite, passData.VertexBuffer);
-                desc.UseResource(FGResourceUsage.ReadWrite, passData.IndexBuffer);
-                desc.UseResource(FGResourceUsage.ReadWrite, passData.VertexData);
+                passData.SourceActiveTextures = _activeTextures;
 
-                desc.UseRenderTarget(passData.OutColor);
-                desc.SetRenderFunction<PassData>(RenderFunction);
+                desc.ReadWrite(passData.VertexBuffer);
+                desc.ReadWrite(passData.IndexBuffer);
+                desc.ReadWrite(passData.VertexData);
+
+                desc.Write(passData.OutColor);
+                desc.SetFunction(RenderFunction);
             }
         }
 
-        private static unsafe void RenderFunction(RasterPassContext context, PassData passData)
+        private static unsafe void RenderFunction(RasterPassContext context)
         {
+            PassData passData = context.GetPassData<PassData>()!;
             RasterCommandBuffer cmd = context.CommandBuffer;
+
             ImDrawDataPtr drawData = ImGui.GetDrawData();
 
             {
@@ -144,7 +153,7 @@ namespace VoxelizationDemo.Editor.Rendering
                     0.0f, 0.0f, 0.5f, 0.0f,
                     (R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f);
 
-                cmd.Upload(passData.VertexData, mm);
+                cmd.UploadBuffer(passData.VertexData, 0, mm);
             }
 
             cmd.SetRenderTarget(0, passData.OutColor);
@@ -152,7 +161,7 @@ namespace VoxelizationDemo.Editor.Rendering
             cmd.SetVertexBuffer(passData.VertexBuffer);
             cmd.SetIndexBuffer(passData.IndexBuffer);
 
-            cmd.SetPipeline(passData.Shader!);
+            cmd.SetShader(passData.Shader!);
 
             passData.Block!.SetResource("cbVertex", passData.VertexData);
 
@@ -198,7 +207,7 @@ namespace VoxelizationDemo.Editor.Rendering
                     cmd.SetScissor(0, new FGRect((int)draw.ClipRect.X, (int)draw.ClipRect.Y, (int)draw.ClipRect.Z, (int)draw.ClipRect.W));
                     cmd.SetProperties(passData.Block!);
 
-                    cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc(draw.ElemCount, 1, (uint)(draw.IdxOffset + idxOffset), (int)(draw.VtxOffset + vtxOffset)));
+                    cmd.DrawIndexedInstanced(draw.ElemCount, 1, (uint)(draw.IdxOffset + idxOffset), (int)(draw.VtxOffset + vtxOffset), 0);
                 }
 
                 vtxOffset += list.VtxBuffer.Size;
@@ -240,7 +249,7 @@ namespace VoxelizationDemo.Editor.Rendering
 
                                 RHITextureNative* native = texture.GetAsNative();
 
-                                passData.ActiveTextures!.Add((nint)native, texture);
+                                passData.SourceActiveTextures!.Add((nint)native, texture);
 
                                 textureData.SetTexID(native);
                                 textureData.SetStatus(ImTextureStatus.Ok);
@@ -257,7 +266,7 @@ namespace VoxelizationDemo.Editor.Rendering
                         else if (textureData.Status == ImTextureStatus.WantUpdates)
                         {
                             RHITextureNative* native = (RHITextureNative*)textureData.BackendUserData;
-                            RHITexture texture = passData.ActiveTextures![(nint)native];
+                            TextureHandle texture = passData.ActiveTextures![(nint)native];
 
                             ImTextureRect updateRect = textureData.UpdateRect;
 
@@ -273,7 +282,7 @@ namespace VoxelizationDemo.Editor.Rendering
                                 }
                             }
 
-                            cmd.Upload(new FGTextureUploadDesc(texture, new FGBox(updateRect.X, updateRect.Y, 0, updateRect.W, updateRect.H, 1), 0, paddedRowSlice), memory);
+                            cmd.UploadTexture(texture, 0, new FGBox(updateRect.X, updateRect.Y, 0, updateRect.X + updateRect.W, updateRect.Y + updateRect.H, 1), memory);
 
                             textureData.SetStatus(ImTextureStatus.Ok);
                         }
@@ -283,7 +292,7 @@ namespace VoxelizationDemo.Editor.Rendering
                                 continue;
 
                             RHITextureNative* native = (RHITextureNative*)textureData.BackendUserData;
-                            RHITexture texture = passData.ActiveTextures![(nint)native];
+                            RHITexture texture = passData.SourceActiveTextures![(nint)native];
 
                             texture?.Dispose();
 
@@ -298,31 +307,38 @@ namespace VoxelizationDemo.Editor.Rendering
 
         private class PassData : IPassData
         {
-            public FGTexture OutColor;
+            public TextureHandle OutColor;
 
-            public FGBuffer VertexBuffer;
-            public FGBuffer IndexBuffer;
+            public BufferHandle VertexBuffer;
+            public BufferHandle IndexBuffer;
 
-            public FGBuffer VertexData;
+            public BufferHandle VertexData;
 
             public ShaderAsset? Shader;
             public PropertyBlock? Block;
 
-            public Dictionary<nint, RHITexture>? ActiveTextures;
+            public Dictionary<nint, RHITexture>? SourceActiveTextures;
+            public Dictionary<nint, TextureHandle> ActiveTextures;
+
+            public PassData()
+            {
+                ActiveTextures = new Dictionary<nint, TextureHandle>();
+            }
 
             public void Clear()
             {
-                OutColor = FGTexture.Invalid;
+                OutColor = TextureHandle.Null;
 
-                VertexBuffer = FGBuffer.Invalid;
-                IndexBuffer = FGBuffer.Invalid;
+                VertexBuffer = BufferHandle.Null;
+                IndexBuffer = BufferHandle.Null;
 
-                VertexData = FGBuffer.Invalid;
+                VertexData = BufferHandle.Null;
 
                 Shader = null;
                 Block = null;
 
-                ActiveTextures = null;
+                SourceActiveTextures = null;
+                ActiveTextures.Clear();
             }
         }
     }

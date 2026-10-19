@@ -120,7 +120,7 @@ namespace Primary.Memory.Native
 
         public void Dispose()
         {
-            if (!_isDisposed)
+            if (!_isDisposed && _scope != null)
             {
                 _scope.PopScope();
                 _isDisposed = false;

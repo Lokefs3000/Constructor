@@ -1,8 +1,9 @@
-﻿using Microsoft.Extensions.ObjectPool;
+﻿using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.ObjectPool;
 using Primary.Profiling;
 using Serilog;
-using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
+using TerraFX.Interop.Windows;
 
 namespace Primary.Threading
 {
@@ -13,12 +14,16 @@ namespace Primary.Threading
         private ObjectPool<TaskCompletionSource> _tcsPool;
         private ConcurrentQueue<PendingTask> _pendingTasks;
 
+        private int _mainThreadId;
+
         internal ThreadHelper()
         {
             s_instance.Target = this;
 
             _tcsPool = ObjectPool.Create<TaskCompletionSource>();
             _pendingTasks = new ConcurrentQueue<PendingTask>();
+
+            _mainThreadId = Environment.CurrentManagedThreadId;
         }
 
         /// <remarks>Not thread-safe</remarks>
@@ -64,6 +69,8 @@ namespace Primary.Threading
 
             return task.TCS.Task;
         }
+
+        public static int MainThreadId => Unsafe.As<ThreadHelper>(s_instance.Target)!._mainThreadId;
 
         private record struct PendingTask(TaskCompletionSource TCS, Action Action);
     }

@@ -79,6 +79,11 @@
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
   </Folder>
+  <Folder Name="/Engine/Native/">
+    <Project Path="Native/PhysXInterop/PhysXInterop.vcxproj" Id="1cf2eb97-8e86-4756-8e18-3a0abf11fc3e">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
   <Folder Name="/Extra/">
     <Project Path="D:/source/repos/Constructor/Extra/BundleExplorer/BundleExplorer.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
@@ -95,6 +100,11 @@
   </Folder>
   <Folder Name="/SourceGenerators/">
     <Project Path="D:/source/repos/Constructor/Primary.SourceGenerator/Primary.SourceGenerator.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Testing/">
+    <Project Path="Testing/NewShaderProcessor/NewShaderProcessor.csproj" Id="4aa19abb-1857-44ff-82d8-d1af6531d0db">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
   </Folder>

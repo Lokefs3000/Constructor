@@ -12,10 +12,17 @@ namespace VoxelizationDemo.Editor.Serialization.Converters
     {
         public override void DeserializeToProperty(ref Utf8JsonReader reader, ValueSource valueSource, object boxed)
         {
-            AssetId id = s_assetIdJsonConverter.Read(ref reader, valueSource.TargetType, JsonSerializerOptions.Default);
-            if (!id.IsInvalid)
+            if (reader.TokenType == JsonTokenType.Null)
             {
-                valueSource.Set(boxed, (IAssetDefinition?)AssetManager.LoadAsset(valueSource.TargetType, id));
+                valueSource.Set(boxed, (IAssetDefinition?)null);
+            }
+            else
+            {
+                AssetId id = s_assetIdJsonConverter.Read(ref reader, valueSource.TargetType, JsonSerializerOptions.Default);
+                if (!id.IsInvalid)
+                {
+                    valueSource.Set(boxed, (IAssetDefinition?)AssetManager.LoadAsset(valueSource.TargetType, id));
+                }
             }
         }
 

@@ -17,6 +17,8 @@ namespace Primary
         internal static readonly ILogger Thread = Create("Thread");
         internal static readonly ILogger Core = Create("Core");
 
+        internal static void ThrowFatal() => throw new FatalException();
+
         private static ILogger Create(string prefix)
         {
             return new LoggerConfiguration()
@@ -27,5 +29,9 @@ namespace Primary
 #endif
                 .CreateLogger();
         }
+    }
+
+    public sealed class FatalException : Exception
+    {
     }
 }

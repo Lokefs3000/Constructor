@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Primary.Collections.ReadOnly;
 using Primary.Scenes;
@@ -56,6 +57,9 @@ namespace VoxelizationDemo.Editor
         {
             _sceneSourcePaths[scene] = localPath;
         }
+
+        internal bool TryGetScenePath(Scene scene, [NotNullWhen(true)] out string? localPath)
+            => _sceneSourcePaths.TryGetValue(scene, out localPath);
 
         public RODictionary<Scene, string> SceneSourcePaths => _sceneSourcePaths;
     }

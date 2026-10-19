@@ -30,6 +30,11 @@ namespace PrimaryEditor.Project
 
         internal void SetupPaths(string projectDir)
         {
+            if (OperatingSystem.IsWindows())
+                projectDir = projectDir.Replace('/', '\\');
+            else
+                projectDir = projectDir.Replace('\\', '/');
+
             _rootFolder = projectDir;
             _contentFolder = Path.Combine(projectDir, "Content");
             _libraryFolder = Path.Combine(projectDir, "Library");

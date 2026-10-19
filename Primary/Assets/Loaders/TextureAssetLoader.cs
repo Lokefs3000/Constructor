@@ -183,7 +183,7 @@ namespace Primary.Assets.Loaders
                     MipLODBias = samplerInfo.MipLODBias,
                     MinLOD = samplerInfo.MinLOD,
                     MaxLOD = samplerInfo.MaxLOD,
-                    MaxAnisotropy = samplerInfo.MaxAnisotropy == 0 ? 16 : (uint)samplerInfo.MaxAnisotropy,
+                    MaxAnisotropy = samplerInfo.MaxAnisotropy == 0 ? 1 : (uint)samplerInfo.MaxAnisotropy,
                 }, sourcePath);
 
                 Debug.Assert(rhiTexture != null && rhiSampler != null);

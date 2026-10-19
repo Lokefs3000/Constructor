@@ -16,6 +16,12 @@ namespace PrimaryEditor.Inspector.Views
             _displayName = sourceData.Display ?? sourceData.Name;
         }
 
+        internal ViewField(ref ViewTypeResolver typeResolver, string typeName, string? displayName, float paddingValue, float indentOffset) : base(paddingValue, indentOffset)
+        {
+            _fieldSource = typeResolver.ResolveSource(typeName);
+            _displayName = displayName ?? typeName;
+        }
+
         public ViewSource FieldSource => _fieldSource;
         public string DisplayName => _displayName;
     }

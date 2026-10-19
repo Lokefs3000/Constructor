@@ -5,5 +5,5 @@ index_stride_mode = 0
 uv_channels = 255
 [[sub_assets]]
 asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
-local_id = 602007619
+local_id = 1879813304
 name = "Capsule"

@@ -227,7 +227,8 @@ namespace PrimaryEditor.Assets
                                 {
                                     try
                                     {
-                                        shouldTryImport = !importerData.Importer.ValidateFile(this, dataConfig.Id, importedPath);
+                                        shouldTryImport = !_filesystemManager.Exists(importedPath);
+                                        shouldTryImport = shouldTryImport || !importerData.Importer.ValidateFile(this, dataConfig.Id, importedPath);
 
                                         if (shouldTryImport && _printDetailedAssetInfo)
                                         {
@@ -613,6 +614,15 @@ namespace PrimaryEditor.Assets
                                         }
 
                                     case FileEventType.Moved:
+                                        {
+                                            if (fileEvent.NewLocalFilePath != null && FilesystemManager.TryGetFullPath(fileEvent.NewLocalFilePath, out string? fullPath))
+                                            {
+                                                if (!File.Exists(fullPath))
+                                                    break;
+                                            }
+
+                                            goto case FileEventType.Renamed;
+                                        }
                                     case FileEventType.Renamed:
                                         {
                                             if (fileEvent.NewLocalFilePath != null)
@@ -659,7 +669,7 @@ namespace PrimaryEditor.Assets
                 {
                     foreach (string localPath in createdFiles)
                     {
-                        if (!localPath.EndsWith(".assetdat") && FilesystemManager.TryGetFullPath(localPath + ".assetdat", out string? newFullPath))
+                        if (!localPath.EndsWith(".assetdat") && FilesystemManager.TryGetFullPath(localPath, out string? newFullPath))
                         {
                             if (TryCreateAssetDataFor(localPath, out AssetDataConfig? dataConfig, out bool exists))
                             {
@@ -677,6 +687,9 @@ namespace PrimaryEditor.Assets
                                 }
                                 else if (_importerRegistry.TryGetImporterForPath(localPath, out _))
                                 {
+                                    FileId id = _assetRegistry.SetupFileWithinRegistry(localPath, null);
+                                    _physicalFileRegistry.StoreFileData(id, newFullPath, newFullPath + ".assetdat");
+
                                     changedFiles.Add(localPath);
                                 }
                             }
@@ -738,6 +751,9 @@ namespace PrimaryEditor.Assets
             if (FilesystemManager.TryFindFilesystemFor(directory.LocalPath, out BaseFilesystem? filesystem) &&
                 filesystem.TryGetFullPath(directory.LocalPath, out string? fullPath))
             {
+                if (!Directory.Exists(directory.LocalPath))
+                    return;
+
                 if (_printDetailedAssetInfo)
                     EdLog.Assets.Information("Discovering files for structure in directory '{dir}'", directory.LocalPath);
 
@@ -1022,7 +1038,7 @@ namespace PrimaryEditor.Assets
                 return false;
             }
 
-            string assetDataPath = Path.Combine(fullPath);
+            string assetDataPath = Path.Combine(fullPath) + ".assetdat";
             string newAssetDataPath = newFullPath + ".assetdat";
 
             if (_assetRegistry.TryLookupIdForPath(oldLocalPath, out FileId id) && FileUtility.TryMove(assetDataPath, newAssetDataPath))
@@ -1270,13 +1286,16 @@ namespace PrimaryEditor.Assets
         {
             ReloadAsset(id);
 
-            // foreach ((_, int localId, _) in context.SubAssets)
-            // {
-            //     ReloadAsset(id.WithLocalId(localId));
-            // }
+            foreach ((_, int localId, _) in context.SubAssets)
+            {
+                ReloadAsset(id.WithLocalId(localId));
+            }
 
             if (!_assetRegistry.TryGetAssetPathForId(id, out string? localPath))
-                return;
+            {
+                localPath = GetLibraryImportPathFor(id);
+                _assetRegistry.UpdateAssetPath(id, localPath);
+            }
 
             if (!_importedAssets.TryGetValue(id, out AssetImportData importData) || importData.ImporterId != importerData.Importer.UniqueId || !importData.IsImported || importData.IsSkippedOnImport)
             {

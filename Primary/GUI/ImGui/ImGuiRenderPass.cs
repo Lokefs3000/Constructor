@@ -6,9 +6,7 @@ using Primary.Rendering;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
-using Primary.Rendering.Recording;
-using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
+using Primary.Rendering.Datatypes;
 using Primary.RHI;
 using Primary.Windowing;
 using System;
@@ -20,7 +18,6 @@ using System.Text;
 
 namespace Primary.GUI.ImGui
 {
-    [RenderPassSetup(RunContext = RenderPassRunContext.PerWindow)]
     public sealed class ImGuiRenderPass : IRenderPass, IDisposable
     {
         private ShaderAsset _baseShader;
@@ -37,12 +34,12 @@ namespace Primary.GUI.ImGui
             _basePropertyBlock.Dispose();
         }
 
-        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
+        public void SetupPasses(FrameGraphBuilder frameGraph)
         {
             ImGuiContext? imgui = IMGUI.CurrentContext;
             if (imgui != null && !imgui.DrawLists.IsEmpty)
             {
-                RenderWindowData windowData = context.Get<RenderWindowData>()!;
+                RenderWindowData windowData = frameGraph.GetContext<RenderWindowData>();
                 if (!windowData.Window.IsPrimary)
                     return;
 
@@ -52,7 +49,7 @@ namespace Primary.GUI.ImGui
                     return;
                 }
 
-                using (RasterPassDescription desc = renderPass.SetupRasterPass("ImGui", out PassData data))
+                using (RasterPassBuilder desc = frameGraph.AddRasterPass("ImGui", out PassData data))
                 {
                     int totalVtxCount = 0;
                     int totalIdxCount = 0;
@@ -72,35 +69,36 @@ namespace Primary.GUI.ImGui
 
                     data.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
                     {
-                        Width = (uint)(Unsafe.SizeOf<ImGuiVertex>() * totalVtxCount),
+                        ElementCount = totalVtxCount,
                         Stride = Unsafe.SizeOf<ImGuiVertex>(),
-                        Usage = FGBufferUsage.VertexBuffer | FGBufferUsage.GenericShader
+                        Target = FGBufferTarget.VertexInput
                     });
                     data.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
                     {
-                        Width = (uint)(Unsafe.SizeOf<ushort>() * totalIdxCount),
+                        ElementCount = totalIdxCount,
                         Stride = Unsafe.SizeOf<ushort>(),
-                        Usage = FGBufferUsage.IndexBuffer | FGBufferUsage.GenericShader
+                        Target = FGBufferTarget.IndexInput
                     });
 
                     data.Shader = _baseShader;
                     data.Properties = _basePropertyBlock;
 
-                    desc.UseRenderTarget(data.OutColor);
-                    desc.UseResource(FGResourceUsage.ReadWrite, data.VertexBuffer);
-                    desc.UseResource(FGResourceUsage.ReadWrite, data.IndexBuffer);
+                    desc.Write(data.OutColor);
+                    desc.ReadWrite(data.VertexBuffer);
+                    desc.ReadWrite(data.IndexBuffer);
 
-                    desc.SetRenderFunction<PassData>(static (x, y) => PassFunction(x, y));
+                    desc.SetFunction(PassFunction);
                 }
             }
         }
 
-        private static void PassFunction(RasterPassContext context, PassData data)
+        private static void PassFunction(RasterPassContext context)
         {
             ImGuiContext imgui = IMGUI.CurrentContext!;
             Window window = WindowManager.Instance.PrimaryWindow!;
 
             RasterCommandBuffer cmd = context.CommandBuffer;
+            PassData data = context.GetPassData<PassData>()!;
 
             imgui.SortDrawLists();
 
@@ -134,7 +132,7 @@ namespace Primary.GUI.ImGui
             cmd.SetVertexBuffer(data.VertexBuffer);
             cmd.SetIndexBuffer(data.IndexBuffer);
 
-            cmd.SetPipeline(data.Shader!);
+            cmd.SetShader(data.Shader!);
             cmd.SetProperties(data.Properties!);
 
             Matrix3x2 matrix = Matrix3x2.Identity;
@@ -175,7 +173,7 @@ namespace Primary.GUI.ImGui
                         lastClipRect = drawCmd.ClipRect;
                     }
 
-                    cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc((uint)indexCount, 1, (uint)(globalIdxOffset + drawCmd.IndexOffset), globalVtxOffset));
+                    cmd.DrawIndexedInstanced((uint)indexCount, 1, (uint)(globalIdxOffset + drawCmd.IndexOffset), globalVtxOffset, 0);
                 }
 
                 globalVtxOffset += drawList.Vertices.Length;
@@ -188,20 +186,20 @@ namespace Primary.GUI.ImGui
 
         private sealed class PassData : IPassData
         {
-            public FGTexture OutColor;
+            public TextureHandle OutColor;
 
-            public FGBuffer VertexBuffer;
-            public FGBuffer IndexBuffer;
+            public BufferHandle VertexBuffer;
+            public BufferHandle IndexBuffer;
 
             public ShaderAsset? Shader;
             public PropertyBlock? Properties;
 
             public void Clear()
             {
-                OutColor = FGTexture.Invalid;
+                OutColor = TextureHandle.Null;
 
-                VertexBuffer = FGBuffer.Invalid;
-                IndexBuffer = FGBuffer.Invalid;
+                VertexBuffer = BufferHandle.Null;
+                IndexBuffer = BufferHandle.Null;
 
                 Shader = null;
                 Properties = null;

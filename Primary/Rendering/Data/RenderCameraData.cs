@@ -1,6 +1,5 @@
 ﻿using Primary.Components;
 using Primary.Mathematics;
-using Primary.Rendering.Resources;
 using Primary.Scenes;
 using System.Numerics;
 
@@ -12,8 +11,8 @@ namespace Primary.Rendering.Data
 
         public WorldTransform Transform { get; private set; }
 
-        public FGTexture ColorTexture { get; internal set; }
-        public FGTexture DepthTexture { get; internal set; }
+        public TextureHandle ColorTexture { get; internal set; }
+        public TextureHandle DepthTexture { get; internal set; }
 
         public Matrix4x4 View { get; private set; }
         public Matrix4x4 Projection { get; private set; }
@@ -26,6 +25,8 @@ namespace Primary.Rendering.Data
 
         public Int2 ClientSize { get; private set; }
 
+        internal RenderOutputData OutputData { get; private set; }
+
         internal RenderCameraData()
         {
 
@@ -34,8 +35,11 @@ namespace Primary.Rendering.Data
         internal void Setup(RenderOutputData outputData)
         {
             CameraEntity = outputData.Entity;
-
+            
             Transform = outputData.Transform;
+
+            ColorTexture = TextureHandle.Null;
+            DepthTexture = TextureHandle.Null;
 
             View = outputData.ProjectionData.ViewMatrix;
             Projection = outputData.ProjectionData.ProjectionMatrix;
@@ -47,6 +51,8 @@ namespace Primary.Rendering.Data
             ZNear = outputData.Camera.NearClip;
 
             ClientSize = outputData.ProjectionData.ClientSize.AsInt2();
+
+            OutputData = outputData;
         }
     }
 }

@@ -43,6 +43,12 @@ namespace PrimaryEditor.Inspector.Views
             _relativeOffset = (new Vector2(sourceData.Indent + indentOffset, sourceData.Padding) * 24.0f).AsInt2();
         }
 
+        internal ViewObject(float paddingValue, float indentOffset)
+        {
+            _conditions = [];
+            _relativeOffset = (new Vector2(indentOffset, paddingValue) * 24.0f).AsInt2();
+        }
+
         public ImmutableArray<ViewCondition> Conditions => _conditions;
         public ViewConditionMode ConditionMode => _conditionMode;
 

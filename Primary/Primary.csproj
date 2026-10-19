@@ -5,7 +5,7 @@
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<Configurations>Debug;Release;ReleaseWithDebug</Configurations>
-		<FileVersion>1.0.493.0</FileVersion>
+		<FileVersion>1.0.700.0</FileVersion>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
 		<DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
@@ -21,6 +21,12 @@
 		<IsAotCompatible>True</IsAotCompatible>
 	</PropertyGroup>
 	<ItemGroup>
+	  <Compile Remove="Rendering\Ancient\**" />
+	  <EmbeddedResource Remove="Rendering\Ancient\**" />
+	  <None Remove="Rendering\Ancient\**" />
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Remove="Components\CRef.Transform.cs" />
 		<Compile Remove="Scenes\SceneEntityManager.cs" />
 	</ItemGroup>
 	<ItemGroup>
@@ -41,6 +47,7 @@
 		<Folder Include="Physics\" />
 	</ItemGroup>
 	<ItemGroup>
+		<None Include="Components\CRef.Transform.cs" />
 		<None Include="Scenes\SceneEntityManager.cs" />
 	</ItemGroup>
 	<ItemGroup>
@@ -49,6 +56,7 @@
 		<PackageReference Include="CommunityToolkit.HighPerformance" Version="8.4.2" />
 		<PackageReference Include="K4os.Compression.LZ4" Version="1.3.8" />
 		<PackageReference Include="K4os.Compression.LZ4.Streams" Version="1.3.8" />
+		<PackageReference Include="NativeCollections" Version="1.7.3" />
 		<PackageReference Include="ppy.SDL3-CS" Version="2026.629.0" />
 		<PackageReference Include="Serilog" Version="4.3.1" />
 		<PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />

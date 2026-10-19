@@ -8,12 +8,16 @@ using System.Runtime.Versioning;
 
 namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe static class ResourceHelper
     {
         public static bool SetResourceName(ref ID3D12Resource2 resource, string? newName) => SetResourceName(ref Unsafe.As<ID3D12Resource2, ID3D12Object>(ref resource), newName);
         public static bool SetResourceName(ref ID3D12RootSignature rootSignature, string? newName) => SetResourceName(ref Unsafe.As<ID3D12RootSignature, ID3D12Object>(ref rootSignature), newName);
         public static bool SetResourceName(ref ID3D12PipelineState pipelineState, string? newName) => SetResourceName(ref Unsafe.As<ID3D12PipelineState, ID3D12Object>(ref pipelineState), newName);
+
+        public static bool SetResourceName(ID3D12Object* resource, string? newName) => SetResourceName(ref Unsafe.AsRef<ID3D12Object>(resource), newName);
+        public static bool SetResourceName(ID3D12Resource2* resource, string? newName) => SetResourceName(ref Unsafe.AsRef<ID3D12Object>(resource), newName);
+        public static bool SetResourceName(ID3D12RootSignature* rootSignature, string? newName) => SetResourceName(ref Unsafe.AsRef<ID3D12Object>(rootSignature), newName);
+        public static bool SetResourceName(ID3D12PipelineState* pipelineState, string? newName) => SetResourceName(ref Unsafe.AsRef<ID3D12Object>(pipelineState), newName);
 
         public static bool SetResourceName(ref ID3D12Object resource, string? newName)
         {
@@ -85,5 +89,7 @@ namespace Primary.RHI.Direct3D12
 
         public static int Align(int value, int alignment) => value + (-value & (alignment - 1));
         public static long Align(long value, long alignment) => value + (-value & (alignment - 1));
+
+        public static readonly uint DefaultShader4ComponentMapping = EncodeShader4ComponentMapping(0, 1, 2, 3);
     }
 }

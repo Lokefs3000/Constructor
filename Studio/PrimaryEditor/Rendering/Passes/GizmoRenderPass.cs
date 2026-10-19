@@ -2,11 +2,10 @@
 using Primary.Mathematics;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
-using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
+using Primary.Rendering.Commands;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -16,8 +15,7 @@ using TerraFX.Interop.Windows;
 
 namespace PrimaryEditor.Rendering.Passes
 {
-    [RenderPassSetup(RunContext = RenderPassRunContext.PerWindow)]
-    internal sealed class GizmoRenderPass : IRenderPass
+    internal sealed class GizmoRenderPass
     {
         private ShaderAsset? _lineShader;
         private ShaderAsset? _triangleShader;
@@ -38,197 +36,6 @@ namespace PrimaryEditor.Rendering.Passes
             _block = _lineShader.CreatePropertyBlock();
         }
 
-        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
-        {
-            Gizmos gizmos = Gizmos.Instance;
-            ScreenGizmos screenGizmos = ScreenGizmos.Instance;
-
-            int vtxSize = screenGizmos.Vertices.Length * Unsafe.SizeOf<ScreenGizmoVertex>() + gizmos.Vertices.Length * Unsafe.SizeOf<GizmoVertex>();
-            int idxSize = screenGizmos.Indices.Length * Unsafe.SizeOf<ushort>() + gizmos.Indices.Length * Unsafe.SizeOf<uint>();
-
-            if (vtxSize > 0 && idxSize > 0)
-            {
-                RenderWindowData windowData = context.Get<RenderWindowData>()!;
-
-                using (RasterPassDescription desc = renderPass.SetupRasterPass("Gizmos", out PassData data))
-                {
-                    data.GlobalBuffer = desc.CreateBuffer(new FGBufferDesc
-                    {
-                        Width = (uint)Unsafe.SizeOf<Matrix4x4>(),
-                        Usage = FGBufferUsage.ConstantBuffer
-                    }, "GizmoGlobals");
-
-                    data.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
-                    {
-                        Width = (uint)vtxSize,
-                        Stride = 0,
-                        Usage = FGBufferUsage.VertexBuffer
-                    }, "GizmoVertices");
-
-                    data.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
-                    {
-                        Width = (uint)idxSize,
-                        Stride = 0,
-                        Usage = FGBufferUsage.IndexBuffer
-                    }, "GizmoIndices");
-
-                    data.OutColor = windowData.ColorTexture;
-
-                    data.LineShader = _lineShader;
-                    data.TriangleShader = _triangleShader;
-
-                    data.ScreenLineShader = _screenLineShader;
-                    data.ScreenTriangleShader = _screenTriangleShader;
-
-                    data.Block = _block;
-
-                    desc.UseResource(FGResourceUsage.Write, data.GlobalBuffer);
-                    desc.UseResource(FGResourceUsage.ReadWrite, data.VertexBuffer);
-                    desc.UseResource(FGResourceUsage.ReadWrite, data.IndexBuffer);
-                    desc.UseRenderTarget(windowData.ColorTexture);
-
-                    desc.SetRenderFunction<PassData>(PassFunction);
-                }
-            }
-        }
-
-        private static void PassFunction(RasterPassContext context, PassData passData)
-        {
-            RenderWindowData windowData = context.Container.Get<RenderWindowData>()!;
-            RasterCommandBuffer cmd = context.CommandBuffer;
-
-            Gizmos gizmos = Gizmos.Instance;
-            ScreenGizmos screenGizmos = ScreenGizmos.Instance;
-
-            passData.Block!.SetResource("cbGlobals", passData.GlobalBuffer);
-
-            int drawStartIdx = 0;
-
-            int vtxDataOffset = 0;
-            int idxDataOffset = 0;
-
-            cmd.SetRenderTarget(0, passData.OutColor);
-
-            cmd.SetProperties(passData.Block);
-
-            // gizmos
-            if (gizmos.HasAnyDrawData)
-            {
-                cmd.Upload(new FGBufferUploadDesc(passData.VertexBuffer, 0), gizmos.Vertices);
-                cmd.Upload(new FGBufferUploadDesc(passData.IndexBuffer, 0), gizmos.Indices);
-
-                cmd.Upload(passData.GlobalBuffer, /*windowData.ViewProjection*/Matrix4x4.Identity);
-
-                cmd.SetVertexBuffer(new FGSetBufferDesc(passData.VertexBuffer, Unsafe.SizeOf<GizmoVertex>()));
-                cmd.SetIndexBuffer(new FGSetBufferDesc(passData.IndexBuffer, Unsafe.SizeOf<uint>()));
-
-                GizmosMode currentMode = GizmosMode.Undefined;
-
-                Span<GizmoSection> sections = gizmos.Sections;
-                for (int i = 0; i < sections.Length; ++i)
-                {
-                    ref GizmoSection currentSection = ref sections[i];
-                    int indexCount = i + 1 < sections.Length ? sections[i + 1].IndexStart - currentSection.IndexStart : gizmos.Indices.Length - currentSection.IndexStart;
-
-                    if (currentSection.Mode != currentMode)
-                    {
-                        cmd.SetPipeline(currentSection.Mode switch
-                        {
-                            GizmosMode.Solid => passData.TriangleShader!,
-                            GizmosMode.Wire => passData.LineShader!,
-                            _ => throw new NotSupportedException()
-                        });
-
-                        currentMode = currentSection.Mode;
-                    }
-
-                    if (indexCount > 0)
-                    {
-                        cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc((uint)indexCount, StartIndexLocation: (uint)drawStartIdx));
-                    }
-                }
-
-                //vtxDataOffset += gizmos.Vertices.Length * Unsafe.SizeOf<GizmoVertex>();
-                //idxDataOffset += gizmos.Indices.Length * Unsafe.SizeOf<ushort>();
-            }
-
-            // screen gizmos
-            if (screenGizmos.HasAnyDrawData)
-            {
-                Matrix3x2 projection =
-                    Matrix3x2.CreateScale(new Vector2(2.0f) / new Int2(windowData.Window.ClientSize.X, -windowData.Window.ClientSize.Y).AsVector2()) *
-                    Matrix3x2.CreateTranslation(-1.0f, 1.0f);
-
-                cmd.Upload(new FGBufferUploadDesc(passData.VertexBuffer, (uint)vtxDataOffset), screenGizmos.Vertices);
-                cmd.Upload(new FGBufferUploadDesc(passData.IndexBuffer, (uint)idxDataOffset), screenGizmos.Indices);
-
-                cmd.Upload(passData.GlobalBuffer, projection);
-
-                cmd.SetVertexBuffer(new FGSetBufferDesc(passData.VertexBuffer, Unsafe.SizeOf<ScreenGizmoVertex>()));
-                cmd.SetIndexBuffer(new FGSetBufferDesc(passData.IndexBuffer, Unsafe.SizeOf<ushort>()));
-
-                ScreenGizmosMode currentMode = ScreenGizmosMode.Undefined;
-                object? currentResource = null;
-
-                Span<ScreenGizmoSection> sections = screenGizmos.Sections;
-                for (int i = 0; i < sections.Length; ++i)
-                {
-                    ref ScreenGizmoSection currentSection = ref sections[i];
-                    int indexCount = i + 1 < sections.Length ? sections[i + 1].IndexStart - currentSection.IndexStart : screenGizmos.Indices.Length - currentSection.IndexStart;
-
-                    if (currentSection.Mode != currentMode)
-                    {
-                        cmd.SetPipeline(currentSection.Mode switch
-                        {
-                            ScreenGizmosMode.Solid => passData.ScreenTriangleShader!,
-                            ScreenGizmosMode.Wire => passData.ScreenLineShader!,
-                            _ => throw new NotSupportedException()
-                        });
-
-                        currentMode = currentSection.Mode;
-                    }
-
-                    if (indexCount > 0)
-                    {
-                        cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc((uint)indexCount, StartIndexLocation: (uint)drawStartIdx));
-                    }
-                }
-            }
-
-            gizmos.ClearDrawData();
-            screenGizmos.ClearDrawData();
-        }
-
-        private class PassData : IPassData
-        {
-            public FGTexture OutColor;
-
-            public FGBuffer GlobalBuffer;
-            public FGBuffer IndexBuffer;
-            public FGBuffer VertexBuffer;
-
-            public ShaderAsset? LineShader;
-            public ShaderAsset? TriangleShader;
-
-            public ShaderAsset? ScreenLineShader;
-            public ShaderAsset? ScreenTriangleShader;
-
-            public PropertyBlock? Block;
-
-            public void Clear()
-            {
-                GlobalBuffer = FGBuffer.Invalid;
-                IndexBuffer = FGBuffer.Invalid;
-                VertexBuffer = FGBuffer.Invalid;
-
-                LineShader = null;
-                TriangleShader = null;
-
-                ScreenLineShader = null;
-                ScreenTriangleShader = null;
-
-                Block = null;
-            }
-        }
+        
     }
 }

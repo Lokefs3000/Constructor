@@ -9,7 +9,7 @@ namespace Primary.Rendering.Data
     {
         public Window Window { get; internal set; }
 
-        public FGTexture ColorTexture { get; internal set; }
+        public TextureHandle ColorTexture { get; internal set; }
 
         internal RenderWindowData()
         {

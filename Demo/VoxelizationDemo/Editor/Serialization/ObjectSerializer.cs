@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using TerraFX.Interop.Windows;
 using VoxelizationDemo.Editor.Serialization.Converters;
 
 namespace VoxelizationDemo.Editor.Serialization
@@ -39,6 +40,26 @@ namespace VoxelizationDemo.Editor.Serialization
                 {
                     AppLog.Editor.Warning("Failed to find property with name '{n}' in object '{t}'", Encoding.UTF8.GetString(propertyInfo.Name), boxed.GetType());
                 }
+            }
+        }
+
+        internal void DeserializeIntoBox(object boxed, ReadOnlySpan<byte> propertyName, ref Utf8JsonReader reader)
+        {
+            PropertyList properties = _manager.PropertyDatabase.QueryProperties(boxed.GetType());
+            if (properties.TryGetSource(propertyName, out ValueSource valueSource))
+            {
+                if (_manager.ConverterDatabase.TryGetConverter(valueSource.TargetType, out ITypeConverter? converter))
+                {
+                    converter.DeserializeToProperty(ref reader, valueSource, boxed);
+                }
+                else
+                {
+                    AppLog.Editor.Warning("Failed to find converter for type '{n}' to deserialize property '{p}'", valueSource.TargetType, Encoding.UTF8.GetString(propertyName));
+                }
+            }
+            else
+            {
+                AppLog.Editor.Warning("Failed to find property with name '{n}' in object '{t}'", Encoding.UTF8.GetString(propertyName), boxed.GetType());
             }
         }
 

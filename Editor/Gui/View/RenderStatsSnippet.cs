@@ -4,7 +4,7 @@ using Editor.UI.Elements;
 using Primary.Profiling;
 using Primary.R2.ForwardPlus;
 using Primary.R2.ForwardPlus.Statistics;
-using Primary.Rendering.Statistics;
+using Primary.Rendering.Ancient.Statistics;
 using Primary.RHI;
 using Primary.Timing;
 using Primary.Utility;

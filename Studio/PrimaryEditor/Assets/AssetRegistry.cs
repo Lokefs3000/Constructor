@@ -79,6 +79,22 @@ namespace PrimaryEditor.Assets
             }
         }
 
+        internal void UpdateAssetPath(string localPath, string? newAssetPath)
+        {
+            if (_assetIdLookupDict.TryGetValue(localPath, out FileId id) && _registeredAssets.TryGetValue(id, out AssetRegistryData registryData))
+            {
+                _registeredAssets[id] = new AssetRegistryData(registryData.LocalPath, newAssetPath);
+            }
+        }
+
+        internal void UpdateAssetPath(FileId id, string? newAssetPath)
+        {
+            if (_registeredAssets.TryGetValue(id, out AssetRegistryData registryData))
+            {
+                _registeredAssets[id] = new AssetRegistryData(registryData.LocalPath, newAssetPath);
+            }
+        }
+
         internal void RemoveAssetFromRegistry(FileId assetId)
         {
             if (_registeredAssets.TryRemove(assetId, out AssetRegistryData registryData))

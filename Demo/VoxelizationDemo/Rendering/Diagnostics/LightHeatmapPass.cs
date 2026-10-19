@@ -9,14 +9,14 @@ using Primary.Common;
 using Primary.Mathematics;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
-using Primary.Rendering.Batching;
-using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
+using Primary.Rendering.Batching;
+using Primary.Rendering.Commands;
 using Primary.RHI;
 using VoxelizationDemo.Rendering.Passes;
+using Primary.Rendering.Datatypes;
 
 namespace VoxelizationDemo.Rendering.Diagnostics
 {
@@ -31,54 +31,56 @@ namespace VoxelizationDemo.Rendering.Diagnostics
             _lightHeatmapBlock = _lightHeatmap.CreatePropertyBlock();
         }
 
-        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
+        public void SetupPasses(FrameGraphBuilder frameGraph)
         {
-            RenderPathBlackboard pathBlackboard = renderPass.Blackboard.Get<RenderPathBlackboard>()!;
+            RenderStageBlackboard pathBlackboard = frameGraph.GetBlackboard<RenderStageBlackboard>()!;
             if (pathBlackboard.RenderList == null || pathBlackboard.LightCollector == null || !_lightHeatmap.IsLoaded)
                 return;
 
-            RenderCameraData cameraData = context.Get<RenderCameraData>()!;
+            RenderCameraData cameraData = frameGraph.GetContext<RenderCameraData>()!;
 
-            using (RasterPassDescription desc = renderPass.SetupRasterPass("LightHeatmap", out PassData passData))
+            using (RasterPassBuilder desc = frameGraph.AddRasterPass("LightHeatmap", out PassData passData))
             {
                 passData.OutColor = cameraData.ColorTexture;
 
                 passData.Shader = _lightHeatmap;
                 passData.Block = _lightHeatmapBlock;
 
-                desc.UseRenderTarget(passData.OutColor);
-                desc.SetRenderFunction<PassData>(PassFunction);
+                desc.Write(passData.OutColor);
+                desc.SetFunction(PassFunction);
             }
         }
 
-        private static void PassFunction(RasterPassContext context, PassData passData)
+        private static void PassFunction(RasterPassContext context)
         {
+            PassData passData = context.GetPassData<PassData>()!;
             RasterCommandBuffer cmd = context.CommandBuffer;
 
-            int outputWidth = passData.OutColor.Description.Width;
-            int outputHeight = passData.OutColor.Description.Height;
+            ref readonly FGTextureDesc outColorDesc = ref context.GetDescription(passData.OutColor);
+            int outputWidth = outColorDesc.Width;
+            int outputHeight = outColorDesc.Height;
 
             cmd.SetRenderTarget(0, passData.OutColor);
             cmd.SetViewport(0, new FGViewport(0, 0, outputWidth, outputHeight));
 
-            cmd.SetPipeline(passData.Shader!);
+            cmd.SetShader(passData.Shader!);
             cmd.SetProperties(passData.Block!);
 
             cmd.SetConstants(new Int2(outputWidth, outputHeight));
 
-            cmd.DrawInstanced(new FGDrawInstancedDesc(3));
+            cmd.DrawInstanced(3, 1, 0, 0);
         }
 
         private sealed class PassData : IPassData
         {
-            public FGTexture OutColor;
+            public TextureHandle OutColor;
 
             public ShaderAsset? Shader;
             public PropertyBlock? Block;
 
             public void Clear()
             {
-                OutColor = FGTexture.Invalid;
+                OutColor = TextureHandle.Null;
 
                 Shader = null;
                 Block = null;

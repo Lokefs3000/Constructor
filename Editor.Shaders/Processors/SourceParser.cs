@@ -1029,27 +1029,27 @@ namespace Editor.Shaders.Processors
                 {
                     case ReferenceType.Function:
                         {
-                            functionRange.End = i;
-                            resourceRange.Start = i;
-                            resourceRange.End = i;
+                            functionRange.End = i + 1;
+                            resourceRange.Start = i + 1;
+                            resourceRange.End = i + 1;
                             break;
                         }
                     case ReferenceType.Resource:
                         {
-                            resourceRange.End = i;
-                            propertyRange.Start = i;
-                            propertyRange.End = i;
+                            resourceRange.End = i + 1;
+                            propertyRange.Start = i + 1;
+                            propertyRange.End = i + 1;
                             break;
                         }
                     case ReferenceType.Property:
                         {
-                            propertyRange.End = i;
+                            propertyRange.End = i + 1;
                             break;
                         }
                 }
             }
 
-            return new FunctionIncludeData(_indicesList.ToArray(), functionRange, resourceRange, propertyRange);
+            return new FunctionIncludeData([.. _indicesList], functionRange, resourceRange, propertyRange);
         }
 
         [UnscopedRef]

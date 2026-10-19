@@ -142,11 +142,11 @@ namespace Editor.Shaders.Data
             }
         }
 
-        public ReadOnlySpan<FunctionData> Functions => _functions.AsSpan();
-        public ReadOnlySpan<ResourceData> Resources => _resources.AsSpan();
-        public ReadOnlySpan<PropertyData> Properties => _properties.AsSpan();
-        public ReadOnlySpan<StructData> Structs => _structs.AsSpan();
-        public ReadOnlySpan<StaticSamplerData> StaticSamplers => _staticSamplers.AsSpan();
+        public Span<FunctionData> Functions => _functions.AsSpan();
+        public Span<ResourceData> Resources => _resources.AsSpan();
+        public Span<PropertyData> Properties => _properties.AsSpan();
+        public Span<StructData> Structs => _structs.AsSpan();
+        public Span<StaticSamplerData> StaticSamplers => _staticSamplers.AsSpan();
 
         public bool HasAnyReferences => _referenceDict.Count > 0;
 

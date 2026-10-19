@@ -2,11 +2,11 @@
 using Editor.UI.Datatypes;
 using Primary.Assets;
 using Primary.Common;
-using Primary.Rendering;
-using Primary.Rendering.Assets;
-using Primary.Rendering.Recording;
-using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
+using Primary.Rendering.Ancient;
+using Primary.Rendering.Ancient.Assets;
+using Primary.Rendering.Ancient.Recording;
+using Primary.Rendering.Ancient.Resources;
+using Primary.Rendering.Ancient.Structures;
 using Primary.RHI;
 using System;
 using System.Collections.Generic;

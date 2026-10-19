@@ -388,13 +388,14 @@ namespace VoxelizationDemo.Editor.Gizmo
                 hitCircleWorld = Vector3.Transform(hitCircleWorld, _rotation) * scale;
 
                 (Vector2 screenPos, bool isBehindViewer) = camera.ProjectWorldToScreen(hitCircleWorld + _origin);
-                ScreenGizmos.DrawWireCircle(screenPos, 16.0f, new Color(staticAxis.AsVector4().WithElement(3, 1.0f)));
+                // ScreenGizmos.DrawWireCircle(screenPos, 16.0f, new Color(staticAxis.AsVector4().WithElement(3, 1.0f)));
 
                 return isBehindViewer ? float.PositiveInfinity : Vector2.Distance(screenPos, mousePos);
             }
         }
 
-        public bool TryStartDrag()
+        public bool TryStartDrag() => TryStartDrag(0.0f);
+        public bool TryStartDrag(float snapScale)
         {
             if (_hoverHit == TranslateGizmoHit.None || !_isEnabled || _currentHit != TranslateGizmoHit.None)
                 return false;
@@ -417,7 +418,7 @@ namespace VoxelizationDemo.Editor.Gizmo
             _inverseRotationQuat = Quaternion.Inverse(_rotationQuaternion);
 
             Ray cameraRay = camera.ProjectViewportToRayInverse(camera.MouseViewport);
-            _startQuaternion = IsSingleAxis(_currentHit) ? ProjectForAxisRadians(cameraRay) : ProjectForAngledQuat(cameraRay);
+            _startQuaternion = IsSingleAxis(_currentHit) ? ProjectForAxisRadians(snapScale, cameraRay) : ProjectForAngledQuat(snapScale, cameraRay);
             _lastHitQuaternion = _startQuaternion;
 
             return true;
@@ -432,7 +433,7 @@ namespace VoxelizationDemo.Editor.Gizmo
             return true;
         }
 
-        public bool TryUpdateDrag(out Quaternion delta)
+        public bool TryUpdateDrag(float snapScale, out Quaternion delta)
         {
             if (_currentHit == TranslateGizmoHit.None)
             {
@@ -443,7 +444,7 @@ namespace VoxelizationDemo.Editor.Gizmo
             CameraManager camera = VoxelRuntime.Instance.CameraManager;
 
             Ray cameraRay = camera.ProjectViewportToRayInverse(camera.MouseViewport);
-            Quaternion worldRot = IsSingleAxis(_currentHit) ? ProjectForAxisRadians(cameraRay) : ProjectForAngledQuat(cameraRay);
+            Quaternion worldRot = IsSingleAxis(_currentHit) ? ProjectForAxisRadians(snapScale, cameraRay) : ProjectForAngledQuat(snapScale, cameraRay);
 
             if (worldRot != _lastHitQuaternion)
             {
@@ -457,7 +458,7 @@ namespace VoxelizationDemo.Editor.Gizmo
             return false;
         }
 
-        private Quaternion ProjectForAxisRadians(Ray ray)
+        private Quaternion ProjectForAxisRadians(float snapScale, Ray ray)
         {
             Debug.Assert(_currentHit == TranslateGizmoHit.X || _currentHit == TranslateGizmoHit.Y || _currentHit == TranslateGizmoHit.Z);
 
@@ -474,6 +475,9 @@ namespace VoxelizationDemo.Editor.Gizmo
             Vector2 flattenedHit = Vector3.Shuffle(Vector3.Transform(originHit, _inverseRotationQuat), shuffleX, shuffleY, 0).AsVector2();
 
             float hitRadians = ExMath.GetAngleTowards(Vector2.Zero, flattenedHit);
+            if (snapScale > 0.0f)
+                hitRadians = float.DegreesToRadians(float.Round(float.RadiansToDegrees(hitRadians) / snapScale) * snapScale);
+
             return _currentHit switch
             {
                 TranslateGizmoHit.X => _rotationQuaternion * Quaternion.CreateFromYawPitchRoll(0.0f, hitRadians, 0.0f),
@@ -483,7 +487,7 @@ namespace VoxelizationDemo.Editor.Gizmo
             };
         }
 
-        private Quaternion ProjectForAngledQuat(Ray ray)
+        private Quaternion ProjectForAngledQuat(float snapScale, Ray ray)
         {
             Debug.Assert(_currentHit == TranslateGizmoHit.Axis || _currentHit == TranslateGizmoHit.All);
 

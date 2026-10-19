@@ -1,4 +1,5 @@
-﻿using Primary.Common;
+﻿using CommunityToolkit.Diagnostics;
+using Primary.Common;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -74,6 +75,14 @@ namespace Primary.Common.Memory
 
             _offset = nextOffset;
             return ptr;
+        }
+
+        public nint GetAtOffset(int offset)
+        {
+            ObjectDisposedException.ThrowIf(_disposedValue, this);
+            Guard.IsInRange(offset, 0, _offset);
+
+            return (nint)(_block + offset);
         }
 
         private void ResizeInternalBlock(int minimumSize)

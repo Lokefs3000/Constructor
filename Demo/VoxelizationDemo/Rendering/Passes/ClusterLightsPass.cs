@@ -10,8 +10,6 @@ using Primary.Rendering.Assets;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
-using TerraFX.Interop.Windows;
 
 namespace VoxelizationDemo.Rendering.Passes
 {
@@ -29,7 +27,7 @@ namespace VoxelizationDemo.Rendering.Passes
             _clusterLightsShader = AssetManager.LoadAsset<ComputeShaderAsset>("Content/Shaders/Compute/ClusterLights.compute");
         }
 
-        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
+        public void SetupPasses(FrameGraphBuilder frameGraph)
         {
             if (!_buildClustersShader.TryFindKernel("CSBuildClusters", out ComputeShaderKernel? buildClusters) ||
                 !_clusterLightsShader.TryFindKernel("CSBinLights", out ComputeShaderKernel? binLights))
@@ -41,89 +39,95 @@ namespace VoxelizationDemo.Rendering.Passes
             if (_buildClustersKernelBlock == null || _binLightsKernelBlock == null)
                 return;
 
-            RenderPathBlackboard pathBlackboard = renderPass.Blackboard.Get<RenderPathBlackboard>()!;
+            RenderStageBlackboard pathBlackboard = frameGraph.GetBlackboard<RenderStageBlackboard>()!;
             if (pathBlackboard.LightCollector == null)
                 return;
 
-            RenderCameraData cameraData = context.Get<RenderCameraData>()!;
+            RenderCameraData cameraData = frameGraph.GetContext<RenderCameraData>()!;
 
-            FGBuffer clusterBoundsBuffer;
-            FGBuffer screenToViewLight;
+            BufferHandle clusterBoundsBuffer;
+            BufferHandle screenToViewLight;
 
-            using (ComputePassDescription desc = renderPass.SetupComputePass("BuildClusters", out BuildClustersPassData passData))
+            using (ComputePassBuilder desc = frameGraph.AddComputePass("BuildClusters", out BuildClustersPassData passData))
             {
                 passData.ScreenToViewDataBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)Unsafe.SizeOf<ScreenToViewData>(),
+                    Name = "ScreenToView",
+                    ElementCount = 1,
                     Stride = Unsafe.SizeOf<ScreenToViewData>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.ConstantBuffer
-                }, "ScreenToView");
+                    Target = FGBufferTarget.Constant
+                });
 
                 passData.ScreenToViewLightBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)Unsafe.SizeOf<ScreenToViewLight>(),
+                    Name = "ScreenToViewLight",
+                    ElementCount = 1,
                     Stride = Unsafe.SizeOf<ScreenToViewLight>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer | FGBufferUsage.Global
-                }, "ScreenToViewLight");
+                    Target = FGBufferTarget.Constant
+                });
 
                 passData.ClustersBoundsBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)(Unsafe.SizeOf<ClusterAABB>() * (ClustersWidth * ClustersHeight * ClustersDepth)),
+                    Name = "ClusterBoundsBuffer",
+                    ElementCount = (int)(ClustersWidth * ClustersHeight * ClustersDepth),
                     Stride = Unsafe.SizeOf<ClusterAABB>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.Structured | FGBufferUsage.UnorderedAccess
-                }, "ClusterBoundsBuffer");
+                    Target = FGBufferTarget.Structured
+                });
 
                 passData.BuildClusters = buildClusters;
                 passData.BuildClustersBlock = _buildClustersKernelBlock;
 
-                desc.UseResource(FGResourceUsage.ReadWrite, passData.ScreenToViewDataBuffer);
-                desc.UseResource(FGResourceUsage.Write, passData.ScreenToViewLightBuffer);
-                desc.UseResource(FGResourceUsage.Write, passData.ClustersBoundsBuffer);
+                desc.ReadWrite(passData.ScreenToViewDataBuffer);
+                desc.Write(passData.ScreenToViewLightBuffer);
+                desc.Write(passData.ClustersBoundsBuffer);
 
-                desc.SetRenderFunction<BuildClustersPassData>(BuildClustersPassFunction);
+                desc.SetFunction(BuildClustersPassFunction);
 
                 // Assign outside
                 clusterBoundsBuffer = passData.ClustersBoundsBuffer;
                 screenToViewLight = passData.ScreenToViewLightBuffer;
             }
 
-            FGBuffer lightIndexList;
-            FGBuffer lightGridBuffer;
+            BufferHandle lightIndexList;
+            BufferHandle lightGridBuffer;
 
-            using (ComputePassDescription desc = renderPass.SetupComputePass("BinLights", out BinLightsPassData passData))
+            using (ComputePassBuilder desc = frameGraph.AddComputePass("BinLights", out BinLightsPassData passData))
             {
                 passData.ClustersBoundsBuffer = clusterBoundsBuffer;
 
                 passData.LightIndexCount = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)Unsafe.SizeOf<uint>(),
+                    Name = "LightIndexCount",
+                    ElementCount = 1,
                     Stride = Unsafe.SizeOf<uint>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.Raw | FGBufferUsage.UnorderedAccess
-                }, "LightIndexCount");
+                    Target = FGBufferTarget.Raw
+                });
 
                 passData.LightIndexList = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)(Unsafe.SizeOf<uint>() * Math.Clamp(pathBlackboard.LightCollector.PointLights.Count, 1, 128) * (ClustersWidth * ClustersHeight * ClustersDepth)),
+                    Name = "LightIndexList",
+                    ElementCount = (int)(Math.Clamp(pathBlackboard.LightCollector.PointLights.Count, 1, 128) * (ClustersWidth * ClustersHeight * ClustersDepth)),
                     Stride = Unsafe.SizeOf<uint>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.Raw | FGBufferUsage.UnorderedAccess | FGBufferUsage.Global
-                }, "LightIndexList");
+                    Target = FGBufferTarget.Raw
+                });
 
                 passData.LightGrid = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)(Unsafe.SizeOf<LightGrid>() * (ClustersWidth * ClustersHeight * ClustersDepth)),
+                    Name = "LightGrid",
+                    ElementCount = (int)(ClustersWidth * ClustersHeight * ClustersDepth),
                     Stride = Unsafe.SizeOf<LightGrid>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.Structured | FGBufferUsage.UnorderedAccess | FGBufferUsage.Global
-                }, "LightGrid");
+                    Target = FGBufferTarget.Structured
+                });
 
                 passData.BinLights = binLights;
                 passData.BinLightsBlock = _binLightsKernelBlock;
 
-                desc.UseResource(FGResourceUsage.Read, passData.ClustersBoundsBuffer);
-                desc.UseResource(FGResourceUsage.Write, passData.LightIndexCount);
-                desc.UseResource(FGResourceUsage.Write, passData.LightIndexList);
-                desc.UseResource(FGResourceUsage.Write, passData.LightGrid);
+                desc.Read(passData.ClustersBoundsBuffer);
+                desc.Write(passData.LightIndexCount);
+                desc.Write(passData.LightIndexList);
+                desc.Write(passData.LightGrid);
 
-                desc.SetRenderFunction<BinLightsPassData>(BinLightsPassFunction);
+                desc.SetFunction(BinLightsPassFunction);
 
                 // Assign outside
                 lightIndexList = passData.LightIndexList;
@@ -136,15 +140,16 @@ namespace VoxelizationDemo.Rendering.Passes
             ShaderGlobalsManager.SetGlobalBuffer("sbLightGrid", lightGridBuffer);
         }
 
-        private static void BuildClustersPassFunction(ComputePassContext context, BuildClustersPassData passData)
+        private static void BuildClustersPassFunction(ComputePassContext context)
         {
+            BuildClustersPassData passData = context.GetPassData<BuildClustersPassData>()!;
             Debug.Assert(passData.BuildClusters != null && passData.BuildClustersBlock != null);
 
             ComputeCommandBuffer cmd = context.CommandBuffer;
 
-            RenderCameraData cameraData = context.Container.Get<RenderCameraData>()!;
+            RenderCameraData cameraData = context.GetContext<RenderCameraData>()!;
 
-            cmd.SetPipeline(passData.BuildClusters);
+            cmd.SetShader(passData.BuildClusters);
             cmd.SetProperties(passData.BuildClustersBlock);
 
             cmd.SetConstants(new BuildClustersComputeData(cameraData.ZNear, cameraData.ZFar));
@@ -153,11 +158,12 @@ namespace VoxelizationDemo.Rendering.Passes
             passData.BuildClustersBlock.SetResource("sbClusterBoundsBuffer", passData.ClustersBoundsBuffer);
 
             {
-                int screenWidth = cameraData.ColorTexture.Description.Width;
-                int screenHeight = cameraData.ColorTexture.Description.Height;
+                ref readonly FGTextureDesc colorTextureDesc = ref context.GetDescription(cameraData.ColorTexture);
+                int screenWidth = colorTextureDesc.Width;
+                int screenHeight = colorTextureDesc.Height;
 
                 Matrix4x4.Invert(cameraData.Projection, out Matrix4x4 invProjection);
-                cmd.Upload(passData.ScreenToViewDataBuffer, new ScreenToViewData(
+                cmd.UploadBuffer(passData.ScreenToViewDataBuffer, 0, new ScreenToViewData(
                     invProjection,
                     (ushort)ClustersWidth,
                     (ushort)ClustersHeight,
@@ -169,7 +175,7 @@ namespace VoxelizationDemo.Rendering.Passes
                 float sliceScalingFactor = ClustersDepth / MathF.Log2(cameraData.ZFar / cameraData.ZNear);
                 float sliceBiasFactor = -(ClustersDepth * MathF.Log2(cameraData.ZNear) / MathF.Log2(cameraData.ZFar / cameraData.ZNear));
 
-                cmd.Upload(passData.ScreenToViewLightBuffer, new ScreenToViewLight(
+                cmd.UploadBuffer(passData.ScreenToViewLightBuffer, 0, new ScreenToViewLight(
                     invProjection,
                     (ushort)ClustersWidth,
                     (ushort)ClustersHeight,
@@ -184,15 +190,16 @@ namespace VoxelizationDemo.Rendering.Passes
             cmd.Dispatch(ClustersWidth, ClustersHeight, ClustersDepth);
         }
 
-        private static void BinLightsPassFunction(ComputePassContext context, BinLightsPassData passData)
+        private static void BinLightsPassFunction(ComputePassContext context)
         {
+            BinLightsPassData passData = context.GetPassData<BinLightsPassData>()!;
             Debug.Assert(passData.BinLights != null && passData.BinLightsBlock != null);
 
             ComputeCommandBuffer cmd = context.CommandBuffer;
 
-            RenderCameraData cameraData = context.Container.Get<RenderCameraData>()!;
+            RenderCameraData cameraData = context.GetContext<RenderCameraData>()!;
 
-            cmd.SetPipeline(passData.BinLights);
+            cmd.SetShader(passData.BinLights);
             cmd.SetProperties(passData.BinLightsBlock);
 
             cmd.SetConstants(cameraData.View);
@@ -211,18 +218,18 @@ namespace VoxelizationDemo.Rendering.Passes
 
         private sealed class BuildClustersPassData : IPassData
         {
-            public FGBuffer ScreenToViewDataBuffer;
-            public FGBuffer ScreenToViewLightBuffer;
-            public FGBuffer ClustersBoundsBuffer;
+            public BufferHandle ScreenToViewDataBuffer;
+            public BufferHandle ScreenToViewLightBuffer;
+            public BufferHandle ClustersBoundsBuffer;
 
             public ComputeShaderKernel? BuildClusters;
             public PropertyBlock? BuildClustersBlock;
 
             public void Clear()
             {
-                ScreenToViewDataBuffer = FGBuffer.Invalid;
-                ScreenToViewLightBuffer = FGBuffer.Invalid;
-                ClustersBoundsBuffer = FGBuffer.Invalid;
+                ScreenToViewDataBuffer = BufferHandle.Null;
+                ScreenToViewLightBuffer = BufferHandle.Null;
+                ClustersBoundsBuffer = BufferHandle.Null;
 
                 BuildClusters = null;
                 BuildClustersBlock = null;
@@ -231,20 +238,20 @@ namespace VoxelizationDemo.Rendering.Passes
 
         private sealed class BinLightsPassData : IPassData
         {
-            public FGBuffer ClustersBoundsBuffer;
-            public FGBuffer LightIndexCount;
-            public FGBuffer LightIndexList;
-            public FGBuffer LightGrid;
+            public BufferHandle ClustersBoundsBuffer;
+            public BufferHandle LightIndexCount;
+            public BufferHandle LightIndexList;
+            public BufferHandle LightGrid;
 
             public ComputeShaderKernel? BinLights;
             public PropertyBlock? BinLightsBlock;
 
             public void Clear()
             {
-                ClustersBoundsBuffer = FGBuffer.Invalid;
-                LightIndexCount = FGBuffer.Invalid;
-                LightIndexList = FGBuffer.Invalid;
-                LightGrid = FGBuffer.Invalid;
+                ClustersBoundsBuffer = BufferHandle.Null;
+                LightIndexCount = BufferHandle.Null;
+                LightIndexList = BufferHandle.Null;
+                LightGrid = BufferHandle.Null;
 
                 BinLights = null;
                 BinLightsBlock = null;

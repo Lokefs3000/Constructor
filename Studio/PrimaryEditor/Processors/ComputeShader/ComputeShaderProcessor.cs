@@ -519,7 +519,7 @@ namespace PrimaryEditor.Processors.ComputeShader
 
             void TravelForStageRecursive(ShPropertyStages stage, FunctionIncludeData includes)
             {
-                foreach (ref readonly ReferenceIndex index in includes.Indices)
+                foreach (ReferenceIndex index in includes.Indices)
                 {
                     switch (index.Type)
                     {

@@ -32,11 +32,11 @@ namespace Primary.Components
             _invalidFlags = TransformInvalidFlags.Invalid | TransformInvalidFlags.Self;
         }
 
-        public Vector3 Position { get => _position; set { _position = value; _invalidFlags |= TransformInvalidFlags.Invalid | TransformInvalidFlags.Self; } }
-        public Quaternion Rotation { get => _rotation; set { _rotation = value; _invalidFlags |= TransformInvalidFlags.Invalid | TransformInvalidFlags.Self; } }
-        public Vector3 Scale { get => _scale; set { _scale = value; _invalidFlags |= TransformInvalidFlags.Invalid | TransformInvalidFlags.Self; } }
+        public Vector3 Position { readonly get => _position; set { _position = value; _invalidFlags |= TransformInvalidFlags.Invalid | TransformInvalidFlags.Self; } }
+        public Quaternion Rotation { readonly get => _rotation; set { _rotation = value; _invalidFlags |= TransformInvalidFlags.Invalid | TransformInvalidFlags.Self; } }
+        public Vector3 Scale { readonly get => _scale; set { _scale = value; _invalidFlags |= TransformInvalidFlags.Invalid | TransformInvalidFlags.Self; } }
 
-        internal TransformInvalidFlags InvalidFlags { get => _invalidFlags; set => _invalidFlags = value; }
+        internal TransformInvalidFlags InvalidFlags { readonly get => _invalidFlags; set => _invalidFlags = value; }
     }
 
     [ComponentUsage(CanBeAdded: false), DontSerializeComponent]

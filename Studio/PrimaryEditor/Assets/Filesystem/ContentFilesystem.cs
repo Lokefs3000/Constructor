@@ -66,6 +66,8 @@ namespace PrimaryEditor.Assets.Filesystem
                 }
             }
 
+            _watcher.Created += OnFileChangedCallback;
+            _watcher.Deleted += OnFileChangedCallback;
             _watcher.Changed += OnFileChangedCallback;
             _watcher.Renamed += OnFileRenamedCallback;
         }
@@ -378,7 +380,7 @@ namespace PrimaryEditor.Assets.Filesystem
         public bool AreFileUpdatesAvailable => _currentPendingFileEvents.Count > 0 && !_isLockCurrentlyActive;
         public bool IsWithinTimeoutPeriod => DateTime.Now < _lastEventTime + TimeoutDuration;
 
-        public static readonly ConsoleVar<TimeSpan> TimeoutDuration = new ConsoleVar<TimeSpan>(TimeSpan.FromSeconds(0.2));
+        public static readonly ConsoleVar<TimeSpan> TimeoutDuration = new ConsoleVar<TimeSpan>(TimeSpan.FromSeconds(0.3));
     }
 
     public readonly record struct FileEvent(string LocalFilePath, string? NewLocalFilePath, FileEventType EventType, bool IsDirectory);

@@ -45,7 +45,7 @@ namespace Primary.Serialization.Json
                 if (!reader.TryGetGuid(out Guid guid))
                     throw new JsonException("Failed to parse GUID");
 
-                return new AssetId((FileId)guid, 0);
+                return new AssetId((FileId)guid);
             }
             else
             {

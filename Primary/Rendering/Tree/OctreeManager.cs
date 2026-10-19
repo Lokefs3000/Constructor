@@ -50,6 +50,9 @@ namespace Primary.Rendering.Tree
                         {
                             case EntityUpdateType.Created:
                                 {
+                                    if (updateData.Entity.IsNull)
+                                        continue;
+
                                     ref RenderOctantInfo octantInfo = ref updateData.Entity.AddComponent<RenderOctantInfo>();
                                     ref RenderBounds bounds = ref updateData.Entity.GetComponent<RenderBounds>();
 

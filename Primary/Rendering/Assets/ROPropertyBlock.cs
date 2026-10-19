@@ -13,13 +13,13 @@ namespace Primary.Rendering.Assets
             _block = block;
         }
 
-        public FGBuffer GetFrameGraphBuffer(string id) => _block?.GetFrameGraphBuffer(id) ?? FGBuffer.Invalid;
+        public BufferHandle GetFrameGraphBuffer(string id) => _block?.GetFrameGraphBuffer(id) ?? BufferHandle.Null;
         public RHIBuffer? GetRHIBuffer(string id) => _block?.GetRHIBuffer(id);
-        public FGTexture GetFrameGraphTexture(string id) => _block?.GetFrameGraphTexture(id) ?? FGTexture.Invalid;
+        public TextureHandle GetFrameGraphTexture(string id) => _block?.GetFrameGraphTexture(id) ?? TextureHandle.Null;
         public RHITexture? GetRHITexture(string id) => _block?.GetRHITexture(id);
         public TextureAsset? GetTextureAsset(string id) => _block?.GetTextureAsset(id);
 
-        public void CopyBlockDataTo(nint nativePtr) => _block?.CopyBlockDataTo(nativePtr);
+        public void CopyBlockDataTo(Span<byte> span) => _block?.CopyBlockDataTo(span);
 
         public IShaderResourceSource? Shader => _block?.Shader;
         public int BlockSize => _block?.BlockSize ?? 0;

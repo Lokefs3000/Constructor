@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System.Collections.Immutable;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -8,13 +9,14 @@ using Silk.NET.DXGI;
 
 namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe sealed class D3D12RHISwapChain : RHISwapChain
     {
         private readonly D3D12RHIDevice _device;
 
         private ComPtr<IDXGISwapChain4> _swapChain;
         private D3D12RHISwapChainBuffer* _buffers;
+
+        private readonly ImmutableArray<RHISwapChainBackbuffer> _backbuffers;
 
         private CompositionSurface? _compositionSurface;
 
@@ -96,6 +98,7 @@ namespace Primary.RHI.Direct3D12
             
             _buffers = (D3D12RHISwapChainBuffer*)NativeMemory.AllocZeroed((nuint)description.BackBufferCount, (nuint)Unsafe.SizeOf<D3D12RHISwapChainBuffer>());
 
+            RHISwapChainBackbuffer[] backbuffers = new RHISwapChainBackbuffer[description.BackBufferCount];
             for (int i = 0; i < description.BackBufferCount; i++)
             {
                 ComPtr<ID3D12Resource2> resource = new ComPtr<ID3D12Resource2>();
@@ -109,7 +112,12 @@ namespace Primary.RHI.Direct3D12
                     BarrierAccess = BarrierAccess.Common,
                     BarrierLayout = BarrierLayout.Present
                 };
+
+                backbuffers[i] = new D3D12RHISwapChainBackbuffer(device, this, i, &_buffers[i]);
             }
+
+            _backbuffers = [.. backbuffers];
+            _activeBufferIndex = (int)_swapChain.GetCurrentBackBufferIndex();
 
             {
                 _nativeRep = (D3D12RHISwapChainNative*)NativeMemory.Alloc((nuint)Unsafe.SizeOf<D3D12RHISwapChainNative>());
@@ -182,7 +190,8 @@ namespace Primary.RHI.Direct3D12
                 throw new D3D12RHIException("Failed to present", hr.Value);
             }
 
-            _nativeRep->ActiveBufferIndex = (int)_swapChain.GetCurrentBackBufferIndex();
+            _activeBufferIndex = (int)_swapChain.GetCurrentBackBufferIndex();
+            _nativeRep->ActiveBufferIndex = _activeBufferIndex;
         }
 
         public override void Resize(Vector2 newSize)
@@ -244,6 +253,8 @@ namespace Primary.RHI.Direct3D12
                         BarrierAccess = BarrierAccess.Common,
                         BarrierLayout = BarrierLayout.Present
                     };
+
+                    ((D3D12RHISwapChainBackbuffer)_backbuffers[i]).ResizeBuffer((int)newSize.X, (int)newSize.Y);
                 }
             }
 
@@ -261,6 +272,9 @@ namespace Primary.RHI.Direct3D12
         public ComPtr<IDXGISwapChain4> SwapChain => _swapChain;
 
         public bool HasPendingResize => _pendingResize.HasValue;
+
+        public override ReadOnlySpan<RHISwapChainBackbuffer> Backbuffers => _backbuffers.AsSpan();
+        public override int CurrentBackbufferIndex => _activeBufferIndex;
 
         public override unsafe RHISwapChainNative* GetAsNative() => (RHISwapChainNative*)_nativeRep;
     }

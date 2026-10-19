@@ -74,7 +74,7 @@ namespace PrimaryEditor.Core
 
         internal void Run()
         {
-            RenderingManager.SetNewRenderPath(new EditorRenderPath());
+            // RenderingManager.SetNewRenderPath(new EditorRenderPath());
 
             ImGuiManager.AddDrawer(new HierchyExplorer());
             ImGuiManager.AddDrawer(new GuiStatistics());

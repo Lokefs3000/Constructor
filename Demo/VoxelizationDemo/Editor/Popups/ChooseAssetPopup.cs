@@ -88,7 +88,7 @@ namespace VoxelizationDemo.Editor.Popups
                 ImGui.Dummy(new Vector2(1.0f, _searchList.Items.Count * itemHeight));
 
                 int itemStartIndex = (int)Math.Floor(scrollAmount / itemHeight);
-                int itemMaxIndex = Math.Clamp((int)Math.Ceiling((scrollAmount + contentAvail.Y) / itemHeight), itemStartIndex, _searchList.Items.Count - 1);
+                int itemMaxIndex = Math.Clamp((int)Math.Ceiling((window.Scroll.Y + contentAvail.Y) / itemHeight), itemStartIndex, _searchList.Items.Count);
 
                 ReadOnlySpan<SearchItem> items = _searchList.Items.AsSpan()[itemStartIndex..itemMaxIndex];
 

@@ -20,10 +20,11 @@ namespace VoxelizationDemo.Editor.Serialization.Converters
             Color v = default;
             for (int i = 0; i < 4; ++i)
             {
-                v[i] = reader.GetSingle();
                 reader.Read();
+                v[i] = reader.GetSingle();
             }
 
+            reader.Read();
             if (reader.TokenType != JsonTokenType.EndArray)
                 throw new JsonException("Expected end array");
 

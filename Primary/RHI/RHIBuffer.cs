@@ -7,6 +7,8 @@
         public ref readonly RHIBufferDescription Description => ref _description;
 
         public abstract RHIBufferNative* GetAsNative();
+
+        public abstract ref readonly RHIAlignmentInfo AlignmentInfo { get; }
     }
 
     public struct RHIBufferNative

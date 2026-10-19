@@ -14,20 +14,18 @@ using Primary.Collections.ReadOnly;
 using Primary.Mathematics;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
-using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
+using Primary.Rendering.Commands;
 using Primary.RHI;
 using PrimaryEditor.Rendering.UI;
 
 namespace EditorUI.Visual.Passes
 {
-    [RenderPassSetup(RunContext = RenderPassRunContext.PerWindow)]
-    internal sealed class RenderUIPass : IRenderPass
+    internal sealed class RenderUIPass //: IRenderPass
     {
-        private ShaderPack _shaderPack;
+        //private ShaderPack _shaderPack;
 
         private PropertyBlock _genericProperties;
         private PropertyBlock _fontProperties;
@@ -49,6 +47,7 @@ namespace EditorUI.Visual.Passes
             _imageProperties = _shaderPack.Image.CreatePropertyBlock();
         }
 
+        /*
         public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
         {
             VisualManager visual = UIManager.Instance.VisualManager;
@@ -318,5 +317,6 @@ namespace EditorUI.Visual.Passes
             //     M22_32 = new Vector3(model.M12, model.M22, model.M32);
             // }
         }
+        */
     }
 }

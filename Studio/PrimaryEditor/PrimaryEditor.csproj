@@ -6,13 +6,16 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<FileVersion>1.0.1400.0</FileVersion>
+		<FileVersion>1.0.1606.0</FileVersion>
 	</PropertyGroup>
 
 	<ItemGroup>
 	  <Compile Remove="Assets\Importers\StylesheetImporter.cs" />
 	  <Compile Remove="Assets\Importers\UIFontFamilyImporter.cs" />
 	  <Compile Remove="Assets\Importers\UILayoutImporter.cs" />
+	  <Compile Remove="Rendering\Passes\GizmoRenderPass.cs" />
+	  <Compile Remove="Rendering\UI\RenderUIPass.cs" />
+	  <Compile Remove="Rendering\UI\UpdateFontsPass.cs" />
 	</ItemGroup>
 
 	<ItemGroup>

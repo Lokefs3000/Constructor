@@ -47,12 +47,17 @@ namespace VoxelizationDemo.Rendering
             _worldOpaquePass = null;
         }
 
-        public void PreRenderPassSetup(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
+        public void FlushPassesForCamera(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
         {
-            RenderCameraData cameraData = context.Get<RenderCameraData>()!;
-            manager.BatchingManager.BatchWorld(_renderList!, new BatchWorldSetup(manager.OctreeManager, cameraData.ViewFrustrum));
+            RenderCameraData cameraData = context.Get<RenderCameraData>();
 
-            RenderPathBlackboard generalBlackboard = blackboard.Add<RenderPathBlackboard>();
+            manager.RequestBatch(_renderList!, new BatchingOptions
+            {
+                ViewFrustrum = cameraData.ViewFrustrum,
+                Center = cameraData.Transform.Position
+            });
+
+            RenderStageBlackboard generalBlackboard = blackboard.Add<RenderStageBlackboard>();
             generalBlackboard.RenderList = _renderList!.IsEmpty ? null : _renderList;
 
             if (generalBlackboard.RenderList != null)
@@ -70,28 +75,14 @@ namespace VoxelizationDemo.Rendering
 
                 jobHandleList.Dispose();
 
-                // foreach (PointLightData light in _lightCollector.PointLights)
-                // {
-                //     Gizmos.DrawWireSphere(light.Position, 0.1f, Color.Yellow);
-                //     Gizmos.DrawWireSphere(light.Position, light.Radius, new Color(light.Diffuse.WithElement(3, 1.0f)));
-                // }
+                foreach (PointLightData light in _lightCollector.PointLights)
+                {
+                    Gizmos.DrawWireSphere(light.Position, 0.1f, Color.Yellow);
+                    Gizmos.DrawWireSphere(light.Position, light.Radius, new Color(light.Diffuse.WithElement(3, 1.0f)));
+                }
 
                 generalBlackboard.LightCollector = _lightCollector;
             }
-
-            // Draw debug stuff
-            // OctreeVisualizer.Visualize(manager.OctreeManager, cameraData.ViewFrustrum);
-        }
-
-        public void FlushPassesForCamera(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
-        {
-            RenderCameraData cameraData = context.Get<RenderCameraData>();
-
-            manager.RequestBatch(_renderList!, new BatchingOptions
-            {
-                ViewFrustrum = cameraData.ViewFrustrum,
-                Center = cameraData.Transform.Position
-            });
 
             manager.PushRenderPass(_setupDataPass!);
             manager.PushRenderPass(_clusterLightsPass!);

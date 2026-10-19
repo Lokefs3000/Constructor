@@ -16,13 +16,13 @@ namespace PrimaryEditor.Assets.Filesystem
 
         public override bool Exists(string localPath)
         {
-            string fullPath = $"{WorkingDirectory}{localPath.AsSpan()[NamespaceKey.Length..]}";
+            string fullPath = Path.Combine(WorkingDirectory, localPath.AsSpan()[(NamespaceKey.Length + 1)..].ToString());
             return File.Exists(fullPath);
         }
 
         public override string? ReadAllText(string localPath)
         {
-            string fullPath = $"{WorkingDirectory}{localPath.AsSpan()[NamespaceKey.Length..]}";
+            string fullPath = Path.Combine(WorkingDirectory, localPath.AsSpan()[(NamespaceKey.Length + 1)..].ToString());
 
             IOException? exception = null;
             for (int i = 0; i < 5; i++)
@@ -55,7 +55,7 @@ namespace PrimaryEditor.Assets.Filesystem
 
         public override byte[]? ReadAllBytes(string localPath)
         {
-            string fullPath = $"{WorkingDirectory}{localPath.AsSpan()[NamespaceKey.Length..]}";
+            string fullPath = Path.Combine(WorkingDirectory, localPath.AsSpan()[(NamespaceKey.Length + 1)..].ToString());
 
             IOException? exception = null;
             for (int i = 0; i < 5; i++)
@@ -88,7 +88,7 @@ namespace PrimaryEditor.Assets.Filesystem
 
         public override Stream? OpenStream(string localPath)
         {
-            string fullPath = $"{WorkingDirectory}{localPath.AsSpan()[NamespaceKey.Length..]}";
+            string fullPath = Path.Combine(WorkingDirectory, localPath.AsSpan()[(NamespaceKey.Length + 1)..].ToString());
 
             IOException? exception = null;
             for (int i = 0; i < 5; i++)

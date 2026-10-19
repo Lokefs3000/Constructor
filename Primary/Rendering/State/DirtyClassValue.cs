@@ -21,10 +21,10 @@ namespace Primary.Rendering.State
             _value = default;
         }
 
-        public T? Value { get => _value; set => _value = value; }
+        public T? Value { readonly get => _value; set => _value = value; }
         public bool IsDirty
         {
-            get => !_previous?.Equals(_value) ?? _value == null;
+            readonly get => _previous == null ? _value != null : !_previous.Equals(_value);
             set => _previous = _value;
         }
 

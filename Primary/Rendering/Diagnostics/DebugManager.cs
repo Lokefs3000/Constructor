@@ -1,4 +1,5 @@
-﻿using Primary.Rendering.Diagnostics.Passes;
+﻿using Primary.Rendering;
+using Primary.Rendering.Diagnostics.Passes;
 using Primary.Threading;
 using System;
 using System.Collections.Generic;
@@ -14,6 +15,8 @@ namespace Primary.Rendering.Diagnostics
 
         private readonly Gizmos? _gizmos;
         private readonly ScreenGizmos? _screenGizmos;
+
+        private GizmoRenderPass? _gizmoRenderPass;
 
         internal DebugManager()
         {
@@ -32,13 +35,15 @@ namespace Primary.Rendering.Diagnostics
                 // delay until full initialization has occured
                 ThreadHelper.ExecuteOnMainThread(Enable);
             }
+
+            _gizmoRenderPass = null;
         }
 
         internal void TrySetupAfterRenderInit(RenderingManager renderer)
         {
             if (_gizmos != null && _screenGizmos != null)
             {
-                renderer.RenderPassManager.AddRenderPass<GizmoRenderPass>();
+                //renderer.RenderPassManager.AddRenderPass<GizmoRenderPass>();
             }
         }
 
@@ -55,6 +60,10 @@ namespace Primary.Rendering.Diagnostics
 
             Engine engine = Engine.GlobalSingleton;
             engine.ImGuiManager.AddDrawer(_statisticsDrawer);
+
+            _gizmoRenderPass = new GizmoRenderPass();
+
+            _isEnabled = true;
         }
 
         public void Disable()
@@ -64,6 +73,19 @@ namespace Primary.Rendering.Diagnostics
 
             Engine engine = Engine.GlobalSingleton;
             engine.ImGuiManager.RemoveDrawer(_statisticsDrawer);
+
+            _gizmoRenderPass?.Dispose();
+            _gizmoRenderPass = null;
+
+            _isEnabled = false;
+        }
+
+        internal void UpdatePerCamera(RenderingManager renderer)
+        {
+            if (_isEnabled && _gizmoRenderPass != null)
+            {
+                renderer.PushRenderPass(_gizmoRenderPass);
+            }
         }
     }
 }

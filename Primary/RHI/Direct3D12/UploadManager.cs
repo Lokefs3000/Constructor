@@ -14,7 +14,6 @@ using D3D12MemAlloc = Interop.D3D12MemAlloc;
 
 namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows10.0.17763.0")]
     internal sealed unsafe class UploadManager : IDisposable
     {
         private readonly D3D12RHIDevice _device;
@@ -121,8 +120,8 @@ namespace Primary.RHI.Direct3D12
                 }
             }
 
-            lock (_uploadListLock)
-                _pendingUploads.Add(new PendingDataUpload(rawData, texture, subresource, alignedPitch, D3D12.TextureDataPlacementAlignment));
+            using var _ = _uploadListLock.EnterScope();
+            _pendingUploads.Add(new PendingDataUpload(rawData, texture, subresource, alignedPitch, D3D12.TextureDataPlacementAlignment));
         }
 
         internal void UploadPending(ref ID3D12GraphicsCommandList10 cmds)
@@ -216,7 +215,7 @@ namespace Primary.RHI.Direct3D12
             active = new RentedList<ActiveDataUpload>();
             uploadBufferSize = 0;
 
-            lock (_uploadListLock)
+            using (_uploadListLock.EnterScope())
             {
                 int baseIndex = 0;
 

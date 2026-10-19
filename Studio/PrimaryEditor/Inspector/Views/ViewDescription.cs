@@ -30,6 +30,11 @@ namespace PrimaryEditor.Inspector.Views
             }
         }
 
+        internal ViewDescription(ReadOnlySpan<ViewObject> viewObjects)
+        {
+            _values = [.. viewObjects];
+        }
+
         public ImmutableArray<ViewObject> Values => _values;
     }
 }

@@ -1,7 +1,7 @@
-﻿using Primary.Rendering;
+﻿using Primary.Rendering.Ancient;
+using Primary.Rendering.Ancient.Recording;
+using Primary.Rendering.Ancient.Structures;
 using Primary.Rendering.Commands;
-using Primary.Rendering.Recording;
-using Primary.Rendering.Structures;
 using Primary.RHI;
 using System;
 using System.Collections.Generic;

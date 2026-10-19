@@ -13,13 +13,17 @@ namespace Primary.Scenes.Components
 {
     public sealed class ComponentRegistry
     {
-        private Dictionary<Type, ComponentRegistryEntry> _entries;
-        private Dictionary<Assembly, AssemblyList> _assemblies;
+        private readonly SceneEntityManager _entityManager;
 
-        private Dictionary<string, Type> _entryTypeLookups;
+        private readonly Dictionary<Type, ComponentRegistryEntry> _entries;
+        private readonly Dictionary<Assembly, AssemblyList> _assemblies;
 
-        internal ComponentRegistry()
+        private readonly Dictionary<string, Type> _entryTypeLookups;
+
+        internal ComponentRegistry(SceneEntityManager entityManager)
         {
+            _entityManager = entityManager;
+
             _entries = new Dictionary<Type, ComponentRegistryEntry>();
             _assemblies = new Dictionary<Assembly, AssemblyList>();
 
@@ -30,23 +34,49 @@ namespace Primary.Scenes.Components
         internal void RegisterComponentTemplated<T>() where T : IComponent, new()
         {
             Type type = typeof(T);
-            Assembly assembly = type.Assembly;
-
-            ComponentType componentType = Component.GetComponentType(type);
-
-            _entries.Add(type, new ComponentRegistryEntry(type, componentType, TryGetRefTemplated<T>, AddOrGetTemplated<T>, BoxTemplated<T>));
-
-            string? fullName = SceneJsonSerializer.GetComponentKey(type);
-            if (fullName != null)
-                _entryTypeLookups.Add(fullName, type);
-
-            if (!_assemblies.TryGetValue(assembly, out AssemblyList list))
+            if (type.IsClass)
             {
-                list = new AssemblyList(new HashSet<Type>());
-                _assemblies.Add(assembly, list);
-            }
+                Assembly assembly = type.Assembly;
 
-            list.Types.Add(type);
+                ComponentType componentType = Component.GetComponentType(type);
+
+                _entries.Add(type, new ComponentRegistryEntry(type, componentType, RemoveTemplated<T>, AddClassTemplated<T>));
+
+                string? fullName = SceneJsonSerializer.GetComponentKey(type);
+                if (fullName != null)
+                    _entryTypeLookups.Add(fullName, type);
+
+                if (!_assemblies.TryGetValue(assembly, out AssemblyList list))
+                {
+                    list = new AssemblyList(new HashSet<Type>());
+                    _assemblies.Add(assembly, list);
+                }
+
+                list.Types.Add(type);
+
+                if (type.IsAssignableTo(typeof(EntityBehaviour)))
+                    _entityManager.BehaviourManager.RegisterBehaviour(type);
+            }
+            else
+            {
+                Assembly assembly = type.Assembly;
+
+                ComponentType componentType = Component.GetComponentType(type);
+
+                _entries.Add(type, new ComponentRegistryEntry(type, componentType, TryGetRefTemplated<T>, AddOrGetTemplated<T>, BoxTemplated<T>, RemoveTemplated<T>));
+
+                string? fullName = SceneJsonSerializer.GetComponentKey(type);
+                if (fullName != null)
+                    _entryTypeLookups.Add(fullName, type);
+
+                if (!_assemblies.TryGetValue(assembly, out AssemblyList list))
+                {
+                    list = new AssemblyList(new HashSet<Type>());
+                    _assemblies.Add(assembly, list);
+                }
+
+                list.Types.Add(type);
+            }
         }
 
         private static ref GenericComponent TryGetRefTemplated<T>(ref readonly Entity e, out bool exists) where T : IComponent, new()
@@ -54,7 +84,17 @@ namespace Primary.Scenes.Components
         private static ref GenericComponent AddOrGetTemplated<T>(ref readonly Entity e) where T : IComponent, new()
             => ref Unsafe.As<T, GenericComponent>(ref e.AddOrGet<T>(new T()));
         private static IComponent BoxTemplated<T>(ref GenericComponent component) where T : IComponent, new()
-           => component;
+           => (IComponent)Unsafe.As<GenericComponent, T>(ref component);
+        private static void RemoveTemplated<T>(ref readonly Entity e) where T : IComponent, new()
+        {
+            e.Remove<T>();
+        }
+        private static IComponent AddClassTemplated<T>(ref readonly Entity e) where T : IComponent, new()
+        {
+            T added = new T();
+            e.Add(added);
+            return added;
+        }
 
         /// <summary>Not thread-safe</summary>
         internal ref readonly ComponentRegistryEntry FindComponentEntry(Type type) => ref CollectionsMarshal.GetValueRefOrNullRef(_entries, type);
@@ -73,11 +113,13 @@ namespace Primary.Scenes.Components
 
         public readonly ComponentBehaviour Behaviour;
 
-        public readonly TryGetRef TryGetRefImpl;
-        public readonly AddOrGet AddOrGetImpl;
-        public readonly Box BoxImpl;
+        public readonly TryGetRef? TryGetRefImpl;
+        public readonly AddOrGet? AddOrGetImpl;
+        public readonly Box? BoxImpl;
+        public readonly Remove? RemoveImpl;
+        public readonly AddClass? AddClassImpl;
 
-        public ComponentRegistryEntry(Type type, ComponentType nativeType, TryGetRef tryGetRefImpl, AddOrGet addOrGetImpl, Box boxImpl)
+        public ComponentRegistryEntry(Type type, ComponentType nativeType, TryGetRef tryGetRefImpl, AddOrGet addOrGetImpl, Box boxImpl, Remove removeImpl)
         {
             Type = type;
             NativeType = nativeType;
@@ -88,11 +130,27 @@ namespace Primary.Scenes.Components
             TryGetRefImpl = tryGetRefImpl;
             AddOrGetImpl = addOrGetImpl;
             BoxImpl = boxImpl;
+            RemoveImpl = removeImpl;
+        }
+
+        public ComponentRegistryEntry(Type type, ComponentType nativeType, Remove remove, AddClass addClass)
+        {
+            Type = type;
+            NativeType = nativeType;
+
+            ComponentUsageAttribute? usageAttribute = type.GetCustomAttribute<ComponentUsageAttribute>();
+            Behaviour = new ComponentBehaviour(usageAttribute?.CanBeAdded ?? true);
+
+            RemoveImpl = remove;
+            AddClassImpl = addClass;
         }
 
         public delegate ref GenericComponent TryGetRef(ref readonly Entity entity, out bool exists);
         public delegate ref GenericComponent AddOrGet(ref readonly Entity entity);
         public delegate IComponent Box(ref GenericComponent component);
+        public delegate void Remove(ref readonly Entity entity);
+
+        public delegate IComponent AddClass(ref readonly Entity entity);
     }
 
     public readonly record struct ComponentBehaviour(bool CanBeAdded);

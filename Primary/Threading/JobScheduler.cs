@@ -289,6 +289,37 @@ namespace Primary.Threading
             }
         }
 
+        public static void Flush(JobHandle job1, JobHandle job2)
+        {
+            if (!job1.HasCompleted && job1.IsValid)
+            {
+                job1.Job.TrySchedule();
+            }
+
+            if (!job2.HasCompleted && job2.IsValid)
+            {
+                job2.Job.TrySchedule();
+            }
+        }
+
+        public static void Flush(JobHandle job1, JobHandle job2, JobHandle job3)
+        {
+            if (!job1.HasCompleted && job1.IsValid)
+            {
+                job1.Job.TrySchedule();
+            }
+
+            if (!job2.HasCompleted && job2.IsValid)
+            {
+                job2.Job.TrySchedule();
+            }
+
+            if (!job3.HasCompleted && job3.IsValid)
+            {
+                job3.Job.TrySchedule();
+            }
+        }
+
         public static void Flush(ReadOnlySpan<JobHandle> jobs)
         {
             foreach (ref readonly JobHandle job in jobs)

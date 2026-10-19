@@ -42,22 +42,28 @@ namespace PrimaryEditor.Inspector.Contexts.Entity
 
         private void OnComponentAdded(SceneEntity entity, Type type)
         {
-            if (type.GetCustomAttribute<InspectorHiddenAttribute>() != null)
+            if (entity != _entity || type.GetCustomAttribute<InspectorHiddenAttribute>() != null)
                 return;
 
             Type groupType = typeof(ComponentInspectorGroup<>).MakeGenericType(type);
             ComponentInspectorGroup group = (ComponentInspectorGroup)Activator.CreateInstance(groupType, BindingFlags.Instance | BindingFlags.NonPublic, null, [entity, type], null)!;
 
             _groups.Add(group);
+            OnGroupAdded?.Invoke(group);
         }
 
         private void OnComponentRemoved(SceneEntity entity, Type type)
         {
+            if (entity != _entity)
+                return;
+
             for (int i = 0; i < _groups.Count; ++i)
             {
-                if (_groups[i].Type == type)
+                InspectorGroup group = _groups[i];
+                if (group.Type == type)
                 {
                     _groups.RemoveAt(i);
+                    OnGroupRemoved?.Invoke(group);
                     break;
                 }
             }
@@ -82,5 +88,8 @@ namespace PrimaryEditor.Inspector.Contexts.Entity
         public override ROList<InspectorGroup> Groups => _groups;
 
         public SceneEntity Entity => _entity;
+
+        public override event Action<InspectorGroup>? OnGroupAdded;
+        public override event Action<InspectorGroup>? OnGroupRemoved;
     }
 }

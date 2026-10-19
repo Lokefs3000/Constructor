@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Primary.Assets;
+using Primary.Memory;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Batching;
@@ -10,64 +12,84 @@ using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
 
 namespace VoxelizationDemo.Rendering.Passes
 {
     public sealed class SetupDataPass : IRenderPass
     {
-        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
+        public void SetupPasses(FrameGraphBuilder frameGraph)
         {
-            RenderPathBlackboard pathBlackboard = renderPass.Blackboard.Get<RenderPathBlackboard>()!;
-            BufferDataBlackboard bufferData = renderPass.Blackboard.Add<BufferDataBlackboard>();
+            RenderStageBlackboard pathBlackboard = frameGraph.GetBlackboard<RenderStageBlackboard>()!;
+            BufferDataBlackboard bufferData = frameGraph.AddBlackboard<BufferDataBlackboard>();
 
-            using (RasterPassDescription desc = renderPass.SetupRasterPass("SetupData", out PassData data))
+            if (pathBlackboard.RenderList != null)
             {
-                data.RenderFlagBuffer = pathBlackboard.RenderList == null ? FGBuffer.Invalid : desc.CreateBuffer(new FGBufferDesc
+                if (bufferData.MaterialOffsets.Length < pathBlackboard.RenderList.MaterialIds.Count)
                 {
-                    Width = (uint)(Unsafe.SizeOf<RenderFlag>() * pathBlackboard.RenderList.TotalFlagCount),
+                    bufferData.MaterialOffsets = new uint[MemoryHelper.AlignUp(pathBlackboard.RenderList.MaterialIds.Count, 16)];
+                }
+            }
+
+            using (RasterPassBuilder desc = frameGraph.AddRasterPass("SetupData", out PassData data))
+            {
+                data.RenderFlagBuffer = pathBlackboard.RenderList == null ? BufferHandle.Null : desc.CreateBuffer(new FGBufferDesc
+                {
+                    Name = "RenderFlagBuffer",
+                    ElementCount = pathBlackboard.RenderList.TotalFlagCount,
                     Stride = Unsafe.SizeOf<RenderFlag>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.Structured | FGBufferUsage.Global
-                }, "RenderFlagBuffer");
+                    Target = FGBufferTarget.Structured
+                });
+
+                data.MaterialDataBuffer = pathBlackboard.RenderList == null ? BufferHandle.Null : desc.CreateBuffer(new FGBufferDesc
+                {
+                    Name = "MaterialDataBuffer",
+                    ElementCount = Math.Max(MemoryHelper.AlignUp((int)pathBlackboard.RenderList.MaterialByteSize, 4), 4),
+                    Stride = 1,
+                    Target = FGBufferTarget.Raw
+                });
 
                 data.WorldMatriciesBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)Unsafe.SizeOf<WorldMatrixData>(),
+                    Name = "WorldMatriciesBuffer",
+                    ElementCount = 1,
                     Stride = Unsafe.SizeOf<WorldMatrixData>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.ConstantBuffer | FGBufferUsage.Global
-                }, "WorldMatriciesBuffer");
+                    Target = FGBufferTarget.Constant
+                });
 
                 data.CameraDataBuffer = desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)Unsafe.SizeOf<CameraData>(),
+                    Name = "CameraDataBuffer",
+                    ElementCount = 1,
                     Stride = Unsafe.SizeOf<CameraData>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.ConstantBuffer | FGBufferUsage.Global
-                }, "CameraDataBuffer");
+                    Target = FGBufferTarget.Constant
+                });
 
-                data.PointLightsBuffer = pathBlackboard.LightCollector == null ? FGBuffer.Invalid : desc.CreateBuffer(new FGBufferDesc
+                data.PointLightsBuffer = pathBlackboard.LightCollector == null ? BufferHandle.Null : desc.CreateBuffer(new FGBufferDesc
                 {
-                    Width = (uint)(Unsafe.SizeOf<PointLightData>() * (pathBlackboard.LightCollector.PointLights.Count + 1)),
+                    Name = "PointLights",
+                    ElementCount = pathBlackboard.LightCollector.PointLights.Count + 1,
                     Stride = Unsafe.SizeOf<PointLightData>(),
-                    Usage = FGBufferUsage.GenericShader | FGBufferUsage.PixelShader | FGBufferUsage.Structured | FGBufferUsage.Global
-                }, "PointLights");
+                    Target = FGBufferTarget.Structured
+                });
 
                 data.RenderList = pathBlackboard.RenderList;
                 data.LightCollector = pathBlackboard.LightCollector;
 
                 if (!data.RenderFlagBuffer.IsNull)
-                    desc.UseResource(FGResourceUsage.Write, data.RenderFlagBuffer);
+                    desc.Write(data.RenderFlagBuffer);
                 if (!data.PointLightsBuffer.IsNull)
-                    desc.UseResource(FGResourceUsage.Write, data.PointLightsBuffer);
+                    desc.Write(data.PointLightsBuffer);
 
-                desc.UseResource(FGResourceUsage.Write, data.WorldMatriciesBuffer);
-                desc.UseResource(FGResourceUsage.Write, data.CameraDataBuffer);
+                desc.Write(data.WorldMatriciesBuffer);
+                desc.Write(data.CameraDataBuffer);
 
-                desc.SetRenderFunction<PassData>(PassFunction);
+                desc.SetFunction(PassFunction);
 
                 // Setup blackboard with data
                 bufferData.WorldMatriciesBuffer = data.WorldMatriciesBuffer;
                 bufferData.CameraDataBuffer = data.CameraDataBuffer;
                 bufferData.RenderFlagBuffer = data.RenderFlagBuffer;
+                bufferData.MaterialBufferData = data.MaterialDataBuffer;
                 bufferData.PointLightsBuffer = data.PointLightsBuffer;
             }
 
@@ -77,15 +99,20 @@ namespace VoxelizationDemo.Rendering.Passes
 
             if (!bufferData.RenderFlagBuffer.IsNull)
                 ShaderGlobalsManager.SetGlobalBuffer("sbRenderFlags", bufferData.RenderFlagBuffer);
-            if (!bufferData.RenderFlagBuffer.IsNull)
+            if (!bufferData.MaterialBufferData.IsNull)
+                ShaderGlobalsManager.SetGlobalBuffer("baMaterialData", bufferData.MaterialBufferData);
+
+            if (!bufferData.PointLightsBuffer.IsNull)
                 ShaderGlobalsManager.SetGlobalBuffer("sbPointLights", bufferData.PointLightsBuffer);
         }
 
-        private static void PassFunction(RasterPassContext context, PassData passData)
+        private static void PassFunction(RasterPassContext context)
         {
+            PassData passData = context.GetPassData<PassData>()!;
             RasterCommandBuffer cmd = context.CommandBuffer;
 
-            RenderCameraData cameraData = context.Container.Get<RenderCameraData>()!;
+            RenderCameraData cameraData = context.GetContext<RenderCameraData>()!;
+            BufferDataBlackboard bufferData = context.GetBlackboard<BufferDataBlackboard>();
 
             if (passData.RenderList != null)
             {
@@ -98,16 +125,34 @@ namespace VoxelizationDemo.Rendering.Passes
                         flagBufferOffset += renderBatcher.Flags.Length;
                     }
                 }
+
+                if (passData.RenderList.MaterialByteSize > 0)
+                {
+                    using (FGMappedSubresource<byte> mapped = cmd.Map<byte>(passData.MaterialDataBuffer))
+                    {
+                        int materialDataOffset = 0;
+                        foreach (var (material, index) in passData.RenderList.MaterialIds)
+                        {
+                            bufferData.MaterialOffsets[index] = (uint)materialDataOffset;
+
+                            if (material.IsLoaded)
+                            {
+                                material.PropertyBlock.CopyBlockDataTo(mapped.Span[materialDataOffset..]);
+                                materialDataOffset += MemoryHelper.AlignUp(material.PropertyBlock.BlockSize, 4);
+                            }
+                        }
+                    }
+                }
             }
 
             {
                 WorldMatrixData matrixData = new WorldMatrixData(cameraData.View, cameraData.Projection, cameraData.ViewProjection);
-                cmd.Upload(passData.WorldMatriciesBuffer, matrixData);
+                cmd.UploadBuffer(passData.WorldMatriciesBuffer, 0, matrixData);
             }
 
             {
                 CameraData camera = new CameraData(cameraData.Transform.Transformation.Translation.AsVector4Unsafe(), cameraData.Transform.ForwardVector.AsVector4Unsafe(), cameraData.ZNear, cameraData.ZFar);
-                cmd.Upload(passData.CameraDataBuffer, camera);
+                cmd.UploadBuffer(passData.CameraDataBuffer, 0, camera);
             }
 
             if (passData.LightCollector != null)
@@ -125,26 +170,26 @@ namespace VoxelizationDemo.Rendering.Passes
             public RenderList? RenderList;
             public LightCollector? LightCollector;
 
-            public FGBuffer RenderFlagBuffer;
-            public FGBuffer MaterialDataBuffer;
+            public BufferHandle RenderFlagBuffer;
+            public BufferHandle MaterialDataBuffer;
 
-            public FGBuffer WorldMatriciesBuffer;
-            public FGBuffer CameraDataBuffer;
+            public BufferHandle WorldMatriciesBuffer;
+            public BufferHandle CameraDataBuffer;
 
-            public FGBuffer PointLightsBuffer;
+            public BufferHandle PointLightsBuffer;
 
             public void Clear()
             {
                 RenderList = null;
                 LightCollector = null;
 
-                RenderFlagBuffer = FGBuffer.Invalid;
-                MaterialDataBuffer = FGBuffer.Invalid;
+                RenderFlagBuffer = BufferHandle.Null;
+                MaterialDataBuffer = BufferHandle.Null;
 
-                WorldMatriciesBuffer = FGBuffer.Invalid;
-                CameraDataBuffer = FGBuffer.Invalid;
+                WorldMatriciesBuffer = BufferHandle.Null;
+                CameraDataBuffer = BufferHandle.Null;
 
-                PointLightsBuffer = FGBuffer.Invalid;
+                PointLightsBuffer = BufferHandle.Null;
             }
         }
 
@@ -154,17 +199,21 @@ namespace VoxelizationDemo.Rendering.Passes
 
     public sealed class BufferDataBlackboard : IBlackboardData
     {
-        public FGBuffer RenderFlagBuffer;
-        public FGBuffer WorldMatriciesBuffer;
-        public FGBuffer CameraDataBuffer;
-        public FGBuffer PointLightsBuffer;
+        public BufferHandle RenderFlagBuffer;
+        public BufferHandle MaterialBufferData;
+        public BufferHandle WorldMatriciesBuffer;
+        public BufferHandle CameraDataBuffer;
+        public BufferHandle PointLightsBuffer;
+
+        public uint[] MaterialOffsets = [];
 
         public void Clear()
         {
-            RenderFlagBuffer = FGBuffer.Invalid;
-            WorldMatriciesBuffer = FGBuffer.Invalid;
-            CameraDataBuffer = FGBuffer.Invalid;
-            PointLightsBuffer = FGBuffer.Invalid;
+            RenderFlagBuffer = BufferHandle.Null;
+            MaterialBufferData = BufferHandle.Null;
+            WorldMatriciesBuffer = BufferHandle.Null;
+            CameraDataBuffer = BufferHandle.Null;
+            PointLightsBuffer = BufferHandle.Null;
         }
     }
 }

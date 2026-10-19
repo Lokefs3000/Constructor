@@ -1,4 +1,5 @@
 ﻿using Primary.Common;
+using Primary.Rendering;
 using Silk.NET.Core.Native;
 using Silk.NET.Direct3D12;
 using Silk.NET.DXGI;
@@ -10,13 +11,14 @@ using D3D12MA = Interop.D3D12MemAlloc;
 
 namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe sealed class D3D12RHITexture : RHITexture
     {
         private readonly D3D12RHIDevice _device;
 
         private ComPtr<ID3D12Resource2> _resource;
         private D3D12MA.Allocation* _allocation;
+
+        private readonly RHIAlignmentInfo _alignmentInfo;
 
         private BarrierSync _barrierSync;
         private BarrierAccess _barrierAccess;
@@ -72,6 +74,9 @@ namespace Primary.RHI.Direct3D12
 
                 _allocation = temp;
             }
+
+            _alignmentInfo = new RHIAlignmentInfo((int)_allocation->GetAlignment(), (int)_allocation->GetSize());
+            _barrierState = new RHIBarrierState(ResourceBarrierSync.All, ResourceBarrierAccess.None, BarrierQueueSpec.None);
 
             _barrierSync = BarrierSync.All;
             _barrierAccess = BarrierAccess.NoAccess;
@@ -132,6 +137,8 @@ namespace Primary.RHI.Direct3D12
         public override unsafe RHIResourceNative* GetBaseAsNative() => (RHIResourceNative*)_nativeRep;
 
         public override RHIResourceType Type => RHIResourceType.Texture;
+
+        public override ref readonly RHIAlignmentInfo AlignmentInfo => ref _alignmentInfo;
 
         public ComPtr<ID3D12Resource2> Resource => _resource;
     }

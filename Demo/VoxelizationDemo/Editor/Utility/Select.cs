@@ -20,6 +20,8 @@ namespace VoxelizationDemo.Editor.Utility
 
         public static bool IsSelected(object obj)
             => VoxelRuntime.Instance.EditorManager.SelectionManager.IsSelected(obj);
+        public static bool IsSelected(SceneEntity entity)
+            => VoxelRuntime.Instance.EditorManager.SelectionManager.IsSelected(entity);
 
         public static ROHashSet<object> Objects => VoxelRuntime.Instance.EditorManager.SelectionManager.Objects;
 

@@ -33,7 +33,7 @@ namespace PrimaryEditor.Processors.Model
             {
                 (int vertexStride, int startUVIndex, int indexStride) = CalculateStrideForModel(assimpScene, config.IndexStrideMode, config.UVChannels);
 
-                using RentedArray<ModelMeshInfo> meshInfos = ImportMeshesFromScene(assimpScene, vertexStride, startUVIndex, indexStride);
+                using RentedArray<ModelMeshInfo> meshInfos = ImportMeshesFromScene(assimpScene, vertexStride, startUVIndex, indexStride, config);
                 using RentedList<ModelNodeInfo> nodeInfos = ImportNodesFromScene(assimpScene);
 
                 return new ModelOutputData(vertexStride, indexStride, [.. meshInfos], [.. nodeInfos]);
@@ -85,7 +85,7 @@ namespace PrimaryEditor.Processors.Model
             return (BaseVertexStride + sizeof(float) * int.PopCount((int)uvMask) * 2, int.TrailingZeroCount((int)uvMask), indexStride);
         }
 
-        private static RentedArray<ModelMeshInfo> ImportMeshesFromScene(Scene* assimpScene, int vertexStride, int startUVIndex, int indexStride)
+        private static RentedArray<ModelMeshInfo> ImportMeshesFromScene(Scene* assimpScene, int vertexStride, int startUVIndex, int indexStride, ModelConfiguration config)
         {
             RentedArray<ModelMeshInfo> meshInfos = new RentedArray<ModelMeshInfo>((int)assimpScene->MNumMeshes);
 
@@ -102,7 +102,7 @@ namespace PrimaryEditor.Processors.Model
                     bool hasTangentsAndBitangents = assimpMesh->MTangents != null && assimpMesh->MBitangents != null;
                     for (int j = 0; j < assimpMesh->MNumVertices; ++j)
                     {
-                        Vector3 position = assimpMesh->MVertices[j];
+                        Vector3 position = assimpMesh->MVertices[j] * config.Scale;
                         Vector3 normal = assimpMesh->MNormals[j];
                         Vector4 tangent = Vector4.Zero;
 

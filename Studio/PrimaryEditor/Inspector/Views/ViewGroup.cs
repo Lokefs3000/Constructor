@@ -30,6 +30,11 @@ namespace PrimaryEditor.Inspector.Views
             }
         }
 
+        internal ViewGroup(ReadOnlySpan<ViewObject> viewObjects, float paddingValue, float indentOffset) : base(paddingValue, indentOffset)
+        {
+            _values = [.. viewObjects];
+        }
+
         public ImmutableArray<ViewObject> Values => _values;
     }
 }

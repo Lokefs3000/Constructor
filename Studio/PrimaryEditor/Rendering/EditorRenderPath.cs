@@ -1,32 +1,45 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using EditorUI.Visual.Passes;
 using Primary.GUI.ImGui;
 using Primary.Rendering;
-using PrimaryEditor.Rendering.Passes;
 using PrimaryEditor.Rendering.UI;
 
 namespace PrimaryEditor.Rendering
 {
     public sealed class EditorRenderPath : IRenderStage
     {
-        public void PreRenderPassSetup(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
-        {
-
-        }
+        //private UpdateFontsPass? _fontsPass;
+        //private RenderUIPass? _renderUIPass;
+        //private GizmoRenderPass? _gizmoRenderPass;
+        private ImGuiRenderPass? _imGuiRenderPass;
 
         public void Install(RenderingManager manager)
         {
-            manager.RenderPassManager.AddRenderPass<UpdateFontsPass>();
-            manager.RenderPassManager.AddRenderPass<RenderUIPass>();
-            manager.RenderPassManager.AddRenderPass<GizmoRenderPass>();
-            manager.RenderPassManager.AddRenderPass<ImGuiRenderPass>();
+            //_fontsPass = new UpdateFontsPass();
+            //_renderUIPass = new RenderUIPass();
+            //_gizmoRenderPass = new GizmoRenderPass();
+            _imGuiRenderPass = new ImGuiRenderPass();
         }
 
         public void Uninstall(RenderingManager manager)
         {
-            
+            //_fontsPass = null;
+            //_renderUIPass = null;
+            //_gizmoRenderPass = null;
+            _imGuiRenderPass = null;
+        }
+
+        public void FlushPassesForCamera(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
+        {
+            //manager.PushRenderPass(_gizmoRenderPass!);
+            manager.PushRenderPass(_imGuiRenderPass!);
+        }
+
+        public void FlushPassesForWindow(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
+        {
+            //manager.PushRenderPass(_fontsPass!);
+            //manager.PushRenderPass(_renderUIPass!);
         }
     }
 }

@@ -16,10 +16,11 @@ namespace VoxelizationDemo.Editor.Serialization.Converters
             Vector3 v = default;
             for (int i = 0; i < 3; ++i)
             {
-                v[i] = reader.GetSingle();
                 reader.Read();
+                v[i] = reader.GetSingle();
             }
 
+            reader.Read();
             if (reader.TokenType != JsonTokenType.EndArray)
                 throw new JsonException("Expected end array");
 

@@ -386,7 +386,7 @@ namespace Primary.IO
         }
     }
 
-    public readonly ref struct SaveFileDialogResult
+    public readonly struct SaveFileDialogResult
     {
         public readonly FileDialogResult Result;
         public readonly string File;

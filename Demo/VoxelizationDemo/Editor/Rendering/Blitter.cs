@@ -4,10 +4,10 @@ using System.Text;
 using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Rendering.Assets;
-using Primary.Rendering.Commands;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
+using Primary.Rendering.Commands;
 using Primary.RHI;
+using Primary.Rendering;
 
 namespace VoxelizationDemo.Editor.Rendering
 {
@@ -29,21 +29,21 @@ namespace VoxelizationDemo.Editor.Rendering
 
             _blitBlock.SetResource("txTexture", texture);
 
-            cmd.SetPipeline(_blitShader);
+            cmd.SetShader(_blitShader);
             cmd.SetProperties(_blitBlock);
-            cmd.DrawInstanced(new FGDrawInstancedDesc(3));
+            cmd.DrawInstanced(3, 1, 0, 0);
         }
 
-        public static void Blit(in RasterCommandBuffer cmd, FGTexture texture)
+        public static void Blit(in RasterCommandBuffer cmd, TextureHandle texture)
         {
             if (!_blitShader.IsLoaded)
                 return;
 
             _blitBlock.SetResource("txTexture", texture);
 
-            cmd.SetPipeline(_blitShader);
+            cmd.SetShader(_blitShader);
             cmd.SetProperties(_blitBlock);
-            cmd.DrawInstanced(new FGDrawInstancedDesc(3));
+            cmd.DrawInstanced(3, 1, 0, 0);
         }
 
         public static void Blit(in RasterCommandBuffer cmd, TextureAsset texture)
@@ -59,9 +59,9 @@ namespace VoxelizationDemo.Editor.Rendering
                 _ => texture
             });
 
-            cmd.SetPipeline(_blitShader);
+            cmd.SetShader(_blitShader);
             cmd.SetProperties(_blitBlock);
-            cmd.DrawInstanced(new FGDrawInstancedDesc(3));
+            cmd.DrawInstanced(3, 1, 0, 0);
         }
     }
 }

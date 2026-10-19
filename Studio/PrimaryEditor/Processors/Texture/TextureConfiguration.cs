@@ -103,6 +103,9 @@ namespace Editor.Processors.Texture
             public bool PremultipliedAlpha { get; set; } = false;
 
             public bool FlipVertical { get; set; } = false;
+
+            public int MaxWidth { get; set; } = 16384;
+            public int MaxHeight { get; set; } = 16384;
         }
 
         public struct Mipmaps()

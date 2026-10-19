@@ -1,12 +1,4 @@
-﻿using CommunityToolkit.Diagnostics;
-using CommunityToolkit.HighPerformance;
-using Editor.Interop.Ed;
-using Primary.Assets.Loaders;
-using Primary.Common;
-using Primary.Mathematics;
-using Primary.Memory.Native;
-using Primary.RHI;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
@@ -14,6 +6,15 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
+using CommunityToolkit.Diagnostics;
+using CommunityToolkit.HighPerformance;
+using Editor.Interop.Ed;
+using Primary.Assets.Loaders;
+using Primary.Common;
+using Primary.Mathematics;
+using Primary.Memory.Native;
+using Primary.RHI;
+using TerraFX.Interop.Windows;
 
 namespace Editor.Processors.Texture
 {
@@ -66,7 +67,17 @@ namespace Editor.Processors.Texture
 
             for (int i = 0; i < rawData.Length; ++i)
             {
-                RawTextureData textureData = rawData[i];
+                ref RawTextureData textureData = ref rawData[i];
+                if (textureData.Width > handling.MaxWidth || textureData.Height > handling.MaxHeight)
+                {
+                    int newWidth = Math.Min(textureData.Width, handling.MaxWidth);
+                    int newHeight = Math.Min(textureData.Height, handling.MaxHeight);
+
+                    ScopedPtr<Vector128<float>> memory = ScopedMemory.Allocate<Vector128<float>>(64, (nuint)(newWidth * newHeight));
+                    RawTextureData newTextureData = new RawTextureData(memory, newWidth, newHeight, textureData.Stride);
+
+                    Process_GenerateMipmap_Box(ref textureData, memory, newWidth, newHeight, textureData.Width);
+                }
 
                 Int2 sourceSize = new Int2(textureData.Width, textureData.Height);
                 int mipCount = 0;
@@ -198,13 +209,19 @@ namespace Editor.Processors.Texture
                                     textureData.Stride = 2;
                                 }
 
-                                handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC3n : TextureImageFormat.RG8;
-                                handling.AlphaSource = TextureAlphaSource.Source;
+                                if (handling.ImageFormat == TextureImageFormat.Automatic)
+                                {
+                                    handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC5u : TextureImageFormat.RG8;
+                                    handling.AlphaSource = TextureAlphaSource.Source;
+                                }
 
-                                swizzleRemap.R = TextureSwizzleChannel.One;
-                                swizzleRemap.G = TextureSwizzleChannel.G;
-                                swizzleRemap.B = TextureSwizzleChannel.Zero;
-                                swizzleRemap.A = TextureSwizzleChannel.R;
+                                if (handling.ImageFormat == TextureImageFormat.BC3n || handling.ImageFormat == TextureImageFormat.RG8 || handling.ImageFormat == TextureImageFormat.BC5u)
+                                {
+                                    swizzleRemap.R = TextureSwizzleChannel.One;
+                                    swizzleRemap.G = TextureSwizzleChannel.G;
+                                    swizzleRemap.B = TextureSwizzleChannel.Zero;
+                                    swizzleRemap.A = TextureSwizzleChannel.R;
+                                }
 
                                 break;
                             }
@@ -639,9 +656,10 @@ namespace Editor.Processors.Texture
             }
         }
 
-        private static void Process_GenerateMipmap_Box(ref RawTextureData textureData, ScopedPtr<Vector128<float>> outputData, int mipWidth, int mipHeight)
+        private static void Process_GenerateMipmap_Box(ref RawTextureData textureData, ScopedPtr<Vector128<float>> outputData, int mipWidth, int mipHeight, int srcWidth = 0)
         {
-            int srcWidth = mipWidth * 2;
+            if (srcWidth == 0)
+                srcWidth = mipWidth * 2;
 
             Vector128<int> srcUpperBound = Vector128.Create(mipWidth, mipHeight, mipWidth, mipHeight) * 2 - Vector128<int>.One;
             Vector128<int> sliceMultiplier = Vector128.Create(1, srcWidth, 1, srcWidth);

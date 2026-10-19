@@ -23,7 +23,10 @@ namespace VoxelizationDemo.Editor
         {
             foreach (IInteractionGizmo gizmo in _gizmos)
             {
-                gizmo.UpdateScreenData(VoxelRuntime.Instance.CameraManager, InputSystem.Pointer.MousePosition);
+                if (gizmo.IsEnabled)
+                {
+                    gizmo.UpdateScreenData(VoxelRuntime.Instance.CameraManager, InputSystem.Pointer.MousePosition);
+                }
             }
         }
 
@@ -58,6 +61,14 @@ namespace VoxelizationDemo.Editor
         internal RotateGizmo CreateRotatation()
         {
             RotateGizmo gizmo = new RotateGizmo();
+            _gizmos.Add(gizmo);
+
+            return gizmo;
+        }
+
+        internal ScaleGizmo CreateScale()
+        {
+            ScaleGizmo gizmo = new ScaleGizmo();
             _gizmos.Add(gizmo);
 
             return gizmo;

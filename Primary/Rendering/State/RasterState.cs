@@ -1,47 +1,53 @@
-﻿using Primary.Common.Memory;
-using Primary.Rendering.D3D12;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets;
+using Primary.Common;
+using Primary.Rendering.Commands;
+using Primary.Rendering.Datatypes;
 using Primary.Rendering.Recording;
-using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
+using Primary.Rendering.Statistics;
 using Primary.RHI;
-using System;
-using System.Collections.Generic;
-using System.Numerics;
-using System.Text;
-using TerraFX.Interop.Windows;
-using Vortice.Mathematics;
 
 namespace Primary.Rendering.State
 {
     internal sealed class RasterState : RenderState
     {
-        private DirtyArray<FGTexture> _renderTargets;
-        private DirtyValue<FGTexture> _depthStencil;
+        private readonly FrameGraph _frameGraph;
 
-        private DirtyArray<NullableUnique<FGViewport>> _viewports;
-        private DirtyArray<NullableUnique<FGRect>> _scissors;
+        private DirtyArrayNullable<TextureHandle> _renderTargets;
+        private DirtyValueNullable<TextureHandle> _depthStencil;
+
+        private DirtyArrayNullable<FGViewport> _viewports;
+        private DirtyArrayNullable<FGRect> _scissors;
 
         private DirtyValue<uint> _stencilRef;
+        private DirtyValue<Color> _blendFactor;
 
-        private DirtyValue<SetVertexBufferData> _vertexBuffer;
-        private DirtyValue<SetIndexBufferData> _indexBuffer;
+        private DirtyValueNullable<SetVertexBufferData> _vertexBuffer;
+        private DirtyValueNullable<SetIndexBufferData> _indexBuffer;
 
-        private DirtyValue<int> _pipeline;
+        private DirtyValue<int> _shader;
 
-        internal RasterState() : base()
+        private IndexRange _renderTargetsRange;
+
+        internal RasterState(FrameGraph frameGraph) : base(frameGraph)
         {
-            _renderTargets = new DirtyArray<FGTexture>(8, FGTexture.Invalid);
-            _depthStencil = new DirtyValue<FGTexture>(FGTexture.Invalid);
+            _frameGraph = frameGraph;
 
-            _viewports = new DirtyArray<NullableUnique<FGViewport>>(8, null);
-            _scissors = new DirtyArray<NullableUnique<FGRect>>(8, null);
+            _renderTargets = new DirtyArrayNullable<TextureHandle>(8, TextureHandle.Null);
+            _depthStencil = new DirtyValueNullable<TextureHandle>(TextureHandle.Null);
+
+            _viewports = new DirtyArrayNullable<FGViewport>(8, null);
+            _scissors = new DirtyArrayNullable<FGRect>(8, null);
 
             _stencilRef = new DirtyValue<uint>(0);
+            _blendFactor = new DirtyValue<Color>(Color.White);
 
-            _vertexBuffer = new DirtyValue<SetVertexBufferData>(SetVertexBufferData.Invalid);
-            _indexBuffer = new DirtyValue<SetIndexBufferData>(SetIndexBufferData.Invalid);
+            _vertexBuffer = new DirtyValueNullable<SetVertexBufferData>(null);
+            _indexBuffer = new DirtyValueNullable<SetIndexBufferData>(null);
 
-            _pipeline = new DirtyValue<int>(-1);
+            _shader = new DirtyValue<int>(-1);
+
+            _renderTargetsRange = IndexRange.Empty;
         }
 
         protected override void DisposeInternal(bool disposing) { }
@@ -50,194 +56,285 @@ namespace Primary.Rendering.State
         {
             base.ClearState();
 
-            _renderTargets.Fill(FGTexture.Invalid, false);
-            _depthStencil.Reset(FGTexture.Invalid);
+            _renderTargets.Fill(null, false);
+            _depthStencil.Reset(null);
 
             _viewports.Fill(null, false);
             _scissors.Fill(null, false);
 
             _stencilRef.Reset(0);
+            _blendFactor.Reset(Color.White);
 
-            _vertexBuffer.Reset(SetVertexBufferData.Invalid);
-            _indexBuffer.Reset(SetIndexBufferData.Invalid);
+            _vertexBuffer.Reset(null);
+            _indexBuffer.Reset(null);
 
-            _pipeline.Reset(-1);
+            _shader.Reset(-1);
+
+            _renderTargetsRange = IndexRange.Empty;
         }
 
         internal override void SoftResetForNextPass()
         {
             base.SoftResetForNextPass();
 
-            _renderTargets.FillNew(FGTexture.Invalid);
-            _depthStencil.Value = FGTexture.Invalid;
+            _renderTargets.FillNew(null);
+            _depthStencil.Value = null;
 
             _viewports.FillNew(null);
             _scissors.FillNew(null);
 
             _stencilRef.Value = 0;
+            _blendFactor.Value = Color.White;
 
-            _vertexBuffer.Value = SetVertexBufferData.Invalid;
-            _indexBuffer.Value = SetIndexBufferData.Invalid;
+            _vertexBuffer.Value = null;
+            _indexBuffer.Value = null;
 
-            _pipeline.Value = -1;
+            _shader.Value = -1;
+
+            _renderTargetsRange = IndexRange.Empty;
         }
 
-        internal override bool CommitState(LinearBlockAllocator allocator, CommandRecorder recorder)
+        internal override bool TryCommitState(ref RenderPassStats stats, BarrierGroup barrierGroup, DescriptorAllocator descriptorAllocator, CommandRecorder commandRecorder, ObjectsCache objectsCache)
         {
-            if (_pipeline.Value == -1)
+            if (_shader.Value == -1)
                 return false;
+
+            RHIGraphicsPipeline shader = objectsCache.RetrieveObject<RHIGraphicsPipeline>(_shader.Value);
+
+            bool renderTargetsNeedUpdate = false;
 
             if (_renderTargets.IsAnyDirty)
             {
                 int count = _renderTargets.DirtyCount;
-                int limit = -1;
 
+                _renderTargetsRange = new IndexRange(-1, -1);
                 for (int i = 0; i < count; ++i)
                 {
-                    ref FGTexture texture = ref _renderTargets.GetWithoutDirty(i);
+                    TextureHandle? renderTarget = _renderTargets[i];
 
                     if (_renderTargets.IsDirty(i))
                     {
-                        recorder.AddCommand(RecCommandType.SetRenderTarget, new CmdSetRenderTarget
+                        RHIFormat format = RHIFormat.Unknown;
+                        if (renderTarget.HasValue)
                         {
-                            Slot = (byte)i,
-                            Texture = texture
+                            ref TextureHandle handle = ref renderTarget.DangerousGetValueOrDefaultReference();
+                            format = handle.IsImported ?
+                                _frameGraph.ResourceManager.GetRHIResource(handle).Description.Format :
+                                _frameGraph.ResourceManager.GetDescription(handle).Format;
+                        }
+
+                        commandRecorder.RecordCommand(CmdCommandType.SetRenderTarget, new CmdSetRenderTarget
+                        {
+                            RenderTargetFormat = format,
+                            RenderTarget = descriptorAllocator.GetDescriptorForRenderTarget(renderTarget.GetValueOrDefault(TextureHandle.Null)),
+                            Slot = (byte)i
                         });
 
-                        if (!texture.IsNull)
+                        renderTargetsNeedUpdate = true;
+
+                        if (renderTarget.HasValue)
                         {
-                            recorder.AddResourceToSet(texture);
+                            ref TextureHandle handle = ref renderTarget.DangerousGetValueOrDefaultReference();
+                            barrierGroup.RequestBarrier(handle, commandRecorder.CommandOffset, ResourceBarrierSync.RenderTarget, ResourceBarrierAccess.RenderTarget);
 
-                            if (i == 0)
+                            if (_viewports[i] == null)
                             {
-                                if (!_viewports.GetWithoutDirty(i).HasValue)
+                                if (handle.IsImported)
                                 {
-                                    if (texture.IsExternal)
-                                    {
-                                        ref readonly RHITextureDescription desc = ref texture.Resource!.Description;
-                                        _viewports[i] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
-                                    }
-                                    else
-                                    {
-                                        ref readonly FGTextureDesc desc = ref texture.Description;
-                                        _viewports[i] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
-                                    }
+                                    ref readonly RHITextureDescription desc = ref _frameGraph.ResourceManager.GetRHIResource(handle).Description;
+                                    _viewports[i] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
                                 }
-
-                                if (!_scissors.GetWithoutDirty(i).HasValue)
+                                else
                                 {
-                                    if (texture.IsExternal)
-                                    {
-                                        ref readonly RHITextureDescription desc = ref texture.Resource!.Description;
-                                        _scissors[i] = new FGRect(0, 0, desc.Width, desc.Height);
-                                    }
-                                    else
-                                    {
-                                        ref readonly FGTextureDesc desc = ref texture.Description;
-                                        _scissors[i] = new FGRect(0, 0, desc.Width, desc.Height);
-                                    }
+                                    ref readonly FGTextureDesc desc = ref _frameGraph.ResourceManager.GetDescription(handle);
+                                    _viewports[i] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
                                 }
                             }
+
+                            if (_scissors[i] == null)
+                            {
+                                if (handle.IsImported)
+                                {
+                                    ref readonly RHITextureDescription desc = ref _frameGraph.ResourceManager.GetRHIResource(handle).Description;
+                                    _scissors[i] = new FGRect(0, 0, desc.Width, desc.Height);
+                                }
+                                else
+                                {
+                                    ref readonly FGTextureDesc desc = ref _frameGraph.ResourceManager.GetDescription(handle);
+                                    _scissors[i] = new FGRect(0, 0, desc.Width, desc.Height);
+                                }
+                            }
+
+                            if (_renderTargetsRange.Start == -1)
+                                _renderTargetsRange.Start = i;
+                            _renderTargetsRange.End = i;
                         }
                     }
-
-                    if (!texture.IsNull)
-                        limit = i;
                 }
 
-                recorder.AddCommand(RecCommandType.CommitRenderTargets, new CmdCommitRenderTargets
-                {
-                    ActiveCount = (byte)(limit + 1),
-                    DeferSetState = _depthStencil.IsDirty
-                });
+                if (_renderTargetsRange.Start == -1 || _renderTargetsRange.End == -1)
+                    _renderTargetsRange = IndexRange.Empty;
+                else
+                    ++_renderTargetsRange.End;
 
                 _renderTargets.ClearDirty();
+            }
+            else if (_couldBarriersHaveChanged)
+            {
+                for (int i = _renderTargetsRange.Start; i < _renderTargetsRange.End; ++i)
+                {
+                    TextureHandle? renderTarget = _renderTargets[i];
+                    if (renderTarget.HasValue)
+                    {
+                        barrierGroup.RequestBarrier(renderTarget.GetValueOrDefault(), commandRecorder.CommandOffset, ResourceBarrierSync.RenderTarget, ResourceBarrierAccess.RenderTarget);
+                    }
+                }
             }
 
             if (_depthStencil.IsDirty)
             {
-                FGTexture texture = _depthStencil.Value;
-                if (!texture.IsNull)
+                TextureHandle? depthStencil = _depthStencil.Value;
+                if (depthStencil.HasValue)
                 {
-                    recorder.AddResourceToSet(texture);
+                    ref TextureHandle handle = ref depthStencil.DangerousGetValueOrDefaultReference();
+                    barrierGroup.RequestBarrier(handle, commandRecorder.CommandOffset, ResourceBarrierSync.DepthStencil, ResourceBarrierAccess.DepthStencilWrite);
 
-                    if (!_viewports.GetWithoutDirty(0).HasValue)
+                    if (!_renderTargets[0].HasValue)
                     {
-                        if (texture.IsExternal)
+                        if (_viewports[0] == null)
                         {
-                            ref readonly RHITextureDescription desc = ref texture.Resource!.Description;
-                            _viewports[0] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
+                            if (handle.IsImported)
+                            {
+                                ref readonly RHITextureDescription desc = ref _frameGraph.ResourceManager.GetRHIResource(handle).Description;
+                                _viewports[0] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
+                            }
+                            else
+                            {
+                                ref readonly FGTextureDesc desc = ref _frameGraph.ResourceManager.GetDescription(handle);
+                                _viewports[0] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
+                            }
                         }
-                        else
-                        {
-                            ref readonly FGTextureDesc desc = ref texture.Description;
-                            _viewports[0] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
-                        }
-                    }
 
-                    if (!_scissors.GetWithoutDirty(0).HasValue)
-                    {
-                        if (texture.IsExternal)
+                        if (_scissors[0] == null)
                         {
-                            ref readonly RHITextureDescription desc = ref texture.Resource!.Description;
-                            _scissors[0] = new FGRect(0, 0, desc.Width, desc.Height);
-                        }
-                        else
-                        {
-                            ref readonly FGTextureDesc desc = ref texture.Description;
-                            _scissors[0] = new FGRect(0, 0, desc.Width, desc.Height);
+                            if (handle.IsImported)
+                            {
+                                ref readonly RHITextureDescription desc = ref _frameGraph.ResourceManager.GetRHIResource(handle).Description;
+                                _scissors[0] = new FGRect(0, 0, desc.Width, desc.Height);
+                            }
+                            else
+                            {
+                                ref readonly FGTextureDesc desc = ref _frameGraph.ResourceManager.GetDescription(handle);
+                                _scissors[0] = new FGRect(0, 0, desc.Width, desc.Height);
+                            }
                         }
                     }
                 }
 
-                recorder.AddCommand(RecCommandType.SetDepthStencil, new CmdSetDepthStencil
-                {
-                    Texture = texture
-                });
-
                 _depthStencil.IsDirty = false;
+                renderTargetsNeedUpdate = true;
+            }
+            else if (_couldBarriersHaveChanged)
+            {
+                TextureHandle? depthStencil = _depthStencil.Value;
+                if (depthStencil.HasValue)
+                {
+                    barrierGroup.RequestBarrier(depthStencil.GetValueOrDefault(), commandRecorder.CommandOffset, ResourceBarrierSync.DepthStencil, ResourceBarrierAccess.DepthStencilWrite);
+                }
+            }
+
+            if (renderTargetsNeedUpdate)
+            {
+                TextureHandle? depthStencil = _depthStencil.Value;
+
+                RHIFormat format = RHIFormat.Unknown;
+                if (depthStencil.HasValue)
+                {
+                    ref TextureHandle handle = ref depthStencil.DangerousGetValueOrDefaultReference();
+                    format = handle.IsImported ?
+                        _frameGraph.ResourceManager.GetRHIResource(handle).Description.Format :
+                        _frameGraph.ResourceManager.GetDescription(handle).Format;
+                }
+
+                commandRecorder.RecordCommand(CmdCommandType.CommitRenderTargets, new CmdCommitRenderTargets
+                {
+                    DepthStencilFormat = format,
+                    DepthStencil = !_depthStencil.Value.HasValue ? CPUDescriptorCmdData.Null : descriptorAllocator.GetDescriptorForDepthStencil(_depthStencil.Value.GetValueOrDefault()),
+                    StartSlot = (byte)_renderTargetsRange.Start,
+                    NumRenderTargets = (byte)_renderTargetsRange.Length
+                });
             }
 
             if (_viewports.IsAnyDirty)
             {
                 int count = _viewports.DirtyCount;
-                int limit = -1;
+
+                int startIndex = -1;
+                int endIndex = -1;
 
                 for (int i = 0; i < count; ++i)
                 {
-                    ref NullableUnique<FGViewport> viewport = ref _viewports.GetWithoutDirty(i);
+                    FGViewport? viewport = _viewports[i];
                     if (_viewports.IsDirty(i))
                     {
                         if (!viewport.HasValue)
                         {
-                            ref FGTexture rtTex = ref _renderTargets.GetWithoutDirty(i);
-                            if (!rtTex.IsNull)
+                            TextureHandle? rtTex = _renderTargets[i];
+                            if (rtTex.HasValue)
                             {
-                                (int width, int height, _) = FGResourceUtility.GetTextureSize(rtTex);
-                                viewport = new FGViewport(0, 0, width, height);
+                                ref TextureHandle handle = ref rtTex.DangerousGetValueOrDefaultReference();
+                                if (handle.IsImported)
+                                {
+                                    ref readonly RHITextureDescription desc = ref _frameGraph.ResourceManager.GetRHIResource(handle).Description;
+                                    _viewports[0] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
+                                }
+                                else
+                                {
+                                    ref readonly FGTextureDesc desc = ref _frameGraph.ResourceManager.GetDescription(handle);
+                                    _viewports[0] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
+                                }
+                            }
+                            else if (i == 0 && _depthStencil.Value.HasValue)
+                            {
+                                TextureHandle handle = _depthStencil.Value.GetValueOrDefault();
+                                if (handle.IsImported)
+                                {
+                                    ref readonly RHITextureDescription desc = ref _frameGraph.ResourceManager.GetRHIResource(handle).Description;
+                                    _viewports[0] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
+                                }
+                                else
+                                {
+                                    ref readonly FGTextureDesc desc = ref _frameGraph.ResourceManager.GetDescription(handle);
+                                    _viewports[0] = new FGViewport(0.0f, 0.0f, desc.Width, desc.Height);
+                                }
                             }
                         }
 
                         if (viewport.HasValue)
                         {
-                            recorder.AddCommand(RecCommandType.SetViewport, new CmdSetViewport
-                            {
-                                Slot = (byte)i,
-                                Viewport = viewport.Value
-                            });
+                            commandRecorder.RecordCommand(CmdCommandType.SetViewport, new CmdSetViewport { Viewport = viewport.GetValueOrDefault(), Slot = (byte)i });
                         }
                     }
 
                     if (viewport.HasValue)
-                        limit = i;
+                    {
+                        if (startIndex == -1)
+                            startIndex = i;
+                        endIndex = i;
+                    }
                 }
 
-                if (limit != -1)
+                ++endIndex;
+                if (startIndex != endIndex)
                 {
-                    recorder.AddCommand(RecCommandType.CommitViewports, new CmdCommitViewports
+                    if (startIndex != -1)
                     {
-                        ActiveCount = (byte)(limit + 1),
-                    });
+                        commandRecorder.RecordCommand(CmdCommandType.CommitViewports, new CmdCommitViewports { StartSlot = (byte)startIndex, NumViewportsToSet = (byte)(endIndex - startIndex) });
+                    }
+                    else
+                    {
+                        commandRecorder.RecordCommand(CmdCommandType.CommitViewports, new CmdCommitViewports { });
+                    }
                 }
 
                 _viewports.ClearDirty();
@@ -246,45 +343,73 @@ namespace Primary.Rendering.State
             if (_scissors.IsAnyDirty)
             {
                 int count = _scissors.DirtyCount;
-                int limit = -1;
+
+                int startIndex = -1;
+                int endIndex = -1;
 
                 for (int i = 0; i < count; ++i)
                 {
-                    ref NullableUnique<FGRect> scissor = ref _scissors.GetWithoutDirty(i);
+                    FGRect? rect = _scissors[i];
                     if (_scissors.IsDirty(i))
                     {
-                        if (!scissor.HasValue)
+                        if (!rect.HasValue)
                         {
-                            ref FGTexture rtTex = ref _renderTargets.GetWithoutDirty(i);
-                            if (!rtTex.IsNull)
+                            TextureHandle? rtTex = _renderTargets[i];
+                            if (rtTex.HasValue)
                             {
-                                (int width, int height, _) = FGResourceUtility.GetTextureSize(rtTex);
-                                scissor = new FGRect(0, 0, width, height);
+                                ref TextureHandle handle = ref rtTex.DangerousGetValueOrDefaultReference();
+                                if (handle.IsImported)
+                                {
+                                    ref readonly RHITextureDescription desc = ref _frameGraph.ResourceManager.GetRHIResource(handle).Description;
+                                    _scissors[0] = new FGRect(0, 0, desc.Width, desc.Height);
+                                }
+                                else
+                                {
+                                    ref readonly FGTextureDesc desc = ref _frameGraph.ResourceManager.GetDescription(handle);
+                                    _scissors[0] = new FGRect(0, 0, desc.Width, desc.Height);
+                                }
+                            }
+                            else if (i == 0 && _depthStencil.Value.HasValue)
+                            {
+                                TextureHandle handle = _depthStencil.Value.GetValueOrDefault();
+                                if (handle.IsImported)
+                                {
+                                    ref readonly RHITextureDescription desc = ref _frameGraph.ResourceManager.GetRHIResource(handle).Description;
+                                    _scissors[0] = new FGRect(0, 0, desc.Width, desc.Height);
+                                }
+                                else
+                                {
+                                    ref readonly FGTextureDesc desc = ref _frameGraph.ResourceManager.GetDescription(handle);
+                                    _scissors[0] = new FGRect(0, 0, desc.Width, desc.Height);
+                                }
                             }
                         }
 
-                        if (scissor.HasValue)
+                        if (rect.HasValue)
                         {
-                            recorder.AddCommand(RecCommandType.SetScissor, new CmdSetScissor
-                            {
-                                Slot = (byte)i,
-                                Scissor = scissor.Value
-                            });
-
-                            limit = i;
+                            commandRecorder.RecordCommand(CmdCommandType.SetScissor, new CmdSetScissor { Rect = rect.GetValueOrDefault(), Slot = (byte)i });
                         }
                     }
 
-                    if (scissor.HasValue)
-                        limit = i;
+                    if (rect.HasValue)
+                    {
+                        if (startIndex == -1)
+                            startIndex = i;
+                        endIndex = i;
+                    }
                 }
 
-                if (limit != -1)
+                ++endIndex;
+                if (startIndex != endIndex)
                 {
-                    recorder.AddCommand(RecCommandType.CommitScissors, new CmdCommitScissors
+                    if (startIndex != -1)
                     {
-                        ActiveCount = (byte)(limit + 1),
-                    });
+                        commandRecorder.RecordCommand(CmdCommandType.CommitScissors, new CmdCommitViewports { StartSlot = (byte)startIndex, NumViewportsToSet = (byte)(endIndex - startIndex) });
+                    }
+                    else
+                    {
+                        commandRecorder.RecordCommand(CmdCommandType.CommitScissors, new CmdCommitViewports { });
+                    }
                 }
 
                 _scissors.ClearDirty();
@@ -292,71 +417,135 @@ namespace Primary.Rendering.State
 
             if (_stencilRef.IsDirty)
             {
-                recorder.AddCommand(RecCommandType.SetStencilReference, new CmdSetStencilRef
-                {
-                    StencilRef = _stencilRef.Value
-                });
-
+                commandRecorder.RecordCommand(CmdCommandType.SetStencilRef, new CmdSetStencilRef { StencilRef = _stencilRef.Value });
                 _stencilRef.IsDirty = false;
+            }
+
+            if (_blendFactor.IsDirty)
+            {
+                commandRecorder.RecordCommand(CmdCommandType.SetStencilRef, new CmdSetBlendFactor { Color = _blendFactor.Value });
+                _blendFactor.IsDirty = false;
             }
 
             if (_vertexBuffer.IsDirty)
             {
-                SetVertexBufferData bufferData = _vertexBuffer.Value;
-                if (!bufferData.Buffer.IsNull)
-                    recorder.AddResourceToSet(bufferData.Buffer);
-
-                recorder.AddCommand(RecCommandType.SetVertexBuffer, new CmdSetVertexBuffer
+                SetVertexBufferData? buffer = _vertexBuffer.Value;
+                if (buffer.HasValue)
                 {
-                    Resource = bufferData.Buffer,
-                    BufferSize = FGResourceUtility.GetWidth(bufferData.Buffer),
-                    Stride = (ushort)(bufferData.Stride == 0 ? FGResourceUtility.GetStride(bufferData.Buffer) : bufferData.Stride)
-                });
+                    SetVertexBufferData value = buffer.GetValueOrDefault();
+
+                    ushort byteStride = (ushort)value.Stride;
+                    uint byteWidth = 0;
+
+                    if (value.Buffer.IsImported)
+                    {
+                        ref readonly RHIBufferDescription desc = ref _frameGraph.ResourceManager.GetRHIResource(value.Buffer).Description;
+                        byteWidth = desc.Width;
+
+                        if (byteStride == 0)
+                            byteStride = (ushort)desc.Stride;
+                    }
+                    else
+                    {
+                        ref readonly FGBufferDesc desc = ref _frameGraph.ResourceManager.GetDescription(value.Buffer);
+                        byteWidth = (uint)(desc.ElementCount * desc.Stride);
+
+                        if (byteStride == 0)
+                            byteStride = (ushort)desc.Stride;
+                    }
+
+                    barrierGroup.RequestBarrier(value.Buffer, commandRecorder.CommandOffset, ResourceBarrierSync.VertexShading, ResourceBarrierAccess.VertexBuffer);
+                    commandRecorder.RecordCommand(CmdCommandType.SetVertexBuffer, new CmdSetVertexBuffer
+                    {
+                        Buffer = value.Buffer,
+                        ByteWidth = byteWidth,
+                        ByteStride = byteStride
+                    });
+                }
 
                 _vertexBuffer.IsDirty = false;
+            }
+            else if (_couldBarriersHaveChanged)
+            {
+                SetVertexBufferData? buffer = _vertexBuffer.Value;
+                if (buffer.HasValue)
+                {
+                    barrierGroup.RequestBarrier(buffer.GetValueOrDefault().Buffer, commandRecorder.CommandOffset, ResourceBarrierSync.VertexShading, ResourceBarrierAccess.VertexBuffer);
+                }
             }
 
             if (_indexBuffer.IsDirty)
             {
-                SetIndexBufferData bufferData = _indexBuffer.Value;
-                if (!bufferData.Buffer.IsNull)
-                    recorder.AddResourceToSet(bufferData.Buffer);
-
-                recorder.AddCommand(RecCommandType.SetIndexBuffer, new CmdSetIndexBuffer
+                SetIndexBufferData? buffer = _indexBuffer.Value;
+                if (buffer.HasValue)
                 {
-                    Resource = bufferData.Buffer,
-                    BufferSize = FGResourceUtility.GetWidth(bufferData.Buffer),
-                    Stride = (ushort)(bufferData.Stride == 0 ? FGResourceUtility.GetStride(bufferData.Buffer) : bufferData.Stride)
-                });
+                    SetIndexBufferData value = buffer.GetValueOrDefault();
+
+                    ushort byteStride = (ushort)value.Stride;
+                    uint byteWidth = 0;
+
+                    if (value.Buffer.IsImported)
+                    {
+                        ref readonly RHIBufferDescription desc = ref _frameGraph.ResourceManager.GetRHIResource(value.Buffer).Description;
+                        byteWidth = desc.Width;
+
+                        if (byteStride == 0)
+                            byteStride = (ushort)desc.Stride;
+                    }
+                    else
+                    {
+                        ref readonly FGBufferDesc desc = ref _frameGraph.ResourceManager.GetDescription(value.Buffer);
+                        byteWidth = (uint)(desc.ElementCount * desc.Stride);
+
+                        if (byteStride == 0)
+                            byteStride = (ushort)desc.Stride;
+                    }
+
+                    barrierGroup.RequestBarrier(value.Buffer, commandRecorder.CommandOffset, ResourceBarrierSync.IndexInput, ResourceBarrierAccess.IndexBuffer);
+                    commandRecorder.RecordCommand(CmdCommandType.SetIndexBuffer, new CmdSetIndexBuffer
+                    {
+                        Buffer = value.Buffer,
+                        ByteWidth = byteWidth,
+                        ByteStride = byteStride
+                    });
+                }
 
                 _indexBuffer.IsDirty = false;
             }
-
-            if (_pipeline.IsDirty)
+            else if (_couldBarriersHaveChanged)
             {
-                recorder.AddCommand(RecCommandType.SetPipeline, new CmdSetPipeline
+                SetIndexBufferData? buffer = _indexBuffer.Value;
+                if (buffer.HasValue)
                 {
-                    Index = _pipeline.Value
-                });
-
-                _pipeline.IsDirty = false;
+                    barrierGroup.RequestBarrier(buffer.GetValueOrDefault().Buffer, commandRecorder.CommandOffset, ResourceBarrierSync.IndexInput, ResourceBarrierAccess.IndexBuffer);
+                }
             }
 
-            return base.CommitState(allocator, recorder);
+            if (_shader.IsDirty || renderTargetsNeedUpdate)
+            {
+                if (_shader.IsDirty)
+                    SetPipelineLimits(shader);
+
+                commandRecorder.RecordCommand(CmdCommandType.SetPipeline, new CmdSetPipeline { PipelineIndex = _shader.Value });
+                _shader.IsDirty = false;
+            }
+
+            return base.TryCommitState(ref stats, barrierGroup, descriptorAllocator, commandRecorder, objectsCache);
         }
 
-        internal void SetRenderTarget(int slot, FGTexture texture) => _renderTargets[slot] = texture;
-        internal void SetDepthStencil(FGTexture texture) => _depthStencil.Value = texture;
+        internal void SetRenderTarget(int slot, TextureHandle? texture) => _renderTargets[slot] = texture;
+        internal void SetDepthStencil(TextureHandle? texture) => _depthStencil.Value = texture;
 
         internal void SetViewport(int slot, FGViewport? viewport) => _viewports[slot] = viewport;
         internal void SetScissor(int slot, FGRect? scissor) => _scissors[slot] = scissor;
 
         internal void SetStencilRef(uint stencilRef) => _stencilRef.Value = stencilRef;
+        internal void SetBlendFactor(Color color) => _blendFactor.Value = color;
 
-        internal void SetVertexBuffer(SetVertexBufferData bufferData) => _vertexBuffer.Value = bufferData;
-        internal void SetIndexBuffer(SetIndexBufferData bufferData) => _indexBuffer.Value = bufferData;
+        internal void SetVertexBuffer(BufferHandle? buffer, int stride) => _vertexBuffer.Value = buffer.HasValue ? new SetVertexBufferData(buffer.Value, stride) : null;
+        internal void SetIndexBuffer(BufferHandle? buffer, int stride) => _indexBuffer.Value = buffer.HasValue ? new SetIndexBufferData(buffer.Value, stride) : null;
 
-        internal void SetPipeline(int pipelineIndex) => _pipeline.Value = pipelineIndex;
+        internal void SetShader(int shaderIndex) => _shader.Value = shaderIndex;
 
         private readonly record struct NullableUnique<T>(T Value, bool HasValue) : IEquatable<NullableUnique<T>> where T : struct, IEquatable<T>
         {
@@ -377,12 +566,6 @@ namespace Primary.Rendering.State
         }
     }
 
-    internal readonly record struct SetVertexBufferData(FGBuffer Buffer, uint Stride)
-    {
-        public static readonly SetVertexBufferData Invalid = new SetVertexBufferData(FGBuffer.Invalid, 0xffffffff);
-    }
-    internal readonly record struct SetIndexBufferData(FGBuffer Buffer, uint Stride)
-    {
-        public static readonly SetIndexBufferData Invalid = new SetIndexBufferData(FGBuffer.Invalid, 0xffffffff);
-    }
+    internal readonly record struct SetVertexBufferData(BufferHandle Buffer, int Stride);
+    internal readonly record struct SetIndexBufferData(BufferHandle Buffer, int Stride);
 }

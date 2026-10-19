@@ -1,13 +1,14 @@
-﻿using CommunityToolkit.HighPerformance;
-using Primary.Assets;
-using Primary.Common;
-using Primary.Rendering.Resources;
-using Primary.RHI;
-using System.Collections.Frozen;
+﻿using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using CommunityToolkit.HighPerformance;
+using Primary.Assets;
+using Primary.Common;
+using Primary.Memory.Native;
+using Primary.Rendering.Resources;
+using Primary.RHI;
 
 namespace Primary.Rendering.Assets
 {
@@ -16,10 +17,11 @@ namespace Primary.Rendering.Assets
         private IShaderResourceSource? _shader;
         private int _loadIndex;
 
-        private FrozenDictionary<FastStringHash, PropertyRemapData> _remapDict;
-        private int _propertyBlockSize;
+        private ShHeaderFlags _headerFlags;
 
-        private nint _propertyData;
+        private FrozenDictionary<FastStringHash, PropertyRemapData> _remapDict;
+
+        private ArrayPtr<byte> _propertyData;
         private PropertyData[] _properties;
 
         private int _resourceCount;
@@ -34,10 +36,9 @@ namespace Primary.Rendering.Assets
             _loadIndex = -1;
 
             _remapDict = FrozenDictionary<FastStringHash, PropertyRemapData>.Empty;
-            _propertyBlockSize = 0;
 
-            _propertyData = nint.Zero;
-            _properties = Array.Empty<PropertyData>();
+            _propertyData = ArrayPtr<byte>.Null;
+            _properties = [];
 
             _resourceCount = 0;
 
@@ -51,9 +52,9 @@ namespace Primary.Rendering.Assets
         {
             if (!_disposedValue)
             {
-                if (_propertyData != nint.Zero)
-                    NativeMemory.Free(_propertyData.ToPointer());
-                _propertyData = nint.Zero;
+                if (!_propertyData.IsNull)
+                    NativeMemory.Free(_propertyData.Pointer);
+                _propertyData = ArrayPtr<byte>.Null;
 
                 _disposedValue = true;
             }
@@ -80,8 +81,8 @@ namespace Primary.Rendering.Assets
         /// <summary>Not thread-safe</summary>
         public void Clear()
         {
-            if (_propertyBlockSize > 0)
-                NativeMemory.Clear(_propertyData.ToPointer(), (nuint)_propertyBlockSize);
+            if (_propertyData.IsNull)
+                _propertyData.Clear();
             Array.Clear(_properties);
 
             ++_updateIndex;
@@ -90,6 +91,8 @@ namespace Primary.Rendering.Assets
         /// <summary>Not thread-safe</summary>
         public bool Reload(IShaderResourceSource? replacementShader = null)
         {
+            IShaderResourceSource? oldShader = _shader;
+
             _shader = replacementShader ?? _shader;
             if (_shader != null && !_shader.IsLoaded)
             {
@@ -101,44 +104,67 @@ namespace Primary.Rendering.Assets
 
             if (_shader == null)
             {
-                if (_propertyData != nint.Zero)
-                    NativeMemory.Free(_propertyData.ToPointer());
+                if (!_propertyData.IsNull)
+                    NativeMemory.Free(_propertyData.Pointer);
+
+                _headerFlags = ShHeaderFlags.None;
 
                 _remapDict = FrozenDictionary<FastStringHash, PropertyRemapData>.Empty;
-                _propertyBlockSize = 0;
 
-                _propertyData = nint.Zero;
-                _properties = Array.Empty<PropertyData>();
+                _propertyData = ArrayPtr<byte>.Null;
+                _properties = [];
 
                 _resourceCount = 0;
             }
             else
             {
-                if (Flags.HasFlag(_shader.HeaderFlags, ShHeaderFlags.ExternalProperties))
-                {
-                    _propertyBlockSize = 0;
-                }
-                else
-                {
-                    if (_propertyBlockSize != _shader.PropertyBlockSize || _propertyData == nint.Zero)
-                    {
-                        if (_propertyData != nint.Zero)
-                            NativeMemory.Free(_propertyData.ToPointer());
-                        if (_shader.PropertyBlockSize > 0)
-                            _propertyData = (nint)NativeMemory.Alloc((nuint)_shader.PropertyBlockSize);
+                MemoryScope scope = default;
 
-                        _propertyBlockSize = _shader.PropertyBlockSize;
+                ScopedPtr<byte> oldPropertyData = ScopedPtr<byte>.Null;
+                int oldPropertyDataSize = 0;
+
+                FrozenDictionary<FastStringHash, PropertyRemapData> oldRemapDict = _remapDict;
+                PropertyData[] oldProperties = _properties;
+
+                if (!_propertyData.IsNullOrEmpty && _shader.PropertyBlockSize > 0)
+                {
+                    scope = ScopedMemory.PushScope();
+                    oldPropertyData = ScopedMemory.Allocate((nuint)_propertyData.Length);
+                    oldPropertyDataSize = _propertyData.Length;
+
+                    _propertyData.CopyTo(oldPropertyData.AsSpan(_propertyData.Length));
+                }
+
+                if (_propertyData.Length != _shader.PropertyBlockSize)
+                {
+                    if (!_propertyData.IsNull)
+                    {
+                        NativeMemory.Free(_propertyData.Pointer);
+                    }
+
+                    if (_shader.PropertyBlockSize > 0)
+                    {
+                        _propertyData = new ArrayPtr<byte>((byte*)NativeMemory.Alloc((nuint)_shader.PropertyBlockSize), _shader.PropertyBlockSize);
+                    }
+                    else
+                    {
+                        _propertyData = ArrayPtr<byte>.Null;
                     }
                 }
+                else if (!_propertyData.IsNull)
+                {
+                    _propertyData.Clear();
+                }
 
-                if (_properties.Length != _shader.Properties.Length)
-                    _properties = _shader.Properties.IsEmpty ? Array.Empty<PropertyData>() : new PropertyData[_shader.Properties.Length];
+                _properties = _shader.Properties.IsEmpty ? [] : new PropertyData[_shader.ResourceCount];
                 Array.Fill(_properties, PropertyData.Null);
 
                 _resourceCount = 0;
 
                 if (_shader.Properties.IsEmpty)
+                {
                     _remapDict = FrozenDictionary<FastStringHash, PropertyRemapData>.Empty;
+                }
                 else
                 {
                     Dictionary<FastStringHash, PropertyRemapData> remapDict = new Dictionary<FastStringHash, PropertyRemapData>();
@@ -147,30 +173,60 @@ namespace Primary.Rendering.Assets
                     for (int i = 0; i < span.Length; ++i)
                     {
                         ref readonly ShaderProperty property = ref span[i];
-                        if (property.ChildIndex != ushort.MaxValue)
+                        if (oldRemapDict.TryGetValue(property.Name, out PropertyRemapData remapData) || oldRemapDict.TryGetValue(property.DisplayName, out remapData))
                         {
-                            _properties[property.ChildIndex] = new PropertyData(property.IndexOrByteOffset, FGResource.Invalid);
+                            if (remapData.Type == property.Type)
+                            {
+                                ref PropertyData propertyData = ref oldProperties[remapData.IndexOrByteOffset];
+                                _properties[property.IndexOrByteOffset] = new PropertyData(property.IndexOrByteOffset, propertyData.FGResource, propertyData.ObjResource, propertyData.Intent);
+
+                                switch (remapData.Type)
+                                {
+                                    case ShPropertyType.Buffer:
+                                    case ShPropertyType.Texture:
+                                    case ShPropertyType.Sampler: continue;
+
+                                    case ShPropertyType.Single:
+                                    case ShPropertyType.Double:
+                                    case ShPropertyType.UInt32:
+                                    case ShPropertyType.Int32:
+                                    case ShPropertyType.Vector2:
+                                    case ShPropertyType.Vector3:
+                                    case ShPropertyType.Vector4:
+                                    case ShPropertyType.Matrix4x4:
+                                        {
+                                            if (!oldPropertyData.IsNull && remapData.IndexOrByteOffset + remapData.ByteWidthOrChildIndex < oldPropertyDataSize && remapData.ByteWidthOrChildIndex == property.ByteWidth)
+                                            {
+                                                oldPropertyData.Copy(_propertyData.Pointer + property.IndexOrByteOffset, remapData.ByteWidthOrChildIndex);
+                                            }
+
+                                            continue;
+                                        }
+
+                                    case ShPropertyType.Struct: continue;
+                                }
+                            }
                         }
+
+                        if (property.Type <= ShPropertyType.Sampler)
+                            _properties[property.IndexOrByteOffset] = new PropertyData(property.IndexOrByteOffset, ResourceHandle.Null);
                     }
 
                     foreach (ref readonly ShaderProperty property in _shader.Properties)
                     {
-                        if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
+                        PropertyRemapData remapData = new PropertyRemapData
                         {
-                            PropertyRemapData remapData = new PropertyRemapData
-                            {
-                                Type = property.Type,
-                                IndexOrByteOffset = property.IndexOrByteOffset,
-                                ByteWidthOrChildIndex = property.Type <= ShPropertyType.Texture ? property.ChildIndex : property.ByteWidth,
+                            Type = property.Type,
+                            IndexOrByteOffset = property.IndexOrByteOffset,
+                            ByteWidthOrChildIndex = property.Type <= ShPropertyType.Texture ? property.ChildIndex : property.ByteWidth,
 
-                                ParentIndex = property.Type <= ShPropertyType.Sampler ? _properties[property.IndexOrByteOffset].ParentIndex : ushort.MaxValue
-                            };
+                            ParentIndex = property.Type <= ShPropertyType.Sampler ? _properties[property.IndexOrByteOffset].ParentIndex : ushort.MaxValue
+                        };
 
-                            remapDict[property.Name] = remapData;
+                        remapDict[property.Name] = remapData;
 
-                            if (property.DisplayName != property.Name)
-                                remapDict[property.DisplayName] = remapData;
-                        }
+                        if (property.DisplayName != property.Name)
+                            remapDict[property.DisplayName] = remapData;
 
                         if (property.Type <= ShPropertyType.Sampler)
                             _resourceCount++;
@@ -178,6 +234,9 @@ namespace Primary.Rendering.Assets
 
                     _remapDict = remapDict.ToFrozenDictionary();
                 }
+
+                _headerFlags = _shader.HeaderFlags;
+                scope.Dispose();
             }
 
             ++_updateIndex;
@@ -192,7 +251,7 @@ namespace Primary.Rendering.Assets
                 if (remap.Type != type)
                     return @default;
 
-                return *(T*)((byte*)_propertyData.ToPointer() + remap.IndexOrByteOffset);
+                return *(T*)((byte*)_propertyData.Pointer + remap.IndexOrByteOffset);
             }
 
             return @default;
@@ -206,14 +265,14 @@ namespace Primary.Rendering.Assets
                 if (remap.Type != type)
                     return;
 
-                *(T*)((byte*)_propertyData.ToPointer() + remap.IndexOrByteOffset) = value;
+                *(T*)((byte*)_propertyData.Pointer + remap.IndexOrByteOffset) = value;
                 ++_updateIndex;
             }
         }
 
         #region Resources
         /// <summary>Not thread-safe</summary>
-        public void SetResource(string id, FGBuffer buffer)
+        public void SetResource(string id, BufferHandle buffer)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -227,7 +286,7 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public void SetResource(string id, FGTexture texture, PropertyBindIntent intent = PropertyBindIntent.Default)
+        public void SetResource(string id, TextureHandle texture, PropertyBindIntent intent = PropertyBindIntent.Default)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
@@ -236,7 +295,7 @@ namespace Primary.Rendering.Assets
                     return;
 
                 if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
-                    _properties[remap.ByteWidthOrChildIndex] = new PropertyData(remap.IndexOrByteOffset, FGResource.Invalid);
+                    _properties[remap.ByteWidthOrChildIndex] = new PropertyData(remap.IndexOrByteOffset, TextureHandle.Null);
 
                 _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, texture, Intent: intent);
                 ++_updateIndex;
@@ -252,7 +311,7 @@ namespace Primary.Rendering.Assets
                 if (remap.Type != ShPropertyType.Buffer)
                     return;
 
-                _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, new FGResource(buffer, null));
+                _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, TextureHandle.Null, buffer);
                 ++_updateIndex;
             }
         }
@@ -267,9 +326,9 @@ namespace Primary.Rendering.Assets
                     return;
 
                 if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
-                    _properties[remap.ByteWidthOrChildIndex] = new PropertyData(remap.IndexOrByteOffset, FGResource.Invalid);
+                    _properties[remap.ByteWidthOrChildIndex] = new PropertyData(remap.IndexOrByteOffset, ResourceHandle.Null);
 
-                _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, new FGResource(texture, null), Intent: intent);
+                _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, ResourceHandle.Null, texture, Intent: intent);
                 ++_updateIndex;
             }
         }
@@ -283,11 +342,11 @@ namespace Primary.Rendering.Assets
                 if (remap.Type != ShPropertyType.Texture)
                     return;
 
-                _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, FGResource.Invalid, texture);
+                _properties[remap.IndexOrByteOffset] = new PropertyData(remap.ParentIndex, ResourceHandle.Null, texture);
 
                 if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
                 {
-                    _properties[remap.ByteWidthOrChildIndex] = new PropertyData(remap.IndexOrByteOffset, FGResource.Invalid);
+                    _properties[remap.ByteWidthOrChildIndex] = new PropertyData(remap.IndexOrByteOffset, ResourceHandle.Null);
                 }
 
                 ++_updateIndex;
@@ -295,19 +354,19 @@ namespace Primary.Rendering.Assets
         }
 
         /// <summary>Not thread-safe</summary>
-        public FGBuffer GetFrameGraphBuffer(string id)
+        public BufferHandle GetFrameGraphBuffer(string id)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
             {
                 if (remap.Type != ShPropertyType.Buffer)
-                    return FGBuffer.Invalid;
+                    return BufferHandle.Null;
 
                 PropertyData data = _properties[remap.IndexOrByteOffset];
-                return data.Resource.IsExternal ? FGBuffer.Invalid : new FGBuffer(data.Resource);
+                return data.FGResource.AsBuffer();
             }
 
-            return FGBuffer.Invalid;
+            return BufferHandle.Null;
         }
 
         /// <summary>Not thread-safe</summary>
@@ -320,26 +379,26 @@ namespace Primary.Rendering.Assets
                     return null;
 
                 PropertyData data = _properties[remap.IndexOrByteOffset];
-                return data.Resource.Resource as RHIBuffer;
+                return data.ObjResource as RHIBuffer;
             }
 
             return null;
         }
 
         /// <summary>Not thread-safe</summary>
-        public FGTexture GetFrameGraphTexture(string id)
+        public TextureHandle GetFrameGraphTexture(string id)
         {
             ref readonly PropertyRemapData remap = ref _remapDict.GetValueRefOrNullRef(id);
             if (!Unsafe.IsNullRef(in remap))
             {
                 if (remap.Type != ShPropertyType.Texture)
-                    return FGTexture.Invalid;
+                    return TextureHandle.Null;
 
                 PropertyData data = _properties[remap.IndexOrByteOffset];
-                return data.Resource.IsExternal ? FGTexture.Invalid : new FGTexture(data.Resource);
+                return data.FGResource.AsTexture();
             }
 
-            return FGTexture.Invalid;
+            return TextureHandle.Null;
         }
 
         /// <summary>Not thread-safe</summary>
@@ -352,7 +411,7 @@ namespace Primary.Rendering.Assets
                     return null;
 
                 PropertyData data = _properties[remap.IndexOrByteOffset];
-                return data.Resource.Resource as RHITexture;
+                return data.ObjResource as RHITexture;
             }
 
             return null;
@@ -368,7 +427,7 @@ namespace Primary.Rendering.Assets
                     return null;
 
                 PropertyData data = _properties[remap.IndexOrByteOffset];
-                return data.Aux as TextureAsset;
+                return data.ObjResource as TextureAsset;
             }
 
             return null;
@@ -386,7 +445,7 @@ namespace Primary.Rendering.Assets
                 if (remap.ByteWidthOrChildIndex != ushort.MaxValue)
                 {
                     PropertyData currentData = _properties[remap.IndexOrByteOffset];
-                    if (currentData.Aux != null)
+                    if (currentData.ObjResource != null)
                         _properties[remap.ByteWidthOrChildIndex] = PropertyData.Null;
                 }
 
@@ -424,7 +483,7 @@ namespace Primary.Rendering.Assets
                 if (Unsafe.SizeOf<T>() != remap.ByteWidthOrChildIndex)
                     return;
 
-                *(T*)((byte*)_propertyData.ToPointer() + remap.IndexOrByteOffset) = value;
+                *(T*)((byte*)_propertyData.Pointer + remap.IndexOrByteOffset) = value;
                 ++_updateIndex;
             }
         }
@@ -456,7 +515,7 @@ namespace Primary.Rendering.Assets
                 if (Unsafe.SizeOf<T>() != remap.ByteWidthOrChildIndex)
                     return default;
 
-                return *(T*)((byte*)_propertyData.ToPointer() + remap.IndexOrByteOffset);
+                return *(T*)((byte*)_propertyData.Pointer + remap.IndexOrByteOffset);
             }
 
             return default;
@@ -464,17 +523,23 @@ namespace Primary.Rendering.Assets
         #endregion
 
         #region Raw
-        public void CopyBlockDataTo(nint ptr)
+        public bool CopyBlockDataTo(Span<byte> span)
         {
-            if (_propertyData != nint.Zero)
-                NativeMemory.Copy(_propertyData.ToPointer(), ptr.ToPointer(), (nuint)_propertyBlockSize);
+            if (!_propertyData.IsNullOrEmpty)
+            {
+                return _propertyData.TryCopyTo(span);
+            }
+
+            return true;
         }
         #endregion
 
         public IShaderResourceSource? Shader => _shader;
 
-        public nint BlockPointer => _propertyData;
-        public int BlockSize => _propertyBlockSize;
+        public ShHeaderFlags HeaderFlags => _headerFlags;
+
+        public ArrayPtr<byte> BlockPointer => _propertyData;
+        public int BlockSize => _propertyData.Length;
 
         public int ResourceCount => _resourceCount;
 
@@ -497,9 +562,9 @@ namespace Primary.Rendering.Assets
         public int ResourceCount { get; }
     }
 
-    internal readonly record struct PropertyData(ushort ParentIndex, FGResource Resource, object? Aux = null, PropertyBindIntent Intent = PropertyBindIntent.Default)
+    internal readonly record struct PropertyData(ushort ParentIndex, ResourceHandle FGResource, object? ObjResource = null, PropertyBindIntent Intent = PropertyBindIntent.Default)
     {
-        internal static readonly PropertyData Null = new PropertyData(ushort.MaxValue, FGResource.Invalid, null);
+        internal static readonly PropertyData Null = new PropertyData(ushort.MaxValue, ResourceHandle.Null, null);
     }
 
     internal struct PropertyRemapData

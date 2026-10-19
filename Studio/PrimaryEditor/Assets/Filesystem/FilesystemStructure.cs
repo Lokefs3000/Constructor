@@ -227,7 +227,7 @@ namespace PrimaryEditor.Assets.Filesystem
             if (_entries == null)
                 _entries = new SortedList<FilesystemEntry, object> { { new FilesystemEntry(name, false), dir } };
             else
-                _entries.Add(new FilesystemEntry(name, false), dir);
+                _entries.TryAdd(new FilesystemEntry(name, false), dir);
         }
 
         internal void AddFile(string name, FilesystemFile file)
@@ -235,7 +235,7 @@ namespace PrimaryEditor.Assets.Filesystem
             if (_entries == null)
                 _entries = new SortedList<FilesystemEntry, object> { { new FilesystemEntry(name, true), file } };
             else
-                _entries.Add(new FilesystemEntry(name, true), file);
+                _entries.TryAdd(new FilesystemEntry(name, true), file);
         }
 
         internal void RemoveEntry(string name, bool isFile)

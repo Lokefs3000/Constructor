@@ -1,14 +1,26 @@
-﻿using Primary.Common.Memory;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets;
+using Primary.Common;
+using Primary.Rendering.Commands;
+using Primary.Rendering.Datatypes;
 using Primary.Rendering.Recording;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using Primary.Rendering.Statistics;
+using Primary.RHI;
 
 namespace Primary.Rendering.State
 {
-    internal class ComputeState : RenderState
+    internal sealed class ComputeState : RenderState
     {
-        private DirtyValue<int> _pipeline;
+        private readonly FrameGraph _frameGraph;
+
+        private DirtyValue<int> _shader;
+
+        internal ComputeState(FrameGraph frameGraph) : base(frameGraph)
+        {
+            _frameGraph = frameGraph;
+
+            _shader = new DirtyValue<int>(-1);
+        }
 
         protected override void DisposeInternal(bool disposing) { }
 
@@ -16,34 +28,35 @@ namespace Primary.Rendering.State
         {
             base.ClearState();
 
-            _pipeline.Reset(-1);
+            _shader.Reset(-1);
         }
 
         internal override void SoftResetForNextPass()
         {
             base.SoftResetForNextPass();
 
-            _pipeline.Reset(-1);
+            _shader.Value = -1;
         }
 
-        internal override bool CommitState(LinearBlockAllocator allocator, CommandRecorder recorder)
+        internal override bool TryCommitState(ref RenderPassStats stats, BarrierGroup barrierGroup, DescriptorAllocator descriptorAllocator, CommandRecorder commandRecorder, ObjectsCache objectsCache)
         {
-            if (_pipeline.Value == -1)
+            if (_shader.Value == -1)
                 return false;
 
-            if (_pipeline.IsDirty)
-            {
-                recorder.AddCommand(RecCommandType.SetPipeline, new CmdSetPipeline
-                {
-                    Index = _pipeline.Value
-                });
+            RHIComputePipeline shader = objectsCache.RetrieveObject<RHIComputePipeline>(_shader.Value);
 
-                _pipeline.IsDirty = false;
+            if (_shader.IsDirty)
+            {
+                if (_shader.IsDirty)
+                    SetPipelineLimits(shader);
+
+                commandRecorder.RecordCommand(CmdCommandType.SetPipeline, new CmdSetPipeline { PipelineIndex = _shader.Value });
+                _shader.IsDirty = false;
             }
 
-            return base.CommitState(allocator, recorder);
+            return base.TryCommitState(ref stats, barrierGroup, descriptorAllocator, commandRecorder, objectsCache);
         }
 
-        internal void SetPipeline(int pipelineIndex) => _pipeline.Value = pipelineIndex;
+        internal void SetShader(int shaderIndex) => _shader.Value = shaderIndex;
     }
 }

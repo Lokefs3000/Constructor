@@ -1,5 +1,6 @@
 ﻿using Arch.Core;
 using Arch.Core.Extensions;
+using Primary.Collections.ReadOnly;
 using Primary.Common;
 using Primary.Components;
 using Primary.Profiling;
@@ -19,7 +20,7 @@ namespace Primary.Systems
             using (new ProfilingScope("Transform"))
             {
                 SceneManager manager = Engine.GlobalSingleton.SceneManager;
-                IReadOnlyList<Scene> scenes = manager.Scenes;
+                ROList<Scene> scenes = manager.Scenes;
 
                 int frameIndex = Time.FrameIndex;
 
@@ -58,17 +59,19 @@ namespace Primary.Systems
                                     Matrix4x4.CreateFromQuaternion(tr.Rotation) *
                                     Matrix4x4.CreateTranslation(tr.Position);
                             lt.UpdateIndex = frameIndex;
+
+                            tr.InvalidFlags |= TransformInvalidFlags.AllChildren;
                         }
 
                         wt.Transformation = lt.Transformation * parent;
                         wt.UpdateIndex = frameIndex;
 
                         if (!child.Children.IsEmpty)
-                            IterateThroughHierchy(childEntity, wt.Transformation, frameIndex, Flags.HasFlag(tr.InvalidFlags, TransformInvalidFlags.AllChildren));
+                            IterateThroughHierchy(childEntity, wt.Transformation, frameIndex, allChildren || Flags.HasFlag(tr.InvalidFlags, TransformInvalidFlags.AllChildren));
                     }
                     else
                     {
-                        IterateThroughHierchy(childEntity, parent, frameIndex, Flags.HasFlag(tr.InvalidFlags, TransformInvalidFlags.AllChildren));
+                        IterateThroughHierchy(childEntity, parent, frameIndex, allChildren || Flags.HasFlag(tr.InvalidFlags, TransformInvalidFlags.AllChildren));
                     }
 
                     tr.InvalidFlags = TransformInvalidFlags.None;

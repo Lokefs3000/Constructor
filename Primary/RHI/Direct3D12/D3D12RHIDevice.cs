@@ -18,7 +18,6 @@ using Feature = Silk.NET.Direct3D12.Feature;
 
 namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe sealed class D3D12RHIDevice : RHIDevice
     {
         private ILogger? _logger;

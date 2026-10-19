@@ -36,7 +36,7 @@ namespace VoxelizationDemo.Editor.Tools
         {
             if (_isBusy)
             {
-                if (_gizmo.TryUpdateDrag(out Vector3 delta))
+                if (_gizmo.TryUpdateDrag(EditorManager.Instance.ToolManager.IsSnappingActive ? EditorManager.Instance.ToolManager.SnapScale : 0.0f, out Vector3 delta))
                 {
                     _gizmo.Origin = _gizmoStartOrigin + delta;
 

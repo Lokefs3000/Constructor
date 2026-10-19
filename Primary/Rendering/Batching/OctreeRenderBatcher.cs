@@ -6,8 +6,8 @@ using Primary.Collections.ReadOnly;
 using Primary.Components;
 using Primary.Mathematics;
 using Primary.Profiling;
+using Primary.Rendering;
 using Primary.Rendering.Assets;
-using Primary.Rendering.Statistics;
 using Primary.Rendering.Tree;
 using Primary.Scenes;
 using System.Diagnostics;
@@ -58,15 +58,12 @@ namespace Primary.Rendering.Batching
         {
             using (new ProfilingScope("BatchOctree"))
             {
-                ref BatchStatistics batchStats = ref _manager.Statistics.Batch;
-
                 _octants.Clear();
                 _octants.Enqueue(octree.RootOctant);
 
                 if (octree.Children.Count > 0)
                 {
-                    ++batchStats.RegionsIterated;
-                    BatchEntitiesWithinOctant(list, octree.Children.AsSpan(), in cullingFrustrum, ref batchStats);
+                    BatchEntitiesWithinOctant(list, octree.Children.AsSpan(), in cullingFrustrum);
                 }
 
                 while (_octants.TryDequeue(out RenderOctant? octant))
@@ -76,8 +73,7 @@ namespace Primary.Rendering.Batching
 
                     if (octant.Children.Count > 0)
                     {
-                        ++batchStats.OctantsTraversed;
-                        BatchEntitiesWithinOctant(list, octant.Children.AsSpan(), in cullingFrustrum, ref batchStats);
+                        BatchEntitiesWithinOctant(list, octant.Children.AsSpan(), in cullingFrustrum);
                     }
 
                     foreach (RenderOctant subOctant in octant.Octants)
@@ -85,12 +81,10 @@ namespace Primary.Rendering.Batching
                         _octants.Enqueue(subOctant);
                     }
                 }
-
-                batchStats.OctantObjectsPassed += _renderingKeys.Count;
             }
         }
 
-        private void BatchEntitiesWithinOctant(RenderList list, ReadOnlySpan<SceneEntity> entities, in Frustrum cullingFrustrum, ref BatchStatistics batchStats)
+        private void BatchEntitiesWithinOctant(RenderList list, ReadOnlySpan<SceneEntity> entities, in Frustrum cullingFrustrum)
         {
             World world = Engine.GlobalSingleton.SceneManager.World;
 
@@ -155,12 +149,11 @@ namespace Primary.Rendering.Batching
                         _materialSourceIndices.Add(material, materialId);
                     }
 
-                    _renderingKeys.Add(new RenderKey(shaderId, modelId, materialId, (ushort)mesh.UniqueId, _renderingData.Count, _id));
+                    // HACK: The mesh id WILL eventually break this
+                    _renderingKeys.Add(new RenderKey(shaderId, modelId, materialId, (ushort)((uint)mesh.UniqueId % 0x3ff), _renderingData.Count, _id));
                     _renderingData.Add(new UnbatchedRenderFlag(material, mesh, transform.Transformation));
                 }
             }
-
-            batchStats.OctantObjectsConsidered += entities.Length;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

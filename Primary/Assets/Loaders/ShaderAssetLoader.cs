@@ -1,15 +1,16 @@
-﻿using CommunityToolkit.HighPerformance;
+﻿using System.Collections.Frozen;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
+using System.Text;
+using CommunityToolkit.HighPerformance;
 using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
 using Primary.RHI;
 using Primary.Utility;
-using System.Collections.Frozen;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.InteropServices;
-using System.Text;
+using Vortice.DXGI;
 
 namespace Primary.Assets.Loaders
 {
@@ -345,7 +346,7 @@ namespace Primary.Assets.Loaders
                             PsSortDummyType type = PsSortDummyType.Resource;
                             if (property.Type == ShPropertyType.Struct)
                                 type = PsSortDummyType.Struct;
-                            else if (property.Type > ShPropertyType.Texture)
+                            else if (property.Type > ShPropertyType.Sampler)
                                 type = PsSortDummyType.Property;
 
                             if (type != PsSortDummyType.Resource && Flags.HasFlag(header.Flags, SBCHeaderFlags.ExternalProperties))
@@ -378,14 +379,30 @@ namespace Primary.Assets.Loaders
                         }
                     }
 
-                    Span<PropertySortDummy> dummiesSpan = dummies.Span.Slice(0, j);
+                    Span<PropertySortDummy> dummiesSpan = dummies.Span[..j];
                     dummiesSpan.Sort();
 
                     Span<ShaderProperty> oldPropertiesSpan = properties.AsSpan();
+                    if (Flags.HasFlag(header.Flags, SBCHeaderFlags.ExternalProperties))
+                    {
+                        for (int i = 0; i < oldPropertiesSpan.Length; i++)
+                        {
+                            ref ShaderProperty property = ref oldPropertiesSpan[i];
+                            if (property.Type > ShPropertyType.Sampler)
+                            {
+                                dummies[j++] = new PropertySortDummy(i | (property.IndexOrByteOffset << 16), property.Name, PsSortDummyType.Property, PsSortDummyUsage.Property);
+                                ++actualUnique;
+                            }
+                        }
+
+                        dummiesSpan = dummies.Span[..j];
+                    }
 
                     int localByteOffset = 0;
                     int globalByteOffset = 0;
 
+                    int propertyByteOffset = 0;
+  
                     Queue<(string, int)> propertyQueue = new Queue<(string, int)>();
 
                     outputProperties = new ShaderProperty[actualUnique];
@@ -432,10 +449,10 @@ namespace Primary.Assets.Loaders
 
                             ref ShaderProperty property = ref oldPropertiesSpan[sourceIndex];
 
-                            WeakRef<int> byteOffsetPtr = Flags.HasFlag(property.Flags, ShPropertyFlags.Global) ? new WeakRef<int>(ref globalByteOffset) : new WeakRef<int>(ref localByteOffset);
+                            WeakRef<int> byteOffsetPtr = property.Type > ShPropertyType.Sampler ? new WeakRef<int>(ref propertyByteOffset) : (Flags.HasFlag(property.Flags, ShPropertyFlags.Global) ? new WeakRef<int>(ref globalByteOffset) : new WeakRef<int>(ref localByteOffset));
                             ref int byteOffset = ref byteOffsetPtr.Ref;
 
-                            if (property.Type <= ShPropertyType.Texture)
+                            if (property.Type <= ShPropertyType.Sampler)
                             {
                                 headerBlockSize += sizeof(uint);
 
@@ -503,6 +520,18 @@ namespace Primary.Assets.Loaders
                                         }
                                     }
                                 }
+                            }
+                            else
+                            {
+                                if (!Flags.HasFlag(headerFlags, ShHeaderFlags.ExternalProperties))
+                                    headerBlockSize += property.ByteWidth;
+                                if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
+                                    propertyBlockSize += property.ByteWidth;
+
+                                outputProperties[outputIdx++] = new ShaderProperty(property.Name, property.DisplayName, (ushort)byteOffset, property.ByteWidth, ushort.MaxValue, property.Type, property.Default, property.Stages, property.Flags | ShPropertyFlags.Property, property.Display);
+
+                                customNameDict.TryGetValue(sourceIndex, out string? customName);
+                                remapTable.Add((customName ?? property.Name).GetDjb2HashCode(), outputIdx - 1);
                             }
                         }
                     }

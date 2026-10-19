@@ -1,5 +1,6 @@
 ﻿using Primary.Mathematics;
 using Primary.Profiling;
+using Primary.Rendering;
 using Primary.Rendering.Tree;
 
 namespace Primary.Rendering.Batching

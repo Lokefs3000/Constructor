@@ -58,7 +58,7 @@ namespace Primary.Rendering.Batching
 
                     Debug.Assert(key.ShaderId == shaderKey);
 
-                    _segments.Add(new RenderSegment(rd.Material, rd.Mesh, 0, 1));
+                    _segments.Add(new RenderSegment(rd.Material, key.MaterialId, rd.Mesh, 0, 1));
                     _flags.Add(new RenderFlag(rd.Model, key.MaterialId));
 
                     return;
@@ -94,7 +94,7 @@ namespace Primary.Rendering.Batching
                     current = key;
                     if (!previous.Equals(current))
                     {
-                        _segments.Add(new RenderSegment(previousRd.Material, previousRd.Mesh, previousIndex, _flags.Count));
+                        _segments.Add(new RenderSegment(previousRd.Material, previous.MaterialId, previousRd.Mesh, previousIndex, _flags.Count));
 
                         previous = current;
                         previousIndex = _flags.Count;
@@ -106,7 +106,7 @@ namespace Primary.Rendering.Batching
 
                 if (previousIndex < _flags.Count)
                 {
-                    _segments.Add(new RenderSegment(previousRd.Material, previousRd.Mesh, previousIndex, _flags.Count));
+                    _segments.Add(new RenderSegment(previousRd.Material, previous.MaterialId, previousRd.Mesh, previousIndex, _flags.Count));
                 }
             }
         }

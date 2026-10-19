@@ -27,5 +27,10 @@ namespace Primary.Rendering
         {
             return Unsafe.As<T>(_items[typeof(T)]);
         }
+
+        public bool Has<T>() where T : class, IContextItem
+        {
+            return _items.ContainsKey(typeof(T));
+        }
     }
 }

@@ -1,14 +1,14 @@
 ﻿using Primary.Assets;
 using Primary.Components;
 using Primary.R2.ForwardPlus.Statistics;
-using Primary.Rendering;
-using Primary.Rendering.Assets;
-using Primary.Rendering.Batching;
+using Primary.Rendering.Ancient;
+using Primary.Rendering.Ancient.Assets;
+using Primary.Rendering.Ancient.Batching;
+using Primary.Rendering.Ancient.Data;
+using Primary.Rendering.Ancient.Recording;
+using Primary.Rendering.Ancient.Resources;
+using Primary.Rendering.Ancient.Structures;
 using Primary.Rendering.Commands;
-using Primary.Rendering.Data;
-using Primary.Rendering.Recording;
-using Primary.Rendering.Resources;
-using Primary.Rendering.Structures;
 using Primary.RHI;
 using System.Runtime.CompilerServices;
 

@@ -36,6 +36,7 @@ namespace Primary.Assets.Types
         public override string Name => _assetData.Name;
 
         public bool IsLoaded => _assetData.Status > ResourceStatus.Running;
+        public bool IsReady => _assetData.Status == ResourceStatus.Success;
 
         public int LoadIndex => _assetData.LoadIndex;
     }

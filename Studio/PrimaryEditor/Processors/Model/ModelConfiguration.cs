@@ -9,6 +9,7 @@ namespace PrimaryEditor.Processors.Model
     {
         public ModelIndexStrideMode IndexStrideMode { get; set; } = ModelIndexStrideMode.Automatic;
         public ModelUVMask UVChannels { get; set; } = ModelUVMask.All;
+        public float Scale { get; set; } = 1.0f;
     }
 
     public enum ModelIndexStrideMode : byte

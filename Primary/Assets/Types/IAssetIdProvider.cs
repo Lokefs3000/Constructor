@@ -46,6 +46,7 @@ namespace Primary.Assets.Types
 
         public AssetId() => this = Invalid;
         public AssetId(FileId fileId, int localId) { _fileId = fileId; _localId = localId; }
+        public AssetId(FileId fileId) { _fileId = fileId; _localId = NoLocalId; }
 
         public readonly AssetId WithoutLocalId() => new AssetId(_fileId, NoLocalId);
         public readonly AssetId WithLocalId(int localId) => new AssetId(_fileId, localId);

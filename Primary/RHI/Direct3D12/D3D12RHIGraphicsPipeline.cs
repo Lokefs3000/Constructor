@@ -11,7 +11,6 @@ using System.Runtime.Versioning;
 
 namespace Primary.RHI.Direct3D12
 {
-    [SupportedOSPlatform("windows10.0.17763.0")]
     public unsafe sealed class D3D12RHIGraphicsPipeline : RHIGraphicsPipeline
     {
         private readonly D3D12RHIDevice _device;
@@ -301,6 +300,7 @@ namespace Primary.RHI.Direct3D12
                     if (hr.IsFailure)
                     {
                         _createdPipelines[rasterState] = null;
+                        _device.FlushPendingMessages();
                         return ref Unsafe.NullRef<ID3D12PipelineState>();
                     }
 
@@ -374,7 +374,6 @@ namespace Primary.RHI.Direct3D12
         public static implicit operator RHIGraphicsPipelineNative(D3D12RHIGraphicsPipelineNative native) => native.Base;
     }
 
-    [SupportedOSPlatform("windows")]
     [StructLayout(LayoutKind.Sequential, Pack = 8)]
     public struct D3D12RasterState : IEquatable<D3D12RasterState>
     {
@@ -390,6 +389,7 @@ namespace Primary.RHI.Direct3D12
         public bool Equals(D3D12RasterState other)
         {
             return
+                RTVFormats.Offset == other.RTVFormats.Offset &&
                 RTVFormats.Count == other.RTVFormats.Count &&
                 DSVFormat == other.DSVFormat &&
                 Vector256.LoadUnsafe(ref Unsafe.As<D3D12RasterState, uint>(ref this)) == Vector256.LoadUnsafe(ref Unsafe.As<D3D12RasterState, uint>(ref this));
@@ -407,6 +407,7 @@ namespace Primary.RHI.Direct3D12
             public Format e6;
             public Format e7;
 
+            public int Offset;
             public int Count;
 
             public __RTVs()

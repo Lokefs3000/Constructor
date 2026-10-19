@@ -10,12 +10,16 @@ namespace Primary.Rendering.Assets
 {
     public sealed class ShaderGlobalsManager
     {
-        private Dictionary<FastStringHash, PropertyData> _globalProperties;
-        private Dictionary<int, FastStringHash> _transitionalProperties;
+        private readonly FrameGraph _frameGraph;
 
-        internal ShaderGlobalsManager()
+        private readonly Dictionary<FastStringHash, PropertyData> _globalProperties;
+        private readonly Dictionary<int, FastStringHash> _transitionalProperties;
+
+        internal ShaderGlobalsManager(FrameGraph frameGraph)
         {
             s_instance.Target = this;
+
+            _frameGraph = frameGraph;
 
             _globalProperties = new Dictionary<FastStringHash, PropertyData>();
             _transitionalProperties = new Dictionary<int, FastStringHash>();
@@ -30,7 +34,7 @@ namespace Primary.Rendering.Assets
                     FastStringHash hash = kvp.Value;
 
                     ref PropertyData data = ref CollectionsMarshal.GetValueRefOrNullRef(_globalProperties, hash);
-                    if (!Unsafe.IsNullRef(ref data) && data.Resource.IsValidAndRenderGraph)
+                    if (!Unsafe.IsNullRef(ref data) && !data.FGResource.IsNull)
                     {
                         _globalProperties.Remove(hash);
                     }
@@ -40,43 +44,21 @@ namespace Primary.Rendering.Assets
             }
         }
 
-        internal void SetBuffer(string name, FGBuffer buffer)
+        internal void SetBuffer(string name, BufferHandle buffer)
         {
-            if (!Flags.HasFlag(buffer.Description.Usage, FGBufferUsage.Global))
-            {
-                EngLog.Render.Warning("Trying to set global buffer '{buf}' with resource not marked as global ('{rname}')", name, buffer.ToString());
-                return;
-            }
-
             _globalProperties[name] = new PropertyData(ushort.MaxValue, buffer);
             _transitionalProperties[buffer.Index] = name;
         }
 
-        internal void SetBuffer(string name, RHIBuffer buffer)
+        internal void SetTexture(string name, TextureHandle texture, PropertyBindIntent intent = PropertyBindIntent.Default)
         {
-            _globalProperties[name] = new PropertyData(ushort.MaxValue, new FGResource(buffer, null));
-        }
-
-        internal void SetTexture(string name, FGTexture texture, PropertyBindIntent intent = PropertyBindIntent.Default)
-        {
-            if (!Flags.HasFlag(texture.Description.Usage, FGTextureUsage.Global))
-            {
-                EngLog.Render.Warning("Trying to set global texture '{buf}' with resource not marked as global ('{rname}')", name, texture.ToString());
-                return;
-            }
-
             _globalProperties[name] = new PropertyData(ushort.MaxValue, texture, Intent: intent);
             _transitionalProperties[texture.Index] = name;
         }
 
-        internal void SetTexture(string name, RHITexture texture, PropertyBindIntent intent = PropertyBindIntent.Default)
-        {
-            _globalProperties[name] = new PropertyData(ushort.MaxValue, new FGResource(texture, null), Intent: intent);
-        }
-
         internal void SetTexture(string name, TextureAsset texture)
         {
-            _globalProperties[name] = new PropertyData(ushort.MaxValue, FGResource.Invalid, texture);
+            _globalProperties[name] = new PropertyData(ushort.MaxValue, TextureHandle.Null, texture);
         }
 
         internal bool TryGetPropertyValue(string propertyName, out PropertyData data)
@@ -85,11 +67,9 @@ namespace Primary.Rendering.Assets
         }
 
         #region Public
-        public static void SetGlobalBuffer(string name, FGBuffer buffer) => Instance.SetBuffer(name, buffer);
-        public static void SetGlobalBuffer(string name, RHIBuffer buffer) => Instance.SetBuffer(name, buffer);
+        public static void SetGlobalBuffer(string name, BufferHandle buffer) => Instance.SetBuffer(name, buffer);
 
-        public static void SetGlobalTexture(string name, FGTexture texture) => Instance.SetTexture(name, texture);
-        public static void SetGlobalTexture(string name, RHITexture texture) => Instance.SetTexture(name, texture);
+        public static void SetGlobalTexture(string name, TextureHandle texture) => Instance.SetTexture(name, texture);
         public static void SetGlobalTexture(string name, TextureAsset texture) => Instance.SetTexture(name, texture);
         #endregion
 

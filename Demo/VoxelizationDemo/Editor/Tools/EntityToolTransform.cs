@@ -62,7 +62,12 @@ namespace VoxelizationDemo.Editor.Tools
             {
                 ref WorldTransform parentWorld = ref _entity.Parent.GetComponent<WorldTransform>();
                 if (!Unsafe.IsNullRef(in parentWorld))
-                    delta = Vector3.Transform(delta, parentWorld.Transformation);
+                {
+                    Matrix4x4 withoutTranslation = parentWorld.Transformation;
+                    withoutTranslation.Translation = Vector3.Zero;
+
+                    delta = Vector3.Transform(delta, withoutTranslation);
+                }
             }
 
             transform.Position = _storedPosition + delta;

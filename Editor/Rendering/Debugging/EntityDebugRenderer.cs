@@ -2,7 +2,7 @@
 using Primary.Common;
 using Primary.Components;
 using Primary.Profiling;
-using Primary.Rendering.Tree;
+using Primary.Rendering.Ancient.Tree;
 using System.Numerics;
 
 namespace Editor.Rendering.Debugging
