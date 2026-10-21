@@ -1,0 +1,113 @@
+#define EXCLUDE_LIGHT_GRID_DATA
+
+#include "../Lighting/LightDataTypes.hlsl"
+#include "ClusterShared.hlsl"
+
+// https://github.com/Angelo1211/HybridRenderingEngine/blob/master/assets/shaders/ComputeShaders/clusterCullLightShader.comp
+
+struct ComputeData
+{
+    float4x4 CameraViewMatrix;
+};
+
+[constants]
+ConstantBuffer<ComputeData> cbComputeData;
+StructuredBuffer<ClusterAABB> sbClusterBoundsBuffer;
+
+RWByteAddressBuffer baLightIndexCount;
+RWByteAddressBuffer baLightIndexList;
+RWStructuredBuffer<LightGrid> sbLightGrid;
+
+groupshared PointLightData sSharedPointLights[16 * 9 * 4];
+
+// It is named 'pointt' because there somewhere is a bug where it thinks there modifiers on it if its just called 'point'???
+float SqrDistancePointAABB(float3 pointt, uint clusterIndex)
+{
+    float sqrDist = 0.0;
+
+    ClusterAABB currentCell = sbClusterBoundsBuffer[clusterIndex];
+    for (int i = 0; i < 3; ++i)
+    {
+        float v = pointt[i];
+
+        if (v < currentCell.MinPoint[i])
+        {
+            sqrDist += (currentCell.MinPoint[i] - v) * (currentCell.MinPoint[i] - v);
+        }
+
+        if (v > currentCell.MaxPoint[i])
+        {
+            sqrDist += (v - currentCell.MaxPoint[i]) * (v - currentCell.MaxPoint[i]);
+        }
+    }
+
+    return sqrDist;
+}
+
+bool TestSphereAABB(float3 lightPosition, float lightRadius, uint clusterIndex)
+{
+    float3 center = mul(cbComputeData.CameraViewMatrix, float4(lightPosition, 1.0)).xyz;
+    float sqrDistance = SqrDistancePointAABB(center, clusterIndex);
+
+    return sqrDistance <= (lightRadius * lightRadius);
+}
+
+[kernel]
+[numthreads(16,9,4)]
+void CSBinLights(uint groupIndex : SV_GroupIndex, uint3 groupId : SV_GroupID)
+{
+    baLightIndexCount.Store(0, 0);
+
+    uint threadCount = 16 * 9 * 4;
+    uint clusterIndex = groupIndex + threadCount * groupId.z;
+
+    uint pointLightCount, pointLightStride;
+    sbPointLights.GetDimensions(pointLightCount, pointLightStride);
+
+    #define MAX_VISIBLE_LIGHTS_PER_CLUSTER 128
+
+    uint visibleLightCount = 0;
+    uint visibleLightIndices[MAX_VISIBLE_LIGHTS_PER_CLUSTER];
+
+    uint numBatches = (pointLightCount + threadCount - 1) / threadCount;
+    for (uint batch = 0; batch < numBatches; ++batch)
+    {
+        uint lightIndex = batch * threadCount + groupIndex;
+        lightIndex = min(lightIndex, pointLightCount);
+
+        sSharedPointLights[groupIndex] = sbPointLights[lightIndex];
+        GroupMemoryBarrierWithGroupSync();
+
+        if (visibleLightCount < MAX_VISIBLE_LIGHTS_PER_CLUSTER)
+        {
+            for (uint light = 0; light < threadCount; ++light)
+            {
+                PointLightData lightData = sSharedPointLights[light];
+                if (lightData.Diffuse.a > 0.0 && TestSphereAABB(lightData.Position, lightData.Radius, clusterIndex))
+                {
+                    visibleLightIndices[visibleLightCount] = (batch * threadCount + light) | LightType_Point;
+
+                    if (++visibleLightCount >= MAX_VISIBLE_LIGHTS_PER_CLUSTER)
+                        break;
+                }
+            }
+        }
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    uint lightListOffset;
+    baLightIndexCount.InterlockedAdd(0, visibleLightCount, lightListOffset);
+
+    for (uint i = 0; i < visibleLightCount; ++i)
+    {
+        baLightIndexList.Store((lightListOffset + i) * 4, visibleLightIndices[i]);
+    }
+
+    LightGrid lightGrid = {
+        lightListOffset,
+        visibleLightCount
+    };
+
+    sbLightGrid[clusterIndex] = lightGrid;
+}

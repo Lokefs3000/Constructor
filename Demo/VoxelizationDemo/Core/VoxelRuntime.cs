@@ -50,6 +50,7 @@ namespace VoxelizationDemo.Core
 
             {
                 SceneEntityManager.Instance.RegisterComponent<PointLight>();
+                SceneEntityManager.Instance.RegisterComponent<Components.DirectionalLight>();
                 SceneEntityManager.Instance.RebuildDependencyGraph();
             }
 

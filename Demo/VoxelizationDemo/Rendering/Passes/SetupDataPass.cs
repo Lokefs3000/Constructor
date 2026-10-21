@@ -72,6 +72,14 @@ namespace VoxelizationDemo.Rendering.Passes
                     Target = FGBufferTarget.Structured
                 });
 
+                data.DirectionalLightBuffer = pathBlackboard.LightCollector == null ? BufferHandle.Null : desc.CreateBuffer(new FGBufferDesc
+                {
+                    Name = "DirectionalLight",
+                    ElementCount = 1,
+                    Stride = Unsafe.SizeOf<DirectionalLightData>(),
+                    Target = FGBufferTarget.Constant
+                });
+
                 data.RenderList = pathBlackboard.RenderList;
                 data.LightCollector = pathBlackboard.LightCollector;
 
@@ -79,6 +87,8 @@ namespace VoxelizationDemo.Rendering.Passes
                     desc.Write(data.RenderFlagBuffer);
                 if (!data.PointLightsBuffer.IsNull)
                     desc.Write(data.PointLightsBuffer);
+                if (!data.DirectionalLightBuffer.IsNull)
+                    desc.Write(data.DirectionalLightBuffer);
 
                 desc.Write(data.WorldMatriciesBuffer);
                 desc.Write(data.CameraDataBuffer);
@@ -91,6 +101,7 @@ namespace VoxelizationDemo.Rendering.Passes
                 bufferData.RenderFlagBuffer = data.RenderFlagBuffer;
                 bufferData.MaterialBufferData = data.MaterialDataBuffer;
                 bufferData.PointLightsBuffer = data.PointLightsBuffer;
+                bufferData.DirectionalLightBuffer = data.DirectionalLightBuffer;
             }
 
             // Initialize global values
@@ -104,6 +115,8 @@ namespace VoxelizationDemo.Rendering.Passes
 
             if (!bufferData.PointLightsBuffer.IsNull)
                 ShaderGlobalsManager.SetGlobalBuffer("sbPointLights", bufferData.PointLightsBuffer);
+            if (!bufferData.DirectionalLightBuffer.IsNull)
+                ShaderGlobalsManager.SetGlobalBuffer("cbDirectionalLight", bufferData.DirectionalLightBuffer);
         }
 
         private static void PassFunction(RasterPassContext context)
@@ -162,6 +175,8 @@ namespace VoxelizationDemo.Rendering.Passes
                     passData.LightCollector.PointLights.AsSpan().CopyTo(mapped.Span);
                     mapped.Span[^1] = default;
                 }
+
+                cmd.UploadBuffer(passData.DirectionalLightBuffer, 0, passData.LightCollector.DirectionalLight);
             }
         }
 
@@ -177,6 +192,7 @@ namespace VoxelizationDemo.Rendering.Passes
             public BufferHandle CameraDataBuffer;
 
             public BufferHandle PointLightsBuffer;
+            public BufferHandle DirectionalLightBuffer;
 
             public void Clear()
             {
@@ -190,6 +206,7 @@ namespace VoxelizationDemo.Rendering.Passes
                 CameraDataBuffer = BufferHandle.Null;
 
                 PointLightsBuffer = BufferHandle.Null;
+                DirectionalLightBuffer = BufferHandle.Null;
             }
         }
 
@@ -204,6 +221,7 @@ namespace VoxelizationDemo.Rendering.Passes
         public BufferHandle WorldMatriciesBuffer;
         public BufferHandle CameraDataBuffer;
         public BufferHandle PointLightsBuffer;
+        public BufferHandle DirectionalLightBuffer;
 
         public uint[] MaterialOffsets = [];
 
@@ -214,6 +232,7 @@ namespace VoxelizationDemo.Rendering.Passes
             WorldMatriciesBuffer = BufferHandle.Null;
             CameraDataBuffer = BufferHandle.Null;
             PointLightsBuffer = BufferHandle.Null;
+            DirectionalLightBuffer = BufferHandle.Null;
         }
     }
 }

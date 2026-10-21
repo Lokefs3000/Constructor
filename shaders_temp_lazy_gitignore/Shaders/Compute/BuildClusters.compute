@@ -1,0 +1,80 @@
+#include "../Lighting/LightDataTypes.hlsl"
+#include "ClusterShared.hlsl"
+
+// https://github.com/Angelo1211/HybridRenderingEngine/blob/master/assets/shaders/ComputeShaders/clusterShader.comp
+
+struct ComputeData
+{
+    float ZNear;
+    float ZFar;
+};
+
+struct ScreenToViewData
+{
+    float4x4 InverseProjection;
+    uint16_t4 TileSizes;
+    uint16_t2 ScreenDimensions;
+};
+
+[constants]
+ConstantBuffer<ComputeData> cbComputeData;
+ConstantBuffer<ScreenToViewData> cbScreenToView;
+
+RWStructuredBuffer<ClusterAABB> sbClusterBoundsBuffer;
+
+float4 ConvertClipToView(float4 clip)
+{
+    float4 view = mul(cbScreenToView.InverseProjection, clip);
+    return view / view.w;
+}
+
+float4 ConvertScreenToView(float4 screenPos)
+{
+    float2 texCoord = screenPos.xy / float2(cbScreenToView.ScreenDimensions);
+    float4 clip = float4(texCoord * 2.0 - 1.0, screenPos.z, screenPos.w);
+
+    return ConvertClipToView(clip);
+}
+
+float3 LineIntersectionToZPlane(float3 a, float3 b, float dist)
+{
+    float3 normal = float3(0.0, 0.0, 1.0);
+    float3 ab = b - a;
+
+    float t = (dist - dot(normal, a)) / dot(normal, ab);
+    float3 result = a + t * ab;
+
+    return result;
+}
+
+[kernel]
+[numthreads(1,1,1)]
+void CSBuildClusters(uint3 groupId : SV_GroupID)
+{
+    float3 eyePos = 0.0;
+
+    uint tileSizeInPixels = cbScreenToView.TileSizes.w;
+    uint tileIndex = groupId.x + groupId.y * cbScreenToView.TileSizes.x + groupId.z * (cbScreenToView.TileSizes.x * cbScreenToView.TileSizes.y);
+
+    float4 maxPointScreenSpace = float4(float2((groupId.xy + 1) * tileSizeInPixels), -1.0, 1.0);
+    float4 minPointScreenSpace = float4(float2(groupId.xy * tileSizeInPixels), -1.0, 1.0);
+
+    float3 maxPointViewSpace = ConvertScreenToView(maxPointScreenSpace).xyz;
+    float3 minPointViewSpace = ConvertScreenToView(minPointScreenSpace).xyz;
+
+    float tileNear = -cbComputeData.ZNear * pow(cbComputeData.ZFar / cbComputeData.ZNear, groupId.z / float(cbScreenToView.TileSizes.z));
+    float tileFar = -cbComputeData.ZNear * pow(cbComputeData.ZFar / cbComputeData.ZNear, (groupId.z + 1) / float(cbScreenToView.TileSizes.z));
+
+    float3 minPointNear = LineIntersectionToZPlane(eyePos, minPointViewSpace, tileNear);
+    float3 minPointFar = LineIntersectionToZPlane(eyePos, minPointViewSpace, tileFar);
+
+    float3 maxPointNear = LineIntersectionToZPlane(eyePos, maxPointViewSpace, tileNear);
+    float3 maxPointFar = LineIntersectionToZPlane(eyePos, maxPointViewSpace, tileFar);
+
+    ClusterAABB cluster = {
+        float4(min(min(minPointNear, minPointFar), min(maxPointNear, maxPointFar)), 0.0),
+        float4(max(max(minPointNear, minPointFar), max(maxPointNear, maxPointFar)), 0.0)
+    };
+    
+    sbClusterBoundsBuffer[tileIndex] = cluster;
+}
