@@ -75,11 +75,11 @@ namespace VoxelizationDemo.Rendering
 
                 jobHandleList.Dispose();
 
-                foreach (PointLightData light in _lightCollector.PointLights)
-                {
-                    Gizmos.DrawWireSphere(light.Position, 0.1f, Color.Yellow);
-                    Gizmos.DrawWireSphere(light.Position, light.Radius, new Color(light.Diffuse.WithElement(3, 1.0f)));
-                }
+                // foreach (PointLightData light in _lightCollector.PointLights)
+                // {
+                //     Gizmos.DrawWireSphere(light.Position, 0.1f, Color.Yellow);
+                //     Gizmos.DrawWireSphere(light.Position, light.Radius, new Color(light.Diffuse.WithElement(3, 1.0f)));
+                // }
 
                 generalBlackboard.LightCollector = _lightCollector;
             }

@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 using Vortice.Mathematics;
 using Primary.Collections.ReadOnly;
+using Primary.Collections;
 
 namespace Primary.Rendering.Tree
 {
@@ -17,7 +18,7 @@ namespace Primary.Rendering.Tree
         private readonly OctreePoint _octreePoint;
 
         private readonly RenderOctant _rootOctant;
-        private Dictionary<int, RenderOctant> _octantDict;
+        private Dictionary<long, RenderOctant> _octantDict;
 
         private readonly List<SceneEntity> _children;
 
@@ -27,7 +28,7 @@ namespace Primary.Rendering.Tree
             _octreePoint = octreePoint;
 
             _rootOctant = new RenderOctant(null, worldBounds, worldBounds.Minimum);
-            _octantDict = new Dictionary<int, RenderOctant>
+            _octantDict = new Dictionary<long, RenderOctant>
             {
                 { _rootOctant.OctantId, _rootOctant }
             };
@@ -37,7 +38,7 @@ namespace Primary.Rendering.Tree
 
         internal void EmplaceWithinTree(SceneEntity entity, AABB boundaries, RenderOctant? baseOctant = null)
         {
-            (RenderOctant ? fittedOctant, float oversize) = GetFittingOctant(boundaries, baseOctant ?? _rootOctant);
+            (RenderOctant? fittedOctant, float oversize) = GetFittingOctant(boundaries, baseOctant ?? _rootOctant);
             if (fittedOctant != null)
             {
                 fittedOctant.EmplaceChild(entity, oversize);
@@ -56,7 +57,7 @@ namespace Primary.Rendering.Tree
             }
         }
 
-        internal void RemoveFromTree(SceneEntity entity, int octantId)
+        internal void RemoveFromTree(SceneEntity entity, long octantId)
         {
             if (octantId == IsContainedWithinRegionId)
             {
@@ -92,8 +93,14 @@ namespace Primary.Rendering.Tree
             }
         }
 
-        internal void MoveEntityWithinTree(SceneEntity entity, AABB boundaries, int octantId)
+        internal void MoveEntityWithinTree(SceneEntity entity, AABB boundaries, long octantId)
         {
+            if (octantId == NullOctantId)
+            {
+                EmplaceWithinTree(entity, boundaries);
+                return;
+            }
+
             if (!_octantDict.TryGetValue(octantId, out RenderOctant? oldOctant))
             {
                 throw new InvalidOperationException("placeholder error");
@@ -101,12 +108,18 @@ namespace Primary.Rendering.Tree
 
             (RenderOctant? newOctant, float oversize) = GetFittingOctant(boundaries, _rootOctant);
 
-            if (newOctant == null)
+            ref RenderOctantInfo octantInfo = ref entity.GetComponent<RenderOctantInfo>();
+            octantId = octantInfo.OctantId;
+
+            if (newOctant == oldOctant)
+            {
+                return;
+            }
+            else if (newOctant == null)
             {
                 oldOctant.RemoveChild(entity);
                 _children.Add(entity);
 
-                ref RenderOctantInfo octantInfo = ref entity.GetComponent<RenderOctantInfo>();
                 octantInfo.OctantId = IsContainedWithinRegionId;
             }
             else if (oldOctant.Owner == newOctant.Owner)
@@ -114,7 +127,6 @@ namespace Primary.Rendering.Tree
                 oldOctant.RemoveChild(entity);
                 newOctant.EmplaceChild(entity, oversize);
 
-                ref RenderOctantInfo octantInfo = ref entity.GetComponent<RenderOctantInfo>();
                 octantInfo.OctantId = newOctant.OctantId;
             }
             else
@@ -128,7 +140,7 @@ namespace Primary.Rendering.Tree
         {
             // initial test
             {
-                float largest = FindExtentsOutOfBounds(octant.Boundaries, boundaries);
+                float largest = FindExtentsOutOfBounds(octant.SourceBoundaries, boundaries);
                 if (largest > ScaledMaxExtents / octant.Depth)
                 {
                     return (null, 0.0f);
@@ -145,7 +157,7 @@ namespace Primary.Rendering.Tree
                     subOctant = octant;
                 Debug.Assert(subOctant != null);
 
-                float largest = FindExtentsOutOfBounds(subOctant.Boundaries, boundaries);
+                float largest = FindExtentsOutOfBounds(subOctant.SourceBoundaries, boundaries);
                 if (largest > ScaledMaxExtents / octant.Depth)
                 {
                     return (previousFittingOctant, largest);
@@ -177,8 +189,8 @@ namespace Primary.Rendering.Tree
             octant.ChildrenList.CopyTo(children.Span);
             octant.ChildrenList.Clear();
 
-            Vector3 size = octant.Boundaries.Size * 0.5f;
-            AABB smallBounds = new AABB(octant.Boundaries.Minimum, octant.Boundaries.Minimum + size);
+            Vector3 size = octant.SourceBoundaries.Size * 0.5f;
+            AABB smallBounds = new AABB(octant.SourceBoundaries.Minimum, octant.SourceBoundaries.Minimum + size);
 
             octant.OctantsList = [
                 new RenderOctant(octant, smallBounds, _worldBounds.Minimum), //Bottom left back,
@@ -257,7 +269,7 @@ namespace Primary.Rendering.Tree
             center = Vector128.Divide(center, octantSize.AsVector128Unsafe());
             center = Vector128.Truncate(center); //duplicate/unnecesary?
 
-            return new OctreePoint((int)center.GetX(), (int)center.GetY(), (int)center.GetZ());
+            return new OctreePoint((short)center.GetX(), (short)center.GetY(), (short)center.GetZ());
         }
 
         public const int OctantEntityLimit = 64;
@@ -265,6 +277,7 @@ namespace Primary.Rendering.Tree
         public const int OctreeRegionSize = 128;
         public const float ScaledMaxExtents = 0.3f;
 
-        public const int IsContainedWithinRegionId = int.MinValue;
+        public const long IsContainedWithinRegionId = long.MinValue;
+        public const long NullOctantId = long.MaxValue;
     }
 }

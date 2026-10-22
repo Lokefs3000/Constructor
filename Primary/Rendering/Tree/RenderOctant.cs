@@ -6,6 +6,7 @@ using Primary.Mathematics;
 using Primary.Scenes;
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 
 namespace Primary.Rendering.Tree
@@ -14,9 +15,10 @@ namespace Primary.Rendering.Tree
     {
         private readonly RenderOctant? _parent;
 
+        private readonly AABB _bounds;
         private AABB _worldBounds;
         private readonly OctreePoint _point;
-        private readonly int _octantId;
+        private readonly long _octantId;
         private readonly int _depth;
 
         private RenderOctant[]? _octants;
@@ -26,6 +28,7 @@ namespace Primary.Rendering.Tree
         {
             _parent = parent;
 
+            _bounds = worldBounds;
             _worldBounds = worldBounds;
             _point = GetOctreePointForOctant(worldBounds.Center - basePosition);
             _octantId = CraftIdFromPoint(_point);
@@ -76,9 +79,10 @@ namespace Primary.Rendering.Tree
 
         public RenderOctant? Owner => _parent;
 
+        public AABB SourceBoundaries => _bounds;
         public AABB Boundaries => _worldBounds;
         public OctreePoint Point => _point;
-        public int OctantId => _octantId;
+        public long OctantId => _octantId;
         public int Depth => _depth;
 
         public ReadOnlySpan<RenderOctant> Octants => _octants;
@@ -92,12 +96,12 @@ namespace Primary.Rendering.Tree
             Vector128<int> vectorInt = Vector128.ConvertToInt32(vector);
 
             //prob dont need "Unsafe.WriteUnaligned" as it should be so fast it wont matter
-            return new OctreePoint(vectorInt.GetElement(0), vectorInt.GetElement(1), vectorInt.GetElement(2));
+            return new OctreePoint((short)vectorInt.GetElement(0), (short)vectorInt.GetElement(1), (short)vectorInt.GetElement(2));
         }
 
-        public static int CraftIdFromPoint(OctreePoint point)
+        public static long CraftIdFromPoint(OctreePoint point)
         {
-            return point.X << 21 | point.Y << 10 | point.Z;
+            return Unsafe.BitCast<ulong, long>((ulong)((ushort)point.X) << 32 | (ulong)((ushort)point.Y) << 16 | (ulong)((ushort)point.Z));
         }
     }
 

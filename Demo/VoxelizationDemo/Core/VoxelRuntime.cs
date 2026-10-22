@@ -20,6 +20,7 @@ using VoxelizationDemo.Components;
 using VoxelizationDemo.Diagnostics;
 using VoxelizationDemo.Editor;
 using VoxelizationDemo.Logic;
+using VoxelizationDemo.Procedural;
 using VoxelizationDemo.Rendering;
 
 namespace VoxelizationDemo.Core
@@ -56,6 +57,8 @@ namespace VoxelizationDemo.Core
 
             Scene scene = _sceneManager.CreateScene("Unique", LoadSceneMode.Single);
             _cameraManager.SetupWithinScene(scene);
+
+            TestScene1.Generate(this);
 
             _editorManager.Enable();
 

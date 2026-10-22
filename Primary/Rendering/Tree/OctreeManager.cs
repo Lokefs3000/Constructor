@@ -114,7 +114,7 @@ namespace Primary.Rendering.Tree
             Vector128<int> vectorInt = Vector128.ConvertToInt32(vector);
 
             //prob dont need "Unsafe.WriteUnaligned" as it should be so fast it wont matter
-            return new OctreePoint(vectorInt.GetElement(0), vectorInt.GetElement(1), vectorInt.GetElement(2));
+            return new OctreePoint((short)vectorInt.GetElement(0), (short)vectorInt.GetElement(1), (short)vectorInt.GetElement(2));
         }
 
         private readonly record struct EntityUpdateData(EntityUpdateType Type, SceneEntity Entity);
@@ -141,14 +141,15 @@ namespace Primary.Rendering.Tree
                 if (FrameIndex == bounds.UpdateIndex)
                 {
                     OctreePoint point = GetOctreeRegionForPoint(bounds.ComputedBounds.Center);
-                    if (point != octantInfo.Tree)
+                    if (point != octantInfo.Tree && octantInfo.OctantId != RegionOctree.NullOctantId)
                     {
                         Manager.MoveEntityTreeWise(entity, point);
                         return;
                     }
 
                     RegionOctree octree = Manager.GetOrCreateOctree(point);
-                    int octantId = RenderOctant.CraftIdFromPoint(RenderOctant.GetOctreePointForOctant(bounds.ComputedBounds.Minimum - octree.WorldBounds.Minimum));
+                    OctreePoint octantPoint = RenderOctant.GetOctreePointForOctant(bounds.ComputedBounds.Center - octree.WorldBounds.Minimum);
+                    long octantId = RenderOctant.CraftIdFromPoint(octantPoint);
                     if (octantId != octantInfo.OctantId)
                     {
                         Manager.MoveEntityOctantWise(entity, point);
@@ -161,7 +162,7 @@ namespace Primary.Rendering.Tree
         }
     }
 
-    public readonly record struct OctreePoint(int X, int Y, int Z) : IEquatable<OctreePoint>
+    public readonly record struct OctreePoint(short X, short Y, short Z) : IEquatable<OctreePoint>
     {
         public override int GetHashCode() => HashCode.Combine(X, Y, Z);
         public override string ToString() => $"{X}x{Y}x{Z}";

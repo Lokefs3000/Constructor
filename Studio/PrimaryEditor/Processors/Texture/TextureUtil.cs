@@ -10,8 +10,6 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
-using System.Text;
-using TerraFX.Interop.Windows;
 
 namespace Editor.Processors.Texture
 {
@@ -153,22 +151,24 @@ namespace Editor.Processors.Texture
                             if (bitmap.Width != channel.Width || bitmap.Height != channel.Height)
                                 throw new Exception($"Image must match channel dimensions: {filePath}");
 
-                            int maxIndex = (int)(bitmap.Width * bitmap.Height * channel.Stride);
-                            if (channel.DestinationChannelId + maxIndex > channel.Data.Length)
+                            int maxIndex = (int)(bitmap.Width * bitmap.Height * channel.Stride) - channel.Stride + channel.DestinationChannelId + 1;
+                            if (maxIndex > channel.Data.Length)
                                 throw new Exception($"Not enough data in provided for: {filePath}");
+
+                            int maxBitmapIndex = (int)(bitmap.Width * bitmap.Height * bitmap.Stride);
 
                             if (bitmap.Stride > channel.SourceChannelId)
                             {
                                 if (channel.Invert)
                                 {
-                                    for (int i = channel.SourceChannelId, j = channel.DestinationChannelId; i < maxIndex; i += bitmap.Stride, j += channel.Stride)
+                                    for (int i = channel.SourceChannelId, j = channel.DestinationChannelId; i < maxBitmapIndex && j < maxIndex; i += bitmap.Stride, j += channel.Stride)
                                     {
                                         channel.Data.DangerousGetReferenceAt(j) = (byte)(byte.MaxValue - bitmap.Pixels[i]);
                                     }
                                 }
                                 else
                                 {
-                                    for (int i = channel.SourceChannelId, j = channel.DestinationChannelId; i < maxIndex; i += bitmap.Stride, j += channel.Stride)
+                                    for (int i = channel.SourceChannelId, j = channel.DestinationChannelId; i < maxBitmapIndex && j < maxIndex; i += bitmap.Stride, j += channel.Stride)
                                     {
                                         channel.Data.DangerousGetReferenceAt(j) = bitmap.Pixels[i];
                                     }
@@ -195,22 +195,24 @@ namespace Editor.Processors.Texture
                             if (bitmap.Width != channel.Width || bitmap.Height != channel.Height)
                                 throw new Exception($"Image must match channel dimensions: {filePath}");
 
-                            int maxIndex = (int)(bitmap.Width * bitmap.Height * channel.Stride);
-                            if (channel.DestinationChannelId + maxIndex > channel.Data.Length)
+                            int maxIndex = (int)(bitmap.Width * bitmap.Height * channel.Stride) - channel.Stride + channel.DestinationChannelId + 1;
+                            if (maxIndex > channel.Data.Length)
                                 throw new Exception($"Not enough data in provided for: {filePath}");
+
+                            int maxBitmapIndex = (int)(bitmap.Width * bitmap.Height * bitmap.Stride);
 
                             if (bitmap.Stride > channel.SourceChannelId)
                             {
                                 if (channel.Invert)
                                 {
-                                    for (int i = channel.SourceChannelId, j = channel.DestinationChannelId; i < maxIndex; i += bitmap.Stride, j += channel.Stride)
+                                    for (int i = channel.SourceChannelId, j = channel.DestinationChannelId; i < maxBitmapIndex && j < maxIndex; i += bitmap.Stride, j += channel.Stride)
                                     {
                                         channel.Data.DangerousGetReferenceAt(j) = (byte)(byte.MaxValue - bitmap.Pixels[i]);
                                     }
                                 }
                                 else
                                 {
-                                    for (int i = channel.SourceChannelId, j = channel.DestinationChannelId; i < maxIndex; i += bitmap.Stride, j += channel.Stride)
+                                    for (int i = channel.SourceChannelId, j = channel.DestinationChannelId; i < maxBitmapIndex && j < maxIndex; i += bitmap.Stride, j += channel.Stride)
                                     {
                                         channel.Data.DangerousGetReferenceAt(j) = bitmap.Pixels[i];
                                     }

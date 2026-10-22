@@ -5,9 +5,11 @@ using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Mathematics;
 using Primary.Memory.Native;
+using PrimaryEditor.Processors;
 using Silk.NET.Assimp;
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.Intrinsics;
 using System.Text;
 using TerraFX.Interop.Windows;
@@ -40,6 +42,15 @@ namespace Editor.Processors.Texture
                         _ => throw new NotImplementedException()
                     };
 
+                    if (channel.Source == TextureCompositeChannel.None)
+                        channel.Source = TextureCompositeChannel.Red;
+
+                    int channelIndex = BitOperations.TrailingZeroCount((uint)channel.Source);
+                    if (channelIndex < 0 || channel.Source == TextureCompositeChannel.None)
+                    {
+                        continue;
+                    }
+
                     if (!idProvider.TryGetLocalPathForId(channel.Asset, out string? filePath))
                     {
                         throw new Exception($"Failed to get path for id: {channel.Asset} ({(TextureCompositeChannel)(1 << i)})");
@@ -55,7 +66,7 @@ namespace Editor.Processors.Texture
 
                     swizzleRemap[i] = (TextureSwizzleChannel)j;
 
-                    TextureChannel data = new TextureChannel(size.X, size.Y, stride, outputData, (int)channel.Source - 1, j++, channel.Invert);
+                    TextureChannel data = new TextureChannel(size.X, size.Y, stride, outputData, channelIndex, j++, channel.Invert);
                     TextureUtil.LoadChannelInto(filePath, data);
                 }
                 else
