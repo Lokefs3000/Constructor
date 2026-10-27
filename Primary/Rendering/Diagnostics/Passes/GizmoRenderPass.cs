@@ -12,26 +12,33 @@ namespace Primary.Rendering.Diagnostics.Passes
     {
         private readonly ShaderAsset _lineShader;
         private readonly ShaderAsset _triangleShader;
+        private readonly ShaderAsset _textShader;
 
         private readonly ShaderAsset _screenLineShader;
         private readonly ShaderAsset _screenTriangleShader;
+        private readonly ShaderAsset _screenTextShader;
 
-        private readonly PropertyBlock _block;
+        private readonly PropertyBlock _genericBlock;
+        private readonly PropertyBlock _textBlock;
 
         public GizmoRenderPass()
         {
             _lineShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Gizmo/GizmoLine.shader");
             _triangleShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Gizmo/GizmoTriangle.shader");
+            _textShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Gizmo/GizmoText.shader");
 
             _screenLineShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Gizmo/ScreenGizmoLine.shader");
             _screenTriangleShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Gizmo/ScreenGizmoTriangle.shader");
+            _screenTextShader = AssetManager.LoadAsset<ShaderAsset>("Engine/Shaders/Gizmo/ScreenGizmoText.shader");
 
-            _block = _lineShader.CreatePropertyBlock();
+            _genericBlock = _lineShader.CreatePropertyBlock();
+            _textBlock = _textShader.CreatePropertyBlock();
         }
 
         public void Dispose()
         {
-            _block?.Dispose();
+            _genericBlock?.Dispose();
+            _textBlock?.Dispose();
         }
 
         public void SetupPasses(FrameGraphBuilder frameGraph)
@@ -79,11 +86,14 @@ namespace Primary.Rendering.Diagnostics.Passes
 
                     data.LineShader = _lineShader;
                     data.TriangleShader = _triangleShader;
+                    data.TextShader = _textShader;
 
                     data.ScreenLineShader = _screenLineShader;
                     data.ScreenTriangleShader = _screenTriangleShader;
+                    data.ScreenTextShader = _screenTextShader;
 
-                    data.Block = _block;
+                    data.GenericBlock = _genericBlock;
+                    data.TextBlock = _textBlock;
 
                     desc.Write(data.GlobalBuffer);
                     desc.Write(cameraData.ColorTexture);
@@ -108,7 +118,10 @@ namespace Primary.Rendering.Diagnostics.Passes
             Gizmos gizmos = Gizmos.Instance;
             ScreenGizmos screenGizmos = ScreenGizmos.Instance;
 
-            passData.Block!.SetResource("cbGlobals", passData.GlobalBuffer);
+            passData.GenericBlock!.SetResource("cbGlobals", passData.GlobalBuffer);
+
+            passData.TextBlock!.SetResource("cbGlobals", passData.GlobalBuffer);
+            passData.TextBlock!.SetResource("txFontAtlas", Gizmos.Font.Texture);
 
             int drawStartIdx = 0;
 
@@ -116,8 +129,6 @@ namespace Primary.Rendering.Diagnostics.Passes
             int idxDataOffset = 0;
 
             cmd.SetRenderTarget(0, passData.OutColor);
-
-            cmd.SetProperties(passData.Block);
 
             // gizmos
             if (gizmos.HasAnyDrawData)
@@ -144,6 +155,15 @@ namespace Primary.Rendering.Diagnostics.Passes
                         {
                             GizmosMode.Solid => passData.TriangleShader!,
                             GizmosMode.Wire => passData.LineShader!,
+                            GizmosMode.Text => passData.TextShader!,
+                            _ => throw new NotSupportedException()
+                        });
+
+                        cmd.SetProperties(currentSection.Mode switch
+                        {
+                            GizmosMode.Solid => passData.GenericBlock!,
+                            GizmosMode.Wire => passData.GenericBlock!,
+                            GizmosMode.Text => passData.TextBlock!,
                             _ => throw new NotSupportedException()
                         });
 
@@ -152,7 +172,7 @@ namespace Primary.Rendering.Diagnostics.Passes
 
                     if (indexCount > 0)
                     {
-                        cmd.DrawIndexedInstanced((uint)indexCount, 1, (uint)drawStartIdx, 0, 0);
+                        cmd.DrawIndexedInstanced((uint)indexCount, 1, (uint)(drawStartIdx + currentSection.IndexStart), 0, 0);
                     }
                 }
 
@@ -193,12 +213,19 @@ namespace Primary.Rendering.Diagnostics.Passes
                             _ => throw new NotSupportedException()
                         });
 
+                        cmd.SetProperties(currentSection.Mode switch
+                        {
+                            ScreenGizmosMode.Solid => passData.GenericBlock!,
+                            ScreenGizmosMode.Wire => passData.GenericBlock!,
+                            _ => throw new NotSupportedException()
+                        });
+
                         currentMode = currentSection.Mode;
                     }
 
                     if (indexCount > 0)
                     {
-                        cmd.DrawIndexedInstanced((uint)indexCount, 1, (uint)drawStartIdx, 0, 0);
+                        cmd.DrawIndexedInstanced((uint)indexCount, 1, (uint)(drawStartIdx + currentSection.IndexStart), 0, 0);
                     }
                 }
             }
@@ -217,11 +244,14 @@ namespace Primary.Rendering.Diagnostics.Passes
 
             public ShaderAsset? LineShader;
             public ShaderAsset? TriangleShader;
+            public ShaderAsset? TextShader;
 
             public ShaderAsset? ScreenLineShader;
             public ShaderAsset? ScreenTriangleShader;
+            public ShaderAsset? ScreenTextShader;
 
-            public PropertyBlock? Block;
+            public PropertyBlock? GenericBlock;
+            public PropertyBlock? TextBlock;
 
             public void Clear()
             {
@@ -233,11 +263,14 @@ namespace Primary.Rendering.Diagnostics.Passes
 
                 LineShader = null;
                 TriangleShader = null;
+                TextShader = null;
 
                 ScreenLineShader = null;
                 ScreenTriangleShader = null;
+                ScreenTextShader = null;
 
-                Block = null;
+                GenericBlock = null;
+                TextBlock = null;
             }
         }
     }

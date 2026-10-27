@@ -31,6 +31,7 @@ namespace VoxelizationDemo.Procedural
             const int SpiralPointCount = 32;
 
             long startTime = Stopwatch.GetTimestamp();
+            int entityCount = 0;
 
             Scene scene = runtime.SceneManager.CreateScene("Test 1", LoadSceneMode.Additive);
 
@@ -64,6 +65,7 @@ namespace VoxelizationDemo.Procedural
                 {
                     SceneEntity entity = scene.CreateEntity(SceneEntity.Null);
                     entity.Name = $"Group_{chunkX}x{chunkZ}";
+                    ++entityCount;
 
                     for (int x = 0; x < ChunkSizeXZ; ++x)
                     {
@@ -85,6 +87,8 @@ namespace VoxelizationDemo.Procedural
                             ref MeshRenderer meshRenderer = ref mesh.AddComponent<MeshRenderer>();
                             meshRenderer.Mesh = cubeMesh;
                             meshRenderer.Material = groundMat;
+
+                            ++entityCount;
                         }
                     }
                 }
@@ -106,6 +110,7 @@ namespace VoxelizationDemo.Procedural
                 
                 SceneEntity spire = scene.CreateEntity(SceneEntity.Null);
                 spire.Name = $"Sprire_{i}";
+                ++entityCount;
 
                 {
                     float heightValue = fnl.GetNoise(position.X / TerrainScale * TerrainNoiseScale, position.Z / TerrainScale * TerrainNoiseScale);
@@ -129,6 +134,8 @@ namespace VoxelizationDemo.Procedural
                     ref MeshRenderer meshRenderer = ref body.AddComponent<MeshRenderer>();
                     meshRenderer.Mesh = cylinderMesh;
                     meshRenderer.Material = spireBodyMat;
+
+                            ++entityCount;
                 }
 
                 {
@@ -142,6 +149,8 @@ namespace VoxelizationDemo.Procedural
                     ref MeshRenderer meshRenderer = ref head.AddComponent<MeshRenderer>();
                     meshRenderer.Mesh = torusMesh;
                     meshRenderer.Material = spireBodyMat;
+
+                    ++entityCount;
                 }
 
                 {
@@ -160,6 +169,8 @@ namespace VoxelizationDemo.Procedural
                     light.Diffuse = new Color(217, 200, 165);
                     light.Radius = 33.0f;
                     light.Intensity = 6.0f;
+
+                    ++entityCount;
                 }
             }
 
@@ -172,9 +183,11 @@ namespace VoxelizationDemo.Procedural
 
                 ref DirectionalLight light = ref dirLight.AddComponent<DirectionalLight>();
                 light.Intensity = 0.75f;
+
+                ++entityCount;
             }
 
-            AppLog.Primary.Information("Test scene took {secs}s to generate", Stopwatch.GetElapsedTime(startTime).TotalSeconds);
+            AppLog.Primary.Information("Test scene took {secs}s to generate with {c} entities", Stopwatch.GetElapsedTime(startTime).TotalSeconds, entityCount);
             return scene;
         }
     }

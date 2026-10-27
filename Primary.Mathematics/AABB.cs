@@ -33,6 +33,22 @@ namespace Primary.Mathematics
             Maximum = value.GetUpper().AsVector3();
         }
 
+        public readonly bool Intersects(Vector3 point)
+        {
+            return Vector128.LessThanOrEqualAll(point.AsVector128(), Maximum.AsVector128()) && Vector128.GreaterThanOrEqualAll(point.AsVector128(), Minimum.AsVector128());
+        }
+
+        public readonly bool Contains(AABB other)
+        {
+            Vector128<float> containedMin = Vector128.LessThanOrEqual(Minimum.AsVector128(), other.Minimum.AsVector128());
+            Vector128<float> containedMax = Vector128.GreaterThanOrEqual(Maximum.AsVector128(), other.Maximum.AsVector128());
+
+            uint minBits = containedMin.ExtractMostSignificantBits() & 0b0111;
+            uint maxBits = containedMax.ExtractMostSignificantBits() & 0b0111;
+
+            return (minBits & maxBits) == 0b111;
+        }
+
         public Vector256<float> AsVector256() => Vector256.Create(Minimum.AsVector128(), Maximum.AsVector128());
         public Vector256<float> AsVector256Unsafe() => Vector256.Create(Minimum.AsVector128Unsafe(), Maximum.AsVector128Unsafe());
 

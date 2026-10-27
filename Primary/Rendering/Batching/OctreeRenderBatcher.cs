@@ -63,17 +63,18 @@ namespace Primary.Rendering.Batching
 
                 if (octree.Children.Count > 0)
                 {
-                    BatchEntitiesWithinOctant(list, octree.Children.AsSpan(), in cullingFrustrum);
+                    BatchEntitiesWithinOctant(list, octree.Children, in cullingFrustrum, true);
                 }
 
                 while (_octants.TryDequeue(out RenderOctant? octant))
                 {
-                    if (!cullingFrustrum.Intersects(octant.Boundaries))
+                    FrustrumIntersection intersection = cullingFrustrum.IntersectWhere(octant.Boundaries);
+                    if (intersection == FrustrumIntersection.Outside)
                         continue;
 
                     if (octant.Children.Count > 0)
                     {
-                        BatchEntitiesWithinOctant(list, octant.Children.AsSpan(), in cullingFrustrum);
+                        BatchEntitiesWithinOctant(list, octant.Children, in cullingFrustrum, intersection == FrustrumIntersection.Partial);
                     }
 
                     foreach (RenderOctant subOctant in octant.Octants)
@@ -84,76 +85,81 @@ namespace Primary.Rendering.Batching
             }
         }
 
-        private void BatchEntitiesWithinOctant(RenderList list, ReadOnlySpan<SceneEntity> entities, in Frustrum cullingFrustrum)
+        private void BatchEntitiesWithinOctant(RenderList list, RegionEntityList entities, in Frustrum cullingFrustrum, bool doFrustrumCull)
         {
             World world = Engine.GlobalSingleton.SceneManager.World;
 
-            for (int i = 0; i < entities.Length; i++)
+            RegionEntityList.Node? node = entities.FirstNode;
+            do
             {
-                ref readonly SceneEntity entity = ref entities[i];
-                ref readonly EntityData rawData = ref world.GetEntityData(entity.WrappedEntity);
-
-                ref readonly EntityEnabled enabled = ref rawData.Get<EntityEnabled>();
-                if (!enabled.Enabled)
-                    continue;
-
-                ref readonly MeshRenderer renderer = ref rawData.Get<MeshRenderer>();
-                //"renderer" SHOULD not be null but a crash will occur if it is
-                if (!Unsafe.IsNullRef(in renderer) && renderer.Mesh != null)
+                ReadOnlySpan<SceneEntity> nodeEntities = node.Entities;
+                for (int i = 0; i < nodeEntities.Length; ++i)
                 {
-                    ref readonly RenderBounds bounds = ref rawData.Get<RenderBounds>();
-                    ref readonly WorldTransform transform = ref rawData.Get<WorldTransform>();
+                    ref readonly SceneEntity entity = ref nodeEntities[i];
+                    ref readonly EntityData rawData = ref world.GetEntityData(entity.WrappedEntity);
 
-                    Debug.Assert(!Unsafe.IsNullRef(in bounds));
-                    Debug.Assert(!Unsafe.IsNullRef(in transform));
-
-                    if (!cullingFrustrum.Intersects(bounds.ComputedBounds))
+                    ref readonly EntityEnabled enabled = ref rawData.Get<EntityEnabled>();
+                    if (!enabled.Enabled)
                         continue;
 
-                    MaterialAsset material = (renderer.Material == null || renderer.Material.Shader == null) ? list.DefaultMaterial! : renderer.Material;
-                    ShaderAsset? shader = material.Shader;
-
-                    if (shader == null)
-                        continue;
-
-                    IRawRenderMesh mesh = renderer.Mesh;
-                    IRenderMeshSource? meshSource = mesh.MeshSource;
-
-                    if (meshSource == null || !meshSource.IsLoaded)
-                        continue;
-
-                    if (shader == null)
+                    ref readonly MeshRenderer renderer = ref rawData.Get<MeshRenderer>();
+                    //"renderer" SHOULD not be null but a crash will occur if it is
+                    if (!Unsafe.IsNullRef(in renderer) && renderer.Mesh != null)
                     {
-                        material = list.DefaultMaterial!;
-                        shader = list.DefaultMaterial!.Shader!;
+                        ref readonly RenderBounds bounds = ref rawData.Get<RenderBounds>();
+                        ref readonly WorldTransform transform = ref rawData.Get<WorldTransform>();
+
+                        Debug.Assert(!Unsafe.IsNullRef(in bounds));
+                        Debug.Assert(!Unsafe.IsNullRef(in transform));
+
+                        if (doFrustrumCull && !cullingFrustrum.Intersects(bounds.ComputedBounds))
+                            continue;
+
+                        MaterialAsset material = (renderer.Material == null || renderer.Material.Shader == null) ? list.DefaultMaterial! : renderer.Material;
+                        ShaderAsset? shader = material.Shader;
+
+                        if (shader == null)
+                            continue;
+
+                        IRawRenderMesh mesh = renderer.Mesh;
+                        IRenderMeshSource? meshSource = mesh.MeshSource;
+
+                        if (meshSource == null || !meshSource.IsLoaded)
+                            continue;
+
+                        if (shader == null)
+                        {
+                            material = list.DefaultMaterial!;
+                            shader = list.DefaultMaterial!.Shader!;
+                        }
+
+                        if (!shader.IsLoaded || !material.IsLoaded)
+                            continue;
+
+                        if (!_shaderSourceIndices.TryGetValue(shader, out ushort shaderId))
+                        {
+                            shaderId = list.GetShaderId(shader);
+                            _shaderSourceIndices.Add(shader, shaderId);
+                        }
+
+                        if (!_meshSourceIndices.TryGetValue(meshSource, out ushort modelId))
+                        {
+                            modelId = list.GetModelId(meshSource);
+                            _meshSourceIndices.Add(meshSource, modelId);
+                        }
+
+                        if (!_materialSourceIndices.TryGetValue(material, out uint materialId))
+                        {
+                            materialId = list.GetMaterialId(material);
+                            _materialSourceIndices.Add(material, materialId);
+                        }
+
+                        // HACK: The mesh id WILL eventually break this
+                        _renderingKeys.Add(new RenderKey(shaderId, modelId, materialId, (ushort)((uint)mesh.UniqueId % 0x3ff), _renderingData.Count, _id));
+                        _renderingData.Add(new UnbatchedRenderFlag(material, mesh, transform.Transformation));
                     }
-
-                    if (!shader.IsLoaded || !material.IsLoaded)
-                        continue;
-
-                    if (!_shaderSourceIndices.TryGetValue(shader, out ushort shaderId))
-                    {
-                        shaderId = list.GetShaderId(shader);
-                        _shaderSourceIndices.Add(shader, shaderId);
-                    }
-
-                    if (!_meshSourceIndices.TryGetValue(meshSource, out ushort modelId))
-                    {
-                        modelId = list.GetModelId(meshSource);
-                        _meshSourceIndices.Add(meshSource, modelId);
-                    }
-
-                    if (!_materialSourceIndices.TryGetValue(material, out uint materialId))
-                    {
-                        materialId = list.GetMaterialId(material);
-                        _materialSourceIndices.Add(material, materialId);
-                    }
-
-                    // HACK: The mesh id WILL eventually break this
-                    _renderingKeys.Add(new RenderKey(shaderId, modelId, materialId, (ushort)((uint)mesh.UniqueId % 0x3ff), _renderingData.Count, _id));
-                    _renderingData.Add(new UnbatchedRenderFlag(material, mesh, transform.Transformation));
                 }
-            }
+            } while ((node = node.Next) != null);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

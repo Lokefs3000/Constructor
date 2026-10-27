@@ -122,22 +122,18 @@ namespace VoxelizationDemo.Editor.Rendering
                 int offsetVtx = 0;
                 int offsetIdx = 0;
 
-                fixed (ImDrawVert* ptr1 = vertices.Span)
-                fixed (ushort* ptr2 = indices.Span)
+                for (int i = 0; i < drawData.CmdListsCount; i++)
                 {
-                    for (int i = 0; i < drawData.CmdListsCount; i++)
-                    {
-                        ImDrawListPtr list = drawData.CmdLists[i];
+                    ImDrawListPtr list = drawData.CmdLists[i];
 
-                        Debug.Assert(offsetVtx + list.VtxBuffer.Size <= vertices.Span.Length);
-                        Debug.Assert(offsetIdx + list.IdxBuffer.Size <= indices.Span.Length);
+                    Debug.Assert(offsetVtx + list.VtxBuffer.Size <= vertices.Span.Length);
+                    Debug.Assert(offsetIdx + list.IdxBuffer.Size <= indices.Span.Length);
 
-                        NativeMemory.Copy(list.VtxBuffer.Data, ptr1 + offsetVtx, (nuint)(list.VtxBuffer.Size * Unsafe.SizeOf<ImDrawVert>()));
-                        NativeMemory.Copy(list.IdxBuffer.Data, ptr2 + offsetIdx, (nuint)(list.IdxBuffer.Size * Unsafe.SizeOf<ushort>()));
+                    new Span<ImDrawVert>(list.VtxBuffer.Data, list.VtxBuffer.Size).CopyTo(vertices.Span[offsetVtx..]);
+                    new Span<ushort>(list.IdxBuffer.Data, list.IdxBuffer.Size).CopyTo(indices.Span[offsetIdx..]);
 
-                        offsetVtx += list.VtxBuffer.Size;
-                        offsetIdx += list.IdxBuffer.Size;
-                    }
+                    offsetVtx += list.VtxBuffer.Size;
+                    offsetIdx += list.IdxBuffer.Size;
                 }
             }
 

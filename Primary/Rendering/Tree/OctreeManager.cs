@@ -141,7 +141,7 @@ namespace Primary.Rendering.Tree
                 if (FrameIndex == bounds.UpdateIndex)
                 {
                     OctreePoint point = GetOctreeRegionForPoint(bounds.ComputedBounds.Center);
-                    if (point != octantInfo.Tree && octantInfo.OctantId != RegionOctree.NullOctantId)
+                    if (point != octantInfo.Tree && octantInfo.OctantId.Code != RegionOctree.NullOctantId)
                     {
                         Manager.MoveEntityTreeWise(entity, point);
                         return;
@@ -149,8 +149,8 @@ namespace Primary.Rendering.Tree
 
                     RegionOctree octree = Manager.GetOrCreateOctree(point);
                     OctreePoint octantPoint = RenderOctant.GetOctreePointForOctant(bounds.ComputedBounds.Center - octree.WorldBounds.Minimum);
-                    long octantId = RenderOctant.CraftIdFromPoint(octantPoint);
-                    if (octantId != octantInfo.OctantId)
+                    int octantId = RenderOctant.CraftIdFromPoint(octantPoint);
+                    if (octantId != octantInfo.OctantId.Code)
                     {
                         Manager.MoveEntityOctantWise(entity, point);
                         return;
@@ -166,5 +166,11 @@ namespace Primary.Rendering.Tree
     {
         public override int GetHashCode() => HashCode.Combine(X, Y, Z);
         public override string ToString() => $"{X}x{Y}x{Z}";
+    }
+
+    public readonly record struct OctreeId(int Code, int HintId = -1) : IEquatable<OctreeId>
+    {
+        public override int GetHashCode() => HashCode.Combine(Code, HintId);
+        public override string ToString() => $"{Code}[{HintId}]";
     }
 }

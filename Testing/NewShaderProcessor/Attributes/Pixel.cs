@@ -12,6 +12,8 @@ namespace NewShaderProcessor.Attributes
             AttributeBuilder builder = new AttributeBuilder(
                 Usage: AttributeUsage.Function);
 
+            builder.AddArgument<string>("name");
+
             builder.Incompatible<Vertex>();
             builder.Incompatible<Kernel>();
             return builder;

@@ -16,7 +16,8 @@ namespace Primary.Rendering.Memory
     {
         private readonly FrameGraph _frameGraph;
 
-        private readonly LinearResizingAllocator _transientAllocator;
+        private readonly LinearBlockAllocator[] _transientAllocators;
+
         private readonly VirtualAllocator _virtualAllocator;
 
         private readonly List<DataUploadRequest> _uploadRequests;
@@ -27,7 +28,11 @@ namespace Primary.Rendering.Memory
         {
             _frameGraph = frameGraph;
 
-            _transientAllocator = new LinearResizingAllocator(4096);
+            _transientAllocators = [
+                new LinearBlockAllocator(4096),
+                new LinearBlockAllocator(4096)
+                ];
+
             _virtualAllocator = new VirtualAllocator();
 
             _uploadRequests = new List<DataUploadRequest>();
@@ -39,7 +44,8 @@ namespace Primary.Rendering.Memory
             {
                 if (disposing)
                 {
-                    _transientAllocator.Dispose();
+                    _transientAllocators[0].Dispose();
+                    _transientAllocators[1].Dispose();
                 }
 
                 _disposedValue = true;
@@ -54,9 +60,8 @@ namespace Primary.Rendering.Memory
 
         internal void CleanupUploadData()
         {
-            _transientAllocator.Reset();
+            _transientAllocators[1 - _frameGraph.FramePingPongValue].Reset();
             _virtualAllocator.ResetAllocator();
-
             _uploadRequests.Clear();
         }
 
@@ -68,7 +73,7 @@ namespace Primary.Rendering.Memory
 
                 foreach (DataUploadRequest uploadRequest in _uploadRequests)
                 {
-                    renderPlan.AddUpload(uploadRequest.OffsetInHeap, new ArrayPtr<byte>((byte*)_transientAllocator.GetAtOffset(uploadRequest.UploadBaseOffset), uploadRequest.UploadSize), uploadRequest.DestSlice, uploadRequest.DestBox, uploadRequest.Resource.Index);
+                    renderPlan.AddUpload(uploadRequest.OffsetInHeap, new ArrayPtr<byte>((byte*)uploadRequest.BasePointer, uploadRequest.UploadSize), uploadRequest.DestSlice, uploadRequest.DestBox, uploadRequest.Resource.Index);
                 }
             }
         }
@@ -77,9 +82,9 @@ namespace Primary.Rendering.Memory
         {
             Debug.Assert(!uploadBytes.IsEmpty);
 
-            int uploadOffset = _transientAllocator.CurrentOffset;
+            int uploadOffset = _transientAllocators[_frameGraph.FramePingPongValue].CurrentOffset;
 
-            ArrayPtr<byte> rawPointer = new ArrayPtr<byte>((byte*)_transientAllocator.Allocate(uploadBytes.Length), uploadBytes.Length);
+            ArrayPtr<byte> rawPointer = new ArrayPtr<byte>((byte*)_transientAllocators[_frameGraph.FramePingPongValue].Allocate(uploadBytes.Length), uploadBytes.Length);
             uploadBytes.CopyTo(rawPointer.AsSpan());
 
             int alignment = 1;
@@ -112,7 +117,7 @@ namespace Primary.Rendering.Memory
             }
 
             VirtualAllocation allocation = _virtualAllocator.Allocate(alignment, uploadBytes.Length);
-            DataUploadRequest uploadRequest = new DataUploadRequest(buffer, allocation.MemoryOffset, allocation.MemorySize, uploadOffset, rawPointer.Length, byteOffset, new FGBox((int)byteOffset, 0, (int)byteOffset + rawPointer.Length, 0));
+            DataUploadRequest uploadRequest = new DataUploadRequest(buffer, allocation.MemoryOffset, allocation.MemorySize, uploadOffset, rawPointer.Length, byteOffset, new FGBox((int)byteOffset, 0, (int)byteOffset + rawPointer.Length, 0), (nint)rawPointer.Pointer);
 
             int index = _uploadRequests.Count;
             _uploadRequests.Add(uploadRequest);
@@ -124,9 +129,9 @@ namespace Primary.Rendering.Memory
         {
             Debug.Assert(!uploadBytes.IsEmpty);
 
-            int uploadOffset = _transientAllocator.CurrentOffset;
+            int uploadOffset = _transientAllocators[_frameGraph.FramePingPongValue].CurrentOffset;
 
-            ArrayPtr<byte> rawPointer = new ArrayPtr<byte>((byte*)_transientAllocator.Allocate(uploadBytes.Length), uploadBytes.Length);
+            ArrayPtr<byte> rawPointer = new ArrayPtr<byte>((byte*)_transientAllocators[_frameGraph.FramePingPongValue].Allocate(uploadBytes.Length), uploadBytes.Length);
             uploadBytes.CopyTo(rawPointer.AsSpan());
 
             Int3 sliceSize;
@@ -152,7 +157,7 @@ namespace Primary.Rendering.Memory
             int memorySize = alignedPitch * sliceSize.Y * sliceSize.Z;
 
             VirtualAllocation allocation = _virtualAllocator.Allocate(alignment, memorySize);
-            DataUploadRequest uploadRequest = new DataUploadRequest(texture, allocation.MemoryOffset, allocation.MemorySize, uploadOffset, rawPointer.Length, slice, box ?? new FGBox(Int3.Zero, sliceSize));
+            DataUploadRequest uploadRequest = new DataUploadRequest(texture, allocation.MemoryOffset, allocation.MemorySize, uploadOffset, rawPointer.Length, slice, box ?? new FGBox(Int3.Zero, sliceSize), (nint)rawPointer.Pointer);
 
             int index = _uploadRequests.Count;
             _uploadRequests.Add(uploadRequest);
@@ -169,11 +174,11 @@ namespace Primary.Rendering.Memory
                 range = new FGRange(bufferDesc.ElementCount * Math.Max(bufferDesc.Stride, 1));
             }
 
-            int uploadOffset = _transientAllocator.CurrentOffset;
+            int uploadOffset = _transientAllocators[_frameGraph.FramePingPongValue].CurrentOffset;
             int uploadElementCount = Math.Max(range.Length / Unsafe.SizeOf<T>(), 1);
 
-            ArrayPtr<T> rawPointer = new ArrayPtr<T>((T*)_transientAllocator.Allocate(uploadElementCount * Unsafe.SizeOf<T>()), uploadElementCount);
-            return (rawPointer, new DataMapInfo(buffer, uploadOffset, range.Length, (uint)range.Mininmum, new FGBox(range.Mininmum, 0, range.Maximum, 0)));
+            ArrayPtr<T> rawPointer = new ArrayPtr<T>((T*)_transientAllocators[_frameGraph.FramePingPongValue].Allocate(uploadElementCount * Unsafe.SizeOf<T>()), uploadElementCount);
+            return (rawPointer, new DataMapInfo(buffer, uploadOffset, range.Length, (uint)range.Mininmum, new FGBox(range.Mininmum, 0, range.Maximum, 0), (nint)rawPointer.Pointer));
         }
 
         internal unsafe (ArrayPtr<T> MapData, DataMapInfo MapInfo) MapForWriting<T>(TextureHandle texture, uint subresource, FGBox? writeBox) where T : unmanaged
@@ -206,11 +211,11 @@ namespace Primary.Rendering.Memory
 
             int totalDataSize = (int)RHIFormatInfo.Query(format).CalculateSize(box.X2 - box.X1, box.Y2 - box.Y1, box.Z2 - box.Z1);
 
-            int uploadOffset = _transientAllocator.CurrentOffset;
+            int uploadOffset = _transientAllocators[_frameGraph.FramePingPongValue].CurrentOffset;
             int uploadElementCount = Math.Max(totalDataSize / Unsafe.SizeOf<T>(), 1);
 
-            ArrayPtr<T> rawPointer = new ArrayPtr<T>((T*)_transientAllocator.Allocate(uploadElementCount * Unsafe.SizeOf<T>()), uploadElementCount);
-            return (rawPointer, new DataMapInfo(texture, uploadOffset, totalDataSize, subresource, box));
+            ArrayPtr<T> rawPointer = new ArrayPtr<T>((T*)_transientAllocators[_frameGraph.FramePingPongValue].Allocate(uploadElementCount * Unsafe.SizeOf<T>()), uploadElementCount);
+            return (rawPointer, new DataMapInfo(texture, uploadOffset, totalDataSize, subresource, box, (nint)rawPointer.Pointer));
         }
 
         internal unsafe int UnmapForWriting(DataMapInfo mapInfo)
@@ -249,7 +254,7 @@ namespace Primary.Rendering.Memory
                 }
 
                 VirtualAllocation allocation = _virtualAllocator.Allocate(alignment, mapInfo.UploadSize);
-                DataUploadRequest uploadRequest = new DataUploadRequest(mapInfo.Resource, allocation.MemoryOffset, allocation.MemorySize, mapInfo.UploadBaseOffset, mapInfo.UploadSize, mapInfo.DestSlice, mapInfo.DestBox);
+                DataUploadRequest uploadRequest = new DataUploadRequest(mapInfo.Resource, allocation.MemoryOffset, allocation.MemorySize, mapInfo.UploadBaseOffset, mapInfo.UploadSize, mapInfo.DestSlice, mapInfo.DestBox, mapInfo.BasePointer);
 
                 int index = _uploadRequests.Count;
                 _uploadRequests.Add(uploadRequest);
@@ -283,7 +288,7 @@ namespace Primary.Rendering.Memory
                 int memorySize = alignedPitch * sliceSize.Y * sliceSize.Z;
 
                 VirtualAllocation allocation = _virtualAllocator.Allocate(alignment, memorySize);
-                DataUploadRequest uploadRequest = new DataUploadRequest(mapInfo.Resource, allocation.MemoryOffset, allocation.MemorySize, mapInfo.UploadBaseOffset, mapInfo.UploadSize, mapInfo.DestSlice, mapInfo.DestBox);
+                DataUploadRequest uploadRequest = new DataUploadRequest(mapInfo.Resource, allocation.MemoryOffset, allocation.MemorySize, mapInfo.UploadBaseOffset, mapInfo.UploadSize, mapInfo.DestSlice, mapInfo.DestBox, mapInfo.BasePointer);
 
                 int index = _uploadRequests.Count;
                 _uploadRequests.Add(uploadRequest);
@@ -292,8 +297,8 @@ namespace Primary.Rendering.Memory
             }
         }
 
-        private readonly record struct DataUploadRequest(ResourceHandle Resource, int OffsetInHeap, int ReservationSize, int UploadBaseOffset, int UploadSize, uint DestSlice, FGBox DestBox);
+        private readonly record struct DataUploadRequest(ResourceHandle Resource, int OffsetInHeap, int ReservationSize, int UploadBaseOffset, int UploadSize, uint DestSlice, FGBox DestBox, nint BasePointer);
     }
 
-    internal readonly record struct DataMapInfo(ResourceHandle Resource, int UploadBaseOffset, int UploadSize, uint DestSlice, FGBox DestBox);
+    internal readonly record struct DataMapInfo(ResourceHandle Resource, int UploadBaseOffset, int UploadSize, uint DestSlice, FGBox DestBox, nint BasePointer);
 }

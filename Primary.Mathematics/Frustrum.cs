@@ -28,13 +28,30 @@ namespace Primary.Mathematics
 
         public readonly bool Intersects(AABB aabb)
         {
-            return !(
-                IsInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Near) ||
+            return !(IsInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Near) ||
                 IsInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Far) ||
                 IsInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Left) ||
                 IsInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Right) ||
                 IsInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Top) ||
                 IsInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Bottom));
+        }
+
+        public readonly FrustrumIntersection IntersectWhere(AABB aabb)
+        {
+            bool value = IsFullyInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Near);
+
+            if (IsFullyInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Far) != value)
+                return FrustrumIntersection.Partial;
+            if (IsFullyInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Left) != value)
+                return FrustrumIntersection.Partial;
+            if (IsFullyInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Right) != value)
+                return FrustrumIntersection.Partial;
+            if (IsFullyInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Top) != value)
+                return FrustrumIntersection.Partial;
+            if (IsFullyInFrontOfPlane(in aabb.Minimum, in aabb.Maximum, in Bottom) != value)
+                return FrustrumIntersection.Partial;
+
+            return value ? FrustrumIntersection.Outside : FrustrumIntersection.Inside;
         }
 
         public readonly bool Intersects(Vector3 center, float radius)
@@ -48,17 +65,36 @@ namespace Primary.Mathematics
                 IsInFrontOfPlane(in center, in radius, in Bottom));
         }
 
-        // Also plagerized from BoundingBox.Intersects(in Plane)
-        // Though it has been vectorized manually since SIMD likes doing stuff in batches?
         private static bool IsInFrontOfPlane(in Vector3 min, in Vector3 max, in Plane plane)
         {
-            Vector128<float> normalSimd = plane.Normal.AsVector128();
+            Vector128<float> normalSimd = plane.AsVector128();
 
-            Vector128<float> normalSelectMask = Vector128.GreaterThanOrEqual(normalSimd, Vector128<float>.Zero);
-            Vector128<float> minimum = Vector128.ConditionalSelect(normalSelectMask, min.AsVector128Unsafe(), max.AsVector128Unsafe()).WithElement(3, 0.0f);
+            Vector128<float> aabbMin = min.AsVector128();
+            Vector128<float> aabbMax = max.AsVector128();
 
-            float distance = Vector128.Dot(normalSimd, minimum);
-            return distance + plane.D > 0.0f;
+            Vector128<float> aabbCenter = (aabbMin + aabbMax) * 0.5f;
+            Vector128<float> aabbExtents = (aabbMax - aabbMin) * 0.5f;
+
+            float d = Vector128.Dot(aabbCenter, plane.AsVector128());
+            float r = Vector128.Dot(aabbExtents, Vector128.Abs(plane.AsVector128()));
+
+            return d - r > -plane.D;
+        }
+
+        private static bool IsFullyInFrontOfPlane(in Vector3 min, in Vector3 max, in Plane plane)
+        {
+            Vector128<float> normalSimd = plane.AsVector128();
+
+            Vector128<float> aabbMin = min.AsVector128();
+            Vector128<float> aabbMax = max.AsVector128();
+
+            Vector128<float> aabbCenter = (aabbMin + aabbMax) * 0.5f;
+            Vector128<float> aabbExtents = (aabbMax - aabbMin) * 0.5f;
+
+            float d = Vector128.Dot(aabbCenter, plane.AsVector128());
+            float r = Vector128.Dot(aabbExtents, Vector128.Abs(plane.AsVector128()));
+
+            return d + r > -plane.D;
         }
 
         private static bool IsInFrontOfPlane(in Vector3 center, in float radius, in Plane plane)
@@ -66,5 +102,12 @@ namespace Primary.Mathematics
             float distance = Vector128.Dot(plane.Normal.AsVector128(), center.AsVector128());
             return distance + plane.D > radius;
         }
+    }
+
+    public enum FrustrumIntersection : byte
+    {
+        Outside = 0,
+        Partial,
+        Inside
     }
 }

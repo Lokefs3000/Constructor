@@ -13,6 +13,8 @@ namespace Primary.Rendering.Diagnostics
 
         private readonly StatisticDrawer _statisticsDrawer;
 
+        private readonly GizmoFont? _font;
+
         private readonly Gizmos? _gizmos;
         private readonly ScreenGizmos? _screenGizmos;
 
@@ -26,8 +28,10 @@ namespace Primary.Rendering.Diagnostics
 
             if (AppArguments.HasArgument("--render-draw-gizmos"))
             {
-                _gizmos = new Gizmos();
-                _screenGizmos = new ScreenGizmos();
+                _font = new GizmoFont();
+
+                _gizmos = new Gizmos(_font);
+                _screenGizmos = new ScreenGizmos(_font);
             }
 
             if (AppArguments.HasArgument("--dbgrender"))

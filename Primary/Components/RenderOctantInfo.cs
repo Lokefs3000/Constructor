@@ -8,12 +8,12 @@ namespace Primary.Components
     internal struct RenderOctantInfo : IComponent
     {
         public OctreePoint Tree;
-        public long OctantId;
+        public OctreeId OctantId;
 
         public RenderOctantInfo()
         {
             Tree = default;
-            OctantId = RegionOctree.NullOctantId;
+            OctantId = new OctreeId(RegionOctree.NullOctantId);
         }
     }
 }

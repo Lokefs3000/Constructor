@@ -13,6 +13,8 @@ namespace Primary.Rendering.Diagnostics
     {
         private static WeakReference s_instance = new WeakReference(null);
 
+        private readonly GizmoFont _font;
+
         private List<ScreenGizmoSection> _sections;
 
         private List<ScreenGizmoVertex> _vertices;
@@ -23,9 +25,11 @@ namespace Primary.Rendering.Diagnostics
         private object? _currentResource;
         private ScreenGizmosMode _currentMode;
 
-        internal ScreenGizmos()
+        internal ScreenGizmos(GizmoFont font)
         {
             s_instance.Target = this;
+
+            _font = font;
 
             _sections = new List<ScreenGizmoSection>();
 
@@ -79,8 +83,8 @@ namespace Primary.Rendering.Diagnostics
             self._indices.Add((ushort)self._vertices.Count);
             self._indices.Add((ushort)(self._vertices.Count + 1));
 
-            self._vertices.Add(new ScreenGizmoVertex(from, c));
-            self._vertices.Add(new ScreenGizmoVertex(to, c));
+            self._vertices.Add(new ScreenGizmoVertex(from, Vector2.Zero, c));
+            self._vertices.Add(new ScreenGizmoVertex(to, Vector2.Zero, c));
         }
 
         public static void DrawVector(Vector2 position)
@@ -93,10 +97,10 @@ namespace Primary.Rendering.Diagnostics
             self._indices.Add((ushort)(self._vertices.Count + 1));
             self._indices.Add((ushort)(self._vertices.Count + 3));
 
-            self._vertices.Add(new ScreenGizmoVertex(position, Color.Red));
-            self._vertices.Add(new ScreenGizmoVertex(position, Color.Green));
-            self._vertices.Add(new ScreenGizmoVertex(position + new Vector2(32.0f, 0.0f), Color.Red));
-            self._vertices.Add(new ScreenGizmoVertex(position + new Vector2(0.0f, 32.0f), Color.Green));
+            self._vertices.Add(new ScreenGizmoVertex(position, Vector2.Zero, Color.Red));
+            self._vertices.Add(new ScreenGizmoVertex(position, Vector2.Zero, Color.Green));
+            self._vertices.Add(new ScreenGizmoVertex(position + new Vector2(32.0f, 0.0f), Vector2.Zero, Color.Red));
+            self._vertices.Add(new ScreenGizmoVertex(position + new Vector2(0.0f, 32.0f), Vector2.Zero, Color.Green));
         }
         #endregion
         #region Wire
@@ -124,10 +128,10 @@ namespace Primary.Rendering.Diagnostics
             self._indices.Add(i3);
             self._indices.Add(i0);
 
-            self._vertices.Add(new ScreenGizmoVertex(min, c));
-            self._vertices.Add(new ScreenGizmoVertex(new Vector2(max.X, min.Y), c));
-            self._vertices.Add(new ScreenGizmoVertex(max, c));
-            self._vertices.Add(new ScreenGizmoVertex(new Vector2(min.X, max.Y), c));
+            self._vertices.Add(new ScreenGizmoVertex(min, Vector2.Zero, c));
+            self._vertices.Add(new ScreenGizmoVertex(new Vector2(max.X, min.Y), Vector2.Zero, c));
+            self._vertices.Add(new ScreenGizmoVertex(max, Vector2.Zero, c));
+            self._vertices.Add(new ScreenGizmoVertex(new Vector2(min.X, max.Y), Vector2.Zero, c));
         }
 
         public static void DrawWireCircle(Vector2 center, float radius, Color? color = null)
@@ -149,7 +153,7 @@ namespace Primary.Rendering.Diagnostics
                     self._indices.Add((ushort)(self._vertices.Count + 1));
                 }
 
-                self._vertices.Add(new ScreenGizmoVertex(new Vector2(sin, cos) * radius + center, c));
+                self._vertices.Add(new ScreenGizmoVertex(new Vector2(sin, cos) * radius + center, Vector2.Zero, c));
             }
         }
 
@@ -173,9 +177,9 @@ namespace Primary.Rendering.Diagnostics
             self._indices.Add(i2);
             self._indices.Add(i0);
 
-            self._vertices.Add(new ScreenGizmoVertex(posA, c));
-            self._vertices.Add(new ScreenGizmoVertex(posB, c));
-            self._vertices.Add(new ScreenGizmoVertex(posC, c));
+            self._vertices.Add(new ScreenGizmoVertex(posA, Vector2.Zero, c));
+            self._vertices.Add(new ScreenGizmoVertex(posB, Vector2.Zero, c));
+            self._vertices.Add(new ScreenGizmoVertex(posC, Vector2.Zero, c));
         }
 
         public static void DrawWireRect(Boundaries bounds, Color? color = null) => DrawWireRect(bounds.Minimum, bounds.Maximum, color);
@@ -201,10 +205,10 @@ namespace Primary.Rendering.Diagnostics
             self._indices.Add(i3);
             self._indices.Add(i2);
 
-            self._vertices.Add(new ScreenGizmoVertex(min, c));
-            self._vertices.Add(new ScreenGizmoVertex(new Vector2(max.X, min.Y), c));
-            self._vertices.Add(new ScreenGizmoVertex(new Vector2(min.X, max.Y), c));
-            self._vertices.Add(new ScreenGizmoVertex(max, c));
+            self._vertices.Add(new ScreenGizmoVertex(min, Vector2.Zero, c));
+            self._vertices.Add(new ScreenGizmoVertex(new Vector2(max.X, min.Y), Vector2.Zero, c));
+            self._vertices.Add(new ScreenGizmoVertex(new Vector2(min.X, max.Y), Vector2.Zero, c));
+            self._vertices.Add(new ScreenGizmoVertex(max, Vector2.Zero, c));
         }
 
         public static void DrawSolidCircle(Vector2 center, float radius, Color? color = null)
@@ -216,7 +220,7 @@ namespace Primary.Rendering.Diagnostics
 
             ushort i0 = (ushort)self._vertices.Count;
 
-            self._vertices.Add(new ScreenGizmoVertex(center, c));
+            self._vertices.Add(new ScreenGizmoVertex(center, Vector2.Zero, c));
 
             const float IndexToRad = MathF.PI * 2.0f / 11.0f;
             for (int i = 0; i < 12; i++)
@@ -231,7 +235,7 @@ namespace Primary.Rendering.Diagnostics
                     self._indices.Add((ushort)(self._vertices.Count + 1));
                 }
 
-                self._vertices.Add(new ScreenGizmoVertex(new Vector2(sin, cos) * radius + center, c));
+                self._vertices.Add(new ScreenGizmoVertex(new Vector2(sin, cos) * radius + center, Vector2.Zero, c));
             }
         }
 
@@ -246,9 +250,9 @@ namespace Primary.Rendering.Diagnostics
             self._indices.Add((ushort)(self._vertices.Count + 1));
             self._indices.Add((ushort)(self._vertices.Count + 2));
 
-            self._vertices.Add(new ScreenGizmoVertex(posA, c));
-            self._vertices.Add(new ScreenGizmoVertex(posB, c));
-            self._vertices.Add(new ScreenGizmoVertex(posC, c));
+            self._vertices.Add(new ScreenGizmoVertex(posA, Vector2.Zero, c));
+            self._vertices.Add(new ScreenGizmoVertex(posB, Vector2.Zero, c));
+            self._vertices.Add(new ScreenGizmoVertex(posC, Vector2.Zero, c));
         }
 
         public static void DrawSolidRect(Boundaries bounds, Color? color = null) => DrawSolidRect(bounds.Minimum, bounds.Maximum, color);
@@ -267,7 +271,7 @@ namespace Primary.Rendering.Diagnostics
         internal static ScreenGizmos Instance => Unsafe.As<ScreenGizmos>(s_instance.Target)!;
     }
 
-    internal readonly record struct ScreenGizmoVertex(Vector2 Position, Color Color);
+    internal readonly record struct ScreenGizmoVertex(Vector2 Position, Vector2 UV, Color Color);
     internal readonly record struct ScreenGizmoSection(int IndexStart, ScreenGizmosMode Mode, object? Resource);
 
     internal enum ScreenGizmosMode : byte

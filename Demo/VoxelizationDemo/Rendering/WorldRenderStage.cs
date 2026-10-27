@@ -87,6 +87,8 @@ namespace VoxelizationDemo.Rendering
             manager.PushRenderPass(_setupDataPass!);
             manager.PushRenderPass(_clusterLightsPass!);
             manager.PushRenderPass(_worldOpaquePass!);
+
+            OctreeVisualizer.Visualize(manager.OctreeManager, cameraData.ViewFrustrum, cameraData.Transform.Position);
         }
 
         public void FlushPassesForWindow(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
