@@ -38,13 +38,13 @@ namespace PrimaryEditor.Assets.Importers
             {
                 if (!context.Pipeline.AssetRegistry.TryGetLocalPathForId(toml.Shader, out string? localShaderPath))
                 {
-                    EdLog.Assets.Error("[{file}]: Failed to retrieve local path for shader id {id}", context.LocalPath, toml.Shader);
+                    EdLog.Assets.Error("[{file}]: Failed to retrieve local path for shader set id {id}", context.LocalPath, toml.Shader);
                     throw new AssetImportException();
                 }
 
-                if (!context.Pipeline.ImporterRegistry.TryGetImporterForPath(localShaderPath, out AssetImporterData importerData) || importerData.Importer is not ShaderImporter)
+                if (!context.Pipeline.ImporterRegistry.TryGetImporterForPath(localShaderPath, out AssetImporterData importerData) || importerData.Importer is not ShaderSetImporter)
                 {
-                    EdLog.Assets.Error("[{file}]: Material shader has an incorrect or missing type '{id}'", context.LocalPath, importerData.Importer?.UniqueId ?? "<null>");
+                    EdLog.Assets.Error("[{file}]: Material shader set has an incorrect or missing type '{id}'", context.LocalPath, importerData.Importer?.UniqueId ?? "<null>");
                     throw new AssetImportException();
                 }
 

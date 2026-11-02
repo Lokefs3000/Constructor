@@ -1,117 +1,100 @@
-﻿using CommunityToolkit.HighPerformance;
-using Primary.Collections.ReadOnly;
-using Primary.Common;
-using Primary.Components;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using Primary.Mathematics;
-using Primary.Scenes;
-using System.Diagnostics;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Runtime.Intrinsics;
 
 namespace Primary.Rendering.Tree
 {
     public sealed class RenderOctant
     {
-        private readonly RenderOctant? _parent;
+        private readonly RenderOctree _octree;
+        private readonly RenderExtents _sourceExtents;
 
-        private readonly AABB _bounds;
-        private AABB _worldBounds;
-        private readonly OctreePoint _point;
-        private readonly int _octantId;
-        private readonly int _depth;
+        private readonly RenderOctant? _parent;
+        private readonly int _treeDepth;
+
+        private readonly byte _entityIndex;
+        private readonly byte _entityBitShift;
+
+        private RenderExtents _currentExtents;
 
         private RenderOctant[]? _octants;
-        private readonly RegionEntityList _children;
+        private int _childrenEntityCount;
+        private int _entityCount;
 
-        internal RenderOctant(RenderOctant? parent, AABB worldBounds, Vector3 basePosition)
+        internal RenderOctant(RenderOctree octree, RenderExtents sourceExtents, RenderOctant? parent, byte entityIndex, byte entityBitShift)
         {
-            _parent = parent;
+            _octree = octree;
+            _sourceExtents = sourceExtents;
 
-            _bounds = worldBounds;
-            _worldBounds = worldBounds;
-            _point = GetOctreePointForOctant(worldBounds.Center - basePosition);
-            _octantId = CraftIdFromPoint(_point);
-            _depth = parent != null ? parent._depth + 1 : 0;
+            _parent = parent;
+            _treeDepth = (parent?._treeDepth ?? 0) + 1;
+
+            _entityIndex = entityIndex;
+            _entityBitShift = entityBitShift;
+
+            _currentExtents = sourceExtents;
 
             _octants = null;
-            _children = new RegionEntityList(32);
+            _childrenEntityCount = 0;
+            _entityCount = 0;
         }
 
-        internal int EmplaceChild(SceneEntity entity, float oversize)
+        internal bool DoRenderExtentsFit(RenderExtents extents)
         {
-            int index = _children.Add(entity);
-            if (oversize > 0.0f)
-            {
-                ref RenderBounds bounds = ref entity.GetComponent<RenderBounds>();
-                _worldBounds = AABB.Union(_worldBounds, bounds.ComputedBounds);
-            }
-
-            return index;
+            float excessSpace = RenderOctree.CalculateExcessSpace(_sourceExtents, extents);
+            return excessSpace < RenderOctree.MaxOctantLoseness;
         }
 
-        internal void RemoveChild(SceneEntity entity, int hintId)
+        internal bool DoRenderExtentsFit(RenderExtents extents, out float excessSpace)
         {
-            bool r = _children.Remove(entity, hintId);
-            Debug.Assert(r);
+            excessSpace = RenderOctree.CalculateExcessSpace(_sourceExtents, extents);
+            return excessSpace < RenderOctree.MaxOctantLoseness;
         }
 
-        internal void OversizeInternalBoundaries(AABB oversizeBounds)
+        internal int IncrementCount()
         {
-            _worldBounds = AABB.Union(_worldBounds, oversizeBounds);
+            int count = Interlocked.Increment(ref _entityCount);
+
+            if (_parent == null)
+                count += _octree.IncrementChildCount();
+            else
+                count += Interlocked.Increment(ref _parent._childrenEntityCount);
+
+            return count;
         }
 
-        public RenderOctant? GetOctantAt(OctreePoint point)
+        internal int DecrementCount()
         {
-            if (_octants == null)
-                return null;
+            int count = Interlocked.Decrement(ref _entityCount);
 
-            int idx = point.X + point.Y * 2 + point.Z * 4;
-            Debug.Assert((uint)idx < _octants!.Length);
+            if (_parent == null)
+                count += _octree.DecrementChildCount();
+            else
+                count += Interlocked.Decrement(ref _parent._childrenEntityCount);
 
-            return _octants.DangerousGetReferenceAt(idx);
+            return count;
         }
 
-        internal RenderOctant[]? OctantsList { get => _octants; set => _octants = value; }
-  
-        public RenderOctant? Owner => _parent;
+        internal int IncrementCountRaw() => ++_entityCount;
+        internal int DecrementCountRaw() => --_entityCount;
 
-        public AABB SourceBoundaries => _bounds;
-        public AABB Boundaries => _worldBounds;
-        public OctreePoint Point => _point;
-        public int OctantId => _octantId;
-        public int Depth => _depth;
+        public RenderExtents SourceExtents => _sourceExtents;
 
-        public ReadOnlySpan<RenderOctant> Octants => _octants;
-        public RegionEntityList Children => _children;
+        public RenderOctant? Parent => _parent;
+        public int TreeDepth => _treeDepth;
 
-        public static OctreePoint GetOctreePointForOctant(Vector3 position)
-        {
-            const float MinimumOctantSize = RegionOctree.OctreeRegionSize / (RegionOctree.MaxOctantTreeDepth * RegionOctree.MaxOctantTreeDepth); //verify
+        public byte EntityIndex => _entityIndex;
+        public byte EntityBitShift => _entityBitShift;
 
-            Vector128<float> vector = Vector128.Truncate(position.AsVector128Unsafe() / MinimumOctantSize);
-            Vector128<int> vectorInt = Vector128.ConvertToInt32(vector);
+        public RenderExtents CurrentExtents { get => _currentExtents; internal set => _currentExtents = value; }
 
-            //prob dont need "Unsafe.WriteUnaligned" as it should be so fast it wont matter
-            return new OctreePoint((short)vectorInt.GetElement(0), (short)vectorInt.GetElement(1), (short)vectorInt.GetElement(2));
-        }
+        public RenderOctant[]? Octants { get => _octants; internal set => _octants = value; }
+        public int ChildrenEntityCount { get => _childrenEntityCount; internal set => _childrenEntityCount = value; }
+        public int EntityCount { get => _entityCount; internal set => _entityCount = value; }
 
-        public static int CraftIdFromPoint(OctreePoint point)
-        {
-            return (int)point.X << 22 | (int)point.Y << 11 | (int)point.Z;
-        }
-    }
-
-    public enum OctantSide : byte
-    {
-        BottomLeftBack = 0,
-        BottomRightBack,
-        TopLeftBack,
-        TopRightBack,
-
-        BottomLeftFront,
-        BottomRightFront,
-        TopLeftFront,
-        TopRightFront,
+        [MemberNotNullWhen(false, nameof(_octants), nameof(Octants))]
+        public bool IsLeaf => _octants == null;
     }
 }

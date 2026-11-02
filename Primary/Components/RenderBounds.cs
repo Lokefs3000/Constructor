@@ -10,7 +10,7 @@ namespace Primary.Components
     public struct RenderBounds : IComponent
     {
         public AABB ComputedBounds = AABB.Zero;
-        public int UpdateIndex = -1;
+        public long UpdateIndex = -1;
         public int MeshLoadIndex = -1;
 
         public RenderBounds()

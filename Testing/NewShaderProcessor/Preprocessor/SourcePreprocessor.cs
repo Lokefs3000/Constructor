@@ -11,11 +11,10 @@ using Serilog;
 
 namespace NewShaderProcessor.Preprocessor
 {
-    internal ref struct SourcePreprocessor : IDisposable
+    internal ref struct SourcePreprocessor
     {
         private readonly ILogger? _logger;
-
-        private RentedList<string> _variants;
+        private readonly ShaderData _data;
 
         private readonly ReadOnlySpan<char> _source;
         private ReadOnlySpan<char> _token;
@@ -26,11 +25,10 @@ namespace NewShaderProcessor.Preprocessor
         private string _sourceName;
         private int _line;
 
-        internal SourcePreprocessor(ILogger? logger, ReadOnlySpan<char> source, string sourceName)
+        internal SourcePreprocessor(ILogger? logger, ShaderData data, ReadOnlySpan<char> source, string sourceName)
         {
             _logger = logger;
-
-            _variants = new RentedList<string>();
+            _data = data;
 
             _source = source;
             _token = ReadOnlySpan<char>.Empty;
@@ -40,11 +38,6 @@ namespace NewShaderProcessor.Preprocessor
 
             _sourceName = sourceName;
             _line = 0;
-        }
-
-        public void Dispose()
-        {
-            _variants.Dispose();
         }
 
         internal void Execute()
@@ -100,10 +93,8 @@ namespace NewShaderProcessor.Preprocessor
             if (string.IsNullOrEmpty(variantName))
                 ThrowException("Variant name must be non-empty");
 
-            if (_variants.Contains(variantName))
+            if (!_data.AddVariant(variantName))
                 ThrowException("Duplicate variant name {n}", variantName);
-
-            _variants.Add(variantName);
 
             if (!IsPragmaArgumentListDone(isContainedInList))
                 ThrowException("Expected end for toggle variant");

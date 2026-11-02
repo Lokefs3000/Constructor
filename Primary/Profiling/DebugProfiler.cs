@@ -128,7 +128,7 @@ namespace Primary.Profiling
 
                         foreach (TrackedGCMarker marker in profiler.GCProfiler.Markers)
                         {
-                            int frameDiff = Time.GetFrameDifference(Time.FrameIndex, marker.FrameIndex);
+                            long frameDiff = Time.GetFrameDifference(Time.FrameIndex, marker.FrameIndex);
                             if (frameDiff < profiler.HistorySize)
                             {
                                 float xPos = (profiler.HistorySize - frameDiff) / (float)_timings.Count * blockWidth + localX;
@@ -362,7 +362,7 @@ namespace Primary.Profiling
             ProfilingManager profiler = ProfilingManager.Instance;
             GCProfiler gcProfiler = profiler.GCProfiler;
 
-            int prevFrameIndex = Time.FrameIndex - 1;
+            long prevFrameIndex = Time.FrameIndex - 1;
 
             if (frame.Threads.Count < profiler.Timestamps.Count)
             {

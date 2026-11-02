@@ -8,28 +8,31 @@ using System.Runtime.Serialization;
 namespace Primary.Components
 {
     [Component]
-    [ComponentConnections(typeof(RenderableAdditionalData), typeof(RenderBounds))]
+    [ComponentConnections(typeof(RenderBounds), typeof(RenderOctantInfo))]
     [ComponentUsage(HasSelfReference: true)]
     public struct MeshRenderer : IComponent
     {
-        [IgnoreDataMember]
-        private SceneEntity _self;
+        private long _updateIndex;
 
         private MeshAsset? _mesh;
         private MaterialAsset? _material;
 
-        [IgnoreDataMember]
-        private int _frameIndex;
+        private ulong _layers;
+
+        public MeshRenderer()
+        {
+            _updateIndex = Time.FrameIndex;
+
+            _layers = ulong.MaxValue;
+        }
 
         public MeshAsset? Mesh
         {
             get => _mesh;
             set
             {
-                //if (_mesh != value)
-                //    RenderFlagContainer.Instance.ChangeMesh(_self);
                 if (_mesh != value)
-                    _frameIndex = Time.FrameIndex;
+                    _updateIndex = Time.FrameIndex;
                 _mesh = value;
             }
         }
@@ -38,25 +41,24 @@ namespace Primary.Components
             get => _material;
             set
             {
-                //if (_material != value)
-                //    RenderFlagContainer.Instance.ChangeMaterial(_self);
+                if (_material != value)
+                    _updateIndex = Time.FrameIndex;
                 _material = value;
             }
         }
 
-        [IgnoreDataMember]
-        public readonly int UpdateIndex => _frameIndex;
-    }
-
-    [ComponentUsage(CanBeAdded: false)]
-    [InspectorHidden, DontSerializeComponent]
-    internal record struct RenderableAdditionalData : IComponent
-    {
-        public uint BatchId;
-
-        public RenderableAdditionalData()
+        public ulong Layers
         {
-            BatchId = uint.MaxValue;
+            get => _layers;
+            set
+            {
+                if (_layers != value)
+                    _updateIndex = Time.FrameIndex;
+                _layers = value;
+            }
         }
+
+        [IgnoreDataMember]
+        public readonly long UpdateIndex => _updateIndex;
     }
 }

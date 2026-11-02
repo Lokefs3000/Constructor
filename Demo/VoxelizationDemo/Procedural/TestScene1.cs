@@ -20,9 +20,9 @@ namespace VoxelizationDemo.Procedural
     {
         internal static Scene Generate(VoxelRuntime runtime)
         {
-            const int ChunkCountX = 8;
-            const int ChunkCountZ = 8;
-            const int ChunkSizeXZ = 8;
+            const int ChunkCountX = 10;
+            const int ChunkCountZ = 10;
+            const int ChunkSizeXZ = 10;
 
             const float TerrainHeight = 6.0f;
             const float TerrainScale = 3.0f;

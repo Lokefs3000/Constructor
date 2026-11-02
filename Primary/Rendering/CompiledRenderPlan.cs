@@ -159,15 +159,15 @@ namespace Primary.Rendering
         internal DescriptorAllocator DirectDescriptorAllocator => _directDescriptorAllocator;
         internal DescriptorAllocator ComputeDescriptorAllocator => _computeDescriptorAllocator;
 
-        internal ROList<RHISwapChain> SwapChains => _swapChains;
+        public ROList<RHISwapChain> SwapChains => _swapChains;
         public ROList<CompiledRenderPass> RenderPasses => _renderPasses;
-        internal ROList<RenderEventInfo> Events => _eventInfos;
-        internal ROList<RenderResourceInfo> Resources => _resourceInfos;
-        internal ReadOnlySpan<int> ResourceIndices => _resourceIndices;
-        internal ROList<GenericResourceDesc> ResourceDescs => _resourceDescs;
-        internal ROList<RenderUploadInfo> Uploads => _uploadInfos;
+        public ROList<RenderEventInfo> Events => _eventInfos;
+        public ROList<RenderResourceInfo> Resources => _resourceInfos;
+        public ReadOnlySpan<int> ResourceIndices => _resourceIndices;
+        public ROList<GenericResourceDesc> ResourceDescs => _resourceDescs;
+        public ROList<RenderUploadInfo> Uploads => _uploadInfos;
 
-        internal ROList<RenderBarrier> WarmupBarriers => _warmupBarriers;
+        public ROList<RenderBarrier> WarmupBarriers => _warmupBarriers;
 
         public int TotalResourceCount { get => _totalResourceCount; internal set => _totalResourceCount = value; }
 
@@ -175,11 +175,11 @@ namespace Primary.Rendering
         public int RequiredUploadMemory { get => _requiredUploadMemory; internal set => _requiredUploadMemory = value; }
     }
 
-    internal readonly record struct RenderEventInfo(RenderEventType EventType, CompiledRenderPass? RenderPass1 = null, CompiledRenderPass? RenderPass2 = null);
-    internal readonly record struct RenderResourceInfo(int ByteOffset, int SizeInBytes, int ResourceIndex, int DescriptionIndex, RHIResource? ImportedResource);
-    internal readonly record struct RenderUploadInfo(int ByteOffsetInHeap, ArrayPtr<byte> SourceData, uint DestSlice, FGBox DestBox, int ResourceIndex);
+    public readonly record struct RenderEventInfo(RenderEventType EventType, CompiledRenderPass? RenderPass1 = null, CompiledRenderPass? RenderPass2 = null);
+    public readonly record struct RenderResourceInfo(int ByteOffset, int SizeInBytes, int ResourceIndex, int DescriptionIndex, RHIResource? ImportedResource);
+    public readonly record struct RenderUploadInfo(int ByteOffsetInHeap, ArrayPtr<byte> SourceData, uint DestSlice, FGBox DestBox, int ResourceIndex);
 
-    internal enum RenderEventType : byte
+    public enum RenderEventType : byte
     {
         // RenderPass1 is not null
         ExecuteDirect,
@@ -191,7 +191,7 @@ namespace Primary.Rendering
         InsertBarrier
     }
 
-    internal readonly record struct ResourceBarrierInfo(ResourceHandle Resource, ResourceBarrierSync Sync, ResourceBarrierAccess Access, BarrierQueueSpec QueueSpec);
+    public readonly record struct ResourceBarrierInfo(ResourceHandle Resource, ResourceBarrierSync Sync, ResourceBarrierAccess Access, BarrierQueueSpec QueueSpec);
 
     public enum ResourceBarrierSync : byte
     {

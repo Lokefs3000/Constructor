@@ -10,167 +10,63 @@ using System.Numerics;
 using System.Runtime.Intrinsics;
 
 using SceneEntityManager = Primary.Scenes.Components.SceneEntityManager;
+using System.Buffers;
+using Primary.Rendering.Tree.Jobs;
+using Primary.Threading;
+using System.Runtime.InteropServices;
 
 namespace Primary.Rendering.Tree
 {
     public sealed class OctreeManager
     {
-        private Dictionary<OctreePoint, RegionOctree> _regions;
-        private Queue<EntityUpdateData> _pendingUpdates;
+        private readonly ArrayPool<RenderableEntity> _entityArrayPool;
+        private readonly Dictionary<Int3, RenderOctree> _regions;
+
+        private readonly UpdateRenderables _updateRenderables;
+        private readonly UpdateMeshRenderers _updateMeshRenderers;
+        private readonly ScheduleOctreeUpdates _scheduleOctreeUpdates;
 
         internal OctreeManager()
         {
-            _regions = new Dictionary<OctreePoint, RegionOctree>();
-            _pendingUpdates = new Queue<EntityUpdateData>();
+            _entityArrayPool = ArrayPool<RenderableEntity>.Create();
+            _regions = new Dictionary<Int3, RenderOctree>();
 
-            SceneEntityManager.Instance.AddComponentAddedCallback<RenderBounds>((e) =>
-            {
-                _pendingUpdates.Enqueue(new EntityUpdateData(EntityUpdateType.Created, e));
-            });
-
-            SceneEntityManager.Instance.AddComponentRemovedCallback<RenderBounds>((e) =>
-            {
-                _pendingUpdates.Enqueue(new EntityUpdateData(EntityUpdateType.Removed, e));
-            });
-
-            SceneEntityManager.Events |= EntityEvents.EntityComponents;
+            _updateRenderables = new UpdateRenderables(this);
+            _updateMeshRenderers = new UpdateMeshRenderers(this);
+            _scheduleOctreeUpdates = new ScheduleOctreeUpdates(this);
         }
 
-        internal void QueryPending()
+        internal JobHandle SchedulePending(JobHandle parentJob)
         {
             using (new ProfilingScope("OctreeUpdate"))
             {
-                World world = Engine.GlobalSingleton.SceneManager.World;
+                JobHandle updateRenderables = _updateRenderables.ScheduleAll(parentJob);
+                updateRenderables.WaitForCompletion();
+                JobHandle updateMeshRenderers = _updateMeshRenderers.ScheduleAll(updateRenderables);
+                updateMeshRenderers.WaitForCompletion();
 
-                if (_pendingUpdates.Count > 0)
-                {
-                    while (_pendingUpdates.TryDequeue(out EntityUpdateData updateData))
-                    {
-                        switch (updateData.Type)
-                        {
-                            case EntityUpdateType.Created:
-                                {
-                                    if (updateData.Entity.IsNull)
-                                        continue;
+                JobHandle octreeUpdates = _scheduleOctreeUpdates.ScheduleAll(updateMeshRenderers);
 
-                                    ref RenderOctantInfo octantInfo = ref updateData.Entity.AddComponent<RenderOctantInfo>();
-                                    ref RenderBounds bounds = ref updateData.Entity.GetComponent<RenderBounds>();
-
-                                    OctreePoint point = GetOctreeRegionForPoint(bounds.ComputedBounds.Center);
-                                    RegionOctree octree = GetOrCreateOctree(point);
-
-                                    octree.EmplaceWithinTree(updateData.Entity, bounds.ComputedBounds);
-                                    break;
-                                }
-                            case EntityUpdateType.Removed: throw new NotImplementedException();
-                        }
-                    }
-                }
-
-                QueryUpdatedBoundsJob job = new QueryUpdatedBoundsJob(this);
-                world.InlineEntityQuery<QueryUpdatedBoundsJob, RenderBounds, RenderOctantInfo>(QueryUpdatedBoundsJob.Query, ref job);
+                return octreeUpdates;
             }
         }
 
-        private void MoveEntityTreeWise(SceneEntity entity, OctreePoint newPoint)
+        internal RenderOctree GetOrCreateOctree(Int3 gridPoint)
         {
-            ref RenderBounds bounds = ref entity.GetComponent<RenderBounds>();
-            ref RenderOctantInfo octantInfo = ref entity.GetComponent<RenderOctantInfo>();
-
-            RegionOctree oldOctree = GetOrCreateOctree(octantInfo.Tree);
-            RegionOctree newOctree = GetOrCreateOctree(newPoint);
-
-            oldOctree.RemoveFromTree(entity, octantInfo.OctantId);
-            newOctree.EmplaceWithinTree(entity, bounds.ComputedBounds);
-        }
-
-        private void MoveEntityOctantWise(SceneEntity entity, OctreePoint point)
-        {
-            ref RenderBounds bounds = ref entity.GetComponent<RenderBounds>();
-            ref RenderOctantInfo octantInfo = ref entity.GetComponent<RenderOctantInfo>();
-
-            RegionOctree octree = GetOrCreateOctree(point);
-            octree.MoveEntityWithinTree(entity, bounds.ComputedBounds, octantInfo.OctantId);
-        }
-
-        private RegionOctree GetOrCreateOctree(OctreePoint point)
-        {
-            if (!_regions.TryGetValue(point, out RegionOctree? octree))
+            ref RenderOctree? octree = ref CollectionsMarshal.GetValueRefOrAddDefault(_regions, gridPoint, out bool exists);
+            if (!exists || octree == null)
             {
-                Vector3 basePosition = new Vector3(point.X, point.Y, point.Z) * RegionOctree.OctreeRegionSize;
-                octree = new RegionOctree(new AABB(basePosition, basePosition + new Vector3(RegionOctree.OctreeRegionSize)), point);
-
-                _regions.Add(point, octree);
+                octree = new RenderOctree(_entityArrayPool, gridPoint);
             }
 
             return octree;
         }
 
-        public Dictionary<OctreePoint, RegionOctree> Regions => _regions;
-
-        public static OctreePoint GetOctreeRegionForPoint(Vector3 position)
+        internal RenderOctree GetOctree(Int3 gridPoint)
         {
-            Vector128<float> vector = Vector128.Floor(position.AsVector128Unsafe() / RegionOctree.OctreeRegionSize);
-            Vector128<int> vectorInt = Vector128.ConvertToInt32(vector);
-
-            //prob dont need "Unsafe.WriteUnaligned" as it should be so fast it wont matter
-            return new OctreePoint((short)vectorInt.GetElement(0), (short)vectorInt.GetElement(1), (short)vectorInt.GetElement(2));
+            return _regions[gridPoint];
         }
 
-        private readonly record struct EntityUpdateData(EntityUpdateType Type, SceneEntity Entity);
-
-        private enum EntityUpdateType : byte
-        {
-            Created,
-            Removed
-        }
-
-        private readonly record struct QueryUpdatedBoundsJob : IForEachWithEntity<RenderBounds, RenderOctantInfo>
-        {
-            public readonly OctreeManager Manager;
-            public readonly int FrameIndex;
-
-            public QueryUpdatedBoundsJob(OctreeManager manager)
-            {
-                Manager = manager;
-                FrameIndex = Time.FrameIndex;
-            }
-
-            public void Update(Entity entity, ref RenderBounds bounds, ref RenderOctantInfo octantInfo)
-            {
-                if (FrameIndex == bounds.UpdateIndex)
-                {
-                    OctreePoint point = GetOctreeRegionForPoint(bounds.ComputedBounds.Center);
-                    if (point != octantInfo.Tree && octantInfo.OctantId.Code != RegionOctree.NullOctantId)
-                    {
-                        Manager.MoveEntityTreeWise(entity, point);
-                        return;
-                    }
-
-                    RegionOctree octree = Manager.GetOrCreateOctree(point);
-                    OctreePoint octantPoint = RenderOctant.GetOctreePointForOctant(bounds.ComputedBounds.Center - octree.WorldBounds.Minimum);
-                    int octantId = RenderOctant.CraftIdFromPoint(octantPoint);
-                    if (octantId != octantInfo.OctantId.Code)
-                    {
-                        Manager.MoveEntityOctantWise(entity, point);
-                        return;
-                    }
-                }
-            }
-
-            public static readonly QueryDescription Query = new QueryDescription().WithAll<RenderBounds, RenderOctantInfo>();
-        }
-    }
-
-    public readonly record struct OctreePoint(short X, short Y, short Z) : IEquatable<OctreePoint>
-    {
-        public override int GetHashCode() => HashCode.Combine(X, Y, Z);
-        public override string ToString() => $"{X}x{Y}x{Z}";
-    }
-
-    public readonly record struct OctreeId(int Code, int HintId = -1) : IEquatable<OctreeId>
-    {
-        public override int GetHashCode() => HashCode.Combine(Code, HintId);
-        public override string ToString() => $"{Code}[{HintId}]";
+        public Dictionary<Int3, RenderOctree> Regions => _regions;
     }
 }

@@ -516,7 +516,7 @@ namespace Primary.Profiling
         }
     }
 
-    public readonly record struct TrackedGCMarker(byte Generation, GCMarkerReason Reason, GCMarkerType Type, long Timestamp, long Duration, int FrameIndex);
+    public readonly record struct TrackedGCMarker(byte Generation, GCMarkerReason Reason, GCMarkerType Type, long Timestamp, long Duration, long FrameIndex);
     public readonly record struct TrackedGCHandle(nint HandleId, GCHandleType Type)
     {
         public override int GetHashCode() => HandleId.GetHashCode();

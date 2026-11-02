@@ -329,6 +329,36 @@ namespace Primary.Rendering.Resources
             return _importedResourceDict[resource];
         }
 
+        public string GetName(in ResourceHandle handle)
+        {
+            if (handle.ResourceType == FGResourceType.Buffer)
+            {
+                if (handle.IsImported)
+                {
+                    RHIBuffer buffer = GetRHIResource(handle.AsBuffer());
+                    return buffer.DebugName ?? buffer.ToString() ?? string.Empty;
+                }
+                else
+                {
+                    ref readonly FGBufferDesc desc = ref GetDescription(handle.AsBuffer());
+                    return desc.Name ?? desc.ToString();
+                }
+            }
+            else
+            {
+                if (handle.IsImported)
+                {
+                    RHITexture texture = GetRHIResource(handle.AsTexture());
+                    return texture.DebugName ?? texture.ToString() ?? string.Empty;
+                }
+                else
+                {
+                    ref readonly FGTextureDesc desc = ref GetDescription(handle.AsTexture());
+                    return desc.Name ?? desc.ToString();
+                }
+            }
+        }
+
         internal void AddRead(RenderPassIndex renderPass, ResourceHandle handle)
         {
             ResourceVersion version = _entries.AsSpan()[handle.Index].Version!;
@@ -484,7 +514,7 @@ namespace Primary.Rendering.Resources
         private readonly record struct ImportedResourceData(int Index, RHIResource Resource, bool IsPure) : IEquatable<ImportedResourceData>;
     }
 
-    internal readonly record struct GenericResourceDesc(string? Name, FGResourceType Type, FGResourceDesc Resource) : IEquatable<GenericResourceDesc>
+    public readonly record struct GenericResourceDesc(string? Name, FGResourceType Type, FGResourceDesc Resource) : IEquatable<GenericResourceDesc>
     {
         public override int GetHashCode() => HashCode.Combine(Name, Resource);
 
@@ -493,7 +523,7 @@ namespace Primary.Rendering.Resources
     }
 
     [StructLayout(LayoutKind.Explicit)]
-    internal record struct FGResourceDesc : IEquatable<FGResourceDesc>
+    public record struct FGResourceDesc : IEquatable<FGResourceDesc>
     {
         [FieldOffset(0)]
         public Buffer BufferDesc;
@@ -530,7 +560,7 @@ namespace Primary.Rendering.Resources
 
         public override int GetHashCode() => new Span<FGResourceDesc>(ref this).GetDjb2HashCode();
 
-        internal record struct Buffer : IEquatable<Buffer>
+        public record struct Buffer : IEquatable<Buffer>
         {
             public int ElementCount;
             public int Stride;
@@ -538,7 +568,7 @@ namespace Primary.Rendering.Resources
             public FGBufferTarget Target;
         }
 
-        internal record struct Texture : IEquatable<Texture>
+        public record struct Texture : IEquatable<Texture>
         {
             public int Width;
             public int Height;

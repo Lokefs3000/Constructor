@@ -150,8 +150,8 @@ namespace VoxelizationDemo.Rendering.Passes
 
                             if (material.IsLoaded)
                             {
-                                material.PropertyBlock.CopyBlockDataTo(mapped.Span[materialDataOffset..]);
-                                materialDataOffset += MemoryHelper.AlignUp(material.PropertyBlock.BlockSize, 4);
+                                material.GetPropertyBlockOrNull(MaterialShaderType.Default)!.CopyBlockDataTo(mapped.Span[materialDataOffset..]);
+                                materialDataOffset += MemoryHelper.AlignUp(material.GetPropertyBlockOrNull(MaterialShaderType.Default)!.BlockSize, 4);
                             }
                         }
                     }

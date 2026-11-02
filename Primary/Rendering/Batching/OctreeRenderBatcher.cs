@@ -1,17 +1,13 @@
-﻿using Arch.Core;
+﻿using System.Diagnostics;
+using System.Numerics;
+using System.Runtime.CompilerServices;
 using Collections.Pooled;
 using CommunityToolkit.HighPerformance;
 using Primary.Assets;
-using Primary.Collections.ReadOnly;
-using Primary.Components;
 using Primary.Mathematics;
 using Primary.Profiling;
-using Primary.Rendering;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Tree;
-using Primary.Scenes;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 
 namespace Primary.Rendering.Batching
 {
@@ -29,6 +25,8 @@ namespace Primary.Rendering.Batching
         private PooledList<RenderKey> _renderingKeys;
         private PooledList<UnbatchedRenderFlag> _renderingData;
 
+        private readonly ushort[] _octantVisibilityArray;
+
         internal OctreeRenderBatcher(byte id, RenderingManager manager)
         {
             _id = id;
@@ -42,6 +40,8 @@ namespace Primary.Rendering.Batching
 
             _renderingKeys = new PooledList<RenderKey>();
             _renderingData = new PooledList<UnbatchedRenderFlag>();
+
+            _octantVisibilityArray = new ushort[byte.MaxValue];
         }
 
         internal void ClearFrameData()
@@ -54,112 +54,113 @@ namespace Primary.Rendering.Batching
             _renderingData.Clear();
         }
 
-        internal void Execute(RenderList list, RegionOctree octree, in Frustrum cullingFrustrum)
+        internal void Execute(RenderList list, RenderOctree octree, in BatchingOptions options)
         {
             using (new ProfilingScope("BatchOctree"))
             {
-                _octants.Clear();
-                _octants.Enqueue(octree.RootOctant);
-
-                if (octree.Children.Count > 0)
+                using (new ProfilingScope("OctantVisibility"))
                 {
-                    BatchEntitiesWithinOctant(list, octree.Children, in cullingFrustrum, true);
+                    ComputeOctantVisibility(octree, in options);
                 }
 
-                while (_octants.TryDequeue(out RenderOctant? octant))
+                using (new ProfilingScope("Iterate"))
                 {
-                    FrustrumIntersection intersection = cullingFrustrum.IntersectWhere(octant.Boundaries);
-                    if (intersection == FrustrumIntersection.Outside)
-                        continue;
+                    Vector3 origin = options.Origin;
+                    float sqrMaxViewDist = options.MaxViewingDistance * options.MaxViewingDistance;
+                    Frustrum viewFrustrum = options.ViewFrustrum;
 
-                    if (octant.Children.Count > 0)
-                    {
-                        BatchEntitiesWithinOctant(list, octant.Children, in cullingFrustrum, intersection == FrustrumIntersection.Partial);
-                    }
+                    MaterialShaderType shaderType = options.ShaderType;
+                    ulong allowedLayers = options.AllowedLayers;
 
-                    foreach (RenderOctant subOctant in octant.Octants)
+                    ushort[] visibilityMasks = _octantVisibilityArray;
+
+                    foreach (ref readonly EntityChunk chunk in octree.Chunks)
                     {
-                        _octants.Enqueue(subOctant);
+                        foreach (ref RenderableEntity entity in chunk.Entities)
+                        {
+                            if ((entity.Layers & allowedLayers) == 0)
+                                continue;
+
+                            float sqrDistFromOrigin = Vector3.DistanceSquared(entity.Extents.Center, origin);
+                            if (sqrDistFromOrigin - entity.SqrBoundingRadius > sqrMaxViewDist)
+                                continue;
+
+                            ref ushort visibilityMask = ref visibilityMasks.DangerousGetReferenceAt(entity.OctantIndex);
+                            FrustrumIntersection octantIntersection = (FrustrumIntersection)((visibilityMask >> entity.OctantBitshift) & 0x3);
+                            if (octantIntersection != FrustrumIntersection.Outside && (octantIntersection == FrustrumIntersection.Inside || entity.Extents.IntersectAny(in viewFrustrum)))
+                            {
+                                MaterialAsset material = (entity.Material == null || entity.Material.GetShaderOrNull(shaderType) == null) ? list.DefaultMaterial! : entity.Material;
+                                ShaderAsset? shader = material.GetShaderOrNull(shaderType)!;
+
+                                if (!material.IsLoaded || shader == null || !shader.IsLoaded)
+                                    continue;
+
+                                IRawRenderMesh? mesh = entity.Mesh;
+                                if (mesh == null)
+                                    continue;
+
+                                IRenderMeshSource? meshSource = mesh.MeshSource;
+                                if (meshSource == null || !meshSource.IsLoaded)
+                                    continue;
+
+                                if (!_shaderSourceIndices.TryGetValue(shader, out ushort shaderId))
+                                {
+                                    shaderId = list.GetShaderId(shader);
+                                    _shaderSourceIndices.Add(shader, shaderId);
+                                }
+
+                                if (!_meshSourceIndices.TryGetValue(meshSource, out ushort modelId))
+                                {
+                                    modelId = list.GetModelId(meshSource);
+                                    _meshSourceIndices.Add(meshSource, modelId);
+                                }
+
+                                if (!_materialSourceIndices.TryGetValue(material, out uint materialId))
+                                {
+                                    materialId = list.GetMaterialId(material);
+                                    _materialSourceIndices.Add(material, materialId);
+                                }
+
+                                Matrix4x4 transform = entity.Transform;
+
+                                // HACK: The mesh id WILL eventually break this
+                                _renderingKeys.Add(new RenderKey(shaderId, modelId, materialId, (ushort)((uint)mesh.UniqueId % 0x3ff), _renderingData.Count, _id));
+                                _renderingData.Add(new UnbatchedRenderFlag(material, mesh, transform));
+                            }
+                        }
                     }
                 }
             }
         }
 
-        private void BatchEntitiesWithinOctant(RenderList list, RegionEntityList entities, in Frustrum cullingFrustrum, bool doFrustrumCull)
+        private void ComputeOctantVisibility(RenderOctree octree, in BatchingOptions options)
         {
-            World world = Engine.GlobalSingleton.SceneManager.World;
-
-            RegionEntityList.Node? node = entities.FirstNode;
-            do
+            if (octree.Octants != null)
             {
-                ReadOnlySpan<SceneEntity> nodeEntities = node.Entities;
-                for (int i = 0; i < nodeEntities.Length; ++i)
+                Frustrum viewFrustrum = options.ViewFrustrum;
+                foreach (RenderOctant subOctant in octree.Octants)
                 {
-                    ref readonly SceneEntity entity = ref nodeEntities[i];
-                    ref readonly EntityData rawData = ref world.GetEntityData(entity.WrappedEntity);
+                    SearchRecursive(subOctant, 0, in viewFrustrum);
+                }
+            }
 
-                    ref readonly EntityEnabled enabled = ref rawData.Get<EntityEnabled>();
-                    if (!enabled.Enabled)
-                        continue;
+            void SearchRecursive(RenderOctant octant, byte entityIndex, in Frustrum viewFrustrum)
+            {
+                FrustrumIntersection intersection = octree.SourceExtents.Intersect(in viewFrustrum);
+                if (intersection != FrustrumIntersection.Outside)
+                {
+                    ref ushort visbilityMask = ref _octantVisibilityArray[entityIndex];
+                    visbilityMask |= (ushort)(((ushort)intersection) << octant.EntityBitShift);
+                }
 
-                    ref readonly MeshRenderer renderer = ref rawData.Get<MeshRenderer>();
-                    //"renderer" SHOULD not be null but a crash will occur if it is
-                    if (!Unsafe.IsNullRef(in renderer) && renderer.Mesh != null)
+                if (octant.Octants != null)
+                {
+                    foreach (RenderOctant subOctant in octant.Octants)
                     {
-                        ref readonly RenderBounds bounds = ref rawData.Get<RenderBounds>();
-                        ref readonly WorldTransform transform = ref rawData.Get<WorldTransform>();
-
-                        Debug.Assert(!Unsafe.IsNullRef(in bounds));
-                        Debug.Assert(!Unsafe.IsNullRef(in transform));
-
-                        if (doFrustrumCull && !cullingFrustrum.Intersects(bounds.ComputedBounds))
-                            continue;
-
-                        MaterialAsset material = (renderer.Material == null || renderer.Material.Shader == null) ? list.DefaultMaterial! : renderer.Material;
-                        ShaderAsset? shader = material.Shader;
-
-                        if (shader == null)
-                            continue;
-
-                        IRawRenderMesh mesh = renderer.Mesh;
-                        IRenderMeshSource? meshSource = mesh.MeshSource;
-
-                        if (meshSource == null || !meshSource.IsLoaded)
-                            continue;
-
-                        if (shader == null)
-                        {
-                            material = list.DefaultMaterial!;
-                            shader = list.DefaultMaterial!.Shader!;
-                        }
-
-                        if (!shader.IsLoaded || !material.IsLoaded)
-                            continue;
-
-                        if (!_shaderSourceIndices.TryGetValue(shader, out ushort shaderId))
-                        {
-                            shaderId = list.GetShaderId(shader);
-                            _shaderSourceIndices.Add(shader, shaderId);
-                        }
-
-                        if (!_meshSourceIndices.TryGetValue(meshSource, out ushort modelId))
-                        {
-                            modelId = list.GetModelId(meshSource);
-                            _meshSourceIndices.Add(meshSource, modelId);
-                        }
-
-                        if (!_materialSourceIndices.TryGetValue(material, out uint materialId))
-                        {
-                            materialId = list.GetMaterialId(material);
-                            _materialSourceIndices.Add(material, materialId);
-                        }
-
-                        // HACK: The mesh id WILL eventually break this
-                        _renderingKeys.Add(new RenderKey(shaderId, modelId, materialId, (ushort)((uint)mesh.UniqueId % 0x3ff), _renderingData.Count, _id));
-                        _renderingData.Add(new UnbatchedRenderFlag(material, mesh, transform.Transformation));
+                        SearchRecursive(subOctant, octant.EntityIndex, in viewFrustrum);
                     }
                 }
-            } while ((node = node.Next) != null);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

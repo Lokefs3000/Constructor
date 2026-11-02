@@ -104,6 +104,14 @@ namespace Primary.Rendering.Batching
                 ReturnKeys();
         }
 
+        internal void FinishDispatch(MaterialShaderType shaderType)
+        {
+            foreach (var (material, _) in _materialIds)
+            {
+                _materialByteSize += (uint)material.GetPropertyBlockOrNull(shaderType)!.BlockSize;
+            }
+        }
+
         internal void SetupShaderBatchers()
         {
             _usedBatchers.Clear();
@@ -181,11 +189,6 @@ namespace Primary.Rendering.Batching
                 id = Unsafe.BitCast<uint, TValue>((uint)(dict.Count - 1));
             else
                 throw new NotSupportedException();
-
-            if (typeof(TKey) == typeof(MaterialAsset))
-            {
-                _materialByteSize += (uint)Unsafe.As<MaterialAsset>(key).PropertyBlock.BlockSize;
-            }
 
             return id;
         }

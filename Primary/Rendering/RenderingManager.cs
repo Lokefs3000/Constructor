@@ -3,6 +3,7 @@ using CommunityToolkit.Diagnostics;
 using Primary.Assets;
 using Primary.Collections.ReadOnly;
 using Primary.Common;
+using Primary.Console;
 using Primary.Profiling;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Batching;
@@ -90,6 +91,8 @@ namespace Primary.Rendering
             _currentPlaybackJob = JobHandle.Completed;
 
             _debugManager.TrySetupAfterRenderInit(this);
+
+            ConsoleManager.Register(_frameGraph.Options);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -98,6 +101,8 @@ namespace Primary.Rendering
             {
                 if (disposing)
                 {
+                    ConsoleManager.Unregister(_frameGraph.Options);
+
                     if (!_currentPlaybackJob.HasCompleted)
                         _currentPlaybackJob.WaitForCompletion();
 
@@ -158,8 +163,10 @@ namespace Primary.Rendering
                     _graphicsDevice.IncrementFrame();
 
                     _renderContextPool.ResetPoolForNewRender();
-                    _octreeManager.QueryPending();
+                    JobHandle octreeManager = _octreeManager.SchedulePending(JobHandle.Completed);
                     _renderWorld.SetupWorld();
+
+                    octreeManager.WaitForCompletion();
                 }
 
                 using (new ProfilingScope("Setup"))
@@ -329,7 +336,7 @@ namespace Primary.Rendering
 
         public JobHandle RequestBatch(RenderList renderList, in BatchingOptions options)
         {
-            _batchingManager.BatchWorld(renderList, new BatchWorldSetup(_octreeManager, options.ViewFrustrum.GetValueOrDefault()));
+            _batchingManager.BatchWorld(renderList, new BatchWorldSetup(_octreeManager, options));
             return JobHandle.Completed;
         }
 

@@ -14,7 +14,6 @@ namespace Primary.Components
             SceneEntityManager.Instance.RegisterComponent<Camera>();
             SceneEntityManager.Instance.RegisterComponent<CameraProjectionData>();
             SceneEntityManager.Instance.RegisterComponent<MeshRenderer>();
-            SceneEntityManager.Instance.RegisterComponent<RenderableAdditionalData>();
             SceneEntityManager.Instance.RegisterComponent<DirectionalLight>();
             SceneEntityManager.Instance.RegisterComponent<Light>();
             SceneEntityManager.Instance.RegisterComponent<LightRenderingData>();

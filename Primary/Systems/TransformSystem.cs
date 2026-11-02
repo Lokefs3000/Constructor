@@ -22,7 +22,7 @@ namespace Primary.Systems
                 SceneManager manager = Engine.GlobalSingleton.SceneManager;
                 ROList<Scene> scenes = manager.Scenes;
 
-                int frameIndex = Time.FrameIndex;
+                long frameIndex = Time.FrameIndex;
 
                 for (int i = 0; i < scenes.Count; i++)
                 {
@@ -38,7 +38,7 @@ namespace Primary.Systems
             }
         }
 
-        private void IterateThroughHierchy(SceneEntity e, Matrix4x4 parent, int frameIndex, bool allChildren)
+        private void IterateThroughHierchy(SceneEntity e, Matrix4x4 parent, long frameIndex, bool allChildren)
         {
             foreach (var child in e.Children)
             {

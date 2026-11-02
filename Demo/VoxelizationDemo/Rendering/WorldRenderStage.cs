@@ -53,8 +53,10 @@ namespace VoxelizationDemo.Rendering
 
             manager.RequestBatch(_renderList!, new BatchingOptions
             {
+                Origin = cameraData.Transform.Position,
+                MaxViewingDistance = cameraData.ZFar,
+
                 ViewFrustrum = cameraData.ViewFrustrum,
-                Center = cameraData.Transform.Position
             });
 
             RenderStageBlackboard generalBlackboard = blackboard.Add<RenderStageBlackboard>();

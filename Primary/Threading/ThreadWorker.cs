@@ -44,7 +44,7 @@ namespace Primary.Threading
                 {
                     Name = $"BgWorker{index}",
                     IsBackground = true,
-                    Priority = ThreadPriority.Normal,
+                    Priority = ThreadPriority.AboveNormal,
                 };
 
                 _thisThreadId = _thisThread.ManagedThreadId;

@@ -320,7 +320,7 @@ namespace Primary.Rendering.Recording
         }
     }
 
-    internal readonly record struct RenderBarrier(
+    public readonly record struct RenderBarrier(
         int EventIndex, int CommandOffset, int ResourceIndex,
         ResourceBarrierSync OldSync, ResourceBarrierAccess OldAccess, BarrierQueueSpec OldQueueSpec,
         ResourceBarrierSync NewSync, ResourceBarrierAccess NewAccess, BarrierQueueSpec NewQueueSpec);

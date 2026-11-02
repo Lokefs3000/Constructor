@@ -28,6 +28,8 @@ namespace Primary.Assets.Types
             return Unsafe.As<TSelf>(this);
         }
 
+        public override string ToString() => $"{Name}[{Status}]";
+
         internal T InternalAssetData => _assetData;
         protected T AssetData => _assetData;
 

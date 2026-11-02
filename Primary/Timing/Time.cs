@@ -14,7 +14,7 @@ namespace Primary.Timing
         private double _deltaTimeDouble;
         private float _deltaTime;
 
-        private int _frameIndex;
+        private long _frameIndex;
 
         private double _maxDeltaTime;
 
@@ -28,7 +28,7 @@ namespace Primary.Timing
             _deltaTimeDouble = 0;
             _deltaTime = 0;
 
-            _frameIndex = -1;
+            _frameIndex = 0;
 
             _maxDeltaTime = 1.0 / 3.0;
         }
@@ -55,13 +55,13 @@ namespace Primary.Timing
             ++_frameIndex;
         }
 
-        public static int GetFrameDifference(int a, int b) => (int)(a > b ? (uint)a - (uint)b : (uint)b - (uint)a);
+        public static int GetFrameDifference(long a, long b) => (int)(a > b ? (uint)a - (uint)b : (uint)b - (uint)a);
 
         public static double DeltaTimeDouble => Instance._deltaTimeDouble;
         public static float DeltaTime => Instance._deltaTime;
 
         public static long TimestampForActiveFrame => Instance._lastFrameTimestamp;
 
-        public static int FrameIndex => Instance._frameIndex;
+        public static long FrameIndex => Instance._frameIndex;
     }
 }

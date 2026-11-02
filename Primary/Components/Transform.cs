@@ -36,6 +36,7 @@ namespace Primary.Components
         public Quaternion Rotation { readonly get => _rotation; set { _rotation = value; _invalidFlags |= TransformInvalidFlags.Invalid | TransformInvalidFlags.Self; } }
         public Vector3 Scale { readonly get => _scale; set { _scale = value; _invalidFlags |= TransformInvalidFlags.Invalid | TransformInvalidFlags.Self; } }
 
+        [IgnoreDataMember]
         internal TransformInvalidFlags InvalidFlags { readonly get => _invalidFlags; set => _invalidFlags = value; }
     }
 
@@ -44,7 +45,7 @@ namespace Primary.Components
     public record struct LocalTransform : IComponent
     {
         public Matrix4x4 Transformation;
-        public int UpdateIndex;
+        public long UpdateIndex;
 
         public readonly Vector3 Position => Transformation.Translation;
 
@@ -58,7 +59,7 @@ namespace Primary.Components
     public struct WorldTransform : IComponent
     {
         public Matrix4x4 Transformation;
-        public int UpdateIndex;
+        public long UpdateIndex;
 
         public readonly Vector3 Position => Transformation.Translation;
 

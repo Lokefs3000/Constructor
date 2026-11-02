@@ -403,6 +403,7 @@ namespace PrimaryEditor.Assets
                 _importerRegistry.RegisterImporter<ModelImporter>(".obj", ".fbx", ".gltf", ".glb");
                 _importerRegistry.RegisterImporter<MaterialImporter>(".mat");
                 _importerRegistry.RegisterImporter<ComputeShaderImporter>(".compute");
+                _importerRegistry.RegisterImporter<ShaderSetImporter>(".shaderset");
 
                 // _importerRegistry.RegisterImporter<UIFontFamilyImporter>(".uifont");
                 // _importerRegistry.RegisterImporter<UILayoutImporter>(".layout");

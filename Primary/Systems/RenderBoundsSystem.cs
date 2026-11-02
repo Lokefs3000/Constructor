@@ -29,7 +29,7 @@ namespace Primary.Systems
                 return;
             }
 
-            int frameIndex = Time.FrameIndex;
+            long frameIndex = Time.FrameIndex;
             if (world.UpdateIndex == frameIndex || renderer.UpdateIndex == frameIndex || renderer.Mesh.LoadIndex != bounds.MeshLoadIndex)
             {
                 AABB local = renderer.Mesh.Boundaries;

@@ -13,71 +13,45 @@ namespace Primary.Rendering.Diagnostics
     {
         public static void Visualize(OctreeManager manager, in Frustrum cullingFrustrum, in Vector3 origin)
         {
-            foreach (RegionOctree octree in manager.Regions.Values)
+            foreach (RenderOctree octree in manager.Regions.Values)
             {
-                DrawOctantRecursive(octree.RootOctant, 0, in cullingFrustrum, in origin, FrustrumIntersection.Inside);
-                Gizmos.DrawWireAABB(new AABB(octree.WorldBounds.Minimum, octree.WorldBounds.Maximum), new Color(1.0f, 1.0f, 0.0f, 1.0f));
+                if (octree.Octants != null)
+                {
+                    foreach (RenderOctant octant in octree.Octants)
+                    {
+                        DrawOctantRecursive(octant, 0, in cullingFrustrum, in origin, FrustrumIntersection.Inside);
+                    }
+                }
+
+                Gizmos.DrawWireAABB(octree.CurrentExtents.AsAABB(), new Color(1.0f, 1.0f, 0.0f, 1.0f));
             }
 
             void DrawOctantRecursive(RenderOctant octant, int depth, in Frustrum cullingFrustrum, in Vector3 origin, FrustrumIntersection octantIntersection)
             {
-                foreach (RenderOctant subOctant in octant.Octants)
+                if (octant.Octants != null)
                 {
-                    FrustrumIntersection intersection = octantIntersection == FrustrumIntersection.Partial ?
-                        cullingFrustrum.IntersectWhere(octant.Boundaries) :
-                        FrustrumIntersection.Inside;
+                    foreach (RenderOctant subOctant in octant.Octants)
+                    {
+                        FrustrumIntersection intersection = octantIntersection == FrustrumIntersection.Partial ?
+                            cullingFrustrum.IntersectWhere(octant.CurrentExtents.AsAABB()) :
+                            FrustrumIntersection.Inside;
 
-                    if (intersection == FrustrumIntersection.Outside)
-                        continue;
+                        if (intersection == FrustrumIntersection.Outside)
+                            continue;
 
-                    DrawOctantRecursive(subOctant, depth + 1, in cullingFrustrum, in origin, intersection);
+                        DrawOctantRecursive(subOctant, depth + 1, in cullingFrustrum, in origin, intersection);
+                    }
                 }
 
-                float perc = depth / (float)RegionOctree.MaxOctantTreeDepth;
+                float perc = depth / (float)RenderOctree.MaxTreeDepth;
 
                 Color arrowColor = new Color(0.0f);
                 arrowColor[2 - (int)octantIntersection] = 1.0f - perc;
 
-                if (octant.Boundaries.Intersects(origin))
+                if (octant.CurrentExtents.AsAABB().Intersects(origin))
                 {
-                    Gizmos.DrawWireAABB(octant.Boundaries, arrowColor);
-                    Gizmos.DrawText(octant.Boundaries.Center, $"Entities: {octant.Children.Count}");
-
-                    Vector3 center = octant.Boundaries.Center;
-
-                    RegionEntityList.Node? node = octant.Children.FirstNode;
-                    do
-                    {
-                        foreach (SceneEntity entity in node.Entities)
-                        {
-                            ref RenderBounds bounds = ref entity.GetComponent<RenderBounds>();
-                            if (!Unsafe.IsNullRef(in bounds) && (octantIntersection == FrustrumIntersection.Inside || cullingFrustrum.Intersects(bounds.ComputedBounds)))
-                            {
-                                int frameDiff = Math.Min(Time.GetFrameDifference(Time.FrameIndex, bounds.UpdateIndex), 100);
-
-                                Color boundsColor = arrowColor;
-                                boundsColor.G = 1.0f - frameDiff * 0.005f;
-
-                                Gizmos.DrawWireAABB(bounds.ComputedBounds, boundsColor);
-                            }
-                        }
-                    } while ((node = node.Next) != null);
-                }
-                else
-                {
-                    RegionEntityList.Node? node = octant.Children.FirstNode;
-                    do
-                    {
-                        foreach (SceneEntity entity in node.Entities)
-                        {
-                            ref RenderBounds bounds = ref entity.GetComponent<RenderBounds>();
-                            int frameDiff = Time.GetFrameDifference(Time.FrameIndex, bounds.UpdateIndex);
-                            if (!Unsafe.IsNullRef(in bounds) && frameDiff < 100 && (octantIntersection == FrustrumIntersection.Inside || cullingFrustrum.Intersects(bounds.ComputedBounds)))
-                            {
-                                Gizmos.DrawWireAABB(bounds.ComputedBounds, Color.Blue.Darken(frameDiff * 0.005f));
-                            }
-                        }
-                    } while ((node = node.Next) != null);
+                    Gizmos.DrawWireAABB(octant.CurrentExtents.AsAABB(), arrowColor);
+                    Gizmos.DrawText(octant.CurrentExtents.Center, $"Entities: {octant.EntityCount}");
                 }
             }
         }

@@ -45,11 +45,15 @@ namespace Primary.Rendering.Batching
                         batcher.ClearFrameData();
                     }
 
+                    BatchingOptions options = setup.Options;
+
                     //TODO: multithreading
                     foreach (var (_, tree) in setup.Octree.Regions)
                     {
-                        _subBatchers[0].Execute(output, tree, setup.CullingFrustrum);
+                        _subBatchers[0].Execute(output, tree, in options);
                     }
+
+                    output.FinishDispatch(options.ShaderType);
                 }
 
                 int totalKeys = 0;
@@ -89,7 +93,7 @@ namespace Primary.Rendering.Batching
                         {
                             OctreeRenderBatcher batcher = _subBatchers[key.Batcher];
                             if (lastShaderIdx != ushort.MaxValue)
-                                output.AddRange(batcher.Flags[keys[previousLastIndex].Index].Material.Shader!, new ShaderKeyRange(previousLastIndex, i));
+                                output.AddRange(batcher.Flags[keys[previousLastIndex].Index].Material.GetShaderOrNull(setup.Options.ShaderType)!, new ShaderKeyRange(previousLastIndex, i));
 
                             previousLastIndex = i;
                             lastShaderIdx = key.ShaderId;
@@ -100,7 +104,7 @@ namespace Primary.Rendering.Batching
                     {
                         ref readonly RenderKey key = ref keys[previousLastIndex];
                         OctreeRenderBatcher batcher = _subBatchers[key.Batcher];
-                        output.AddRange(batcher.Flags[key.Index].Material.Shader!, new ShaderKeyRange(previousLastIndex, keys.Length));
+                        output.AddRange(batcher.Flags[key.Index].Material.GetShaderOrNull(setup.Options.ShaderType)!, new ShaderKeyRange(previousLastIndex, keys.Length));
                     }
                 }
 
@@ -115,5 +119,5 @@ namespace Primary.Rendering.Batching
         }
     }
 
-    public readonly record struct BatchWorldSetup(OctreeManager Octree, Frustrum CullingFrustrum);
+    public readonly record struct BatchWorldSetup(OctreeManager Octree, BatchingOptions Options);
 }

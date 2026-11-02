@@ -34,6 +34,7 @@ namespace Primary.Mathematics
         }
 
         public static Vector3 AsVector2(this Int3 value) => new Vector3(value.X, value.Y, value.Z);
+        public static Vector3 AsVector3(this Int3 value) => new Vector3(value.X, value.Y, value.Z);
 
         public static Int3 AsInt3(this Vector3 value) => new Int3((int)value.X, (int)value.Y, (int)value.Z);
     }

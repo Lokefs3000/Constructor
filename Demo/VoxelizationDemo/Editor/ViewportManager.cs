@@ -93,6 +93,14 @@ namespace VoxelizationDemo.Editor
                     }
                 }
 
+                if (ImGui.MenuItem("Render inspector"u8))
+                {
+                    if (!EditorManager.Instance.WindowManager.HasWindowOpen<RenderInspector>())
+                    {
+                        EditorManager.Instance.WindowManager.AddOpenWindow(new RenderInspector());
+                    }
+                }
+
                 ImGui.EndPopup();
             }
         }

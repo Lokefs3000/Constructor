@@ -29,6 +29,7 @@ namespace Primary.Collections.ReadOnly
 
         public bool Contains(T item) => _list.Contains(item);
         public void CopyTo(T[] array, int arrayIndex) => _list.CopyTo(array, arrayIndex);
+        public void CopyTo(Span<T> destination) => _list.CopyTo(destination);
 
         bool ICollection<T>.Remove(T item) => throw new NotSupportedException();
 

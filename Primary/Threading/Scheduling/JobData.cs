@@ -21,6 +21,8 @@ namespace Primary.Threading.Scheduling
         private bool _hasThrown;
         private JobStatus _jobStatus;
 
+        private bool _canBeManuallyFlushed;
+
         private RentedList<JobHandle> _dependents;
         private int _unfinishedDependencies;
 
@@ -45,6 +47,8 @@ namespace Primary.Threading.Scheduling
             _hasThrown = false;
             _jobStatus = JobStatus.Idle;
 
+            _canBeManuallyFlushed = false;
+
             _dependents = new RentedList<JobHandle>();
             _unfinishedDependencies = 0;
 
@@ -64,7 +68,7 @@ namespace Primary.Threading.Scheduling
             _jobStatus = JobStatus.Idle;
         }
 
-        internal JobHandle SetupForNewJob(JobPriority priority, IJob? job)
+        internal JobHandle SetupForNewJob(JobPriority priority, IJob? job, bool canBeManuallyFlushed)
         {
             // There shouldn't be any need for this but as a safety incase something happened with setting it
             _waitHandle.Set();
@@ -74,6 +78,8 @@ namespace Primary.Threading.Scheduling
 
             _hasThrown = false;
             _jobStatus = JobStatus.Pending;
+
+            _canBeManuallyFlushed = canBeManuallyFlushed;
 
             _dependents.Dispose();
             _unfinishedDependencies = 0;
@@ -93,6 +99,9 @@ namespace Primary.Threading.Scheduling
 #if DEBUG
             if (Interlocked.CompareExchange(ref _currentThreadId, Environment.CurrentManagedThreadId, -1) != -1)
                 throw new InvalidOperationException("Job executed on multiple threads at once!");
+
+            // Keep a variable so i can see what job executed when debugging
+            IJob? executedJob = _jobToExecute;
 #endif
 
             // If this is already true that means a parent has thrown and we need to just forgo executing the job
@@ -143,28 +152,36 @@ namespace Primary.Threading.Scheduling
             _scheduler.ReturnJobDataToPool(this);
         }
 
-        internal void TrySchedule()
+        internal bool TrySchedule()
         {
 #if DEBUG
-            if (_currentThreadId != -1)
-                throw new InvalidOperationException("Trying to schedule job that has executed but not pooled");
+            //if (_currentThreadId != -1)
+            //    throw new InvalidOperationException("Trying to schedule job that has executed but not pooled");
 #endif
+
             // Only enqueue if we have been submitted and are ready to run
             // This is incase a dependency has completed and we are creating a monolith job so we don't finish before everything is done
             if (Interlocked.CompareExchange(ref _jobStatus, JobStatus.IsSubmitted, JobStatus.WaitingForSubmit) == JobStatus.WaitingForSubmit)
+            {
                 _scheduler.EnqueueWithPriority(this, _priority);
+                return true;
+            }
+
+            return false;
         }
 
         internal bool AddDependent(JobHandle job)
         {
             if (job.Job == this)
                 throw new InvalidOperationException("Cannot add self as dependent");
+            if (job.Job._jobStatus != JobStatus.Pending)
+                throw new InvalidOperationException("Only pending jobs can have dependencies added");
 
-            if (!job.HasCompleted)
+            if (job.IsValid && !job.HasCompleted)
             {
                 using (_lock.EnterScope())
                 {
-                    if (_jobToExecute == null && _unfinishedDependencies == 0)
+                    if (_jobToExecute == null && Interlocked.CompareExchange(ref _unfinishedDependencies, 0, 0) == 0 && _jobStatus == JobStatus.Idle)
                         return false;
 
                     _dependents.Add(job);
@@ -186,8 +203,8 @@ namespace Primary.Threading.Scheduling
                 throw new InvalidOperationException("Job must be in a pending state to do this");
 #endif
 
-            // We should only try to submit if we trying to wait on something
-            if (maySubmitEarly && Volatile.Read(ref _unfinishedDependencies) == 0)
+            // We should only try to submit if we are trying to wait on something
+            if (maySubmitEarly && Interlocked.CompareExchange(ref _unfinishedDependencies, 0, 0) == 0)
             {
                 JobStatus status = Interlocked.Exchange(ref _jobStatus, JobStatus.IsSubmitted);
                 Debug.Assert(status == JobStatus.Pending || status == JobStatus.WaitingForSubmit);
@@ -200,7 +217,7 @@ namespace Primary.Threading.Scheduling
                 Debug.Assert(status == JobStatus.Pending);
 
                 // Incase all dependencies finish before changing the job status but after checking
-                if (maySubmitEarly && Volatile.Read(ref _unfinishedDependencies) == 0)
+                if (maySubmitEarly && Interlocked.CompareExchange(ref _unfinishedDependencies, 0, 0) == 0)
                     TrySchedule();
             }
         }
@@ -214,14 +231,23 @@ namespace Primary.Threading.Scheduling
         internal bool HasThrown => Volatile.Read(ref _hasThrown);
         internal JobStatus Status => Unsafe.BitCast<byte, JobStatus>(Volatile.Read(ref Unsafe.As<JobStatus, byte>(ref _jobStatus)));
 
+        internal bool CanBeManuallyFlushed => _canBeManuallyFlushed;
+
         internal static bool CompareVersionForCompletion(long currentVersion, long comparisonVersion) => currentVersion > comparisonVersion;
     }
 
     internal enum JobStatus : byte
     {
+        /// <summary>Current job is doing nothing</summary>
         Idle = 0,
+
+        /// <summary>Current job is waiting to be submitted</summary>
         WaitingForSubmit,
+
+        /// <summary>Current job has been submitted</summary>
         IsSubmitted,
+
+        /// <summary>Current job is pending</summary>
         Pending
     }
 

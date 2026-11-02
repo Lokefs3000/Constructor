@@ -15,7 +15,7 @@ namespace Primary.Assets
         }
 
         public ModelAsset? ParentAsset => AssetData.ParentAsset;
-
+        
         IRenderMeshSource? IRawRenderMesh.MeshSource => IsLoaded && (ParentAsset?.IsLoaded ?? false) ? ParentAsset.InternalAssetData : null;
         public AABB Boundaries => AssetData.Boundaries;
         public ref readonly RenderMeshDrawArgs Args => ref AssetData.Args;

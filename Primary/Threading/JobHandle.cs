@@ -48,6 +48,7 @@ namespace Primary.Threading
         internal readonly bool IsEmpty => long.MaxValue == _version;
         internal readonly bool IsAbort => long.MaxValue - 1 == _version;
         internal readonly bool IsValid => _version < long.MaxValue - 1;
+        internal readonly bool IsFlushable => _jobData.CanBeManuallyFlushed && _jobData.Status == JobStatus.WaitingForSubmit;
 
         public static JobHandle Completed => new JobHandle(default!, long.MaxValue - 2);
     }

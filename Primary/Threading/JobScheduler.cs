@@ -9,6 +9,7 @@ using Primary.Common;
 using Primary.Components;
 using Primary.Threading.Scheduling;
 using Primary.Threading.Statistics;
+using TerraFX.Interop.Windows;
 
 namespace Primary.Threading
 {
@@ -191,7 +192,7 @@ namespace Primary.Threading
             JobScheduler scheduler = Instance;
             JobData jobData = scheduler._jobDataPool.GetPooledJob();
 
-            JobHandle jobHandle = jobData.SetupForNewJob(priority, job);
+            JobHandle jobHandle = jobData.SetupForNewJob(priority, job, true);
             jobData.SwitchToWaitAndTrySubmit();
 
             return jobHandle;
@@ -207,18 +208,11 @@ namespace Primary.Threading
             }
 
             JobData jobData = scheduler._jobDataPool.GetPooledJob();
-            JobHandle jobHandle = jobData.SetupForNewJob(priority, job);
+            JobHandle jobHandle = jobData.SetupForNewJob(priority, job, false);
 
             if (parentJob.IsValid && !parentJob.HasCompleted)
             {
-                if (!parentJob.Job.AddDependent(jobHandle))
-                {
-                    jobData.TrySchedule();
-                }
-            }
-            else
-            {
-                jobData.TrySchedule();
+                parentJob.Job.AddDependent(jobHandle);
             }
 
             jobData.SwitchToWaitAndTrySubmit(true);
@@ -235,7 +229,7 @@ namespace Primary.Threading
             }
 
             JobData jobData = scheduler._jobDataPool.GetPooledJob();
-            JobHandle jobHandle = jobData.SetupForNewJob(priority, job);
+            JobHandle jobHandle = jobData.SetupForNewJob(priority, job, false);
 
             bool couldAddToAny = false;
             foreach (ref readonly JobHandle parentJob in parentJobs)
@@ -257,7 +251,7 @@ namespace Primary.Threading
         {
             JobScheduler scheduler = Instance;
             JobData jobData = scheduler._jobDataPool.GetPooledJob();
-            JobHandle jobHandle = jobData.SetupForNewJob(priority, null);
+            JobHandle jobHandle = jobData.SetupForNewJob(priority, null, false);
 
             bool areAnyJobsStillRunning = false;
             foreach (ref readonly JobHandle job in jobs)
@@ -283,7 +277,7 @@ namespace Primary.Threading
 
         public static void Flush(JobHandle job)
         {
-            if (!job.HasCompleted && job.IsValid)
+            if (job.IsFlushable && !job.HasCompleted && job.IsValid)
             {
                 job.Job.TrySchedule();
             }
@@ -291,12 +285,12 @@ namespace Primary.Threading
 
         public static void Flush(JobHandle job1, JobHandle job2)
         {
-            if (!job1.HasCompleted && job1.IsValid)
+            if (job1.IsFlushable && !job1.HasCompleted && job1.IsValid)
             {
                 job1.Job.TrySchedule();
             }
 
-            if (!job2.HasCompleted && job2.IsValid)
+            if (job2.IsFlushable && !job2.HasCompleted && job2.IsValid)
             {
                 job2.Job.TrySchedule();
             }
@@ -304,17 +298,17 @@ namespace Primary.Threading
 
         public static void Flush(JobHandle job1, JobHandle job2, JobHandle job3)
         {
-            if (!job1.HasCompleted && job1.IsValid)
+            if (job1.IsFlushable && !job1.HasCompleted && job1.IsValid)
             {
                 job1.Job.TrySchedule();
             }
 
-            if (!job2.HasCompleted && job2.IsValid)
+            if (job2.IsFlushable && !job2.HasCompleted && job2.IsValid)
             {
                 job2.Job.TrySchedule();
             }
 
-            if (!job3.HasCompleted && job3.IsValid)
+            if (job3.IsFlushable && !job3.HasCompleted && job3.IsValid)
             {
                 job3.Job.TrySchedule();
             }
@@ -324,7 +318,7 @@ namespace Primary.Threading
         {
             foreach (ref readonly JobHandle job in jobs)
             {
-                if (!job.HasCompleted && job.IsValid)
+                if (job.IsFlushable && !job.HasCompleted && job.IsValid)
                 {
                     job.Job.TrySchedule();
                 }
@@ -333,6 +327,8 @@ namespace Primary.Threading
 
         private static readonly WeakReference s_instance = new WeakReference(null);
         public static JobScheduler Instance => Unsafe.As<JobScheduler>(s_instance.Target)!;
+
+        public static int WorkerCount => Instance._workers.Length;
     }
 
     public enum JobPriority : byte

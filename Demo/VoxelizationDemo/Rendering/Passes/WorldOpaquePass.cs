@@ -65,7 +65,7 @@ namespace VoxelizationDemo.Rendering.Passes
                     if (currentMaterial != segment.Material)
                     {
                         currentMaterial = segment.Material;
-                        cmd.SetProperties(segment.Material.PropertyBlock);
+                        cmd.SetProperties(segment.Material.GetPropertyBlockOrNull(MaterialShaderType.Default)!);
                     }
 
                     if (currentMeshSource != segment.Mesh.MeshSource)

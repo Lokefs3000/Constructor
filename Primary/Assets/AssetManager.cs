@@ -56,7 +56,8 @@ namespace Primary.Assets
                 { typeof(MaterialAsset), new MaterialAssetLoader() },
                 { typeof(TextureAsset), new TextureAssetLoader() },
                 { typeof(ComputeShaderAsset), new ComputeShaderAssetLoader() },
-                { typeof(TextureAtlasAsset), new TextureAtlasAssetLoader() }
+                { typeof(TextureAtlasAsset), new TextureAtlasAssetLoader() },
+                { typeof(ShaderSetAsset), new ShaderSetAssetLoader() }
             }.ToFrozenDictionary();
 
             _invalidAssets = new Dictionary<Type, (IAssetDefinition, IInternalAssetData)>();

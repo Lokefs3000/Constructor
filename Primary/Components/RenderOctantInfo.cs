@@ -1,4 +1,5 @@
 ﻿using Primary.Editor;
+using Primary.Mathematics;
 using Primary.Rendering.Tree;
 
 namespace Primary.Components
@@ -7,13 +8,17 @@ namespace Primary.Components
     [InspectorHidden]
     internal struct RenderOctantInfo : IComponent
     {
-        public OctreePoint Tree;
-        public OctreeId OctantId;
+        public RenderOctree? Octree;
+        public int RenderableId;
+
+        public long LastUpdateFrame;
 
         public RenderOctantInfo()
         {
-            Tree = default;
-            OctantId = new OctreeId(RegionOctree.NullOctantId);
+            Octree = null;
+            RenderableId = -1;
+
+            LastUpdateFrame = -1;
         }
     }
 }

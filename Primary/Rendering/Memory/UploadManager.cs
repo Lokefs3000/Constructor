@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Primary.Collections.ReadOnly;
 using Primary.Common;
 using Primary.Common.Memory;
 using Primary.Mathematics;
@@ -69,11 +70,12 @@ namespace Primary.Rendering.Memory
         {
             using (new ProfilingScope("FlushUploads"))
             {
-                renderPlan.RequiredUploadMemory = _virtualAllocator.AllocatedMemory;
+                renderPlan.RequiredUploadMemory = 0;
 
                 foreach (DataUploadRequest uploadRequest in _uploadRequests)
                 {
                     renderPlan.AddUpload(uploadRequest.OffsetInHeap, new ArrayPtr<byte>((byte*)uploadRequest.BasePointer, uploadRequest.UploadSize), uploadRequest.DestSlice, uploadRequest.DestBox, uploadRequest.Resource.Index);
+                    renderPlan.RequiredUploadMemory = Math.Max(renderPlan.RequiredUploadMemory, uploadRequest.OffsetInHeap + uploadRequest.ReservationSize);
                 }
             }
         }
@@ -297,8 +299,11 @@ namespace Primary.Rendering.Memory
             }
         }
 
-        private readonly record struct DataUploadRequest(ResourceHandle Resource, int OffsetInHeap, int ReservationSize, int UploadBaseOffset, int UploadSize, uint DestSlice, FGBox DestBox, nint BasePointer);
+        public ROList<DataUploadRequest> UploadRequests => _uploadRequests;
+
     }
+
+    public readonly record struct DataUploadRequest(ResourceHandle Resource, int OffsetInHeap, int ReservationSize, int UploadBaseOffset, int UploadSize, uint DestSlice, FGBox DestBox, nint BasePointer);
 
     internal readonly record struct DataMapInfo(ResourceHandle Resource, int UploadBaseOffset, int UploadSize, uint DestSlice, FGBox DestBox, nint BasePointer);
 }
