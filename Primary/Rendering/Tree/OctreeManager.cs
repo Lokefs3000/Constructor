@@ -41,9 +41,7 @@ namespace Primary.Rendering.Tree
             using (new ProfilingScope("OctreeUpdate"))
             {
                 JobHandle updateRenderables = _updateRenderables.ScheduleAll(parentJob);
-                updateRenderables.WaitForCompletion();
                 JobHandle updateMeshRenderers = _updateMeshRenderers.ScheduleAll(updateRenderables);
-                updateMeshRenderers.WaitForCompletion();
 
                 JobHandle octreeUpdates = _scheduleOctreeUpdates.ScheduleAll(updateMeshRenderers);
 

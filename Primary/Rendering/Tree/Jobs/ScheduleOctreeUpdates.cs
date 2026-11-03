@@ -81,12 +81,12 @@ namespace Primary.Rendering.Tree.Jobs
             {
                 if (Octree!.WantsInternalUpdate)
                 {
-                    Octree.UpdateInternals();
+                    //Octree.UpdateInternals();
                 }
 
                 if (Octree.WantsExtentsRefit)
                 {
-                    Octree.RefitExtents();
+                    //Octree.RefitExtents();
                 }
 
                 Octree = null;

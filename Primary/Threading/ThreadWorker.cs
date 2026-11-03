@@ -234,6 +234,15 @@ namespace Primary.Threading
 
         internal void SubmitJobToQueue(JobHandle jobHandle, JobPriority priority)
         {
+            // Skip the queue if we are submitting to ourselves
+            if (Environment.CurrentManagedThreadId == _thisThreadId)
+            {
+                _jobQueue[(int)priority].Push(jobHandle);
+                _notification?.Set();
+
+                return;
+            }
+
             _incomingQueue[(int)priority].Enqueue(jobHandle);
             _notification?.Set();
         }

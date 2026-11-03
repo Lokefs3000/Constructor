@@ -144,6 +144,11 @@ namespace Primary.Rendering.Batching
                 }
             }
 
+            if (octree.CurrentExtents.IntersectAny(options.ViewFrustrum))
+            {
+                _octantVisibilityArray[0] = ushort.MaxValue;
+            }
+
             void SearchRecursive(RenderOctant octant, byte entityIndex, in Frustrum viewFrustrum)
             {
                 FrustrumIntersection intersection = octree.SourceExtents.Intersect(in viewFrustrum);

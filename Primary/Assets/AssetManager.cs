@@ -400,7 +400,10 @@ namespace Primary.Assets
         {
             AssetManager @this = NullableUtility.ThrowIfNull(s_instance);
             if (@this._scheduler.TryGetRunningTask(assetId, out Task? task))
+            {
                 task?.Wait();
+                Thread.Yield();
+            }
         }
 
         /// <summary>Thread-safe</summary>

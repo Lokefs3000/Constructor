@@ -39,6 +39,8 @@ namespace Primary.Threading
             }
         }
 
+        public override string ToString() => HasCompleted ? "{ Done }" : $"{{ Status={_jobData.Status}, Flags={_jobData.Flags}, Priority={_jobData.Priority} }}";
+
         public readonly bool HasCompleted => _version == long.MaxValue - 2 || JobData.CompareVersionForCompletion(_jobData.Version, _version);
         public readonly bool IsSubmitted => _jobData.Status == JobStatus.IsSubmitted;
 
@@ -48,8 +50,7 @@ namespace Primary.Threading
         internal readonly bool IsEmpty => long.MaxValue == _version;
         internal readonly bool IsAbort => long.MaxValue - 1 == _version;
         internal readonly bool IsValid => _version < long.MaxValue - 1;
-        internal readonly bool IsFlushable => _jobData.CanBeManuallyFlushed && _jobData.Status == JobStatus.WaitingForSubmit;
-
+   
         public static JobHandle Completed => new JobHandle(default!, long.MaxValue - 2);
     }
 }

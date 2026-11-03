@@ -56,7 +56,7 @@ namespace Primary.Threading
                 }
                 catch (Exception ex)
                 {
-                    EngLog.Assets.Error(ex, "Error occured loading asset '{path}'", args.SourcePath);
+                    EngLog.Assets.Error(ex, "Error occured loading asset '{path}'", args.LocalPath);
                     args.AssetData.UpdateAssetFailed(args.Asset);
                 }
             };

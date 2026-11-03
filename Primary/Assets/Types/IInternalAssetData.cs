@@ -24,10 +24,10 @@
     public enum ResourceStatus : byte
     {
         Pending = 0,
+        Disposed,
         Running,
         Error,
         Bad,
-        Disposed,
         Success
     }
 }

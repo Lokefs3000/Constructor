@@ -104,15 +104,40 @@ namespace Primary.Threading
 
         internal void EnqueueWithPriority(JobData jobData, JobPriority priority)
         {
+            int nextWorkerIndex = (_nextWorkerIndex = (_nextWorkerIndex + 1) % _workers.Length);
+
+            ThreadWorker? firstThreadWorker = null;
             while (true)
             {
-                ThreadWorker threadWorker = _workers[_nextWorkerIndex = ++_nextWorkerIndex % _workers.Length];
-                if (threadWorker.CanAcceptJobs)
+                ThreadWorker threadWorker = _workers[nextWorkerIndex = ++nextWorkerIndex % _workers.Length];
+                if (threadWorker == firstThreadWorker)
                 {
-                    // The current job should not have been started yet
-                    threadWorker.SubmitJobToQueue(new JobHandle(jobData), priority);
+                    // If we can't select an inactive worker try to put it onto the first one
+                    if (threadWorker.CanAcceptJobs)
+                    {
+                        // The current job should not have been started yet
+                        threadWorker.SubmitJobToQueue(new JobHandle(jobData), priority);
 
-                    break;
+                        break;
+                    }
+                    else
+                    {
+                        firstThreadWorker = null;
+                    }
+                }
+                else if (threadWorker.CanAcceptJobs)
+                {
+                    if (!threadWorker.IsActive)
+                    {
+                        // The current job should not have been started yet
+                        threadWorker.SubmitJobToQueue(new JobHandle(jobData), priority);
+
+                        break;
+                    }
+                    else
+                    {
+                        firstThreadWorker ??= threadWorker;
+                    }
                 }
             }
         }
@@ -192,8 +217,9 @@ namespace Primary.Threading
             JobScheduler scheduler = Instance;
             JobData jobData = scheduler._jobDataPool.GetPooledJob();
 
-            JobHandle jobHandle = jobData.SetupForNewJob(priority, job, true);
-            jobData.SwitchToWaitAndTrySubmit();
+            JobHandle jobHandle = jobData.SetupForNewJob(priority, job, JobFlags.None);
+
+            jobData.Finish();
 
             return jobHandle;
         }
@@ -208,14 +234,16 @@ namespace Primary.Threading
             }
 
             JobData jobData = scheduler._jobDataPool.GetPooledJob();
-            JobHandle jobHandle = jobData.SetupForNewJob(priority, job, false);
+            JobHandle jobHandle = jobData.SetupForNewJob(priority, job, JobFlags.HasDependencies);
 
             if (parentJob.IsValid && !parentJob.HasCompleted)
             {
-                parentJob.Job.AddDependent(jobHandle);
+                jobData.AddDependency(parentJob);
             }
 
-            jobData.SwitchToWaitAndTrySubmit(true);
+            jobData.Finish();
+            jobData.TrySchedule();
+
             return jobHandle;
         }
 
@@ -229,55 +257,60 @@ namespace Primary.Threading
             }
 
             JobData jobData = scheduler._jobDataPool.GetPooledJob();
-            JobHandle jobHandle = jobData.SetupForNewJob(priority, job, false);
+            JobHandle jobHandle = jobData.SetupForNewJob(priority, job, JobFlags.HasDependencies);
 
-            bool couldAddToAny = false;
             foreach (ref readonly JobHandle parentJob in parentJobs)
             {
                 if (parentJob.IsValid && !parentJob.HasCompleted)
                 {
-                    if (parentJob.Job.AddDependent(jobHandle))
-                    {
-                        couldAddToAny = true;
-                    }
+                    jobData.AddDependency(parentJob);
                 }
             }
 
-            jobData.SwitchToWaitAndTrySubmit(true);
+            jobData.Finish();
+            jobData.TrySchedule();
+
             return jobHandle;
         }
 
         public static JobHandle CombineAll(ReadOnlySpan<JobHandle> jobs, JobPriority priority = JobPriority.Realtime)
         {
             JobScheduler scheduler = Instance;
-            JobData jobData = scheduler._jobDataPool.GetPooledJob();
-            JobHandle jobHandle = jobData.SetupForNewJob(priority, null, false);
 
-            bool areAnyJobsStillRunning = false;
+            JobData jobData = scheduler._jobDataPool.GetPooledJob();
+            JobHandle jobHandle = jobData.SetupForNewJob(priority, null, JobFlags.HasDependencies | JobFlags.IsMonolithic);
+
+            bool areAnyJobsStillRunning = true;
             foreach (ref readonly JobHandle job in jobs)
             {
                 if (job.IsValid && !job.HasCompleted)
                 {
-                    if (job.Job.AddDependent(jobHandle))
+                    if (jobData.AddDependency(job))
+                    {
                         areAnyJobsStillRunning = true;
+                    }
                 }
             }
 
             if (!areAnyJobsStillRunning)
             {
+                jobData.Cancel();
                 scheduler.ReturnJobDataToPool(jobData);
+
                 return JobHandle.Completed;
             }
             else
             {
-                jobData.SwitchToWaitAndTrySubmit(true);
+                jobData.Finish();
+                jobData.TrySchedule();
+
                 return jobHandle;
             }
         }
 
         public static void Flush(JobHandle job)
         {
-            if (job.IsFlushable && !job.HasCompleted && job.IsValid)
+            if (!job.HasCompleted && job.IsValid)
             {
                 job.Job.TrySchedule();
             }
@@ -285,12 +318,12 @@ namespace Primary.Threading
 
         public static void Flush(JobHandle job1, JobHandle job2)
         {
-            if (job1.IsFlushable && !job1.HasCompleted && job1.IsValid)
+            if (!job1.HasCompleted && job1.IsValid)
             {
                 job1.Job.TrySchedule();
             }
 
-            if (job2.IsFlushable && !job2.HasCompleted && job2.IsValid)
+            if (!job2.HasCompleted && job2.IsValid)
             {
                 job2.Job.TrySchedule();
             }
@@ -298,17 +331,17 @@ namespace Primary.Threading
 
         public static void Flush(JobHandle job1, JobHandle job2, JobHandle job3)
         {
-            if (job1.IsFlushable && !job1.HasCompleted && job1.IsValid)
+            if (!job1.HasCompleted && job1.IsValid)
             {
                 job1.Job.TrySchedule();
             }
 
-            if (job2.IsFlushable && !job2.HasCompleted && job2.IsValid)
+            if (!job2.HasCompleted && job2.IsValid)
             {
                 job2.Job.TrySchedule();
             }
 
-            if (job3.IsFlushable && !job3.HasCompleted && job3.IsValid)
+            if (!job3.HasCompleted && job3.IsValid)
             {
                 job3.Job.TrySchedule();
             }
@@ -318,7 +351,7 @@ namespace Primary.Threading
         {
             foreach (ref readonly JobHandle job in jobs)
             {
-                if (job.IsFlushable && !job.HasCompleted && job.IsValid)
+                if (!job.HasCompleted && job.IsValid)
                 {
                     job.Job.TrySchedule();
                 }

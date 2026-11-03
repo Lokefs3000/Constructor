@@ -349,6 +349,8 @@ namespace Primary.Rendering.Tree
         public RenderExtents CurrentExtents => _currentExtents;
 
         internal RenderOctant[]? Octants => _octants;
+        public int EntityCount => _entityCount;
+        public int ChildrenEntityCount => _childrenEntityCount;
 
         public bool WantsInternalUpdate => _wantsInternalUpdate;
         public bool WantsExtentsRefit => _wantsExtentsRefit;

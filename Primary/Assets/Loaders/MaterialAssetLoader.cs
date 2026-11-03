@@ -46,23 +46,22 @@ namespace Primary.Assets.Loaders
             if (source == null)
             {
                 materialData.UpdateAssetFailed(material);
-                return;
+                throw new AssetLoadException("Failed to read material data source");
+
             }
 
             MaterialTomlOutput? toml = TomlSerializer.Deserialize<MaterialTomlOutput>(source, MaterialTomlSerializerContext.Default);
             if (toml == null)
             {
                 materialData.UpdateAssetFailed(material);
-                return;
+                throw new AssetLoadException("Failed to parse material data");
             }
 
-            ShaderSetAsset shaderSet = AssetManager.LoadAsset<ShaderSetAsset>(toml.Shader);
-
-            shaderSet.WaitIfNotLoaded();
+            ShaderSetAsset shaderSet = AssetManager.LoadAsset<ShaderSetAsset>(toml.Shader).WaitIfNotLoaded();
             if (shaderSet.Status != ResourceStatus.Success)
             {
                 materialData.UpdateAssetFailed(material);
-                return;
+                throw new AssetLoadException("Material shader set failed to load");
             }
 
             MaterialShader[] shaderTypes = new MaterialShader[Enum.GetNames<MaterialShaderType>().Length];

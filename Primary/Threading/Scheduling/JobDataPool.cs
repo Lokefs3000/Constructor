@@ -97,8 +97,8 @@ namespace Primary.Threading.Scheduling
         {
             ArrayBuffer arrayBuffer = _currentArrayBuffer;
 
-            int arrayIndex = (int)(jobData.ArrayId & 0xffffffff);
-            int arrayVersion = (int)((jobData.ArrayId >> 32) & 0xffffffff);
+            int arrayIndex = 0;//(int)(jobData.ArrayId & 0xffffffff);
+            int arrayVersion = 0;//(int)((jobData.ArrayId >> 32) & 0xffffffff);
 
             // Ensure we aren't overriding an already good index
             if (arrayBuffer.Version == arrayVersion)

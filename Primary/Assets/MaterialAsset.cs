@@ -276,11 +276,11 @@ namespace Primary.Assets
             _shaderSet = shaderSet;
             _shaderTypes = shaderTypes;
 
-            //AssetManager.ListenForAssetLoad(shaderSet, this, OnShaderSetLoaded);
-            //if (shaderSet.IsReady)
-            //{
-            //    ThreadHelper.ExecuteOnMainThread(() => OnShaderSetLoaded(shaderSet, false));
-            //}
+            AssetManager.ListenForAssetLoad(shaderSet, this, OnShaderSetLoaded);
+            if (shaderSet.IsReady)
+            {
+                ThreadHelper.ExecuteOnMainThread(() => OnShaderSetLoaded(shaderSet, false));
+            }
         }
 
         private void OnShaderSetLoaded(ShaderSetAsset shaderSet, bool wasReloaded)
