@@ -23,6 +23,8 @@ namespace Primary.Rendering.Diagnostics
                 {
                     if (isInsideAnyOctant > 0)
                         octantMask.Span[..isInsideAnyOctant].Fill(0);
+                    isInsideAnyOctant = 0;
+
                     if (octree.Octants != null)
                     {
                         foreach (RenderOctant octant in octree.Octants)
@@ -36,11 +38,13 @@ namespace Primary.Rendering.Diagnostics
 
                     isWithinOctree = true;
                 }
+                else
+                {
+                    isInsideAnyOctant = 0;
+                }
 
                 Gizmos.DrawWireAABB(octree.CurrentExtents.AsAABB(), new Color(1.0f, 1.0f, 0.0f, isWithinOctree ? 1.0f : 0.2f));
-                if (isWithinOctree)
-                    Gizmos.DrawText(octree.CurrentExtents.Center, $"Entities: {octree.EntityCount}");
-
+                
                 if (isInsideAnyOctant > 0)
                 {
                     foreach (ref readonly EntityChunk chunk in octree.Chunks)
@@ -54,6 +58,9 @@ namespace Primary.Rendering.Diagnostics
                         }
                     }
                 }
+
+                if (isWithinOctree)
+                    Gizmos.DrawText(octree.CurrentExtents.Center, $"Entities: {octree.EntityCount}");
             }
 
             void DrawOctantRecursive(RenderOctant octant, int depth, in Frustrum cullingFrustrum, in Vector3 origin, FrustrumIntersection octantIntersection, Span<ushort> visibilityMask, ref int isInAnyOctant)

@@ -102,31 +102,39 @@ namespace Primary.Threading
                 _isActive = true;
                 while (!token.IsCancellationRequested)
                 {
-                    for (int i = 0; i < _incomingQueue.Length; ++i)
+                    bool didTakeIncomingJob = false;
+                    for (int i = 0; i < 3; ++i)
                     {
-                        ConcurrentQueue<JobHandle> incomingQueue = _incomingQueue[i];
+                        ConcurrentQueue<JobHandle> incomingQueue = _scheduler.GetIncomingQueue(i);
                         JobHandleQueue currentQueue = _jobQueue[i];
 
                         while (currentQueue.Size < (1 << 5) && incomingQueue.TryDequeue(out JobHandle handle))
                         {
                             currentQueue.Push(handle);
+                            didTakeIncomingJob = true;
                         }
                     }
 
-                    JobHandle jobToExecute = GetNextJob();
+                    JobHandle jobToExecute = GetNextJob(out int takenFromIndex);
                     if (jobToExecute.IsValid)
                     {
                         jobToExecute.Job.ExecuteJob();
                     }
                     else
                     {
-                        // No events could be popped or stolen so we wait for more
-                        // Though we wake up occasionally incase a different thread has work to be stolen
-                        _isActive = false;
-                        _notification!.Wait(2000, token);
-                        _notification.Reset();
+                        // Don't sleep if we managed to take some jobs as more may have been added already
+                        if (!didTakeIncomingJob)
+                        {
+                            // No events could be popped or stolen so we wait for more
+                            // Though we wake up occasionally incase a different thread has work to be stolen
 
-                        _isActive = true;
+                            _isActive = false;
+                            // _notification!.Wait(2000, token);
+                            // _notification.Reset();
+                            _scheduler.WaitForIncomingJobs(2000);
+                            _isActive = true;
+                        }
+
                     }
                 }
             }
@@ -147,26 +155,30 @@ namespace Primary.Threading
 
         internal void WorkUntilCompletion(JobHandle? jobToWaitFor, CancellationToken token)
         {
+            int currentThreadId = Environment.CurrentManagedThreadId;
+            if (currentThreadId != _thisThreadId && !(_thisThreadId == -1 && ThreadHelper.MainThreadId == currentThreadId))
+                throw new InvalidOperationException("Only threads from the job scheduler may work until completion");
+
             try
             {
                 _isActive = true;
                 // if (_mode == WorkerMode.Foreground)
                 //     Volatile.Write(ref _canAcceptJobs, true);
-            
+
                 while (!(jobToWaitFor.HasValue && jobToWaitFor.DangerousGetValueOrNullReference().HasCompleted) && !token.IsCancellationRequested)
                 {
-                    for (int i = 0; i < _incomingQueue.Length; ++i)
+                    for (int i = 0; i < 3; ++i)
                     {
-                        ConcurrentQueue<JobHandle> incomingQueue = _incomingQueue[i];
+                        ConcurrentQueue<JobHandle> incomingQueue = _scheduler.GetIncomingQueue(i);
                         JobHandleQueue currentQueue = _jobQueue[i];
-            
+
                         while (currentQueue.Size < (1 << 5) && incomingQueue.TryDequeue(out JobHandle handle))
                         {
                             currentQueue.Push(handle);
                         }
                     }
-            
-                    JobHandle jobToExecute = GetNextJob();
+
+                    JobHandle jobToExecute = GetNextJob(out int takenFromIndex);
                     if (jobToExecute.IsValid)
                     {
                         jobToExecute.Job.ExecuteJob();
@@ -186,38 +198,39 @@ namespace Primary.Threading
                 EngLog.Thread.Warning(ex, "An exception occured inside while waiting for a job");
             }
 
+#if false
             if (_mode == WorkerMode.Foreground)
             {
                 Volatile.Write(ref _canAcceptJobs, false);
                 _isActive = false;
-            
+
                 // Send incoming and queued events back to the scheduler
                 JobHandle incomingJobHandle;
                 while (true)
                 {
                     bool hasHadAnyJobs = false;
-                    for (int i = 0; i < _incomingQueue.Length; ++i)
+                    for (int i = 0; i < 3; ++i)
                     {
-                        ConcurrentQueue<JobHandle> incomingQueue = _incomingQueue[i];
+                        ConcurrentQueue<JobHandle> incomingQueue = _scheduler.GetIncomingQueue(i);
                         JobHandleQueue currentQueue = _jobQueue[i];
-            
+
                         if (!currentQueue.IsEmpty)
                         {
                             while ((incomingJobHandle = currentQueue.Pop()).IsValid)
                             {
                                 _scheduler.EnqueueWithPriority(incomingJobHandle, (JobPriority)i);
                             }
-            
+
                             hasHadAnyJobs = true;
                         }
-            
+
                         while (incomingQueue.TryDequeue(out incomingJobHandle))
                         {
                             _scheduler.EnqueueWithPriority(incomingJobHandle, (JobPriority)i);
                             hasHadAnyJobs = true;
                         }
                     }
-            
+
                     if (!hasHadAnyJobs)
                     {
                         break;
@@ -228,6 +241,7 @@ namespace Primary.Threading
                     }
                 }
             }
+#endif
 
             jobToWaitFor?.WaitForCompletion(true);
         }
@@ -247,7 +261,7 @@ namespace Primary.Threading
             _notification?.Set();
         }
 
-        private JobHandle GetNextJob()
+        private JobHandle GetNextJob(out int takenFromIndex)
         {
             // Iterate for each priority
             for (int i = 0; i < _jobQueue.Length; ++i)
@@ -258,6 +272,8 @@ namespace Primary.Threading
                 if (handle.IsValid)
                 {
                     Debug.Assert(handle.IsSubmitted && !handle.HasCompleted);
+
+                    takenFromIndex = _workerIndex;
                     return handle;
                 }
                 else
@@ -276,6 +292,8 @@ namespace Primary.Threading
                             if ((handle = worker._jobQueue[i].Steal()).IsValid)
                             {
                                 Debug.Assert(handle.IsSubmitted && !handle.HasCompleted);
+
+                                takenFromIndex = workerIndex;
                                 return handle;
                             }
                             else if (handle.IsAbort)
@@ -292,16 +310,21 @@ namespace Primary.Threading
                     if (possibleVictim != null && (handle = possibleVictim._jobQueue[i].Steal()).IsValid)
                     {
                         Debug.Assert(handle.IsSubmitted && !handle.HasCompleted);
+
+                        takenFromIndex = workerIndex;
                         return handle;
                     }
                 }
             }
+
+            takenFromIndex = -100;
 
             Thread.Yield();
             return JobHandleQueue.Empty;
         }
 
         internal int ThreadId => _thisThreadId;
+        internal int WorkerIndex => _workerIndex;
 
         internal bool IsActive => _isActive;
         internal bool CanAcceptJobs => _canAcceptJobs;

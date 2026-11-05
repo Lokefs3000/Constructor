@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using Collections.Pooled;
@@ -8,10 +9,11 @@ using Primary.Mathematics;
 using Primary.Profiling;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Tree;
+using Primary.Threading;
 
 namespace Primary.Rendering.Batching
 {
-    internal sealed class OctreeRenderBatcher
+    internal sealed class OctreeRenderBatcher : IJob
     {
         private readonly byte _id;
         private readonly RenderingManager _manager;
@@ -24,6 +26,8 @@ namespace Primary.Rendering.Batching
 
         private PooledList<RenderKey> _renderingKeys;
         private PooledList<UnbatchedRenderFlag> _renderingData;
+
+        private ConcurrentQueue<BatchRequestData> _batchingQueue;
 
         private readonly ushort[] _octantVisibilityArray;
 
@@ -40,6 +44,8 @@ namespace Primary.Rendering.Batching
 
             _renderingKeys = new PooledList<RenderKey>();
             _renderingData = new PooledList<UnbatchedRenderFlag>();
+
+            _batchingQueue = new ConcurrentQueue<BatchRequestData>();
 
             _octantVisibilityArray = new ushort[byte.MaxValue];
         }
@@ -133,6 +139,14 @@ namespace Primary.Rendering.Batching
             }
         }
 
+        void IJob.Execute()
+        {
+            if (_batchingQueue.TryDequeue(out BatchRequestData requestData))
+            {
+                Execute(requestData.List, requestData.Octree, requestData.Options);
+            }
+        }
+
         private void ComputeOctantVisibility(RenderOctree octree, in BatchingOptions options)
         {
             if (octree.Octants != null)
@@ -175,7 +189,14 @@ namespace Primary.Rendering.Batching
             return ref _renderingData.Span.DangerousGetReferenceAt(index);
         }
 
+        internal void AddToQueue(RenderList list, RenderOctree octree, in BatchingOptions options)
+        {
+            _batchingQueue.Enqueue(new BatchRequestData(list, octree, options));
+        }
+
         internal ReadOnlySpan<RenderKey> Keys => _renderingKeys.Span;
         internal ReadOnlySpan<UnbatchedRenderFlag> Flags => _renderingData.Span;
+
+        private readonly record struct BatchRequestData(RenderList List, RenderOctree Octree, BatchingOptions Options);
     }
 }

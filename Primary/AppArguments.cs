@@ -163,6 +163,14 @@ namespace Primary
                                             EngLog.Core.Warning("Failed to parse value '{v}' for argument '{n}'", nextArg, format.Name);
                                         break;
                                     }
+                                case ArgumentTypeLiteral.Boolean:
+                                    {
+                                        if (bool.TryParse(nextArg, out bool result))
+                                            _arguments.Add(format.Name, result);
+                                        else
+                                            EngLog.Core.Warning("Failed to parse value '{v}' for argument '{n}'", nextArg, format.Name);
+                                        break;
+                                    }
                                 case ArgumentTypeLiteral.String:
                                     {
                                         _arguments.Add(format.Name, nextArg);

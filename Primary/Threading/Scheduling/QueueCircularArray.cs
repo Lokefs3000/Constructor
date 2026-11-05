@@ -7,8 +7,8 @@ namespace Primary.Threading.Scheduling
 {
     internal sealed class QueueCircularArray
     {
-        private int _logSize;
-        private JobHandle[] _segment;
+        private readonly int _logSize;
+        private readonly JobHandle[] _segment;
 
         internal QueueCircularArray(int logSize)
         {

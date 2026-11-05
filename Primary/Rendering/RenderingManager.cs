@@ -59,7 +59,7 @@ namespace Primary.Rendering
 
         public RenderingManager()
         {
-            _graphicsDevice = RHIDeviceFactory.CreateDefaultApi(new RHIDeviceDescription { EnableValidation = Engine.IsDebugBuild && !AppArguments.HasArgument("rhi-nodebug") }, EngLog.RHI);
+            _graphicsDevice = RHIDeviceFactory.CreateDefaultApi(new RHIDeviceDescription { EnableValidation = AppArguments.GetValueOrDefault("rhi-setdebug", Engine.IsDebugBuild) }, EngLog.RHI);
             _defaultSampler = _graphicsDevice.CreateSampler(new RHISamplerDescription(), "Default")!;
             _playbackDevice = PlaybackDeviceFactory.CreateDevice(_graphicsDevice);
 
@@ -156,6 +156,7 @@ namespace Primary.Rendering
         {
             using (new ProfilingScope("Render"))
             {
+                JobHandle octreeManager;
                 using (new ProfilingScope("Prepare"))
                 {
                     _renderedWindows.Clear();
@@ -163,7 +164,7 @@ namespace Primary.Rendering
                     _graphicsDevice.IncrementFrame();
 
                     _renderContextPool.ResetPoolForNewRender();
-                    JobHandle octreeManager = _octreeManager.SchedulePending(JobHandle.Completed);
+                    octreeManager = _octreeManager.SchedulePending(JobHandle.Completed);
                     _renderWorld.SetupWorld();
 
                     octreeManager.WaitForCompletion();

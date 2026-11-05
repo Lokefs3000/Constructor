@@ -229,15 +229,15 @@ namespace Primary.Rendering.Batching
     public struct RenderKey(ushort ShaderId, ushort ModelId, uint MaterialId, ushort MeshId, int ListIndex, byte BatcherIndex) : IComparable<RenderKey>, IComparer<RenderKey>, IEquatable<RenderKey>
     {
         public ulong Key = Create(ShaderId, ModelId, MaterialId, MeshId);
-        public uint ListIndex = (((uint)BatcherIndex) << 31) | ((uint)ListIndex);
+        public uint ListIndex = (((uint)BatcherIndex) << 24) | ((uint)ListIndex);
 
         public readonly ushort ShaderId => (ushort)((Key >> 43) & 0xffffu);
         public readonly ushort ModelId => (ushort)((Key >> 27) & 0xffffu);
         public readonly uint MaterialId => (uint)((Key >> 10) & 0x1ffffu);
         public readonly ushort MeshId => (ushort)(Key & 0x3ffu);
 
-        public readonly int Index => (int)((ListIndex) & 0x1ffffffu);
-        public readonly int Batcher => (byte)((ListIndex >> 31) & 0x1u);
+        public readonly int Index => (int)((ListIndex) & 0xffffff);
+        public readonly int Batcher => (byte)((ListIndex >> 24) & 0xff);
 
         public readonly int Compare(RenderKey x, RenderKey y) => x.Key.CompareTo(y.Key);
         public readonly int CompareTo(RenderKey other) => Key.CompareTo(other.Key);

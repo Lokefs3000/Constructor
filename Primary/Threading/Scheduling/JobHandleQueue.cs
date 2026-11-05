@@ -47,6 +47,7 @@ namespace Primary.Threading.Scheduling
 
         internal JobHandle Steal()
         {
+            return Empty;
             long b = Volatile.Read(ref _bottom);
             long t = Interlocked.Read(ref _top);
             QueueCircularArray a = _activeArray;

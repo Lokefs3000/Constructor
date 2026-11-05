@@ -87,15 +87,15 @@ namespace VoxelizationDemo.Editor.Rendering
             Vector2 scale = Vector2.One / new Vector2(outColorDesc.Width, outColorDesc.Height) * 32.0f;
 
             cmd.SetRenderTarget(0, passData.OutColor);
-            cmd.SetDepthStencil(passData.OutDepth);
 
             cmd.SetShader(passData.Shader!);
             cmd.SetProperties(passData.Block!);
 
-            cmd.SetConstants(scale);
+            cmd.SetConstants(new Vector4(scale, outColorDesc.Width, outColorDesc.Height));
 
             passData.Block!.SetResource("sbIcons", passData.IconBuffer);
             passData.Block!.SetResource("txIconAtlas", passData.Texture!);
+            passData.Block!.SetResource("txSceneDepth", passData.OutDepth!);
 
             cmd.DrawInstanced(6, (uint)passData.IconManager.TotalIconCount, 0, 0);
         }

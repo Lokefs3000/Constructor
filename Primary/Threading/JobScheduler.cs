@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using CommunityToolkit.Diagnostics;
@@ -21,6 +22,11 @@ namespace Primary.Threading
         private readonly CancellationTokenSource _cancellationToken;
 
         private readonly ImmutableArray<ThreadWorker> _workers;
+
+        private readonly ImmutableArray<ConcurrentQueue<JobHandle>> _incomingJobs;
+        private readonly AutoResetEvent _incomingJobsEvent;
+
+        private readonly WaitHandle[] _waitHandlesToWait;
 
         private int _nextWorkerIndex;
 
@@ -48,6 +54,18 @@ namespace Primary.Threading
 
             _workers = [.. workers];
 
+            _incomingJobs = [
+                new ConcurrentQueue<JobHandle>(),
+                new ConcurrentQueue<JobHandle>(),
+                new ConcurrentQueue<JobHandle>()
+                ];
+            _incomingJobsEvent = new AutoResetEvent(false);
+
+            _waitHandlesToWait = [
+                _incomingJobsEvent,
+                _cancellationToken.Token.WaitHandle
+                ];
+
             _nextWorkerIndex = 0;
 
             // Start all workers now
@@ -68,6 +86,7 @@ namespace Primary.Threading
                     WaitForAllJobs();
 
                     _cancellationToken.Cancel();
+                    _incomingJobsEvent.Dispose();
 
                     foreach (ThreadWorker worker in _workers)
                     {
@@ -104,7 +123,12 @@ namespace Primary.Threading
 
         internal void EnqueueWithPriority(JobData jobData, JobPriority priority)
         {
-            int nextWorkerIndex = (_nextWorkerIndex = (_nextWorkerIndex + 1) % _workers.Length);
+            Debug.Assert(jobData.Status == JobStatus.IsSubmitted);
+
+            _incomingJobs[(int)priority].Enqueue(new JobHandle(jobData));
+            _incomingJobsEvent.Set();
+
+            /*int nextWorkerIndex = (_nextWorkerIndex = (_nextWorkerIndex + 1) % _workers.Length);
 
             ThreadWorker? firstThreadWorker = null;
             while (true)
@@ -139,7 +163,7 @@ namespace Primary.Threading
                         firstThreadWorker ??= threadWorker;
                     }
                 }
-            }
+            }*/
         }
 
         internal bool WaitForJobAndSupport(JobHandle jobHandle)
@@ -204,6 +228,16 @@ namespace Primary.Threading
                 else
                     break;
             }
+        }
+
+        internal void WaitForIncomingJobs(int millisecondsTimeout)
+        {
+            WaitHandle.WaitAny(_waitHandlesToWait, millisecondsTimeout);
+        }
+
+        internal ConcurrentQueue<JobHandle> GetIncomingQueue(int index)
+        {
+            return _incomingJobs[index];
         }
 
         internal JobDataPoolCQ JobDataPool => _jobDataPool;

@@ -70,6 +70,10 @@ namespace Primary.Threading.Scheduling
 
             _jobToExecute = job;
 
+            _enqueueId = -100;
+            _enqueuCount = 0;
+            _workingCount = 0;
+
             return new JobHandle(this, _version);
         }
 
@@ -128,21 +132,19 @@ namespace Primary.Threading.Scheduling
             {
                 if (_status != JobStatus.WaitingOnDependencies)
                 {
-                    Debugger.Break();
                     return;
                 }
 
                 // Allow skipping this check if we are sure all dependencies have finished
-                if (/*insistOnDependencyFinish || */Interlocked.CompareExchange(ref _runningDependencies, 0, 0) == 0)
+                if (insistOnDependencyFinish || Interlocked.CompareExchange(ref _runningDependencies, 0, 0) == 0)
                 {
                     JobStatus status = Interlocked.CompareExchange(ref _status, JobStatus.IsSubmitted, JobStatus.WaitingOnDependencies);
                     if (status == JobStatus.WaitingOnDependencies)
                     {
+                        _enqueueId = JobScheduler.Instance.FindWorkerForThread(Environment.CurrentManagedThreadId)?.WorkerIndex ?? -100;
+                        ++_enqueuCount;
+
                         _scheduler.EnqueueWithPriority(this, _priority);
-                    }
-                    else
-                    {
-                        Debugger.Break();
                     }
                 }
             }
@@ -150,24 +152,29 @@ namespace Primary.Threading.Scheduling
             {
                 if (_status != JobStatus.WaitingOnSubmit)
                 {
-                    Debugger.Break();
                     return;
                 }
 
                 JobStatus status = Interlocked.CompareExchange(ref _status, JobStatus.IsSubmitted, JobStatus.WaitingOnSubmit);
                 if (status == JobStatus.WaitingOnSubmit)
                 {
+                    _enqueueId = JobScheduler.Instance.FindWorkerForThread(Environment.CurrentManagedThreadId)?.WorkerIndex ?? -100;
+                    ++_enqueuCount;
+
                     _scheduler.EnqueueWithPriority(this, _priority);
-                }
-                else
-                {
-                    Debugger.Break();
                 }
             }
         }
 
         internal void ExecuteJob()
         {
+#if DEBUG
+            if (Interlocked.CompareExchange(ref _runningDependencies, 0, 0) > 0)
+                throw new InvalidOperationException("Job scheduled but has unfinished dependencies");
+#endif
+
+            ++_workingCount;
+
             bool didThrow = false;
             if (!HasThrown)
             {
@@ -198,6 +205,7 @@ namespace Primary.Threading.Scheduling
                     int runningDependencies = Interlocked.Decrement(ref job._runningDependencies);
                     if (runningDependencies == 0)
                     {
+                        // It is possible for this to fail if the jobs creator flushes right after this is decremented
                         job.TrySchedule(true);
                     }
                 }
@@ -205,15 +213,24 @@ namespace Primary.Threading.Scheduling
                 _dependents.Dispose();
             }
 
-            _jobToExecute = null;
+            int hash = GetHashCode();
 
             JobStatus status = Interlocked.Exchange(ref _status, JobStatus.Pooled);
             if (status != JobStatus.IsSubmitted)
                 throw new InvalidOperationException("Job should be in submitted state");
 
+            _jobToExecute = null;
+
             _waitHandle.Set();
+            _submitId = JobScheduler.Instance.FindWorkerForThread(Environment.CurrentManagedThreadId)?.WorkerIndex ?? -100;
             _scheduler.ReturnJobDataToPool(this);
         }
+
+        private int _submitId;
+        private int _workingCount;
+
+        private int _enqueuCount;
+        private int _enqueueId;
 
         internal JobScheduler Scheduler => _scheduler;
 

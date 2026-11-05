@@ -23,7 +23,7 @@ namespace Primary.Rendering.Passes
                     cameraData.ColorTexture = builder.ImportTexture(cameraData.OutputData.TargetTexture);
                 }
 
-                cameraData.DepthTexture = builder.CreateTexture(new FGTextureDesc(cameraData.ClientSize.X, cameraData.ClientSize.Y, RHIFormat.D24_UNorm_S8_UInt, FGTextureTarget.DepthStencil, "CamDepth"));
+                cameraData.DepthTexture = builder.CreateTexture(new FGTextureDesc(cameraData.ClientSize.X, cameraData.ClientSize.Y, RHIFormat.X24_Typeless_G8_UInt, FGTextureTarget.DepthStencil, "CamDepth"));
 
                 builder.SetFunction(PassFunction);
             }

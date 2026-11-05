@@ -100,7 +100,7 @@ namespace Primary.Rendering.Resources
 
                         compiledPass.BarrierGroup.SetupForResources(_entries.Count);
 
-                        foreach (ResourceHandle resourceToWrite in renderPass.Writes)
+                        foreach (ResourceHandle resourceToWrite in renderPass.Resources)
                         {
                             if (resourceToWrite.ResourceType == FGResourceType.Texture)
                             {

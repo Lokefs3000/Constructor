@@ -440,6 +440,8 @@ namespace Primary.Rendering.Playback.D3D12
                     }
                 }
 
+                _device.NativeDevice.FlushPendingMessages();
+
                 using (new ProfilingScope("Present"))
                 {
                     foreach (RHISwapChain swapChain in _renderPlan.SwapChains)

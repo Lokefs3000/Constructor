@@ -498,7 +498,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                     dsvDesc = new DepthStencilViewDesc
                                                     {
                                                         ViewDimension = DsvDimension.Texture1D,
-                                                        Format = textureDesc.Format.ToRenderTargetFormat(),
+                                                        Format = textureDesc.Format.ToDepthStencilFormat(),
                                                         Anonymous = new DepthStencilViewDescUnion
                                                         {
                                                             Texture1D = new Tex1DDsv
@@ -515,7 +515,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                     dsvDesc = new DepthStencilViewDesc
                                                     {
                                                         ViewDimension = DsvDimension.Texture2D,
-                                                        Format = textureDesc.Format.ToRenderTargetFormat(),
+                                                        Format = textureDesc.Format.ToDepthStencilFormat(),
                                                         Anonymous = new DepthStencilViewDescUnion
                                                         {
                                                             Texture2D = new Tex2DDsv
@@ -540,7 +540,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                     dsvDesc = new DepthStencilViewDesc
                                                     {
                                                         ViewDimension = DsvDimension.Texture2D,
-                                                        Format = textureDesc.Format.ToRenderTargetFormat(),
+                                                        Format = textureDesc.Format.ToDepthStencilFormat(),
                                                         Anonymous = new DepthStencilViewDescUnion
                                                         {
                                                             Texture2D = new Tex2DDsv
@@ -557,7 +557,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                     dsvDesc = new DepthStencilViewDesc
                                                     {
                                                         ViewDimension = DsvDimension.Texture2Darray,
-                                                        Format = textureDesc.Format.ToRenderTargetFormat(),
+                                                        Format = textureDesc.Format.ToDepthStencilFormat(),
                                                         Anonymous = new DepthStencilViewDescUnion
                                                         {
                                                             Texture2DArray = new Tex2DArrayDsv
@@ -675,6 +675,12 @@ namespace Primary.Rendering.Playback.D3D12
                                                 (uint)textureDesc.Swizzle.B,
                                                 (uint)textureDesc.Swizzle.A);
 
+                                            Format format;
+                                            if (textureDesc.Usage.HasFlags(RHIResourceUsage.DepthStencil))
+                                                format = textureDesc.Format.ToDepthFormat().ToResourceViewFormat();
+                                            else
+                                                format = textureDesc.Format.ToResourceViewFormat();
+
                                             switch (textureDesc.Dimension)
                                             {
                                                 case RHIDimension.Texture1D:
@@ -682,7 +688,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         srvDesc = new ShaderResourceViewDesc
                                                         {
                                                             ViewDimension = SrvDimension.Texture1D,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Shader4ComponentMapping = componentMapping,
                                                             Anonymous = new ShaderResourceViewDescUnion
                                                             {
@@ -702,7 +708,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         srvDesc = new ShaderResourceViewDesc
                                                         {
                                                             ViewDimension = SrvDimension.Texture2D,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Shader4ComponentMapping = componentMapping,
                                                             Anonymous = new ShaderResourceViewDescUnion
                                                             {
@@ -723,7 +729,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         srvDesc = new ShaderResourceViewDesc
                                                         {
                                                             ViewDimension = SrvDimension.Texture3D,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Shader4ComponentMapping = componentMapping,
                                                             Anonymous = new ShaderResourceViewDescUnion
                                                             {
@@ -743,7 +749,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         srvDesc = new ShaderResourceViewDesc
                                                         {
                                                             ViewDimension = SrvDimension.Texturecube,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Shader4ComponentMapping = componentMapping,
                                                             Anonymous = new ShaderResourceViewDescUnion
                                                             {
@@ -801,6 +807,12 @@ namespace Primary.Rendering.Playback.D3D12
                                         {
                                             FGResourceDesc.Texture textureDesc = resourceDesc.Resource.TextureDesc;
 
+                                            Format format;
+                                            if (textureDesc.Target.HasFlags(FGTextureTarget.DepthStencil))
+                                                format = textureDesc.Format.ToDepthFormat().ToResourceViewFormat();
+                                            else
+                                                format = textureDesc.Format.ToResourceViewFormat();
+
                                             switch (textureDesc.Dimension)
                                             {
                                                 case FGTextureDimension.Tex2D:
@@ -808,7 +820,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         srvDesc = new ShaderResourceViewDesc
                                                         {
                                                             ViewDimension = SrvDimension.Texture2D,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Shader4ComponentMapping = ResourceHelper.DefaultShader4ComponentMapping,
                                                             Anonymous = new ShaderResourceViewDescUnion
                                                             {
@@ -829,7 +841,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         srvDesc = new ShaderResourceViewDesc
                                                         {
                                                             ViewDimension = SrvDimension.Texture2Darray,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Shader4ComponentMapping = ResourceHelper.DefaultShader4ComponentMapping,
                                                             Anonymous = new ShaderResourceViewDescUnion
                                                             {
@@ -852,7 +864,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         srvDesc = new ShaderResourceViewDesc
                                                         {
                                                             ViewDimension = SrvDimension.Texture3D,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Shader4ComponentMapping = ResourceHelper.DefaultShader4ComponentMapping,
                                                             Anonymous = new ShaderResourceViewDescUnion
                                                             {
@@ -872,7 +884,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         srvDesc = new ShaderResourceViewDesc
                                                         {
                                                             ViewDimension = SrvDimension.Texturecube,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Shader4ComponentMapping = ResourceHelper.DefaultShader4ComponentMapping,
                                                             Anonymous = new ShaderResourceViewDescUnion
                                                             {
@@ -892,7 +904,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         srvDesc = new ShaderResourceViewDesc
                                                         {
                                                             ViewDimension = SrvDimension.Texturecubearray,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Shader4ComponentMapping = ResourceHelper.DefaultShader4ComponentMapping,
                                                             Anonymous = new ShaderResourceViewDescUnion
                                                             {
@@ -977,6 +989,12 @@ namespace Primary.Rendering.Playback.D3D12
                                             RHITexture texture = (RHITexture)resourceInfo.ImportedResource;
                                             ref readonly RHITextureDescription textureDesc = ref texture.Description;
 
+                                            Format format;
+                                            if (textureDesc.Usage.HasFlags(RHIResourceUsage.DepthStencil))
+                                                format = textureDesc.Format.ToDepthFormat().ToResourceViewFormat();
+                                            else
+                                                format = textureDesc.Format.ToResourceViewFormat();
+
                                             switch (textureDesc.Dimension)
                                             {
                                                 case RHIDimension.Texture1D:
@@ -984,7 +1002,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         uavDesc = new UnorderedAccessViewDesc
                                                         {
                                                             ViewDimension = UavDimension.Texture1D,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Anonymous = new UnorderedAccessViewDescUnion
                                                             {
                                                                 Texture1D = new Tex1DUav
@@ -1001,7 +1019,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         uavDesc = new UnorderedAccessViewDesc
                                                         {
                                                             ViewDimension = UavDimension.Texture2D,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Anonymous = new UnorderedAccessViewDescUnion
                                                             {
                                                                 Texture2D = new Tex2DUav
@@ -1019,7 +1037,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         uavDesc = new UnorderedAccessViewDesc
                                                         {
                                                             ViewDimension = UavDimension.Texture3D,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Anonymous = new UnorderedAccessViewDescUnion
                                                             {
                                                                 Texture3D = new Tex3DUav
@@ -1077,6 +1095,12 @@ namespace Primary.Rendering.Playback.D3D12
                                         {
                                             FGResourceDesc.Texture textureDesc = resourceDesc.Resource.TextureDesc;
 
+                                            Format format;
+                                            if (textureDesc.Target.HasFlags(FGTextureTarget.DepthStencil))
+                                                format = textureDesc.Format.ToDepthFormat().ToResourceViewFormat();
+                                            else
+                                                format = textureDesc.Format.ToResourceViewFormat();
+
                                             switch (textureDesc.Dimension)
                                             {
                                                 case FGTextureDimension.Tex2D:
@@ -1084,7 +1108,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         uavDesc = new UnorderedAccessViewDesc
                                                         {
                                                             ViewDimension = UavDimension.Texture2D,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Anonymous = new UnorderedAccessViewDescUnion
                                                             {
                                                                 Texture2D = new Tex2DUav
@@ -1102,7 +1126,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         uavDesc = new UnorderedAccessViewDesc
                                                         {
                                                             ViewDimension = UavDimension.Texture2Darray,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Anonymous = new UnorderedAccessViewDescUnion
                                                             {
                                                                 Texture2DArray = new Tex2DArrayUav
@@ -1122,7 +1146,7 @@ namespace Primary.Rendering.Playback.D3D12
                                                         uavDesc = new UnorderedAccessViewDesc
                                                         {
                                                             ViewDimension = UavDimension.Texture3D,
-                                                            Format = textureDesc.Format.ToResourceViewFormat(),
+                                                            Format = format,
                                                             Anonymous = new UnorderedAccessViewDescUnion
                                                             {
                                                                 Texture3D = new Tex3DUav

@@ -26,9 +26,9 @@
             "type": "Integer"
         },
         {
-            "name": "rhi-nodebug",
+            "name": "rhi-setdebug",
             "shorthand": null,
-            "type": null
+            "type": "Boolean"
         },
         {
             "name": "job-initial-logsize",

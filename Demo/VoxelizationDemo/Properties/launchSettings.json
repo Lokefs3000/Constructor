@@ -2,7 +2,7 @@
   "profiles": {
     "VoxelizationDemo": {
       "commandName": "Project",
-      "commandLineArgs": "--detailed-asset-info",
+      "commandLineArgs": "--detailed-asset-info --rhi-setdebug true",
       "debugEngines": "managed"
     }
   }

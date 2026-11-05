@@ -1,26 +1,27 @@
-﻿using Primary.Mathematics;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Collections;
+using Primary.Common;
+using Primary.Mathematics;
 using Primary.Profiling;
 using Primary.Rendering;
 using Primary.Rendering.Tree;
+using Primary.Threading;
 
 namespace Primary.Rendering.Batching
 {
     public sealed class BatchingManager
     {
         private readonly RenderingManager _manager;
-        private readonly OctreeRenderBatcher[] _subBatchers;
+        private readonly List<OctreeRenderBatcher> _subBatchers;
+        private int _subBatchersIndex;
 
         private List<RenderList> _activeLists;
 
         internal BatchingManager(RenderingManager manager)
         {
             _manager = manager;
-            _subBatchers = [
-                new OctreeRenderBatcher(0, manager),
-                new OctreeRenderBatcher(1, manager),
-                new OctreeRenderBatcher(2, manager),
-                new OctreeRenderBatcher(3, manager),
-                ];
+            _subBatchers = new List<OctreeRenderBatcher>();
+            _subBatchersIndex = 0;
 
             _activeLists = new List<RenderList>();
         }
@@ -40,17 +41,45 @@ namespace Primary.Rendering.Batching
                 using (new ProfilingScope("Dispatch"))
                 {
                     output.ClearFrameData();
-                    foreach (OctreeRenderBatcher batcher in _subBatchers)
+                    foreach (OctreeRenderBatcher batcher in _subBatchers.AsSpan()[.._subBatchersIndex])
                     {
                         batcher.ClearFrameData();
                     }
 
                     BatchingOptions options = setup.Options;
 
-                    //TODO: multithreading
+                    using RentedList<JobHandle> jobs = new RentedList<JobHandle>();
+
+                    _subBatchersIndex = 0;
                     foreach (var (_, tree) in setup.Octree.Regions)
                     {
-                        _subBatchers[0].Execute(output, tree, in options);
+                        OctreeRenderBatcher renderBatcher;
+                        if (_subBatchersIndex >= _subBatchers.Count)
+                        {
+                            renderBatcher = new OctreeRenderBatcher((byte)_subBatchersIndex, _manager);
+                            _subBatchers.Add(renderBatcher);
+                        }
+                        else
+                        {
+                            renderBatcher = _subBatchers[_subBatchersIndex];
+                        }
+
+                        renderBatcher.AddToQueue(output, tree, options);
+
+                        JobHandle job = JobScheduler.Schedule(renderBatcher, JobPriority.Realtime);
+                        JobScheduler.Flush(job);
+
+                        jobs.Add(job);
+
+                        ++_subBatchersIndex;
+                    }
+
+                    if (!jobs.IsEmpty)
+                    {
+                        if (jobs.Count == 1)
+                            jobs[0].WaitForCompletion();
+                        else
+                            JobScheduler.CombineAll(jobs.AsSpan()).WaitForCompletion();
                     }
 
                     output.FinishDispatch(options.ShaderType);
@@ -61,7 +90,7 @@ namespace Primary.Rendering.Batching
 
                 using (new ProfilingScope("Group"))
                 {
-                    foreach (OctreeRenderBatcher batcher in _subBatchers)
+                    foreach (OctreeRenderBatcher batcher in _subBatchers.AsSpan()[.._subBatchersIndex])
                     {
                         totalKeys += batcher.Keys.Length;
                     }
@@ -69,7 +98,7 @@ namespace Primary.Rendering.Batching
                     keys = output.RentKeys(totalKeys);
 
                     Span<RenderKey> tempKeys = keys;
-                    foreach (OctreeRenderBatcher batcher in _subBatchers)
+                    foreach (OctreeRenderBatcher batcher in _subBatchers.AsSpan()[.._subBatchersIndex])
                     {
                         batcher.Keys.CopyTo(tempKeys);
                         tempKeys = tempKeys.Slice(batcher.Keys.Length);
@@ -111,7 +140,7 @@ namespace Primary.Rendering.Batching
                 using (new ProfilingScope("Batch"))
                 {
                     output.SetupShaderBatchers();
-                    output.ExecuteActiveBatchers(_subBatchers);
+                    output.ExecuteActiveBatchers(_subBatchers.AsSpan()[.._subBatchersIndex]);
                 }
 
                 output.ReturnKeys();
