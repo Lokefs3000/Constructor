@@ -116,7 +116,7 @@ namespace VoxelizationDemo.Core
 
             _assetPipeline.ImporterRegistry.RegisterImporter<EffectVolumeImporter>(".fxvol");
 
-            _projectData.SetupData(@"D:\source\repos\Constructor\Demo\VoxelizationDemo\Source", null);
+            _projectData.SetupData(@"..\..\..\Source", null);
             _assetPipeline.ImportAnyChangesLaunch(null);
             _scriptPipeline.PerformLaunchCheck();
         }

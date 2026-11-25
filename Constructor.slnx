@@ -16,27 +16,27 @@
     </Project>
   </Folder>
   <Folder Name="/Editor/">
-    <Project Path="D:/source/repos/Constructor/Editor.Geometry/Editor.Geometry.csproj" />
-    <Project Path="D:/source/repos/Constructor/Editor.Interop/Editor.Interop.csproj">
-      <BuildDependency Project="D:/source/repos/Constructor/Native/EditorInterop/EditorInterop.vcxproj" />
-      <BuildDependency Project="D:/source/repos/Constructor/Native/TextureInterop/TextureInterop.vcxproj" />
+    <Project Path="Editor.Geometry/Editor.Geometry.csproj" />
+    <Project Path="Editor.Interop/Editor.Interop.csproj">
+      <BuildDependency Project="Native/EditorInterop/EditorInterop.vcxproj" />
+      <BuildDependency Project="Native/TextureInterop/TextureInterop.vcxproj" />
     </Project>
-    <Project Path="D:/source/repos/Constructor/Editor.Processors/Editor.Processors.csproj" />
-    <Project Path="D:/source/repos/Constructor/Editor.Shaders/Editor.Shaders.csproj">
+    <Project Path="Editor.Processors/Editor.Processors.csproj" />
+    <Project Path="Editor.Shaders/Editor.Shaders.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
-    <Project Path="D:/source/repos/Constructor/Editor.UI/Editor.UI.csproj">
+    <Project Path="Editor.UI/Editor.UI.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
-    <Project Path="D:/source/repos/Constructor/Editor/Editor.csproj" />
+    <Project Path="Editor/Editor.csproj" />
   </Folder>
   <Folder Name="/Editor/Debug/">
-    <Project Path="D:/source/repos/Constructor/ExportValidator/ExportValidator.csproj">
+    <Project Path="ExportValidator/ExportValidator.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
   </Folder>
   <Folder Name="/Editor/Dedicated/">
-    <Project Path="D:/source/repos/Constructor/ExtConsole/ExtConsole.csproj">
+    <Project Path="ExtConsole/ExtConsole.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
     <Project Path="TextureViewer/TextureViewer.csproj" Id="51ae3650-9e27-432e-913b-08df1ce9872d">
@@ -44,8 +44,8 @@
     </Project>
   </Folder>
   <Folder Name="/Editor/Native/">
-    <Project Path="D:/source/repos/Constructor/Native/EditorInterop/EditorInterop.vcxproj" Id="656e6c57-b883-4a4a-b11a-a62ba4a1965b" />
-    <Project Path="D:/source/repos/Constructor/Native/TextureInterop/TextureInterop.vcxproj" Id="ff671329-e291-4cfa-b380-e6bf9859156e">
+    <Project Path="Native/EditorInterop/EditorInterop.vcxproj" Id="656e6c57-b883-4a4a-b11a-a62ba4a1965b" />
+    <Project Path="Native/TextureInterop/TextureInterop.vcxproj" Id="ff671329-e291-4cfa-b380-e6bf9859156e">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
   </Folder>
@@ -58,21 +58,21 @@
     </Project>
   </Folder>
   <Folder Name="/Engine/">
-    <Project Path="D:/source/repos/Constructor/Primary.Common/Primary.Common.csproj" />
-    <Project Path="D:/source/repos/Constructor/Primary.Interop/Primary.Interop.csproj" />
-    <Project Path="D:/source/repos/Constructor/Primary.Mathematics/Primary.Mathematics.csproj" Id="4faa09b0-f0c2-44e0-91fc-42d54ab4c90b">
+    <Project Path="Primary.Common/Primary.Common.csproj" />
+    <Project Path="Primary.Interop/Primary.Interop.csproj" />
+    <Project Path="Primary.Mathematics/Primary.Mathematics.csproj" Id="4faa09b0-f0c2-44e0-91fc-42d54ab4c90b">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
-    <Project Path="D:/source/repos/Constructor/Primary.R2.ForwardPlus/Primary.R2.ForwardPlus.csproj">
+    <Project Path="Primary.R2.ForwardPlus/Primary.R2.ForwardPlus.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
-    <Project Path="D:/source/repos/Constructor/Primary.RHI.Direct3D12/Primary.RHI.Direct3D12.csproj" />
-    <Project Path="D:/source/repos/Constructor/Primary.RHI/Primary.RHI.csproj" />
-    <Project Path="D:/source/repos/Constructor/Primary.RHI2/Primary.RHI2.csproj">
+    <Project Path="Primary.RHI.Direct3D12/Primary.RHI.Direct3D12.csproj" />
+    <Project Path="Primary.RHI/Primary.RHI.csproj" />
+    <Project Path="Primary.RHI2/Primary.RHI2.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
-    <Project Path="D:/source/repos/Constructor/Primary/Primary.csproj" />
-    <Project Path="D:/source/repos/Constructor/Runtime/Runtime.csproj" />
+    <Project Path="Primary/Primary.csproj" />
+    <Project Path="Runtime/Runtime.csproj" />
   </Folder>
   <Folder Name="/Engine/Generators/">
     <Project Path="Generators/PhysXBindGen/PhysXBindGen.csproj" Id="760d04e4-0f7d-4adc-99ee-79227e16f57c">
@@ -80,10 +80,10 @@
     </Project>
   </Folder>
   <Folder Name="/Engine/Interop/">
-    <Project Path="D:/source/repos/Constructor/Interop.D3D12MemAlloc/Interop.D3D12MemAlloc.csproj">
+    <Project Path="Interop.D3D12MemAlloc/Interop.D3D12MemAlloc.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
-    <Project Path="D:/source/repos/Constructor/Interop.NVAftermath/Interop.NVAftermath.csproj">
+    <Project Path="Interop.NVAftermath/Interop.NVAftermath.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
     <Project Path="Interop.PhysX/Interop.PhysX.csproj" Id="83e415ed-a8fc-4de7-9640-f8307ad19621">
@@ -97,10 +97,10 @@
     </Project>
   </Folder>
   <Folder Name="/Extra/">
-    <Project Path="D:/source/repos/Constructor/Extra/BundleExplorer/BundleExplorer.csproj">
+    <Project Path="Extra/BundleExplorer/BundleExplorer.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
-    <Project Path="D:/source/repos/Constructor/ExtraFramework/ExtraFramework.csproj" />
+    <Project Path="ExtraFramework/ExtraFramework.csproj" />
   </Folder>
   <Folder Name="/Library/">
     <Project Path="Library/xxHash/xxHash.csproj" Id="76fbbe98-a0c8-4f04-9a8c-72e4a07273e7">
@@ -111,7 +111,7 @@
     <File Path=".editorconfig" />
   </Folder>
   <Folder Name="/SourceGenerators/">
-    <Project Path="D:/source/repos/Constructor/Primary.SourceGenerator/Primary.SourceGenerator.csproj">
+    <Project Path="Primary.SourceGenerator/Primary.SourceGenerator.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
   </Folder>
