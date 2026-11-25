@@ -13,7 +13,7 @@ namespace Primary.Input.Bindings
         private List<Binding> _positiveBindings;
         private List<Binding> _negativeBindings;
 
-        internal Composite1D()
+        public Composite1D()
         {
             _name = string.Empty;
 

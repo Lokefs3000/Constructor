@@ -1,0 +1,226 @@
+{
+    "Entities": [
+        {
+            "Id": 0,
+            "Enabled": true,
+            "Name": "Ground",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 1,
+            "Enabled": true,
+            "Name": "Sun",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "VoxelizationDemo?VoxelizationDemo.Components.DirectionalLight"
+            ]
+        },
+        {
+            "Id": 2,
+            "Enabled": true,
+            "Name": "Box",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 3,
+            "Enabled": true,
+            "Name": "Player",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Game?Game.Player.PlayerController"
+            ]
+        },
+        {
+            "Id": 4,
+            "Parent": 3,
+            "Enabled": true,
+            "Name": "Model",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 5,
+            "Enabled": true,
+            "Name": "New SceneEntity",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "VoxelizationDemo?VoxelizationDemo.Rendering.Compositing.EffectVolume"
+            ]
+        }
+    ],
+    "Components": [
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                100,
+                100,
+                100
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a1c638-0f50-79f0-8d0a-7aad681bea26",
+            "_layers": 18446744073709551615
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0.3796602,
+                0.35820967,
+                0.20602632,
+                0.827706
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "VoxelizationDemo?VoxelizationDemo.Components.DirectionalLight",
+            "_diffuse": 1,
+            "_intensity": 5
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                4,
+                1,
+                1
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                2,
+                4
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9775-76f3-a056-c434d98a5056",
+                -1884491445
+            ],
+            "_material": "01a1c638-0f43-78eb-9326-45012504028b",
+            "_layers": 18446744073709551615
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0.9,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Game?Game.Player.PlayerController",
+            "_walkingMoveSpeed": 2
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                0.8,
+                0.9,
+                0.8
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9770-7a44-830e-da49e6b7f88d",
+                1879813304
+            ],
+            "_material": "01a1c638-0f50-79f0-8d0a-7aad681bea26",
+            "_layers": 18446744073709551615
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "VoxelizationDemo?VoxelizationDemo.Rendering.Compositing.EffectVolume",
+            "_asset": "01a1daa8-78d7-74d7-a5f1-2a24f9c6d29c",
+            "_isGlobal": true,
+            "_shape": "Box",
+            "_blendDistance": 0,
+            "_weight": 1,
+            "_priority": 0,
+            "_boxExtents": [
+                1,
+                1,
+                1
+            ],
+            "_sphereRadius": 0
+        }
+    ]
+}

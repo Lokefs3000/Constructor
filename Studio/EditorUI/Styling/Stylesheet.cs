@@ -1,0 +1,167 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Text;
+using CommunityToolkit.Diagnostics;
+using CommunityToolkit.HighPerformance;
+using EditorUI.Reflection;
+using Primary.Collections.ReadOnly;
+using Primary.Rendering.Assets;
+
+namespace EditorUI.Styling
+{
+    public sealed class Stylesheet
+    {
+        private readonly string _sourceName;
+
+        private readonly Dictionary<ClassKey, StylesheetClass> _classes;
+        private readonly Dictionary<string, string> _variables;
+
+        public Stylesheet(string sourceName)
+        {
+            _sourceName = sourceName;
+
+            _classes = new Dictionary<ClassKey, StylesheetClass>();
+            _variables = new Dictionary<string, string>();
+        }
+
+        public StylesheetClass CreateClass(ClassType classType, string name)
+        {
+            Guard.IsFalse(classType == ClassType.Pseudo, "A pseudo class must be parented to another class");
+            Guard.IsTrue(IsNameValid(classType, name), "Name is not valid for a class");
+
+            if (classType == ClassType.Named)
+                name = name[1..];
+
+            StylesheetClassName className = new StylesheetClassName(classType, name);
+            StylesheetClass stylesheetClass = new StylesheetClass(className);
+
+            Guard.IsTrue(_classes.TryAdd(new ClassKey(classType, name), stylesheetClass), "Class with the same qualified name already exists");
+            return stylesheetClass;
+        }
+
+        public StylesheetClass CreateOrGetClass(ClassType classType, string name, out bool alreadyExists)
+        {
+            Guard.IsFalse(classType == ClassType.Pseudo, "A pseudo class must be parented to another class");
+            Guard.IsTrue(IsNameValid(classType, name), "Name is not valid for a class");
+
+            if (classType == ClassType.Named)
+                name = name[1..];
+
+            ClassKey key = new ClassKey(classType, name);
+            alreadyExists = _classes.TryGetValue(key, out StylesheetClass? stylesheetClass);
+
+            if (!alreadyExists)
+            {
+                StylesheetClassName className = new StylesheetClassName(classType, name);
+                stylesheetClass = new StylesheetClass(className);
+
+                _classes.Add(key, stylesheetClass);
+            }
+
+            return stylesheetClass!;
+        }
+
+        public void RemoveClass(ClassType classType, string name)
+        {
+            _classes.Remove(new ClassKey(classType, name));
+        }
+
+        public bool TryGetClass(ClassType classType, string name, [NotNullWhen(true)] out StylesheetClass? stylesheetClass)
+        {
+            return _classes.TryGetValue(new ClassKey(classType, name), out stylesheetClass);
+        }
+
+        public void SetVariable(string variableName, string value)
+        {
+
+        }
+
+        public void RemoveVariable(string variableName, string value)
+        {
+
+        }
+
+        public string SourceName => _sourceName;
+
+        public RODictionary<ClassKey, StylesheetClass> Classes => _classes;
+        public RODictionary<string, string> Variables => _variables;
+
+        public static bool IsNameValid(ClassType classType, string name)
+        {
+            switch (classType)
+            {
+                case ClassType.Named:
+                    {
+                        if (name.Length < 2)
+                            return false;
+
+                        for (int i = 0; i < name.Length; i++)
+                        {
+                            char c = name[i];
+
+                            if (i == 0)
+                            {
+                                if (c != '.')
+                                    return false;
+                            }
+                            else
+                            {
+                                if (!char.IsLetterOrDigit(c) && c != '-')
+                                    return false;
+                            }
+                        }
+
+                        return true;
+                    }
+                case ClassType.Typed:
+                    {
+                        if (name.Length < 1)
+                            return false;
+
+                        for (int i = 0; i < name.Length; i++)
+                        {
+                            char c = name[i];
+
+                            if (!char.IsLetterOrDigit(c) && c != '-')
+                                return false;
+                        }
+
+                        return true;
+                    }
+                default: return false;
+            }
+        }
+
+        public static string GetQualifiedClassName(ClassType classType, string name)
+        {
+            switch (classType)
+            {
+                case ClassType.Named: return $".{name}";
+                case ClassType.Typed: return name;
+                default: return string.Empty;
+            }
+        }
+    }
+
+    public readonly record struct ClassKey(ClassType Type, string Name)
+    {
+        public override string ToString() => $"{{ {Name}({Type}) }}";
+
+        public override int GetHashCode() => HashCode.Combine(Type, Name.GetDjb2HashCode());
+    }
+
+    public readonly record struct ClassStyleKey(StylesheetClass Class, StyleKey Key, int TriggerMask)
+    {
+        public override string ToString() => $"{{ {Class.ClassName}={Key} }}";
+
+        public override int GetHashCode() => HashCode.Combine(Class, Key.Property.GetDjb2HashCode());
+    }
+
+    public readonly record struct StyleKey(string Property) : IEquatable<StyleKey>
+    {
+        public override string ToString() => $"{{ {Property} }}";
+
+        public override int GetHashCode() => Property.GetDjb2HashCode();
+    }
+}

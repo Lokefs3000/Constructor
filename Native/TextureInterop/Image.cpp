@@ -1,0 +1,249 @@
+#include "Shared.hpp"
+
+#include "libpng/png.h"
+#include "turbojpeg/turbojpeg.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
+
+#define TINYEXR_IMPLEMENTATION
+#include "tinyexr/tinyexr.h"
+
+#pragma pack(push, 1)
+
+struct ImageLoadData
+{
+	uint8_t* Data;
+	uint32_t Length;
+};
+
+struct ImageMetrics
+{
+	uint32_t Width;
+	uint32_t Height;
+
+	uint8_t Stride;
+};
+
+#pragma pack(pop)
+
+static const char* CopyMessageWithTerminator(const char* reason)
+{
+	if (reason != nullptr)
+	{
+		size_t len = strlen(reason);
+		if (len > 0)
+		{
+			bool endsWithTerminator = reason[len - 1] == '\0';
+			char* newString = (char*)malloc(len + (endsWithTerminator ? 0 : 1));
+
+			if (newString == nullptr)
+				return nullptr;
+
+			memcpy(newString, reason, len);
+			if (!endsWithTerminator)
+				newString[len] = '\0';
+
+			return newString;
+		}
+	}
+
+	return nullptr;
+}
+
+extern "C"
+{
+	__declspec(dllexport) bool LoadPNG(ImageLoadData* imageData, ImageBitmap* output, const char** errorOutput)
+	{
+		/*
+		if (dataLength < 8 || !png_sig_cmp(data, 0, 8))
+		{
+			return false;
+		}
+
+		png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+		if (png_ptr == nullptr)
+		{
+			return false;
+		}
+
+		png_infop info_ptr = png_create_info_struct(png_ptr);
+		if (info_ptr == nullptr)
+		{
+			png_destroy_read_struct(&png_ptr, nullptr, nullptr);
+			return false;
+		}
+
+		if (setjmp(png_jmpbuf(png_ptr)))
+		{
+			png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
+			return false;
+		}
+
+		png()
+		*/
+
+		int w, h, ch;
+		stbi_uc* pixels = stbi_load_from_memory(imageData->Data, imageData->Length, &w, &h, &ch, 0);
+		if (pixels == nullptr)
+		{
+			*errorOutput = CopyMessageWithTerminator(stbi_failure_reason());
+			return false;
+		}
+
+		output->Width = w;
+		output->Height = h;
+		output->Stride = ch;
+		output->Pixels = pixels;
+		return true;
+	}
+
+	__declspec(dllexport) void FreePNG(ImageBitmap* bitmap)
+	{
+		stbi_image_free(bitmap->Pixels);
+	}
+
+	__declspec(dllexport) void FreePNGError(const char* errorOutput)
+	{
+		if (errorOutput != nullptr)
+			free((void*)errorOutput);
+	}
+
+	__declspec(dllexport) bool QueryPNG(ImageLoadData* imageData, ImageMetrics* metrics, const char** errorOutput)
+	{
+		int w, h, ch;
+		if (stbi_info_from_memory(imageData->Data, imageData->Length, &w, &h, &ch) == 0)
+		{
+			*errorOutput = CopyMessageWithTerminator(stbi_failure_reason());
+			return false;
+		}
+
+		metrics->Width = w;
+		metrics->Height = h;
+		metrics->Stride = ch;
+		return true;
+	}
+
+	__declspec(dllexport) bool LoadJPEG(ImageLoadData* imageData, ImageBitmap* output, const char** errorOutput)
+	{
+		tjhandle tj = tj3Init(TJINIT_DECOMPRESS);
+
+		if (tj3DecompressHeader(tj, imageData->Data, imageData->Length) < 0)
+		{
+			*errorOutput = CopyMessageWithTerminator(tj3GetErrorStr(tj));
+			tj3Destroy(tj);
+			return false;
+		}
+
+		int width = tj3Get(tj, TJPARAM_JPEGWIDTH);
+		int height = tj3Get(tj, TJPARAM_JPEGHEIGHT);
+		TJCS colorSpace = (TJCS)tj3Get(tj, TJPARAM_COLORSPACE);
+		int subSamp = tj3Get(tj, TJPARAM_SUBSAMP);
+
+		size_t bufSize = tj3JPEGBufSize(width, height, subSamp);
+		uint8_t* outBuf = (uint8_t*)tj3Alloc(bufSize);
+
+		TJPF pixelFormat = TJPF_UNKNOWN;
+		switch (colorSpace)
+		{
+			case TJCS_GRAY: pixelFormat = TJPF_GRAY; break;
+			default: pixelFormat = TJPF_RGB; break;
+		}
+
+		if (tj3Decompress8(tj, imageData->Data, imageData->Length, outBuf, 0, pixelFormat) < 0)
+		{
+			*errorOutput = CopyMessageWithTerminator(tj3GetErrorStr(tj));
+			tj3Destroy(tj);
+			return false;
+		}
+
+		tj3Destroy(tj);
+
+		output->Width = width;
+		output->Height = height;
+		output->Stride = pixelFormat == TJPF_GRAY ? 1 : 3;
+		output->Pixels = outBuf;
+		return true;
+	}
+
+	__declspec(dllexport) void FreeJPEG(ImageBitmap* bitmap)
+	{
+		tj3Free(bitmap->Pixels);
+	}
+
+	__declspec(dllexport) void FreeJPEGError(const char* errorOutput)
+	{
+		if (errorOutput != nullptr)
+			free((void*)errorOutput);
+	}
+
+	__declspec(dllexport) bool QueryJPEG(ImageLoadData* imageData, ImageMetrics* metrics, const char** errorOutput)
+	{
+		tjhandle tj = tj3Init(TJINIT_DECOMPRESS);
+
+		if (tj3DecompressHeader(tj, imageData->Data, imageData->Length) < 0)
+		{
+			*errorOutput = CopyMessageWithTerminator(tj3GetErrorStr(tj));
+			tj3Destroy(tj);
+			return false;
+		}
+
+		metrics->Width = tj3Get(tj, TJPARAM_JPEGWIDTH);
+		metrics->Height = tj3Get(tj, TJPARAM_JPEGHEIGHT);
+		metrics->Stride = tj3Get(tj, TJPARAM_COLORSPACE) == TJCS_GRAY ? 1 : 3;
+
+		tj3Destroy(tj);
+		return true;
+	}
+
+	__declspec(dllexport) bool LoadEXRHDR(ImageLoadData* imageData, ImageBitmapHDR* output, const char** errorOutput)
+	{
+		if (LoadEXRFromMemory(&output->Pixels, (int*)&output->Width, (int*)&output->Height, imageData->Data, imageData->Length, errorOutput) != TINYEXR_SUCCESS)
+		{
+			return false;
+		}
+
+		output->Stride = 4;
+		return true;
+	}
+
+	__declspec(dllexport) void FreeEXR(ImageBitmapHDR* bitmap)
+	{
+		free(bitmap->Pixels);
+	}
+
+	__declspec(dllexport) void FreeEXRError(const char* errorOutput)
+	{
+		FreeEXRErrorMessage(errorOutput);
+	}
+
+	__declspec(dllexport) bool QueryEXR(ImageLoadData* imageData, ImageMetrics* metrics, const char** errorOutput)
+	{
+		EXRVersion exr_version;
+		EXRHeader exr_header;
+
+		InitEXRHeader(&exr_header);
+		int ret = ParseEXRVersionFromMemory(&exr_version, imageData->Data, imageData->Length);
+		if (ret != TINYEXR_SUCCESS)
+		{
+			std::stringstream ss;
+			ss << "Failed to parse EXR version. code(" << ret << ")";
+			tinyexr::SetErrorMessage(ss.str(), errorOutput);
+			return ret;
+		}
+
+		ret = ParseEXRHeaderFromMemory(&exr_header, &exr_version, imageData->Data, imageData->Length, errorOutput);
+		if (ret != TINYEXR_SUCCESS)
+		{
+			FreeEXRHeader(&exr_header);
+			return ret;
+		}
+
+		metrics->Width = exr_header.display_window.max_x - exr_header.display_window.min_x + 1;
+		metrics->Height = exr_header.display_window.max_y - exr_header.display_window.min_y + 1;
+		metrics->Stride = 4;
+
+		FreeEXRHeader(&exr_header);
+		return true;
+	}
+}

@@ -1,0 +1,12 @@
+[
+    {
+        "$type": "SkyboxEffect",
+        "isEnabled": true,
+        "skybox": "Content/Textures/Skybox/Skybox_1.exr"
+    },
+    {
+        "$type": "TonemappingEffect",
+        "isEnabled": true,
+        "tonemapper": "GT7"
+    }
+]

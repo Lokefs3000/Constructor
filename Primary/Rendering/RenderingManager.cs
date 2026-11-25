@@ -1,73 +1,112 @@
-﻿using Arch.Core.Extensions;
+﻿using System.Diagnostics;
+using CommunityToolkit.Diagnostics;
 using Primary.Assets;
+using Primary.Collections.ReadOnly;
 using Primary.Common;
-using Primary.Components;
-using Primary.Editor;
+using Primary.Console;
 using Primary.Profiling;
+using Primary.Rendering.Assets;
 using Primary.Rendering.Batching;
+using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
-using Primary.Rendering.Pooling;
-using Primary.Rendering.Raw;
-using Primary.RenderLayer;
+using Primary.Rendering.Diagnostics;
+using Primary.Rendering.Passes;
+using Primary.Rendering.Playback;
+using Primary.Rendering.Partitioning;
+using Primary.Rendering.Utility;
 using Primary.RHI;
-using Serilog;
-using System.Numerics;
+using Primary.Scenes;
+using Primary.Services;
+using Primary.Threading;
+using Primary.Utility;
+using Primary.Windowing;
 
 namespace Primary.Rendering
 {
     public class RenderingManager : IDisposable
     {
-        private GraphicsDevice _graphicsDevice;
-        private static WeakReference s_gd = new WeakReference(null);
+        private readonly RHIDevice _graphicsDevice;
+        private readonly RHISampler _defaultSampler;
+        private readonly IPlaybackDevice _playbackDevice;
 
-        private SwapChainCache _swapChainCache;
-        private RenderBatcher _renderBatcher;
-        private RenderPassManager _renderPassManager;
-        private RenderScene _renderScene;
-        private FrameCollector _frameCollector;
-        private FrameUploadManager _frameUploadManager;
-        private CommandBufferPool _commandBufferPool;
-        private RenderPassData _renderPassData;
-        private RenderTargetPool _renderTargetPool;
-        private Blitter _blitter;
+        private readonly ServiceGroup _services;
 
-        private RenderPass _renderPass;
+        private readonly FrameGraph _frameGraph;
+        private readonly ShaderGlobalsManager _globalsManager;
+        private readonly SwapChainCache _swapChainCache;
+        private readonly RenderContextPool _renderContextPool;
 
-        private MaterialAsset _missingMaterial;
+        private readonly RenderWorld _renderWorld;
+        private readonly PartitioningManager _partitioningManager;
+        private readonly BatchingManager _batchingManager;
+        private readonly MaterialPassCollection _materialPassCollection;
 
-        private IRenderPath _path;
+        private readonly DebugManager _debugManager;
 
-        private Window? _defaultWindow;
+        private readonly RenderPrimitives _renderPrimitives;
 
-        private RenderingConfig _config;
+        private readonly List<IRenderStage> _renderStages;
+
+        private readonly SetupCameraPass _setupCameraPass;
+        private readonly SetupWindowPass _setupWindowPass;
+        private readonly PresentOutputPass _presentPass;
+
+        private readonly TransientEventList<CompiledRenderPlan> _inspectRenderPlan;
+        private readonly TransientEventList _setupPreRender;
+
+        private RenderContextContainer? _currentContextContainer;
+        private RenderContextContainer _root;
+
+        private readonly HashSet<Window> _renderedWindows;
+
+        private JobHandle _currentPlaybackJob;
 
         private bool _disposedValue;
 
         public RenderingManager()
         {
-            _graphicsDevice = GraphicsDeviceFactory.Create(GraphicsAPI.Direct3D12, new LoggerConfiguration().MinimumLevel.Debug().WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [RHI] {Message:lj}{NewLine}{Exception}").CreateLogger());
-            s_gd.Target = _graphicsDevice;
+            _graphicsDevice = RHIDeviceFactory.CreateDefaultApi(new RHIDeviceDescription { EnableValidation = AppArguments.GetValueOrDefault("rhi-setdebug", Engine.IsDebugBuild) }, EngLog.RHI);
+            _defaultSampler = _graphicsDevice.CreateSampler(new RHISamplerDescription(), "Default")!;
+            _playbackDevice = PlaybackDeviceFactory.CreateDevice(_graphicsDevice);
 
-            _swapChainCache = new SwapChainCache(_graphicsDevice);
-            _renderBatcher = new RenderBatcher();
-            _renderPassManager = new RenderPassManager();
-            _renderScene = new RenderScene();
-            _frameCollector = new FrameCollector();
-            _frameUploadManager = new FrameUploadManager(_graphicsDevice);
-            _commandBufferPool = new CommandBufferPool(_graphicsDevice);
-            _renderPassData = new RenderPassData(new RenderPassViewportData(), new RenderPassLightingData());
-            _renderTargetPool = new RenderTargetPool(_graphicsDevice);
-            _blitter = new Blitter();
+            _services = new ServiceGroup();
 
-            _renderPass = new RenderPass();
+            _frameGraph = new FrameGraph();
+            _globalsManager = new ShaderGlobalsManager(_frameGraph);
+            _swapChainCache = new SwapChainCache(this);
+            _renderContextPool = new RenderContextPool();
 
-            _missingMaterial = AssetManager.LoadAsset<MaterialAsset>("Engine/Materials/Missing.mat", true)!;
+            _renderWorld = new RenderWorld();
+            _partitioningManager = new PartitioningManager(this);
+            _batchingManager = new BatchingManager(this);
+            _materialPassCollection = new MaterialPassCollection();
 
-            _path = new ForwardRenderPath(this);
+            _debugManager = new DebugManager();
 
-            _defaultWindow = null;
+            _renderPrimitives = new RenderPrimitives();
 
-            _config = new RenderingConfig();
+            _renderStages = new List<IRenderStage>();
+    
+            _setupCameraPass = new SetupCameraPass();
+            _setupWindowPass = new SetupWindowPass();
+            _presentPass = new PresentOutputPass();
+
+            _inspectRenderPlan = new TransientEventList<CompiledRenderPlan>();
+            _setupPreRender = new TransientEventList();
+
+            _currentContextContainer = null;
+            _root = new RenderContextContainer();
+
+            _renderedWindows = new HashSet<Window>();
+
+            _currentPlaybackJob = JobHandle.Completed;
+
+            _services.AddService(_batchingManager);
+            _services.AddService(_materialPassCollection);
+
+            _debugManager.TrySetupAfterRenderInit(this);
+
+            ConsoleManager.Register(_frameGraph.Options);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -76,18 +115,26 @@ namespace Primary.Rendering
             {
                 if (disposing)
                 {
-                    _graphicsDevice.SynchronizeDevice(SynchronizeDeviceTargets.All);
+                    ConsoleManager.Unregister(_frameGraph.Options);
 
-                    _path.Dispose();
+                    if (!_currentPlaybackJob.HasCompleted)
+                        _currentPlaybackJob.WaitForCompletion();
 
-                    s_gd.Target = null;
+                    foreach (IRenderStage stage in _renderStages)
+                    {
+                        stage.Uninstall(this);
+                    }
 
-                    _renderTargetPool.Dispose();
-                    _commandBufferPool.Dispose();
-                    _frameUploadManager.Dispose();
-                    _renderPassManager.Dispose();
-                    _renderBatcher.Dispose();
+                    _renderStages.Clear();
+
+                    _presentPass.Dispose();
+
+                    _renderPrimitives.Dispose();
                     _swapChainCache.Dispose();
+                    _frameGraph.Dispose();
+
+                    _playbackDevice.Dispose();
+                    _defaultSampler.Dispose();
                     _graphicsDevice.Dispose();
                 }
 
@@ -101,152 +148,246 @@ namespace Primary.Rendering
             GC.SuppressFinalize(this);
         }
 
-        public void ExecuteRender()
+        /// <summary>Not thread-safe</summary>
+        public void InstallRenderStage(IRenderStage stage)
         {
-            if (_defaultWindow == null)
-                return;
-
-            SwapChain swapChain = _swapChainCache.GetOrAddDefault(_defaultWindow);
-
-            using (new ProfilingScope("ExecuteRender"))
+            if (_renderStages.AddUnique(stage))
             {
-                //_graphicsDevice.SynchronizeDevice(SynchronizeDeviceTargets.All);
+                stage.Install(this);
+            }
+        }
 
-                _graphicsDevice.BeginFrame();
+        /// <summary>Not thread-safe</summary>
+        public void UninstallRenderStage(IRenderStage stage)
+        {
+            if (_renderStages.Remove(stage))
+            {
+                stage.Uninstall(this);
+            }
+        }
 
-                _commandBufferPool.PrepareNewFrame();
-                _renderPassManager.ReorganizePassesIfRequired();
-                _frameCollector.SetupScene(_renderScene);
-                _frameCollector.CollectWorld(_renderBatcher, _missingMaterial);
-
-                //_frameUploadManager.UploadPending();
-                //_frameUploadManager.OpenBuffersForFrame();
-
-                PreRender?.Invoke();
-
-                Span<RSOutputViewport> viewports = _renderScene.Viewports;
-                if (viewports.Length > 0)
+        public void Render()
+        {
+            using (new ProfilingScope("Render"))
+            {
+                JobHandle prepareJob;
+                using (new ProfilingScope("Prepare"))
                 {
-                    for (int i = 0; i < viewports.Length; i++)
+                    _renderedWindows.Clear();
+
+                    _graphicsDevice.IncrementFrame();
+
+                    _renderContextPool.ResetPoolForNewRender();
+                    _renderWorld.SetupWorld();
+
+                    JobHandle updateMaterials = _materialPassCollection.ScheduleUpdates();
+                    JobHandle partitioningManager = _partitioningManager.SchedulePending(updateMaterials);
+
+                    prepareJob = partitioningManager;
+                    prepareJob.WaitForCompletion();
+                }
+
+                using (new ProfilingScope("Setup"))
+                {
+                    using (new ProfilingScope("PreRenderEvent"))
                     {
-                        using (new ProfilingScope("RTViewport"))
+                        _setupPreRender.InvokeAndClear();
+                    }
+
+                    if (_renderStages.Count > 0)
+                    {
+                        for (int i = 0; i < _renderWorld.Outputs.Length; i++)
                         {
-                            SetupRenderState(ref viewports[i]);
+                            RenderOutputData outputData = _renderWorld.Outputs[i];
 
-                            _path.PreparePasses(_renderPassData);
-                            _path.ExecutePasses(_renderPass);
+                            RenderFromPerspective(outputData, out TextureHandle currentTexture);
+                            if (i + 1 == _renderWorld.Outputs.Length || _renderWorld.Outputs[i + 1].Window != outputData.Window)
+                            {
+                                if (currentTexture.IsImported)
+                                    currentTexture = TextureHandle.Null;
 
-                            DispatchRenderPasses();
+                                RenderFromWindow(outputData.Window, currentTexture);
+
+                                _renderedWindows.Add(outputData.Window);
+                            }
+                        }
+
+                        foreach (var kvp in WindowManager.Instance.Windows)
+                        {
+                            Window window = kvp.Value;
+                            if (window.IsShown && _renderedWindows.Add(window))
+                            {
+                                RenderFromWindow(window, TextureHandle.Null);
+                            }
                         }
                     }
                 }
 
-                PostRender?.Invoke(_renderPass);
-                if (!_renderPass.IsEmpty)
+                CompiledRenderPlan renderPlan = _frameGraph.CreateRenderPlan();
+                using (new ProfilingScope("InspectRenderPlanEvent"))
                 {
-                    DispatchRenderPasses();
+                    _inspectRenderPlan.InvokeAndClear(renderPlan);
                 }
 
-                //_frameUploadManager.SubmitBuffersForEndOfFrame();
+                if (renderPlan.RenderPasses.Count > 0)
+                {
+                    if (!_currentPlaybackJob.HasCompleted)
+                        _currentPlaybackJob.WaitForCompletion();
+                    _currentPlaybackJob = _playbackDevice.ExecuteRenderPlan(renderPlan);
 
-                _renderBatcher.ClearBatchData();
-                _renderScene.ClearInternalData();
-            }
+                    if (!_frameGraph.Options.AllowMultithreadedPlayback)
+                        _currentPlaybackJob.WaitForCompletion();
+                }
 
-            swapChain.Present(PresentParameters.None);
+                _globalsManager.CleanupTransitional();
+                _frameGraph.CleanupForEndOfFrame();
+                _batchingManager.ClearAllRenderLists();
 
-            using (new ProfilingScope("FinishFrame"))
-            {
-                _graphicsDevice.FinishFrame();
+                _debugManager.FinishCurrentRender();
+
+                _renderedWindows.Clear();
             }
         }
 
-        public void EmitDebugStatistics(DebugDataContainer container)
+        private void RenderFromPerspective(RenderOutputData outputData, out TextureHandle usedTexture)
         {
-            _path?.EmitDebugStatistics(container);
+            using (new ProfilingScope(Engine.IsDebugBuild && !outputData.Entity.IsNull ? $"Cam-{outputData.Entity.Name}" : "Cam-Default"))
+            {
+                usedTexture = TextureHandle.Null;
+
+                SetupContextForOutput(outputData, out RenderContextContainer context);
+
+                foreach (IRenderStage stage in _renderStages)
+                {
+                    stage.FlushPassesForCamera(this, _frameGraph.Blackboard, context);
+                }
+
+                _debugManager.UpdatePerCamera(this);
+
+                TextureHandle currentTexture = context.Get<RenderCameraData>()!.ColorTexture;
+                if (!currentTexture.IsImported)
+                {
+                    PushRenderPass(_presentPass);
+                }
+
+                _currentContextContainer = null;
+
+                usedTexture = currentTexture;
+            }
         }
 
-        private void SetupRenderState(ref RSOutputViewport outputViewport)
+        private void RenderFromWindow(Window outputWindow, TextureHandle outputTexture)
         {
+            using (new ProfilingScope(outputWindow.WindowTitle))
             {
-                Vector2 outputSize = outputViewport.ClientSize;
-                if (outputSize.X >= 1.0f && outputSize.Y >= 1.0f)
-                    outputSize = _config.OutputViewport;
+                SetupContextForWindow(outputWindow, ref outputTexture, out RenderContextContainer context);
 
-                RenderPassViewportData rpViewportData = _renderPassData.Get<RenderPassViewportData>()!;
-                rpViewportData.CameraRenderTarget = _renderTargetPool.GetOrCreate(outputViewport.Id, outputSize);
-                rpViewportData.BackBufferRenderTarget = _swapChainCache.GetOrAddDefault(_defaultWindow!).BackBuffer;
-                rpViewportData.RefCameraSetter = outputViewport.RootEntity.Get<Camera>();
-                rpViewportData.View = outputViewport.ViewMatrix;
-                rpViewportData.Projection = outputViewport.ProjectionMatrix;
-                rpViewportData.VP = outputViewport.ViewMatrix * outputViewport.ProjectionMatrix;
-                rpViewportData.ViewPosition = outputViewport.ViewPosition;
-                rpViewportData.ViewDirection = outputViewport.ViewDirection;
+                foreach (IRenderStage stage in _renderStages)
+                {
+                    stage.FlushPassesForWindow(this, _frameGraph.Blackboard, context);
+                }
 
-                //cfg
-                if (!_config.OutputRenderTarget.IsNull)
-                    rpViewportData.BackBufferRenderTarget = _config.OutputRenderTarget.RHIRenderTarget!;
-            }
+                PushRenderPass(_presentPass);
 
-            {
-                RenderPassLightingData rpLightingData = _renderPassData.Get<RenderPassLightingData>()!;
+                _currentContextContainer = null;
             }
         }
 
-        private void DispatchRenderPasses()
+        /// <summary>Not thread-safe</summary>
+        public void RenderFromCamera(SceneEntity entity)
         {
-            IReadOnlyList<IPassDescription> descriptions = _renderPass.Descriptions;
+            Guard.IsFalse(entity.IsNull);
 
-            //TODO: implement auto threading of passes once a task scheduler is actually implemented
-
-            foreach (IPassDescription desc in descriptions)
-            {
-                desc.ExecuteInternal(_renderPassData);
-            }
-
-            _renderPass.ClearForNextFrame();
+            throw new NotImplementedException();
         }
 
-        public Window? DefaultWindow { get => _defaultWindow; set => _defaultWindow = value; }
+        private void SetupContextForOutput(RenderOutputData outputData, out RenderContextContainer context)
+        {
+            context = _root; //_renderContextPool.GetCameraContext();
+            _currentContextContainer = context;
 
+            RenderStateData stateData = context.GetOrCreate(static () => new RenderStateData());
+            {
+                stateData.SwapChain = _swapChainCache.GetForWindow(outputData.Window!);
+            }
+
+            RenderCameraData cameraData = context.GetOrCreate(static () => new RenderCameraData());
+            {
+                cameraData.Setup(outputData);
+
+                if (cameraData.OutputData.TargetTexture == null)
+                {
+                    cameraData.ColorTexture = _frameGraph.ResourceManager.CreateTexture(new FGTextureDesc(cameraData.ClientSize.X, cameraData.ClientSize.Y, RHIFormat.RGBA16_Float, FGTextureTarget.RenderTarget, "CamColor"));
+                }
+                else
+                {
+                    cameraData.ColorTexture = _frameGraph.ResourceManager.ImportTexture(cameraData.OutputData.TargetTexture);
+                }
+
+                cameraData.DepthTexture = _frameGraph.ResourceManager.CreateTexture(new FGTextureDesc(cameraData.ClientSize.X, cameraData.ClientSize.Y, RHIFormat.D24_UNorm_S8_UInt, FGTextureTarget.DepthStencil, "CamDepth"));
+            }
+
+            //PushRenderPass(_setupCameraPass);
+        }
+
+        private void SetupContextForWindow(Window window, ref TextureHandle outputTexture, out RenderContextContainer context)
+        {
+            context = _root; //_renderContextPool.GetWindowContext();
+            _currentContextContainer = context;
+
+            RenderStateData stateData = context.GetOrCreate(static () => new RenderStateData());
+            {
+                stateData.SwapChain = _swapChainCache.GetForWindow(window);
+            }
+
+            RenderWindowData windowData = context.GetOrCreate(static () => new RenderWindowData());
+            {
+                windowData.Window = window;
+                windowData.ColorTexture = outputTexture;
+
+                if (windowData.ColorTexture.IsNull)
+                {
+                    windowData.ColorTexture = _frameGraph.ResourceManager.CreateTexture(new FGTextureDesc(windowData.Window.ClientSize.X, windowData.Window.ClientSize.Y, RHIFormat.RGB10A2_UNorm, FGTextureTarget.RenderTarget, "WndColor"));
+                }
+            }
+
+            // PushRenderPass(_setupWindowPass);
+        }
+
+        public void PushRenderPass<T>(T renderPass) where T : IRenderPass
+        {
+            ArgumentNullException.ThrowIfNull(renderPass);
+            Debug.Assert(_currentContextContainer != null);
+            _frameGraph.PushRenderPass(renderPass, _currentContextContainer!);
+        }
+
+        public JobHandle RequestBatch(RenderList renderList, BatchingOptions options, JobHandle parentJob)
+        {
+            return _batchingManager.BatchWorld(renderList, options, parentJob);
+        }
+
+        public void InspectRenderPlan(Action<CompiledRenderPlan> action) => _inspectRenderPlan.Subscribe(action);
+        public void SetupPreRender(Action action) => _setupPreRender.Subscribe(action);
+
+        public RHIDevice GraphicsDevice => _graphicsDevice;
+        public RHISampler DefaultSampler => _defaultSampler;
+
+        internal IPlaybackDevice PlaybackDevice => _playbackDevice;
+
+        public ROServiceGroup Services => _services;
+
+        public FrameGraph FrameGraph => _frameGraph;
+        public PartitioningManager PartitioningManager => _partitioningManager;
+        public RenderWorld RenderWorld => _renderWorld;
+        public BatchingManager BatchingManager => _batchingManager;
+        public DebugManager DebugManager => _debugManager;
+        public ShaderGlobalsManager GlobalsManager => _globalsManager;
         public SwapChainCache SwapChainCache => _swapChainCache;
-        public GraphicsDevice GraphicsDevice => _graphicsDevice;
-        public RenderBatcher RenderBatcher => _renderBatcher;
-        public RenderPassManager RenderPassManager => _renderPassManager;
-        public FrameCollector FrameCollector => _frameCollector;
+        public RenderPrimitives RenderPrimitives => _renderPrimitives;
 
-        public RenderScene RenderScene => _renderScene;
+        public ROList<IRenderStage> RenderStages => _renderStages;
 
-        public IRenderPath RenderPath => _path;
-
-        public ref RenderingConfig Configuration => ref _config;
-
-        public event Action? PreRender;
-        public event Action<RenderPass>? PostRender;
-
-        internal event Action<IDebugCallbacks>? EmitDebugData;
-
-        public static GraphicsDevice Device => NullableUtility.ThrowIfNull((GraphicsDevice?)s_gd.Target);
-    }
-
-    public struct RenderingConfig
-    {
-        public GfxRenderTarget OutputRenderTarget;
-        public Vector2 OutputViewport;
-
-        public RenderingMode RenderMode;
-    }
-
-    public enum RenderingMode : byte
-    {
-        Lit = 0,
-        Unlit,
-        Wireframe,
-        Normals,
-        Lighting,
-        DetailLighting,
-        Reflections,
-        ShaderComplexity,
-        Overdraw
+        ///<summary>Not thread-safe</summary>
+        public Action? SubmitTransitionalPasses;
     }
 }

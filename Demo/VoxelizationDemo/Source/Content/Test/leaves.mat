@@ -1,0 +1,6 @@
+shader = "Content/Materials/Sets/LitCutout.shaderset"
+
+[resources]
+Diffuse = "Content/Test/leaves.png"
+Normal = "Content/Test/leaves_normal.png"
+Mask = "Content/Test/leaves_mask.texcomp"

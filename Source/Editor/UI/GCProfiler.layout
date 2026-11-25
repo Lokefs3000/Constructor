@@ -1,0 +1,32 @@
+<Widget Size="1.0 0 1.0 0">
+    <Stylesheet Path="Editor/UI/Stylesheets/GCProfiler.style" />
+    <Stylesheet Path="Editor/UI/Stylesheets/Main.style" />
+
+    <LayoutFrame Id="tabs-left" Class="side-tab-background" Size="0.2 0 1.0 0" ItemPadding="1">
+        <Button Class="side-tab-button">
+            <Label InputState="Never" Text="Graph" />
+        </Button>
+        <Button Class="side-tab-button">
+            <Label InputState="Never" Text="Handles" />
+        </Button>
+        <Button Class="side-tab-button">
+            <Label InputState="Never" Text="Segments" />
+        </Button>
+    </LayoutFrame>
+    <Widget Id="content" Class="background" Position="0.2 1 0.0 0" Size="0.8 -1 1.0 0" Padding="2 2 2 2">
+        <Widget IsEnabled="True" Id="graph" Size="1.0 0 1.0 0">
+            <LayoutFrame Class="number-list" Id="timing" Size="0.925 0 0.0 20" LayoutDirection="Horizontal" LayoutBalance="Space">
+                <Label Text="-0.00ms" />
+                <Label Text="-0.00ms" />
+                <Label Text="-0.00ms" />
+                <Label Text="-0.00ms" />
+            </LayoutFrame>
+            <Widget Class="number-list" Id="memory" Size="0.075 0 1.0 -20" Position="1.0 0 0.0 20" Anchor="1.0 0">
+                <Label Text="0 kb" />
+                <Label Position="0.0 0 1.0 0" Anchor="0.0 1.0" Text="000 kb" />
+                <Label Position="0.0 0 0.0 50" Anchor="0.0 0.5" Class="highlight-label" Text="000 kb" />
+            </Widget>
+            <GCGraphView Class=".background" Id="graph" Position="0.0 0 0.0 20" Size="0.925 0 1.0 -20" />
+        </Widget>
+    </Widget>
+</Widget>

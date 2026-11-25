@@ -1,0 +1,67 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<ItemGroup Condition=" '$(Configuration)'=='Debug' ">
+		<None Update="runtimes\win-x64\native\PhysXCommon_64_Checked.dll">
+			<Link>runtimes\win-x64\native\PhysXCommon_64.dll</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="runtimes\win-x64\native\PhysXCommon_64_Checked.pdb">
+			<Link>runtimes\win-x64\native\PhysXCommon_64.pdb</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="runtimes\win-x64\native\PhysXFoundation_64_Checked.dll">
+			<Link>runtimes\win-x64\native\PhysXFoundation_64.dll</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="runtimes\win-x64\native\PhysXFoundation_64_Checked.pdb">
+			<Link>runtimes\win-x64\native\PhysXFoundation_64.pdb</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="runtimes\win-x64\native\PhysX_64_Checked.dll">
+			<Link>runtimes\win-x64\native\PhysX_64.dll</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="runtimes\win-x64\native\PhysX_64_Checked.pdb">
+			<Link>runtimes\win-x64\native\PhysX_64.pdb</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup Condition=" '$(Configuration)'!='Debug' ">
+		<None Update="runtimes\win-x64\native\PhysXCommon_64.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="runtimes\win-x64\native\PhysXCommon_64.pdb">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="runtimes\win-x64\native\PhysXFoundation_64.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="runtimes\win-x64\native\PhysXFoundation_64.pdb">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="runtimes\win-x64\native\PhysX_64.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="runtimes\win-x64\native\PhysX_64.pdb">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	
+	<ItemGroup>
+		<None Update="runtimes\win-x64\native\physx_interop_x64.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="runtimes\win-x64\native\physx_interop_x64.pdb">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+</Project>

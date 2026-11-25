@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Layout>
+	<Stylesheet Path="Editor/UI/Default.style" />
+
+	<Window>
+		<SplitContainer Position="0.0 0 0.0 28" Size="1.0 0 1.0 -28">
+			<SplitPanel Position="0.15" Direction="Vertical">
+				
+			</SplitPanel>
+			<SplitPanel ClipDescendents="True" Position="1.0" Direction="Vertical">
+				
+			</SplitPanel>
+		</SplitContainer>
+	</Window>
+</Layout>

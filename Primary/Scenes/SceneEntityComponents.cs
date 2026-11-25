@@ -4,12 +4,13 @@ using Primary.Common;
 using Primary.Components;
 using System.Collections;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Primary.Scenes
 {
     //TODO: stop enumeration when EntityData is modified!
-    public struct SceneEntityComponents : IEnumerable
+    public ref struct SceneEntityComponents : IEnumerable
     {
         private EntityData _entityData;
 
@@ -19,17 +20,14 @@ namespace Primary.Scenes
             _entityData = entityData;
         }
 
-        public IEnumerator GetEnumerator() => new Enumerator(ref _entityData);
+        [UnscopedRef]
+        public Enumerator GetEnumerator() => new Enumerator(ref _entityData);
+        IEnumerator IEnumerable.GetEnumerator() => throw new NotSupportedException();
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        private struct Enumerator : IEnumerator
+        public ref struct Enumerator : IEnumerator
         {
             private EntityData _entityData;
-            private WeakRef<ComponentType> _components;
+            private Span<ComponentType> _components;
             private int _componentsLength;
             private int _index;
 
@@ -37,9 +35,9 @@ namespace Primary.Scenes
             internal Enumerator(ref EntityData entityData)
             {
                 Span<ComponentType> types = entityData.Archetype.Signature.Components;
-
+                
                 _entityData = entityData;
-                _components = new WeakRef<ComponentType>(ref types.DangerousGetReference());
+                _components = types;
                 _componentsLength = types.Length;
                 _index = _componentsLength - 1;
             }
@@ -61,7 +59,7 @@ namespace Primary.Scenes
             {
                 get
                 {
-                    Array array = _entityData.Chunk.GetArray(Unsafe.Add(ref _components.Ref, _index));
+                    Array array = _entityData.Chunk.GetArray(_components[_index]);
 
                     object? obj = array.GetValue(_entityData.Slot.Index);
                     Debug.Assert(obj != null && obj is IComponent);

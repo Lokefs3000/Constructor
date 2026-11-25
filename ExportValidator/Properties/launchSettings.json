@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ExportValidator": {
+      "commandName": "Project",
+      "commandLineArgs": "D:\\source\\repos\\Constructor\\Editor\\bin\\Debug\\net10.0\\Editor.exe"
+    }
+  }
+}

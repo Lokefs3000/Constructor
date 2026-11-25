@@ -1,0 +1,19 @@
+﻿using System.Runtime.Serialization;
+
+namespace Primary.RHI
+{
+    public class RHIException : Exception
+    {
+        public RHIException()
+        {
+        }
+
+        public RHIException(string? message) : base(message)
+        {
+        }
+
+        public RHIException(string? message, Exception? innerException) : base(message, innerException)
+        {
+        }
+    }
+}

@@ -1,4 +1,5 @@
 ﻿using Primary.Assets;
+using Primary.Assets.Types;
 using System.Text;
 
 namespace Editor.Serialization.Types
@@ -23,7 +24,7 @@ namespace Editor.Serialization.Types
     {
         public void Serialize(StringBuilder sb, object? obj)
         {
-            RenderMesh? val = (RenderMesh?)obj;
+            Mesh? val = (Mesh?)obj;
             if (val == null)
             {
                 sb.Append("null");

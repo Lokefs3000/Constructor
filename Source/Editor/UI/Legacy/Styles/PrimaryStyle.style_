@@ -1,0 +1,21 @@
+@use "Variables.style";
+
+Label {
+    font-family: $primary-font-family;
+}
+
+Frame {
+    background-color: $primary-bg-colour;
+}
+
+.primary-menubar {
+    > MenuItem:first-of-type {
+        font-size: 24;
+    }
+
+    [IsPressed] {
+        [IsChecked] {
+
+        }
+    }
+}

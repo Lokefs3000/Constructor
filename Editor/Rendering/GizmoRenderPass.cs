@@ -1,9 +1,6 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Editor.Interaction;
 using Primary.Assets;
-using Primary.Rendering;
-using Primary.Rendering.Data;
-using Primary.Rendering.Raw;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using RHI = Primary.RHI;
@@ -80,11 +77,12 @@ namespace Editor.Rendering
             using (RasterPassDescription desc = renderPass.CreateRasterPass())
             {
                 desc.SetThreadingPolicy(RenderPassThreadingPolicy.None);
+                desc.SetDebugName("Gizmo");
                 desc.SetFunction(PassFunction);
             }
         }
 
-        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
+        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData, object? userArg)
         {
             DrawGrid(commandBuffer, passData);
             DrawGizmos(commandBuffer, passData);

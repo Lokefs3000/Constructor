@@ -1,8 +1,11 @@
 ﻿using Arch.Core;
 using Arch.Core.Extensions;
+using Primary.Collections.ReadOnly;
+using Primary.Common;
 using Primary.Components;
 using Primary.Profiling;
 using Primary.Scenes;
+using Primary.Scenes.Components;
 using Primary.Timing;
 using Schedulers;
 using System.Numerics;
@@ -17,39 +20,39 @@ namespace Primary.Systems
             using (new ProfilingScope("Transform"))
             {
                 SceneManager manager = Engine.GlobalSingleton.SceneManager;
-                IReadOnlyList<Scene> scenes = manager.Scenes;
+                ROList<Scene> scenes = manager.Scenes;
 
-                int frameIndex = Time.FrameIndex;
+                long frameIndex = Time.FrameIndex;
 
                 for (int i = 0; i < scenes.Count; i++)
                 {
                     Scene scene = scenes[i];
 
                     ref Transform tr = ref scene.Root.WrappedEntity.Get<Transform>();
-                    if (tr.Invalid || true)
+                    if (Flags.HasFlag(tr.InvalidFlags, TransformInvalidFlags.Invalid))
                     {
-                        IterateThroughHierchy(scene.Root.WrappedEntity, Matrix4x4.Identity, frameIndex);
-                        tr.Invalid = false;
+                        IterateThroughHierchy(scene.Root.WrappedEntity, Matrix4x4.Identity, frameIndex, false);
+                        tr.InvalidFlags = TransformInvalidFlags.None;
                     }
                 }
             }
         }
 
-        private void IterateThroughHierchy(SceneEntity e, Matrix4x4 parent, int frameIndex)
+        private void IterateThroughHierchy(SceneEntity e, Matrix4x4 parent, long frameIndex, bool allChildren)
         {
             foreach (var child in e.Children)
             {
                 Entity childEntity = child.WrappedEntity;
 
                 ref Transform tr = ref childEntity.Get<Transform>();
-                if (tr.Invalid || true)
+                if (Flags.HasFlag(tr.InvalidFlags, TransformInvalidFlags.Invalid) || allChildren)
                 {
                     ref WorldTransform wt = ref childEntity.Get<WorldTransform>();
                     ref LocalTransform lt = ref childEntity.Get<LocalTransform>();
 
                     if (!Unsafe.IsNullRef(ref wt) && !Unsafe.IsNullRef(ref lt))
                     {
-                        if (tr.SelfInvalid)
+                        if (Flags.HasFlag(tr.InvalidFlags, TransformInvalidFlags.Self))
                         {
                             lt.Transformation =
                                     Matrix4x4.CreateScale(tr.Scale) *
@@ -57,19 +60,21 @@ namespace Primary.Systems
                                     Matrix4x4.CreateTranslation(tr.Position);
                             lt.UpdateIndex = frameIndex;
 
-                            tr.SelfInvalid = false;
+                            tr.InvalidFlags |= TransformInvalidFlags.AllChildren;
                         }
 
                         wt.Transformation = lt.Transformation * parent;
                         wt.UpdateIndex = frameIndex;
 
                         if (!child.Children.IsEmpty)
-                            IterateThroughHierchy(childEntity, wt.Transformation, frameIndex);
+                            IterateThroughHierchy(childEntity, wt.Transformation, frameIndex, allChildren || Flags.HasFlag(tr.InvalidFlags, TransformInvalidFlags.AllChildren));
                     }
                     else
                     {
-                        IterateThroughHierchy(childEntity, parent, frameIndex);
+                        IterateThroughHierchy(childEntity, parent, frameIndex, allChildren || Flags.HasFlag(tr.InvalidFlags, TransformInvalidFlags.AllChildren));
                     }
+
+                    tr.InvalidFlags = TransformInvalidFlags.None;
                 }
             }
         }

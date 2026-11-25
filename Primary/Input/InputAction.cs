@@ -1,4 +1,5 @@
-﻿using Primary.Input.Bindings;
+﻿using Primary.Collections.ReadOnly;
+using Primary.Input.Bindings;
 using Primary.Input.Controls;
 using Primary.Input.Devices;
 
@@ -37,7 +38,7 @@ namespace Primary.Input
         public string Name { get => _name; set => _name = value; }
 
         public IInputControl? Control { get => _control; set => _control = value; }
-        public IReadOnlyList<IInputBinding> Bindings => _bindings;
+        public ROList<IInputBinding> Bindings => _bindings;
 
         public ref readonly DeviceValue Value => ref _value;
     }

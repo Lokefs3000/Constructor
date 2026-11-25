@@ -1,9 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="ReleaseWithDebug|Win32">
+      <Configuration>ReleaseWithDebug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="ReleaseWithDebug|x64">
+      <Configuration>ReleaseWithDebug</Configuration>
+      <Platform>x64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
@@ -19,15 +27,239 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="BCInterop.cpp" />
-    <ClCompile Include="BC\bc7enc.cpp" />
-    <ClCompile Include="BC\rgbcx.cpp" />
+    <ClCompile Include="msdf-atlas-gen\artery-font-export.cpp" />
+    <ClCompile Include="msdf-atlas-gen\bitmap-blit.cpp" />
+    <ClCompile Include="msdf-atlas-gen\charset-parser.cpp" />
+    <ClCompile Include="msdf-atlas-gen\Charset.cpp" />
+    <ClCompile Include="msdf-atlas-gen\csv-export.cpp" />
+    <ClCompile Include="msdf-atlas-gen\FontGeometry.cpp" />
+    <ClCompile Include="msdf-atlas-gen\glyph-generators.cpp" />
+    <ClCompile Include="msdf-atlas-gen\GlyphGeometry.cpp" />
+    <ClCompile Include="msdf-atlas-gen\GridAtlasPacker.cpp" />
+    <ClCompile Include="msdf-atlas-gen\image-encode.cpp" />
+    <ClCompile Include="msdf-atlas-gen\json-export.cpp" />
+    <ClCompile Include="msdf-atlas-gen\main.cpp" />
+    <ClCompile Include="msdf-atlas-gen\Padding.cpp" />
+    <ClCompile Include="msdf-atlas-gen\RectanglePacker.cpp" />
+    <ClCompile Include="msdf-atlas-gen\shadron-preview-generator.cpp" />
+    <ClCompile Include="msdf-atlas-gen\size-selectors.cpp" />
+    <ClCompile Include="msdf-atlas-gen\TightAtlasPacker.cpp" />
+    <ClCompile Include="msdf-atlas-gen\utf8.cpp" />
+    <ClCompile Include="msdf-atlas-gen\Workload.cpp" />
+    <ClCompile Include="MSDFAtlasInterop.cpp" />
+    <ClCompile Include="MSDFGenInterop.cpp" />
+    <ClCompile Include="msdfgen\core\contour-combiners.cpp" />
+    <ClCompile Include="msdfgen\core\Contour.cpp" />
+    <ClCompile Include="msdfgen\core\convergent-curve-ordering.cpp" />
+    <ClCompile Include="msdfgen\core\DistanceMapping.cpp" />
+    <ClCompile Include="msdfgen\core\edge-coloring.cpp" />
+    <ClCompile Include="msdfgen\core\edge-segments.cpp" />
+    <ClCompile Include="msdfgen\core\edge-selectors.cpp" />
+    <ClCompile Include="msdfgen\core\EdgeHolder.cpp" />
+    <ClCompile Include="msdfgen\core\equation-solver.cpp" />
+    <ClCompile Include="msdfgen\core\export-svg.cpp" />
+    <ClCompile Include="msdfgen\core\msdf-error-correction.cpp" />
+    <ClCompile Include="msdfgen\core\MSDFErrorCorrection.cpp" />
+    <ClCompile Include="msdfgen\core\msdfgen.cpp" />
+    <ClCompile Include="msdfgen\core\Projection.cpp" />
+    <ClCompile Include="msdfgen\core\rasterization.cpp" />
+    <ClCompile Include="msdfgen\core\render-sdf.cpp" />
+    <ClCompile Include="msdfgen\core\save-bmp.cpp" />
+    <ClCompile Include="msdfgen\core\save-fl32.cpp" />
+    <ClCompile Include="msdfgen\core\save-rgba.cpp" />
+    <ClCompile Include="msdfgen\core\save-tiff.cpp" />
+    <ClCompile Include="msdfgen\core\Scanline.cpp" />
+    <ClCompile Include="msdfgen\core\sdf-error-estimation.cpp" />
+    <ClCompile Include="msdfgen\core\shape-description.cpp" />
+    <ClCompile Include="msdfgen\core\Shape.cpp" />
+    <ClCompile Include="msdfgen\ext\import-font.cpp" />
+    <ClCompile Include="msdfgen\ext\import-svg.cpp" />
+    <ClCompile Include="msdfgen\ext\resolve-shape-geometry.cpp" />
+    <ClCompile Include="msdfgen\ext\save-png.cpp" />
     <ClCompile Include="SPIRVInterop.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BC\bc7enc.h" />
-    <ClInclude Include="BC\rgbcx.h" />
-    <ClInclude Include="BC\rgbcx_table4.h" />
+    <ClInclude Include="freetype\freetype\config\ftconfig.h" />
+    <ClInclude Include="freetype\freetype\config\ftheader.h" />
+    <ClInclude Include="freetype\freetype\config\ftmodule.h" />
+    <ClInclude Include="freetype\freetype\config\ftoption.h" />
+    <ClInclude Include="freetype\freetype\config\ftstdlib.h" />
+    <ClInclude Include="freetype\freetype\config\integer-types.h" />
+    <ClInclude Include="freetype\freetype\config\mac-support.h" />
+    <ClInclude Include="freetype\freetype\config\public-macros.h" />
+    <ClInclude Include="freetype\freetype\freetype.h" />
+    <ClInclude Include="freetype\freetype\ftadvanc.h" />
+    <ClInclude Include="freetype\freetype\ftbbox.h" />
+    <ClInclude Include="freetype\freetype\ftbdf.h" />
+    <ClInclude Include="freetype\freetype\ftbitmap.h" />
+    <ClInclude Include="freetype\freetype\ftbzip2.h" />
+    <ClInclude Include="freetype\freetype\ftcache.h" />
+    <ClInclude Include="freetype\freetype\ftchapters.h" />
+    <ClInclude Include="freetype\freetype\ftcid.h" />
+    <ClInclude Include="freetype\freetype\ftcolor.h" />
+    <ClInclude Include="freetype\freetype\ftdriver.h" />
+    <ClInclude Include="freetype\freetype\fterrdef.h" />
+    <ClInclude Include="freetype\freetype\fterrors.h" />
+    <ClInclude Include="freetype\freetype\ftfntfmt.h" />
+    <ClInclude Include="freetype\freetype\ftgasp.h" />
+    <ClInclude Include="freetype\freetype\ftglyph.h" />
+    <ClInclude Include="freetype\freetype\ftgxval.h" />
+    <ClInclude Include="freetype\freetype\ftgzip.h" />
+    <ClInclude Include="freetype\freetype\ftimage.h" />
+    <ClInclude Include="freetype\freetype\ftincrem.h" />
+    <ClInclude Include="freetype\freetype\ftlcdfil.h" />
+    <ClInclude Include="freetype\freetype\ftlist.h" />
+    <ClInclude Include="freetype\freetype\ftlogging.h" />
+    <ClInclude Include="freetype\freetype\ftlzw.h" />
+    <ClInclude Include="freetype\freetype\ftmac.h" />
+    <ClInclude Include="freetype\freetype\ftmm.h" />
+    <ClInclude Include="freetype\freetype\ftmodapi.h" />
+    <ClInclude Include="freetype\freetype\ftmoderr.h" />
+    <ClInclude Include="freetype\freetype\ftotval.h" />
+    <ClInclude Include="freetype\freetype\ftoutln.h" />
+    <ClInclude Include="freetype\freetype\ftparams.h" />
+    <ClInclude Include="freetype\freetype\ftpfr.h" />
+    <ClInclude Include="freetype\freetype\ftrender.h" />
+    <ClInclude Include="freetype\freetype\ftsizes.h" />
+    <ClInclude Include="freetype\freetype\ftsnames.h" />
+    <ClInclude Include="freetype\freetype\ftstroke.h" />
+    <ClInclude Include="freetype\freetype\ftsynth.h" />
+    <ClInclude Include="freetype\freetype\ftsystem.h" />
+    <ClInclude Include="freetype\freetype\fttrigon.h" />
+    <ClInclude Include="freetype\freetype\fttypes.h" />
+    <ClInclude Include="freetype\freetype\ftwinfnt.h" />
+    <ClInclude Include="freetype\freetype\internal\autohint.h" />
+    <ClInclude Include="freetype\freetype\internal\cffotypes.h" />
+    <ClInclude Include="freetype\freetype\internal\cfftypes.h" />
+    <ClInclude Include="freetype\freetype\internal\compiler-macros.h" />
+    <ClInclude Include="freetype\freetype\internal\ftcalc.h" />
+    <ClInclude Include="freetype\freetype\internal\ftdebug.h" />
+    <ClInclude Include="freetype\freetype\internal\ftdrv.h" />
+    <ClInclude Include="freetype\freetype\internal\ftgloadr.h" />
+    <ClInclude Include="freetype\freetype\internal\fthash.h" />
+    <ClInclude Include="freetype\freetype\internal\ftmemory.h" />
+    <ClInclude Include="freetype\freetype\internal\ftmmtypes.h" />
+    <ClInclude Include="freetype\freetype\internal\ftobjs.h" />
+    <ClInclude Include="freetype\freetype\internal\ftpsprop.h" />
+    <ClInclude Include="freetype\freetype\internal\ftrfork.h" />
+    <ClInclude Include="freetype\freetype\internal\ftserv.h" />
+    <ClInclude Include="freetype\freetype\internal\ftstream.h" />
+    <ClInclude Include="freetype\freetype\internal\fttrace.h" />
+    <ClInclude Include="freetype\freetype\internal\ftvalid.h" />
+    <ClInclude Include="freetype\freetype\internal\psaux.h" />
+    <ClInclude Include="freetype\freetype\internal\pshints.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svbdf.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svcfftl.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svcid.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svfntfmt.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svgldict.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svgxval.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svkern.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svmetric.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svmm.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svotval.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svpfr.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svpostnm.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svprop.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svpscmap.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svpsinfo.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svsfnt.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svttcmap.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svtteng.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svttglyf.h" />
+    <ClInclude Include="freetype\freetype\internal\services\svwinfnt.h" />
+    <ClInclude Include="freetype\freetype\internal\sfnt.h" />
+    <ClInclude Include="freetype\freetype\internal\svginterface.h" />
+    <ClInclude Include="freetype\freetype\internal\t1types.h" />
+    <ClInclude Include="freetype\freetype\internal\tttypes.h" />
+    <ClInclude Include="freetype\freetype\internal\wofftypes.h" />
+    <ClInclude Include="freetype\freetype\otsvg.h" />
+    <ClInclude Include="freetype\freetype\t1tables.h" />
+    <ClInclude Include="freetype\freetype\ttnameid.h" />
+    <ClInclude Include="freetype\freetype\tttables.h" />
+    <ClInclude Include="freetype\freetype\tttags.h" />
+    <ClInclude Include="freetype\ft2build.h" />
+    <ClInclude Include="msdf-atlas-gen\artery-font-export.h" />
+    <ClInclude Include="msdf-atlas-gen\AtlasGenerator.h" />
+    <ClInclude Include="msdf-atlas-gen\AtlasStorage.h" />
+    <ClInclude Include="msdf-atlas-gen\bitmap-blit.h" />
+    <ClInclude Include="msdf-atlas-gen\BitmapAtlasStorage.h" />
+    <ClInclude Include="msdf-atlas-gen\BitmapAtlasStorage.hpp" />
+    <ClInclude Include="msdf-atlas-gen\Charset.h" />
+    <ClInclude Include="msdf-atlas-gen\csv-export.h" />
+    <ClInclude Include="msdf-atlas-gen\DynamicAtlas.h" />
+    <ClInclude Include="msdf-atlas-gen\DynamicAtlas.hpp" />
+    <ClInclude Include="msdf-atlas-gen\FontGeometry.h" />
+    <ClInclude Include="msdf-atlas-gen\glyph-generators.h" />
+    <ClInclude Include="msdf-atlas-gen\GlyphBox.h" />
+    <ClInclude Include="msdf-atlas-gen\GlyphGeometry.h" />
+    <ClInclude Include="msdf-atlas-gen\GridAtlasPacker.h" />
+    <ClInclude Include="msdf-atlas-gen\image-encode.h" />
+    <ClInclude Include="msdf-atlas-gen\image-save.h" />
+    <ClInclude Include="msdf-atlas-gen\image-save.hpp" />
+    <ClInclude Include="msdf-atlas-gen\ImmediateAtlasGenerator.h" />
+    <ClInclude Include="msdf-atlas-gen\ImmediateAtlasGenerator.hpp" />
+    <ClInclude Include="msdf-atlas-gen\json-export.h" />
+    <ClInclude Include="msdf-atlas-gen\msdf-atlas-gen.h" />
+    <ClInclude Include="msdf-atlas-gen\Padding.h" />
+    <ClInclude Include="msdf-atlas-gen\rectangle-packing.h" />
+    <ClInclude Include="msdf-atlas-gen\rectangle-packing.hpp" />
+    <ClInclude Include="msdf-atlas-gen\Rectangle.h" />
+    <ClInclude Include="msdf-atlas-gen\RectanglePacker.h" />
+    <ClInclude Include="msdf-atlas-gen\Remap.h" />
+    <ClInclude Include="msdf-atlas-gen\shadron-preview-generator.h" />
+    <ClInclude Include="msdf-atlas-gen\size-selectors.h" />
+    <ClInclude Include="msdf-atlas-gen\TightAtlasPacker.h" />
+    <ClInclude Include="msdf-atlas-gen\types.h" />
+    <ClInclude Include="msdf-atlas-gen\utf8.h" />
+    <ClInclude Include="msdf-atlas-gen\utils.hpp" />
+    <ClInclude Include="msdf-atlas-gen\Workload.h" />
+    <ClInclude Include="msdfgen\core\arithmetics.hpp" />
+    <ClInclude Include="msdfgen\core\base.h" />
+    <ClInclude Include="msdfgen\core\bitmap-interpolation.hpp" />
+    <ClInclude Include="msdfgen\core\Bitmap.h" />
+    <ClInclude Include="msdfgen\core\Bitmap.hpp" />
+    <ClInclude Include="msdfgen\core\BitmapRef.hpp" />
+    <ClInclude Include="msdfgen\core\contour-combiners.h" />
+    <ClInclude Include="msdfgen\core\Contour.h" />
+    <ClInclude Include="msdfgen\core\convergent-curve-ordering.h" />
+    <ClInclude Include="msdfgen\core\DistanceMapping.h" />
+    <ClInclude Include="msdfgen\core\edge-coloring.h" />
+    <ClInclude Include="msdfgen\core\edge-segments.h" />
+    <ClInclude Include="msdfgen\core\edge-selectors.h" />
+    <ClInclude Include="msdfgen\core\EdgeColor.h" />
+    <ClInclude Include="msdfgen\core\EdgeHolder.h" />
+    <ClInclude Include="msdfgen\core\equation-solver.h" />
+    <ClInclude Include="msdfgen\core\export-svg.h" />
+    <ClInclude Include="msdfgen\core\generator-config.h" />
+    <ClInclude Include="msdfgen\core\msdf-error-correction.h" />
+    <ClInclude Include="msdfgen\core\MSDFErrorCorrection.h" />
+    <ClInclude Include="msdfgen\core\pixel-conversion.hpp" />
+    <ClInclude Include="msdfgen\core\Projection.h" />
+    <ClInclude Include="msdfgen\core\Range.hpp" />
+    <ClInclude Include="msdfgen\core\rasterization.h" />
+    <ClInclude Include="msdfgen\core\render-sdf.h" />
+    <ClInclude Include="msdfgen\core\save-bmp.h" />
+    <ClInclude Include="msdfgen\core\save-fl32.h" />
+    <ClInclude Include="msdfgen\core\save-rgba.h" />
+    <ClInclude Include="msdfgen\core\save-tiff.h" />
+    <ClInclude Include="msdfgen\core\Scanline.h" />
+    <ClInclude Include="msdfgen\core\sdf-error-estimation.h" />
+    <ClInclude Include="msdfgen\core\SDFTransformation.h" />
+    <ClInclude Include="msdfgen\core\shape-description.h" />
+    <ClInclude Include="msdfgen\core\Shape.h" />
+    <ClInclude Include="msdfgen\core\ShapeDistanceFinder.h" />
+    <ClInclude Include="msdfgen\core\ShapeDistanceFinder.hpp" />
+    <ClInclude Include="msdfgen\core\SignedDistance.hpp" />
+    <ClInclude Include="msdfgen\core\Vector2.hpp" />
+    <ClInclude Include="msdfgen\core\YAxisOrientation.h" />
+    <ClInclude Include="msdfgen\ext\import-font.h" />
+    <ClInclude Include="msdfgen\ext\import-svg.h" />
+    <ClInclude Include="msdfgen\ext\resolve-shape-geometry.h" />
+    <ClInclude Include="msdfgen\ext\save-png.h" />
+    <ClInclude Include="msdfgen\msdfgen-config.h" />
+    <ClInclude Include="msdfgen\msdfgen-ext.h" />
+    <ClInclude Include="msdfgen\msdfgen.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -40,27 +272,42 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
@@ -76,10 +323,16 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -88,6 +341,10 @@
     <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>edinterop</TargetName>
+    <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">
     <TargetName>edinterop</TargetName>
     <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
@@ -123,6 +380,23 @@
       <EnableUAC>false</EnableUAC>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;EDITORINTEROP_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -137,14 +411,14 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.313.2\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)freetype;$(ProjectDir);$(ProjectDir)msdfgen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.313.2\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SPIRVd.lib;SPIRV-Tools-optd.lib;SPIRV-Toolsd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.350.0\Lib;$(ProjectDir)nativelib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SPIRVd.lib;SPIRV-Tools-optd.lib;SPIRV-Toolsd.lib;%(AdditionalDependencies);freetype.lib</AdditionalDependencies>
       <DelayLoadDLLs>SPIRVd.dll;SPIRV-Tools-sharedd.dll</DelayLoadDLLs>
     </Link>
     <PostBuildEvent>
@@ -167,14 +441,44 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.313.2\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)freetype;$(ProjectDir);$(ProjectDir)msdfgen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.313.2\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SPIRV.lib;SPIRV-Tools-opt.lib;SPIRV-Tools.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.350.0\Lib;$(ProjectDir)nativelib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SPIRV.lib;SPIRV-Tools-opt.lib;SPIRV-Tools.lib;%(AdditionalDependencies);freetype.lib</AdditionalDependencies>
+      <DelayLoadDLLs>SPIRV.dll;SPIRV-Tools-shared.dll</DelayLoadDLLs>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy $(OutDir)edinterop.dll $(SolutionDir)Editor.Interop\runtimes\win-x64\native\edinterop.dll</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;EDITORINTEROP_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <CompileAs>CompileAsCpp</CompileAs>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)freetype;$(ProjectDir);$(ProjectDir)msdfgen;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.350.0\Lib;$(ProjectDir)nativelib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SPIRV.lib;SPIRV-Tools-opt.lib;SPIRV-Tools.lib;%(AdditionalDependencies);freetype.lib</AdditionalDependencies>
       <DelayLoadDLLs>SPIRV.dll;SPIRV-Tools-shared.dll</DelayLoadDLLs>
     </Link>
     <PostBuildEvent>

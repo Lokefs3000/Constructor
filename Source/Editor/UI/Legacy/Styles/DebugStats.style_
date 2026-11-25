@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Stylesheet>
+    <Class Name="rstat-background" Type="Frame">
+        <Position Value="1.0 -10 0.0 10" />
+        <Anchor Value="1.0 0.0" />
+        <BackgroundColor Value="#00000080" />
+    </Class>
+    <Class Name="rstat-label" Type="Label">
+        <FontWeight Value="Bold" />
+        <FontSize Value="0.75" />
+        <Alignment Value="MiddleLeft" />
+    </Class>
+
+    <Class Name="rstat-fps" Type="Label">
+        <TextColor Value="#43c559" />
+    </Class>
+    <Class Name="rstat-render" Type="Label">
+        <TextColor Value="#9964be" />
+    </Class>
+    <Class Name="rstat-octree" Type="Label">
+        <TextColor Value="#249ded" />
+    </Class>
+    <Class Name="rstat-draw" Type="Label">
+        <TextColor Value="#e82c2c" />
+    </Class>
+    <Class Name="rstat-gpumem" Type="Label">
+        <TextColor Value="#eb8928" />
+    </Class>
+    <Class Name="rstat-gc" Type="Label">
+        <TextColor Value="#e2ed6a" />
+    </Class>
+</Stylesheet>

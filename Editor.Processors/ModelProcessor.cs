@@ -21,10 +21,11 @@ namespace Editor.Processors
         {
             ModelProcessorArgs args = (ModelProcessorArgs)args_in;
 
-            PostProcessSteps steps = PostProcessPreset.TargetRealTimeMaximumQuality;
+            PostProcessSteps steps = PostProcessPreset.TargetRealTimeMaximumQuality | PostProcessSteps.FlipWindingOrder;
             Scene* scene = s_api.ImportFile(args.AbsoluteFilepath, (uint)steps);
             if (scene == null)
             {
+                string str = s_api.GetErrorStringS();
                 //bad
                 return false;
             }
@@ -127,7 +128,7 @@ namespace Editor.Processors
                     VertexCount = assimpMesh->MNumVertices,
                     IndexCount = indexCount,
 
-                    VertexStride = (ushort)(12 * sizeof(float) + byte.PopCount(uvChannelMask) * 2 * sizeof(float)),
+                    VertexStride = (ushort)(12 * sizeof(float) + Math.Max(byte.PopCount(uvChannelMask), (byte)1) * 2 * sizeof(float)),
                     UVChannelMask = uvChannelMask,
                 };
 
@@ -253,25 +254,34 @@ namespace Editor.Processors
 
         private void WriteMeshes(BinaryWriter bw, List<PMFMesh> meshes, Scene* scene, bool useHalfPrecision, bool useLargeIndices)
         {
+            MeshInfos = new ModelMeshInfo[meshes.Count];
+
             Span<PMFMesh> span = meshes.AsSpan();
             for (int i = 0; i < span.Length; i++)
             {
                 ref PMFMesh mesh = ref span[i];
 
+                MeshInfos[i] = new ModelMeshInfo(mesh.Name);
+
                 bw.Write(mesh.Name);
                 bw.Write(mesh.VertexCount);
                 bw.Write(mesh.IndexCount);
                 bw.Write(mesh.VertexStride);
-                bw.Write(mesh.UVChannelMask);
+                bw.Write((byte)(mesh.UVChannelMask | 1));
 
-                int channelCount = 8 - byte.LeadingZeroCount(mesh.UVChannelMask);
+                int channelCount = Math.Max(8 - byte.LeadingZeroCount(mesh.UVChannelMask), 1);
                 int stride = 12 + channelCount * 2;
 
                 Mesh* assimpMesh = scene->MMeshes[i];
+                bool hasTangentAndBitangents = assimpMesh->MTangents != null && assimpMesh->MBitangents != null;
+
+                Vector3 zero = Vector3.Zero;
+
                 if (useHalfPrecision)
                 {
                     using PoolArray<Half> vertices = ArrayPool<Half>.Shared.Rent((int)mesh.VertexCount * stride);
                     Span<Half> verticesSpan = vertices.AsSpan((int)mesh.VertexCount * stride);
+
 
                     for (int j = 0; j < assimpMesh->MNumVertices; j++)
                     {
@@ -281,6 +291,12 @@ namespace Editor.Processors
                         ref Vector3 normal = ref assimpMesh->MNormals[j];
                         ref Vector3 tangent = ref assimpMesh->MTangents[j];
                         ref Vector3 bitangent = ref assimpMesh->MBitangents[j];
+
+                        if (!hasTangentAndBitangents)
+                        {
+                            tangent = ref zero;
+                            bitangent = ref normal;
+                        }
 
                         localVertices[0] = (Half)position.X;
                         localVertices[1] = (Half)position.Y;
@@ -329,6 +345,12 @@ namespace Editor.Processors
                         ref Vector3 tangent = ref assimpMesh->MTangents[j];
                         ref Vector3 bitangent = ref assimpMesh->MBitangents[j];
 
+                        if (!hasTangentAndBitangents)
+                        {
+                            tangent = ref zero;
+                            bitangent = ref normal;
+                        }
+
                         ref Vector3 baseV3 = ref Unsafe.As<float, Vector3>(ref localVertices.DangerousGetReference());
 
                         baseV3 = position;
@@ -360,7 +382,7 @@ namespace Editor.Processors
                     for (int j = 0; j < assimpMesh->MNumFaces; j++)
                     {
                         ref Face assimpFace = ref assimpMesh->MFaces[j];
-                        Debug.Assert(assimpFace.MNumIndices != 3);
+                        Debug.Assert(assimpFace.MNumIndices == 3);
 
                         int k = j * 3;
                         indicesSpan[k] = assimpFace.MIndices[0];
@@ -401,7 +423,7 @@ namespace Editor.Processors
                 bw.Write(node.Name);
 
                 bw.Write(node.Transform.Features);
-                if (FlagUtility.HasFlag(node.Transform.Features, PMFTransformFeatures.Position))
+                if (Flags.HasFlag(node.Transform.Features, PMFTransformFeatures.Position))
                 {
                     if (useHalfPrecision)
                     {
@@ -413,7 +435,7 @@ namespace Editor.Processors
                         bw.Write(node.Transform.Position);
                 }
 
-                if (FlagUtility.HasFlag(node.Transform.Features, PMFTransformFeatures.Rotation))
+                if (Flags.HasFlag(node.Transform.Features, PMFTransformFeatures.Rotation))
                 {
                     if (useHalfPrecision)
                     {
@@ -426,14 +448,14 @@ namespace Editor.Processors
                         bw.Write(node.Transform.Rotation);
                 }
 
-                if (FlagUtility.HasFlag(node.Transform.Features, PMFTransformFeatures.UniformScale))
+                if (Flags.HasFlag(node.Transform.Features, PMFTransformFeatures.UniformScale))
                 {
                     if (useHalfPrecision)
                         bw.Write((Half)node.Transform.Scale.X);
                     else
                         bw.Write(node.Transform.Scale.X);
                 }
-                else if (FlagUtility.HasFlag(node.Transform.Features, PMFTransformFeatures.Scale))
+                else if (Flags.HasFlag(node.Transform.Features, PMFTransformFeatures.Scale))
                 {
                     if (useHalfPrecision)
                     {

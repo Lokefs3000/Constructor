@@ -1,0 +1,1731 @@
+{
+    "Entities": [
+        {
+            "Id": 0,
+            "Enabled": true,
+            "Name": "Cabinet",
+            "Components": [
+                "Primary?Primary.Components.Transform"
+            ]
+        },
+        {
+            "Id": 1,
+            "Parent": 0,
+            "Enabled": true,
+            "Name": "Inside",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 2,
+            "Parent": 0,
+            "Enabled": true,
+            "Name": "Top",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 3,
+            "Parent": 0,
+            "Enabled": true,
+            "Name": "Door",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 4,
+            "Parent": 3,
+            "Enabled": true,
+            "Name": "Handle",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 5,
+            "Enabled": true,
+            "Name": "Player",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 6,
+            "Enabled": true,
+            "Name": "Cabinet",
+            "Components": [
+                "Primary?Primary.Components.Transform"
+            ]
+        },
+        {
+            "Id": 7,
+            "Parent": 6,
+            "Enabled": true,
+            "Name": "Inside",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 8,
+            "Parent": 6,
+            "Enabled": true,
+            "Name": "Top",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 9,
+            "Parent": 6,
+            "Enabled": true,
+            "Name": "Door",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 10,
+            "Parent": 9,
+            "Enabled": true,
+            "Name": "Handle",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 11,
+            "Enabled": true,
+            "Name": "Cabinet",
+            "Components": [
+                "Primary?Primary.Components.Transform"
+            ]
+        },
+        {
+            "Id": 12,
+            "Parent": 11,
+            "Enabled": true,
+            "Name": "Inside",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 13,
+            "Parent": 11,
+            "Enabled": true,
+            "Name": "Top",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 14,
+            "Parent": 11,
+            "Enabled": true,
+            "Name": "Door",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 15,
+            "Parent": 14,
+            "Enabled": true,
+            "Name": "Handle",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 16,
+            "Enabled": true,
+            "Name": "Cabinet",
+            "Components": [
+                "Primary?Primary.Components.Transform"
+            ]
+        },
+        {
+            "Id": 17,
+            "Parent": 16,
+            "Enabled": true,
+            "Name": "Inside",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 18,
+            "Parent": 16,
+            "Enabled": true,
+            "Name": "Top",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 19,
+            "Parent": 16,
+            "Enabled": true,
+            "Name": "Door",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 20,
+            "Parent": 19,
+            "Enabled": true,
+            "Name": "Handle",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 21,
+            "Enabled": true,
+            "Name": "Cabinet",
+            "Components": [
+                "Primary?Primary.Components.Transform"
+            ]
+        },
+        {
+            "Id": 22,
+            "Parent": 21,
+            "Enabled": true,
+            "Name": "Inside",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 23,
+            "Parent": 21,
+            "Enabled": true,
+            "Name": "Top",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 24,
+            "Parent": 21,
+            "Enabled": true,
+            "Name": "Door",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 25,
+            "Parent": 24,
+            "Enabled": true,
+            "Name": "Handle",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 26,
+            "Enabled": true,
+            "Name": "Cabinet",
+            "Components": [
+                "Primary?Primary.Components.Transform"
+            ]
+        },
+        {
+            "Id": 27,
+            "Parent": 26,
+            "Enabled": true,
+            "Name": "Inside",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 28,
+            "Parent": 26,
+            "Enabled": true,
+            "Name": "Top",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 29,
+            "Parent": 26,
+            "Enabled": true,
+            "Name": "Door",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 30,
+            "Parent": 29,
+            "Enabled": true,
+            "Name": "Handle",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 31,
+            "Enabled": true,
+            "Name": "Cabinet",
+            "Components": [
+                "Primary?Primary.Components.Transform"
+            ]
+        },
+        {
+            "Id": 32,
+            "Parent": 31,
+            "Enabled": true,
+            "Name": "Inside",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 33,
+            "Parent": 31,
+            "Enabled": true,
+            "Name": "Top",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 34,
+            "Parent": 31,
+            "Enabled": true,
+            "Name": "Door",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 35,
+            "Parent": 34,
+            "Enabled": true,
+            "Name": "Handle",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 36,
+            "Enabled": true,
+            "Name": "Floor",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 37,
+            "Enabled": true,
+            "Name": "Sun",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "VoxelizationDemo?VoxelizationDemo.Components.DirectionalLight"
+            ]
+        },
+        {
+            "Id": 38,
+            "Enabled": true,
+            "Name": "Wall",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 39,
+            "Enabled": true,
+            "Name": "Wall",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 40,
+            "Enabled": true,
+            "Name": "Wall",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 41,
+            "Enabled": true,
+            "Name": "Wall",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 42,
+            "Enabled": true,
+            "Name": "Wall",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 43,
+            "Enabled": true,
+            "Name": "Wall",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 44,
+            "Enabled": true,
+            "Name": "Floor",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 45,
+            "Enabled": true,
+            "Name": "Wall",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 46,
+            "Enabled": true,
+            "Name": "Wall",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 47,
+            "Enabled": true,
+            "Name": "Wall",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 48,
+            "Enabled": true,
+            "Name": "Wall",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        }
+    ],
+    "Components": [
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                614034361
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                -1185998831
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -0.495,
+                0,
+                -0.325
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                768985107
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0.85,
+                0,
+                -0.0625
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                1527965359
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -2.4,
+                0.5,
+                -1.15
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9770-7a44-830e-da49e6b7f88d",
+                1879813304
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -1,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                614034361
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                -1185998831
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -0.495,
+                0,
+                -0.325
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                768985107
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0.85,
+                0,
+                -0.0625
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                1527965359
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -2,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                614034361
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                -1185998831
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -0.495,
+                0,
+                -0.325
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                768985107
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0.85,
+                0,
+                -0.0625
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                1527965359
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -3,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                614034361
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                -1185998831
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -0.495,
+                0,
+                -0.325
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                768985107
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0.85,
+                0,
+                -0.0625
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                1527965359
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -4,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                614034361
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                -1185998831
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -0.495,
+                0,
+                -0.325
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                768985107
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0.85,
+                0,
+                -0.0625
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                1527965359
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -5,
+                0,
+                -1
+            ],
+            "_rotation": [
+                0,
+                -0.7071068,
+                0,
+                0.7071067
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                614034361
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                -1185998831
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -0.495,
+                0,
+                -0.325
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                768985107
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0.85,
+                0,
+                -0.0625
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                1527965359
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -5,
+                0,
+                -2
+            ],
+            "_rotation": [
+                0,
+                -0.7071068,
+                0,
+                0.7071067
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                614034361
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                -1185998831
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -0.495,
+                0,
+                -0.325
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                768985107
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0.85,
+                0,
+                -0.0625
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "01a14964-4124-78be-a8b4-a13240bd740b",
+                1527965359
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -2,
+                -0.5,
+                -4.5
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                10,
+                10,
+                10
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0.9246882,
+                0,
+                0,
+                0.38072523
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "VoxelizationDemo?VoxelizationDemo.Components.DirectionalLight",
+            "_diffuse": 1,
+            "_intensity": 1.5
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -2.5,
+                0.10000001,
+                0.5
+            ],
+            "_rotation": [
+                -0.7071067,
+                0,
+                0,
+                0.7071068
+            ],
+            "_scale": [
+                6,
+                1,
+                1.1999999
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -5.5,
+                1,
+                -2.5
+            ],
+            "_rotation": [
+                -0.49999988,
+                -0.49999976,
+                -0.5000001,
+                0.5
+            ],
+            "_scale": [
+                6,
+                1,
+                3
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -5,
+                1.1999999,
+                0.5
+            ],
+            "_rotation": [
+                -0.7071067,
+                0,
+                0,
+                0.7071068
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                1.1999999,
+                0.5
+            ],
+            "_rotation": [
+                -0.7071067,
+                0,
+                0,
+                0.7071068
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -2.5,
+                1.1999999,
+                0.5
+            ],
+            "_rotation": [
+                -0.7071067,
+                0,
+                0,
+                0.7071068
+            ],
+            "_scale": [
+                0.19999981,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -2.5,
+                2.1,
+                0.5
+            ],
+            "_rotation": [
+                -0.7071067,
+                0,
+                0,
+                0.7071068
+            ],
+            "_scale": [
+                6,
+                1,
+                0.79999995
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -2,
+                2.5,
+                -4.5
+            ],
+            "_rotation": [
+                -1,
+                0,
+                0,
+                -2.9802322E-08
+            ],
+            "_scale": [
+                10,
+                10,
+                10
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0.5,
+                1,
+                -2.5
+            ],
+            "_rotation": [
+                0.49999952,
+                -0.49999928,
+                -0.5000002,
+                -0.49999997
+            ],
+            "_scale": [
+                6,
+                1,
+                3
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0.5,
+                1,
+                -3
+            ],
+            "_rotation": [
+                2.2351594E-07,
+                -0.70710367,
+                -0.70710677,
+                1.9371544E-07
+            ],
+            "_scale": [
+                6,
+                1,
+                3
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -2.5,
+                1,
+                -5.5
+            ],
+            "_rotation": [
+                2.2351594E-07,
+                -0.70710367,
+                -0.70710677,
+                1.9371544E-07
+            ],
+            "_scale": [
+                6,
+                1,
+                3
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                -2.5,
+                1,
+                -4.45
+            ],
+            "_rotation": [
+                0.49999952,
+                -0.49999928,
+                -0.5000002,
+                -0.49999997
+            ],
+            "_scale": [
+                2.8999999,
+                1,
+                3
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-732c-b510-bf116426892b",
+                -2123692621
+            ],
+            "_material": "01a13598-472c-7313-806f-a983e9fdea68"
+        }
+    ]
+}

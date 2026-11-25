@@ -1,0 +1,8 @@
+@use "Editor/UI/Stylesheets/Globals.style";
+
+entryGridItemStyle {
+    font-family: $primary-font-family;
+    font-size: 14;
+    text-color: $primary-text-colour;
+    selected-color: $selected-highlight-color;
+}

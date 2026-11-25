@@ -1,0 +1,161 @@
+﻿using Primary.Assets.Types;
+using Primary.Collections.ReadOnly;
+using Primary.Rendering.Assets;
+using Primary.RHI;
+using System;
+using System.Collections.Frozen;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Text;
+
+namespace Primary.Assets
+{
+    public sealed class ComputeShaderAsset : BaseAssetDefinition<ComputeShaderAsset, ComputeShaderAssetData>
+    {
+        public ComputeShaderAsset(ComputeShaderAssetData assetData) : base(assetData)
+        {
+        }
+
+        public bool TryFindKernel(string kernelName, [NotNullWhen(true)] out ComputeShaderKernel? kernel)
+        {
+            if (!IsLoaded)
+            {
+                kernel = null;
+                return false;
+            }
+
+            return AssetData.Kernels.TryGetValue(kernelName, out kernel);
+        }
+
+        public PropertyBlock? CreatePropertyBlock(string kernelName)
+        {
+            if (Status != ResourceStatus.Success)
+                return null;
+            if (AssetData.Kernels.TryGetValue(kernelName, out ComputeShaderKernel? kernel))
+                return kernel.CreatePropertyBlock();
+
+            return null;
+        }
+
+        public IReadOnlyDictionary<FastStringHash, ComputeShaderKernel> Kernels => AssetData.Kernels;
+    }
+
+    public sealed class ComputeShaderAssetData : BaseInternalAssetData<ComputeShaderAsset>
+    {
+        private FrozenDictionary<FastStringHash, ComputeShaderKernel> _kernels;
+
+        public ComputeShaderAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
+        {
+            _kernels = FrozenDictionary<FastStringHash, ComputeShaderKernel>.Empty;
+        }
+
+        public override void Dispose()
+        {
+            base.Dispose();
+
+            foreach (var kvp in _kernels)
+                kvp.Value.Pipeline.Dispose();
+
+            _kernels = FrozenDictionary<FastStringHash, ComputeShaderKernel>.Empty;
+        }
+
+        public void UpdateAssetData(ComputeShaderAsset asset, FrozenDictionary<FastStringHash, ComputeShaderKernel> kernels)
+        {
+            base.UpdateAssetData(asset);
+
+            _kernels = kernels;
+        }
+
+        internal FrozenDictionary<FastStringHash, ComputeShaderKernel> Kernels => _kernels;
+    }
+
+    public record class ComputeShaderKernel : IShaderResourceSource
+    {
+        private ComputeShaderAsset _asset;
+
+        private KernelThreadSize _threadSize;
+
+        private ShaderProperty[] _properties;
+        private FrozenDictionary<int, int> _remappingTable;
+
+        private int _propertyBlockSize;
+        private int _headerBlockSize;
+
+        private ShHeaderFlags _headerFlags;
+
+        private RHIComputePipeline _computePipeline;
+
+        private int _resourceCount;
+
+        internal ComputeShaderKernel()
+        {
+            _asset = default!;
+
+            _threadSize = default;
+
+            _properties = [];
+            _remappingTable = FrozenDictionary<int, int>.Empty;
+
+            _propertyBlockSize = 0;
+            _headerBlockSize = 0;
+
+            _headerFlags = ShHeaderFlags.None;
+
+            _computePipeline = default!;
+
+            _resourceCount = 0;
+        }
+
+        internal void SetupData(ComputeShaderAsset asset, KernelThreadSize threadSize, ShaderProperty[] properties, FrozenDictionary<int, int> remappingTable, int propertyBlockSize, int headerBlockSize, ShHeaderFlags headerFlags, RHIComputePipeline computePipeline)
+        {
+            _asset = asset;
+
+            _threadSize = threadSize;
+
+            _properties = properties;
+            _remappingTable = remappingTable;
+
+            _propertyBlockSize = propertyBlockSize;
+            _headerBlockSize = headerBlockSize;
+
+            _headerFlags = headerFlags;
+
+            _computePipeline = computePipeline;
+
+            _resourceCount = 0;
+            foreach (ref readonly ShaderProperty property in properties.AsSpan())
+            {
+                if (property.Type == ShPropertyType.Buffer || property.Type == ShPropertyType.Texture || property.Type == ShPropertyType.Sampler)
+                    _resourceCount++;
+            }
+        }
+
+        public PropertyBlock? CreatePropertyBlock()
+        {
+            return new PropertyBlock(this);
+        }
+
+        public int LoadIndex => _asset.LoadIndex;
+        public bool IsLoaded => _asset.IsLoaded;
+
+        public KernelThreadSize ThreadSize => _threadSize;
+
+        public ReadOnlySpan<ShaderProperty> Properties => _properties;
+        public IReadOnlyDictionary<int, int> RemappingTable => _remappingTable;
+
+        public int PropertyBlockSize => _propertyBlockSize;
+        public int HeaderBlockSize => _headerBlockSize;
+
+        public ShHeaderFlags HeaderFlags => _headerFlags;
+
+        public RHIComputePipeline Pipeline => _computePipeline;
+
+        public int ResourceCount => _resourceCount;
+    }
+
+    public readonly record struct KernelThreadSize(int X, int Y, int Z)
+    {
+        public override int GetHashCode() => HashCode.Combine(X, Y, Z);
+        public override string ToString() => $"{X}x{Y}x{Z}";
+    }
+}

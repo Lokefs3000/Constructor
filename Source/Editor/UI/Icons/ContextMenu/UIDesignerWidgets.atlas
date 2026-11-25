@@ -1,0 +1,36 @@
+texture = "Editor/UI/Icons/ContextMenu/UIDesignerWidgets.png"
+
+[[sprites]]
+name = "Button"
+offset = [0, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "GridFrame"
+offset = [32, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Image"
+offset = [64, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Label"
+offset = [96, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "LayoutFrame"
+offset = [128, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Widget"
+offset = [160, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "NoImg"
+offset = [192, 0]
+size = [32, 32]

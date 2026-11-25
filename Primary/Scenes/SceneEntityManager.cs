@@ -103,7 +103,7 @@ namespace Primary.Scenes
                 type.GetCustomAttribute<ComponentRequirementsAttribute>(),
                 type.GetCustomAttribute<ComponentConnectionsAttribute>(),
                 type.GetCustomAttribute<ComponentUsageAttribute>(),
-                ComponentRegistry.Add(type),
+                ComponentRegistry.Add(type), //TODO: revamp to NOT use pointers
                 static (Entity e, out bool exists) => Unsafe.AsPointer(ref e.TryGetRef<T>(out exists)),
                 static (Entity e) => Unsafe.AsPointer(ref e.AddOrGet(new T())),
                 static (Entity e, IComponent c) => e.Set<T>((T)c),
@@ -431,7 +431,25 @@ namespace Primary.Scenes
             return null;
         }
 
+        public static bool TryGetComponentData<T>(out Component componentData) where T : IComponent
+        {
+            SceneEntityManager @this = NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target));
+            return @this._components.TryGetValue(typeof(T), out componentData);
+        }
+
+        public static bool TryGetComponentData(Type type, out Component componentData)
+        {
+            SceneEntityManager @this = NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target));
+            return @this._components.TryGetValue(type, out componentData);
+        }
+
         public static SceneEntity CreateEntity(Scene? scene) => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target)).CreateReadyEntity(scene);
+
+        public static void DestroyEntity(SceneEntity entity)
+        {
+            Scene scene = entity.Scene;
+            scene.World.Destroy(entity.WrappedEntity);
+        }
 
         public static IEnumerable<Type> RegisteredComponents => NullableUtility.ThrowIfNull(Unsafe.As<SceneEntityManager>(s_instance.Target))._components.Keys;
 

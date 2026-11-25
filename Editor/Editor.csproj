@@ -1,56 +1,201 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
-		<TargetFramework>net9.0</TargetFramework>
+		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<StartupObject>Editor.Program</StartupObject>
+		<Configurations>Debug;Release;ReleaseWithDebug</Configurations>
+		<AssemblyVersion>0.1.0</AssemblyVersion>
+		<FileVersion>0.1.3</FileVersion>
 	</PropertyGroup>
-
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
+		<DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+		<Optimize>True</Optimize>
+	</PropertyGroup>
 	<ItemGroup>
-	  <Compile Remove="Serialization\NewFolder\**" />
-	  <EmbeddedResource Remove="Serialization\NewFolder\**" />
-	  <None Remove="Serialization\NewFolder\**" />
+		<Compile Remove="DearImGui\ConsoleView.cs" />
+		<Compile Remove="DearImGui\ContentView.cs" />
+		<Compile Remove="DearImGui\DebugStatisticsView.cs" />
+		<Compile Remove="DearImGui\DebugView.cs" />
+		<Compile Remove="DearImGui\EditorTaskViewer.cs" />
+		<Compile Remove="DearImGui\FrameGraphViewer.cs" />
+		<Compile Remove="DearImGui\GeoEditorView.cs" />
+		<Compile Remove="DearImGui\HierchyView.cs" />
+		<Compile Remove="DearImGui\ImGuiCustom.cs" />
+		<Compile Remove="DearImGui\ImGuiUtility.cs" />
+		<Compile Remove="DearImGui\ImGuiWidgets.cs" />
+		<Compile Remove="DearImGui\ImportFileView.cs" />
+		<Compile Remove="DearImGui\InputDebugger.cs" />
+		<Compile Remove="DearImGui\Old\Components\ContentIconBuilder.cs" />
+		<Compile Remove="DearImGui\Old\ConsoleView.cs" />
+		<Compile Remove="DearImGui\Old\ContentView.cs" />
+		<Compile Remove="DearImGui\Old\Debuggers\AssetDatabaseDebugger.cs" />
+		<Compile Remove="DearImGui\Old\Debuggers\AssetDebugger.cs" />
+		<Compile Remove="DearImGui\Old\Debuggers\DynAtlasDebugger.cs" />
+		<Compile Remove="DearImGui\Old\Debuggers\IVisualDebugger.cs" />
+		<Compile Remove="DearImGui\Old\Debuggers\RenderDebugger.cs" />
+		<Compile Remove="DearImGui\Old\Debuggers\ToolDebugger.cs" />
+		<Compile Remove="DearImGui\Old\DebugStatisticsView.cs" />
+		<Compile Remove="DearImGui\Old\DebugView.cs" />
+		<Compile Remove="DearImGui\Old\EditorTaskViewer.cs" />
+		<Compile Remove="DearImGui\Old\Extra\BundleExplorer.cs" />
+		<Compile Remove="DearImGui\Old\FrameGraphViewer.cs" />
+		<Compile Remove="DearImGui\Old\GeoEditorView.cs" />
+		<Compile Remove="DearImGui\Old\HierchyView.cs" />
+		<Compile Remove="DearImGui\Old\ImGuiCustom.cs" />
+		<Compile Remove="DearImGui\Old\ImGuiUtility.cs" />
+		<Compile Remove="DearImGui\Old\ImGuiWidgets.cs" />
+		<Compile Remove="DearImGui\Old\ImportFileView.cs" />
+		<Compile Remove="DearImGui\Old\InputDebugger.cs" />
+		<Compile Remove="DearImGui\Old\OutputView.cs" />
+		<Compile Remove="DearImGui\Old\PopupManager.cs" />
+		<Compile Remove="DearImGui\Old\Popups\AssetPicker.cs" />
+		<Compile Remove="DearImGui\Old\Popups\MaterialAssetPicker.cs" />
+		<Compile Remove="DearImGui\Old\Popups\ModelAssetPicker.cs" />
+		<Compile Remove="DearImGui\Old\ProfilerView.cs" />
+		<Compile Remove="DearImGui\Old\ProfilerView2.cs" />
+		<Compile Remove="DearImGui\Old\PropertiesView.cs" />
+		<Compile Remove="DearImGui\Old\Properties\EffectVolumeProperties.cs" />
+		<Compile Remove="DearImGui\Old\Properties\EntityProperties.cs" />
+		<Compile Remove="DearImGui\Old\Properties\GeoEditProperties.cs" />
+		<Compile Remove="DearImGui\Old\Properties\MaterialProperties.cs" />
+		<Compile Remove="DearImGui\Old\Properties\ModelProperties.cs" />
+		<Compile Remove="DearImGui\Old\Properties\ShaderProperties.cs" />
+		<Compile Remove="DearImGui\Old\Properties\TextureProperties.cs" />
+		<Compile Remove="DearImGui\Old\RenderPassInspector.cs" />
+		<Compile Remove="DearImGui\Old\SceneView.cs" />
+		<Compile Remove="DearImGui\Old\Tooling\CubemapTool.cs" />
+		<Compile Remove="DearImGui\Old\ViewWidgets\FramePacingWidget.cs" />
+		<Compile Remove="DearImGui\Old\ViewWidgets\SceneViewWidget.cs" />
+		<Compile Remove="DearImGui\Old\ViewWidgets\SnappingWidget.cs" />
+		<Compile Remove="DearImGui\Old\ViewWidgets\ToolSelectorWidget.cs" />
+		<Compile Remove="DearImGui\Old\ViewWidgets\ToolSpaceWidget.cs" />
+		<Compile Remove="DearImGui\OutputView.cs" />
+		<Compile Remove="DearImGui\PopupManager.cs" />
+		<Compile Remove="DearImGui\ProfilerView.cs" />
+		<Compile Remove="DearImGui\ProfilerView2.cs" />
+		<Compile Remove="DearImGui\PropertiesView.cs" />
+		<Compile Remove="DearImGui\RenderPassInspector.cs" />
+		<Compile Remove="DearImGui\SceneView.cs" />
+		<Compile Remove="GeoEdit\BrushFaceEnumerator.cs" />
+		<Compile Remove="GeoEdit\GeoMaterialIndexer.cs" />
+		<Compile Remove="GeoEdit\GeoMathUtility.cs" />
+		<Compile Remove="GeoEdit\GeoPicker.cs" />
+		<Compile Remove="GeoEdit\IGeoTool.cs" />
+		<Compile Remove="GeoEdit\PlaceTool.cs" />
+		<Compile Remove="GeoEdit\Selectables.cs" />
+		<Compile Remove="Interaction\Logic\GeoSelectionLogic.cs" />
+		<Compile Remove="Interaction\Tools\TranslateTool_Old.cs" />
+		<Compile Remove="Rendering\GeoToolRenderPass.cs" />
+		<Compile Remove="Rendering\GizmoRenderPass.cs" />
+		<Compile Remove="Rendering\RenderPathManager.cs" />
+		<Compile Remove="Rendering\SelectionRenderPass.cs" />
+		<Compile Remove="Rendering\ToolsRenderPass.cs" />
+		<Compile Remove="Serialization\SceneSerializer.cs" />
 	</ItemGroup>
-
 	<ItemGroup>
 		<ProjectReference Include="..\Editor.Geometry\Editor.Geometry.csproj" />
-		<ProjectReference Include="..\Editor.Gui\Editor.Gui.csproj" />
 		<ProjectReference Include="..\Editor.Interop\Editor.Interop.csproj" />
 		<ProjectReference Include="..\Editor.Processors\Editor.Processors.csproj" />
+		<ProjectReference Include="..\Editor.UI\Editor.UI.csproj" />
+		<ProjectReference Include="..\ExtConsole\ExtConsole.csproj" />
+		<ProjectReference Include="..\Primary.R2.ForwardPlus\Primary.R2.ForwardPlus.csproj" />
 		<ProjectReference Include="..\Primary\Primary.csproj" />
 	</ItemGroup>
-
+	<ItemGroup>
+		<ProjectReference Include="..\Primary.SourceGenerator\Primary.SourceGenerator.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+	</ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="CircularBuffer" Version="1.4.0" />
 		<PackageReference Include="CommandLineParser" Version="2.9.1" />
-		<PackageReference Include="CsToml.Generator" Version="1.7.2">
-		  <PrivateAssets>all</PrivateAssets>
-		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		<PackageReference Include="CsToml.Generator" Version="1.8.2">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Hexa.NET.ImGui" Version="2.2.8.5" />
-		<PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.17.4" />
+		<PackageReference Include="Hexa.NET.ImGui" Version="2.2.9" />
+		<PackageReference Include="Hexa.NET.ImGui.Backends.SDL3" Version="1.0.18" />
 		<PackageReference Include="RectpackSharp" Version="1.2.0" />
+		<PackageReference Include="Sigil" Version="5.0.0" />
 		<PackageReference Include="StbImageSharper" Version="1.0.1" />
 	</ItemGroup>
-
 	<ItemGroup>
-	  <Folder Include="Rendering\Paths\" />
+		<Folder Include="DearImGui\StylesheetEd\" />
+		<Folder Include="Diagnostics\" />
+		<Folder Include="Rendering\Paths\" />
 	</ItemGroup>
-
 	<ItemGroup>
-	  <None Update="splash.bmp">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	  <None Update="SplashData.bundle">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
+		<None Include="DearImGui\DearImGuiWindowManager.cs" />
+		<None Include="DearImGui\Old\Components\ContentIconBuilder.cs" />
+		<None Include="DearImGui\Old\ConsoleView.cs" />
+		<None Include="DearImGui\Old\ContentView.cs" />
+		<None Include="DearImGui\Old\Debuggers\AssetDatabaseDebugger.cs" />
+		<None Include="DearImGui\Old\Debuggers\AssetDebugger.cs" />
+		<None Include="DearImGui\Old\Debuggers\DynAtlasDebugger.cs" />
+		<None Include="DearImGui\Old\Debuggers\IVisualDebugger.cs" />
+		<None Include="DearImGui\Old\Debuggers\RenderDebugger.cs" />
+		<None Include="DearImGui\Old\Debuggers\ToolDebugger.cs" />
+		<None Include="DearImGui\Old\DebugStatisticsView.cs" />
+		<None Include="DearImGui\Old\DebugView.cs" />
+		<None Include="DearImGui\Old\EditorTaskViewer.cs" />
+		<None Include="DearImGui\Old\Extra\BundleExplorer.cs" />
+		<None Include="DearImGui\Old\FrameGraphViewer.cs" />
+		<None Include="DearImGui\Old\GeoEditorView.cs" />
+		<None Include="DearImGui\Old\HierchyView.cs" />
+		<None Include="DearImGui\Old\ImGuiCustom.cs" />
+		<None Include="DearImGui\Old\ImGuiUtility.cs" />
+		<None Include="DearImGui\Old\ImGuiWidgets.cs" />
+		<None Include="DearImGui\Old\ImportFileView.cs" />
+		<None Include="DearImGui\Old\InputDebugger.cs" />
+		<None Include="DearImGui\Old\OutputView.cs" />
+		<None Include="DearImGui\Old\PopupManager.cs" />
+		<None Include="DearImGui\Old\Popups\AssetPicker.cs" />
+		<None Include="DearImGui\Old\Popups\MaterialAssetPicker.cs" />
+		<None Include="DearImGui\Old\Popups\ModelAssetPicker.cs" />
+		<None Include="DearImGui\Old\ProfilerView.cs" />
+		<None Include="DearImGui\Old\ProfilerView2.cs" />
+		<None Include="DearImGui\Old\PropertiesView.cs" />
+		<None Include="DearImGui\Old\Properties\EffectVolumeProperties.cs" />
+		<None Include="DearImGui\Old\Properties\EntityProperties.cs" />
+		<None Include="DearImGui\Old\Properties\GeoEditProperties.cs" />
+		<None Include="DearImGui\Old\Properties\MaterialProperties.cs" />
+		<None Include="DearImGui\Old\Properties\ModelProperties.cs" />
+		<None Include="DearImGui\Old\Properties\ShaderProperties.cs" />
+		<None Include="DearImGui\Old\Properties\TextureProperties.cs" />
+		<None Include="DearImGui\Old\RenderPassInspector.cs" />
+		<None Include="DearImGui\Old\SceneView.cs" />
+		<None Include="DearImGui\Old\Tooling\CubemapTool.cs" />
+		<None Include="DearImGui\Old\ViewWidgets\FramePacingWidget.cs" />
+		<None Include="DearImGui\Old\ViewWidgets\SceneViewWidget.cs" />
+		<None Include="DearImGui\Old\ViewWidgets\SnappingWidget.cs" />
+		<None Include="DearImGui\Old\ViewWidgets\ToolSelectorWidget.cs" />
+		<None Include="DearImGui\Old\ViewWidgets\ToolSpaceWidget.cs" />
+		<None Include="GeoEdit\BrushFaceEnumerator.cs" />
+		<None Include="GeoEdit\GeoMaterialIndexer.cs" />
+		<None Include="GeoEdit\GeoMathUtility.cs" />
+		<None Include="GeoEdit\GeoPicker.cs" />
+		<None Include="GeoEdit\IGeoTool.cs" />
+		<None Include="GeoEdit\PlaceTool.cs" />
+		<None Include="GeoEdit\Selectables.cs" />
+		<None Include="Interaction\Logic\GeoSelectionLogic.cs" />
+		<None Include="Interaction\Tools\TranslateTool_Old.cs" />
+		<None Include="Rendering\GeoToolRenderPass.cs" />
+		<None Include="Rendering\GizmoRenderPass.cs" />
+		<None Include="Rendering\RenderPathManager.cs" />
+		<None Include="Rendering\SelectionRenderPass.cs" />
+		<None Include="Rendering\ToolsRenderPass.cs" />
+		<None Include="Serialization\SceneSerializer.cs" />
 	</ItemGroup>
-
+	<ItemGroup>
+		<None Update="splash.bmp">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="SplashData.bundle">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 	<Target Name="PatchExec" AfterTargets="PostBuildEvent">
 		<Exec Command="call &quot;..\..\..\..\Patcher\D3D12SDKVersionPatcher\PatchEditor.bat&quot; &quot;Editor&quot;" WorkingDirectory="$(OutDir)" />
 	</Target>
-
 </Project>

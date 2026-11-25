@@ -1,0 +1,2 @@
+"Default" = "Content/Shaders/LitCutout.shader"
+"Shadow" = "Content/Shaders/Shadow/ShadowGeneric.shader"

@@ -1,0 +1,119 @@
+{
+    "Entities": [
+        {
+            "Id": 0,
+            "Enabled": true,
+            "Name": "Sun",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "VoxelizationDemo?VoxelizationDemo.Components.DirectionalLight"
+            ]
+        },
+        {
+            "Id": 1,
+            "Enabled": true,
+            "Name": "Sphere",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "Primary?Primary.Components.MeshRenderer"
+            ]
+        },
+        {
+            "Id": 2,
+            "Enabled": true,
+            "Name": "Effects",
+            "Components": [
+                "Primary?Primary.Components.Transform",
+                "VoxelizationDemo?VoxelizationDemo.Rendering.Compositing.EffectVolume"
+            ]
+        }
+    ],
+    "Components": [
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0.3535534,
+                -0.35355335,
+                0.14644662,
+                0.8535534
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "VoxelizationDemo?VoxelizationDemo.Components.DirectionalLight",
+            "_diffuse": 1,
+            "_intensity": 1
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "Primary?Primary.Components.MeshRenderer",
+            "_mesh": [
+                "019f320a-9777-7605-94a7-501110f3c113",
+                1040048950
+            ],
+            "_material": "01a1c638-0f50-79f0-8d0a-7aad681bea26",
+            "_layers": 18446744073709551615
+        },
+        {
+            "Key": "Primary?Primary.Components.Transform",
+            "_position": [
+                0,
+                0,
+                0
+            ],
+            "_rotation": [
+                0,
+                0,
+                0,
+                1
+            ],
+            "_scale": [
+                1,
+                1,
+                1
+            ]
+        },
+        {
+            "Key": "VoxelizationDemo?VoxelizationDemo.Rendering.Compositing.EffectVolume",
+            "_asset": "01a1daa8-78d7-74d7-a5f1-2a24f9c6d29c",
+            "_isGlobal": false,
+            "_shape": "Box",
+            "_blendDistance": 0,
+            "_weight": 1,
+            "_priority": 0,
+            "_boxExtents": [
+                1,
+                1,
+                1
+            ],
+            "_sphereRadius": 0
+        }
+    ]
+}

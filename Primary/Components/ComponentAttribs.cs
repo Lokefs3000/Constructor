@@ -1,6 +1,6 @@
 ﻿namespace Primary.Components
 {
-    [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public sealed class ComponentRequirementsAttribute : Attribute
     {
         private Type[] _required;
@@ -42,8 +42,27 @@
         public bool HasSelfReference => _hasSelfRef;
     }
 
-    [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public sealed class DontSerializeComponentAttribute : Attribute
+    {
+
+    }
+
+    [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
+    public sealed class IncompatibleComponentsAttribute : Attribute
+    {
+        private Type[] _components;
+
+        public IncompatibleComponentsAttribute(params Type[] Components)
+        {
+            _components = Components;
+        }
+
+        public Type[] ComponentTypes => _components;
+    }
+
+    [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+    public sealed class ComponentAttribute : Attribute
     {
 
     }

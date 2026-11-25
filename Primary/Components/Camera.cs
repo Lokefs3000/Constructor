@@ -5,11 +5,13 @@ using System.Runtime.Serialization;
 
 namespace Primary.Components
 {
+    [Component]
     [ComponentRequirements(typeof(Transform)), ComponentConnections(typeof(CameraProjectionData))]
     public record struct Camera : IComponent
     {
-        [IgnoreDataMember]
-        private bool _isDirty;
+        [IgnoreDataMember] private bool _isDirty;
+
+        private CameraUpdateMode _updateMode;
 
         private CameraClear _clear;
         private Color _clearColor;
@@ -22,6 +24,8 @@ namespace Primary.Components
         {
             _isDirty = true;
 
+            _updateMode = CameraUpdateMode.EveryFrame;
+
             _clear = CameraClear.Solid;
             _clearColor = Color.Black;
 
@@ -30,6 +34,8 @@ namespace Primary.Components
             _farClip = 1000.0f;
         }
 
+        public CameraUpdateMode UpdateMode { get => _updateMode; set => _updateMode = value; }
+
         public CameraClear Clear { get => _clear; set => _clear = value; }
         public Color ClearColor { get => _clearColor; set => _clearColor = value; }
 
@@ -37,7 +43,6 @@ namespace Primary.Components
         public float NearClip { get => _nearClip; set { _nearClip = value; _isDirty = true; } }
         public float FarClip { get => _farClip; set { _farClip = value; _isDirty = true; } }
 
-        [IgnoreDataMember]
         internal bool IsDirty { get => _isDirty; set => _isDirty = value; }
     }
 
@@ -48,6 +53,12 @@ namespace Primary.Components
         public Vector2 ClientSize;
         public Matrix4x4 ProjectionMatrix;
         public Matrix4x4 ViewMatrix;
+    }
+
+    public enum CameraUpdateMode : byte
+    {
+        EveryFrame = 0,
+        Scriptable,
     }
 
     public enum CameraClear : byte

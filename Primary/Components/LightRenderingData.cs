@@ -2,7 +2,8 @@
 
 namespace Primary.Components
 {
-    [ComponentUsage(CanBeAdded: false)]
+    [Component]
+    [ComponentUsage(CanBeAdded: false), DontSerializeComponent]
     [InspectorHidden]
     public record struct LightRenderingData : IComponent
     {

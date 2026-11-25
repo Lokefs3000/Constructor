@@ -1,5 +1,10 @@
 ﻿using Editor.Storage;
 using Primary.Assets;
+using Primary.Assets.Types;
+using Tomlyn;
+using Tomlyn.Model;
+using Tomlyn.Parsing;
+using Tomlyn.Syntax;
 
 namespace Editor.Assets.Importers
 {
@@ -19,21 +24,35 @@ namespace Editor.Assets.Importers
         {
             string localInputFile = fullFilePath.Substring(filesystem.AbsolutePath.Length);
 
-            pipeline.ReloadAsset(pipeline.Identifier.GetOrRegisterAsset(localInputFile));
+            AssetId id = pipeline.Identifier.GetOrRegisterAsset(localInputFile);
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<MaterialAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localInputFile), localInputFile));
+            pipeline.ReloadAsset(id);
+
+            EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<MaterialAsset>(new AssetDatabaseEntry(id, localInputFile, true));
             return true;
         }
 
         public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
         {
             if (!ValidateFile(localFilePath, filesystem, pipeline))
+            {
+                EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<MaterialAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, false));
                 return;
+            }
 
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<MaterialAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath));
+            EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<MaterialAsset>(new AssetDatabaseEntry(pipeline.Identifier.GetOrRegisterAsset(localFilePath), localFilePath, true));
         }
 
-        public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline) => true;
+        public bool ValidateFile(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
+        {
+            string? str = filesystem.ReadAllText(localFilePath);
+            return str == null ? false : !TomlParser.Create(str).HasErrors;
+        }
+
+        private static readonly TomlParserOptions s_validateOptions = new TomlParserOptions
+        {
+            Mode = TomlParserMode.Tolerant
+        };
 
         public string CustomFileIcon => "Editor/Textures/Icons/FileMaterial.png";
     }

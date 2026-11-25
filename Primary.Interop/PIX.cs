@@ -7,10 +7,16 @@ namespace Primary.Interop
         [LibraryImport("WinPixEventRuntime.dll", EntryPoint = "PIXBeginEventOnCommandList", StringMarshalling = StringMarshalling.Utf8)]
         public static partial void PIXBeginEventOnCommandList(nint commandList, ulong color, string formatString);
 
+        [LibraryImport("WinPixEventRuntime.dll", EntryPoint = "PIXBeginEventOnCommandList", StringMarshalling = StringMarshalling.Utf8)]
+        public static unsafe partial void PIXBeginEventOnCommandList(nint commandList, ulong color, byte* formatString);
+
         [LibraryImport("WinPixEventRuntime.dll", EntryPoint = "PIXEndEventOnCommandList")]
         public static partial void PIXEndEventOnCommandList(nint commandList);
 
         [LibraryImport("WinPixEventRuntime.dll", EntryPoint = "PIXSetMarkerOnCommandList", StringMarshalling = StringMarshalling.Utf8)]
         public static partial void PIXSetMarkerOnCommandList(nint commandList, ulong color, string formatString);
+
+        [LibraryImport("WinPixEventRuntime.dll", EntryPoint = "PIXSetMarkerOnCommandList", StringMarshalling = StringMarshalling.Utf8)]
+        public static unsafe partial void PIXSetMarkerOnCommandList(nint commandList, ulong color, byte* formatString);
     }
 }

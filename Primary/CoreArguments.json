@@ -1,0 +1,55 @@
+{
+    "arguments": [
+        {
+            "name": "core-minimal",
+            "shorthand": null,
+            "type": null
+        },
+        {
+            "name": "r-force-swapchain-8bit",
+            "shorthand": null,
+            "type": null
+        },
+        {
+            "name": "d3d12-no-tight-alignment",
+            "shorthand": null,
+            "type": null
+        },
+        {
+            "name": "no-logbook",
+            "shorthand": null,
+            "type": null
+        },
+        {
+            "name": "logbook-max-size",
+            "shorthand": null,
+            "type": "Integer"
+        },
+        {
+            "name": "rhi-setdebug",
+            "shorthand": null,
+            "type": "Boolean"
+        },
+        {
+            "name": "job-initial-logsize",
+            "shorthand": null,
+            "type": "Integer"
+        },
+        {
+            "name": "job-max-threads",
+            "shorthand": null,
+            "type": "Integer"
+        },
+        {
+            "name": "render-draw-gizmos",
+            "shorthand": null,
+            "type": null
+        },
+        {
+            "name": "phys-trace-allocs",
+            "shorthand": null,
+            "type": null
+        }
+    ],
+    "includes": []
+}

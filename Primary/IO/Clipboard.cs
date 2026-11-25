@@ -1,15 +1,5 @@
-﻿using CommunityToolkit.HighPerformance;
-using Primary.Common;
-using Primary.RHI;
-using SDL;
-using System;
-using System.Buffers;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using TerraFX.Interop.Windows;
 
 namespace Primary.IO
@@ -61,15 +51,23 @@ namespace Primary.IO
             return false;
         }
 
+        [SupportedOSPlatform("windows")]
         private static unsafe class Win32Impl
         {
             internal static bool SetUtf16Text(ReadOnlySpan<char> text)
             {
-                if (Windows.OpenClipboard(HWND.NULL).Value == 0)
+                HWND hwnd = Engine.GlobalSingleton.WindowManager.PrimaryWindow == null ?
+                    HWND.NULL :
+                    new HWND((void*)Engine.GlobalSingleton.WindowManager.PrimaryWindow.NativeWindowHandle);
+
+                if (Windows.OpenClipboard(hwnd).Value == 0)
                     return false;
 
                 try
                 {
+                    if (!Windows.EmptyClipboard())
+                        return false;
+
                     HGLOBAL memory = Windows.GlobalAlloc(GMEM.GMEM_MOVEABLE, (nuint)((text.Length + 1) * sizeof(char)));
                     {
                         char* ptr = (char*)Windows.GlobalLock(memory);
@@ -90,11 +88,18 @@ namespace Primary.IO
 
             internal static bool SetUtf8Text(ReadOnlySpan<byte> text)
             {
+                HWND hwnd = Engine.GlobalSingleton.WindowManager.PrimaryWindow == null ?
+                   HWND.NULL :
+                   new HWND((void*)Engine.GlobalSingleton.WindowManager.PrimaryWindow.NativeWindowHandle);
+
                 if (Windows.OpenClipboard(HWND.NULL).Value == 0)
                     return false;
 
                 try
                 {
+                    if (!Windows.EmptyClipboard())
+                        return false;
+
                     HGLOBAL memory = Windows.GlobalAlloc(GMEM.GMEM_MOVEABLE, (nuint)((text.Length + 1) * sizeof(byte)));
                     {
                         byte* ptr = (byte*)Windows.GlobalLock(memory);
@@ -115,7 +120,11 @@ namespace Primary.IO
 
             internal static string? GetUtf16Text()
             {
-                if (Windows.OpenClipboard(HWND.NULL).Value == 0)
+                HWND hwnd = Engine.GlobalSingleton.WindowManager.PrimaryWindow == null ?
+                    HWND.NULL :
+                    new HWND((void*)Engine.GlobalSingleton.WindowManager.PrimaryWindow.NativeWindowHandle);
+
+                if (Windows.OpenClipboard(hwnd).Value == 0)
                     return null;
 
                 try
@@ -133,7 +142,7 @@ namespace Primary.IO
                         Windows.GlobalUnlock(new HGLOBAL(memory));
                     }
 
-                    return text;
+                    return text.TrimEnd('\0');
                 }
                 finally
                 {
@@ -145,7 +154,11 @@ namespace Primary.IO
 
             internal static byte[]? GetUtf8Text()
             {
-                if (Windows.OpenClipboard(HWND.NULL).Value == 0)
+                HWND hwnd = Engine.GlobalSingleton.WindowManager.PrimaryWindow == null ?
+                    HWND.NULL :
+                    new HWND((void*)Engine.GlobalSingleton.WindowManager.PrimaryWindow.NativeWindowHandle);
+
+                if (Windows.OpenClipboard(hwnd).Value == 0)
                     return null;
 
                 try
@@ -159,7 +172,7 @@ namespace Primary.IO
                     {
                         byte* ptr = (byte*)Windows.GlobalLock(new HGLOBAL(memory));
 
-                        data = new byte[Windows.GlobalSize(new HGLOBAL(memory))];
+                        data = new byte[Windows.GlobalSize(new HGLOBAL(memory)) - sizeof(byte)];
                         fixed (byte* localPtr = data)
                         {
                             NativeMemory.Copy(ptr, localPtr, (nuint)data.LongLength);
@@ -180,7 +193,11 @@ namespace Primary.IO
 
             internal static bool HasData()
             {
-                if (Windows.OpenClipboard(HWND.NULL).Value == 0)
+                HWND hwnd = Engine.GlobalSingleton.WindowManager.PrimaryWindow == null ?
+                    HWND.NULL :
+                    new HWND((void*)Engine.GlobalSingleton.WindowManager.PrimaryWindow.NativeWindowHandle);
+
+                if (Windows.OpenClipboard(hwnd).Value == 0)
                     return false;
 
                 try

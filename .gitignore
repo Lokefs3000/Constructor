@@ -403,4 +403,8 @@ FodyWeavers.xsd
 /ProjectBK
 /Project
 /Project/Library
-/Source
+/Source/DemoGame1
+
+# Temporary
+/infra_import
+/Demo/VoxelizationDemo/Source/Library/

@@ -1,0 +1,51 @@
+struct FontGlyph
+{
+    float4 PlaneBounds;
+    float4 AtlasBounds;
+    float Advance;
+};
+
+struct TextSectionData
+{
+    float2 BasePosition;
+
+    float TextScale;
+    uint FontStyleIndex;
+    float4 Color;
+
+    uint CharacterOffset;
+    uint CharacterCount;
+    
+    uint BaseVertexOffset;
+    uint BaseIndiceOffset;
+};
+
+struct Vertex
+{
+    float2 Position;
+    float2 UV;
+    float4 Color;
+    uint MetadataOffset;
+};
+
+StructuredBuffer<TextSectionData> sbTextSections;
+StructuredBuffer<uint16_t> sbCharacters;
+
+RWStructuredBuffer<Vertex> sbVertices;
+RWStructuredBuffer<uint> sbIndices;
+
+[kernel]
+[numthreads(32, 1, 1)]
+void CSGenTextGeometry(uint3 dispatchId : SV_DispatchThreadID)
+{
+    TextSectionData sectionData = sbTextSections[dispatchId.x];
+
+    uint vertexIndex = sectionData.BaseVertexOffset;
+    uint indiceIndex = sectionData.BaseIndiceOffset;
+    
+    for (uint i = sectionData.CharacterOffset; i < sectionData.CharacterCount; ++i)
+    {
+        uint16_t c = sbCharacters[i];
+        
+    }
+}

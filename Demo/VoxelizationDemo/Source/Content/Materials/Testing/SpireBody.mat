@@ -1,0 +1,9 @@
+shader = "Content/Materials/Sets/LitTriplanar.shaderset"
+
+[resources]
+Diffuse = "Content/Materials/Testing/MetalPlates/MetalPlates014_1K-JPG_Color.jpg"
+Normal = "Content/Materials/Testing/MetalPlates/MetalPlates014_1K-JPG_NormalGL.jpg"
+Mask = "Content/Materials/Testing/MetalPlates/MetalPlates014_Mask.texcomp"
+
+[properties]
+"UV Scale" = "[1.2, 1.2]"

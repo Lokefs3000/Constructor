@@ -1,0 +1,56 @@
+texture = "Content/Textures/Editor/ToolIcons.png"
+
+[[sprites]]
+name = "Translate"
+offset = [0, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Rotate"
+offset = [32, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Scale"
+offset = [64, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "SnapOff"
+offset = [0, 32]
+size = [32, 32]
+
+[[sprites]]
+name = "SnapOn"
+offset = [32, 32]
+size = [32, 32]
+
+[[sprites]]
+name = "SpaceLocal"
+offset = [64, 32]
+size = [32, 32]
+
+[[sprites]]
+name = "SpaceWorld"
+offset = [96, 32]
+size = [32, 32]
+
+[[sprites]]
+name = "SpaceAbsolute"
+offset = [256, 32]
+size = [32, 32]
+
+[[sprites]]
+name = "OriginFirst"
+offset = [128, 32]
+size = [32, 32]
+
+[[sprites]]
+name = "OriginCenter"
+offset = [160, 32]
+size = [32, 32]
+
+[[sprites]]
+name = "OriginLast"
+offset = [192, 32]
+size = [32, 32]

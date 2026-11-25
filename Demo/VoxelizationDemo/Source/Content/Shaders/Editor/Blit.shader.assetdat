@@ -1,0 +1,43 @@
+asset_id = "01a08b5d405e7843893370e26c98edff"
+meta_version = 1
+sub_assets = []
+[unique_config]
+primitive_topology = 0
+[unique_config.rasterizer]
+fill_mode = 0
+cull_mode = 0
+front_counter_clockwise = false
+depth_bias = 0
+depth_bias_clamp = 0.0
+slope_scaled_depth_bias = 0.0
+depth_clip_enable = false
+conservative_raster = false
+[unique_config.depth_stencil]
+depth_enable = false
+depth_write_mask = 1
+depth_func = 4
+stencil_enable = false
+stencil_read_mask = 255
+stencil_write_mask = 255
+[unique_config.depth_stencil.front_face]
+fail = 0
+depth_fail = 0
+pass = 0
+func = 0
+[unique_config.depth_stencil.back_face]
+fail = 0
+depth_fail = 0
+pass = 0
+func = 0
+[unique_config.blend]
+alpha_to_coverage_enable = false
+independent_blend_enable = false
+[[unique_config.blend.rtblends]]
+blend_enable = false
+src_blend = 1
+dst_blend = 0
+blend_op = 0
+src_blend_alpha = 1
+dst_blend_alpha = 0
+blend_op_alpha = 0
+render_target_write_mask = 15

@@ -1,0 +1,322 @@
+﻿using Editor.UI.Assets;
+using Primary;
+using Primary.Assets;
+using Primary.Common;
+using Primary.Mathematics;
+using Primary.Rendering.Ancient;
+using Primary.Rendering.Ancient.Assets;
+using Primary.Rendering.Ancient.Recording;
+using Primary.Rendering.Ancient.Resources;
+using Primary.Rendering.Ancient.Structures;
+using Primary.Rendering.Commands;
+using Primary.RHI;
+using System.Buffers;
+using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
+namespace Editor.UI.Visual.Passes
+{
+    [RenderPassSetup(RunContext = RenderPassRunContext.PerWindow)]
+    internal sealed class UIWindowRenderPass : IRenderPass
+    {
+        private ShaderAsset[] _shaders;
+        private PropertyBlock[] _dataBlocks;
+
+        public UIWindowRenderPass()
+        {
+            _shaders = new ShaderAsset[Enum.GetValues<BuiltSegmentType>().Length];
+            _dataBlocks = new PropertyBlock[Enum.GetValues<DataBlockTarget>().Length];
+
+            _shaders[(int)BuiltSegmentType.Points] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/Points.shader");
+            _shaders[(int)BuiltSegmentType.Lines] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/Lines.shader");
+            _shaders[(int)BuiltSegmentType.Rect] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/Rect.shader");
+            _shaders[(int)BuiltSegmentType.RoundedRect] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/RoundedRect.shader");
+            _shaders[(int)BuiltSegmentType.Circle] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/Circle.shader");
+            _shaders[(int)BuiltSegmentType.Triangle] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/Triangle.shader");
+            _shaders[(int)BuiltSegmentType.Image] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/Image.shader");
+            _shaders[(int)BuiltSegmentType.Text] = AssetManager.LoadAsset<ShaderAsset>("Editor/Shaders/EdGui/Primitives/Text.shader");
+
+            _dataBlocks[(int)DataBlockTarget.Default] = _shaders[(int)BuiltSegmentType.Points].CreatePropertyBlock();
+            _dataBlocks[(int)DataBlockTarget.Image] = _shaders[(int)BuiltSegmentType.Image].CreatePropertyBlock();
+            _dataBlocks[(int)DataBlockTarget.Text] = _shaders[(int)BuiltSegmentType.Text].CreatePropertyBlock();
+        }
+
+        public void SetupRenderPasses(RenderPass renderPass, RenderContextContainer context)
+        {
+            UIRenderer renderer = UIManager.Instance.Renderer;
+            if (renderer.AreAnyHostsQueued)
+            {
+                BlackboardData blackboard = renderPass.Blackboard.Add<BlackboardData>()!;
+
+                UIGenGradientsRenderPass.BlackboardData? gradientsBlackboard = renderPass.Blackboard.Get<UIGenGradientsRenderPass.BlackboardData>();
+
+                while (renderer.TryDequeueQueuedWindow(out HostRedrawData redraw))
+                {
+                    string name = "UI-DrawHost";
+                    string rtName = "UI-RT";
+
+                    IRenderableWindow? window = (redraw.Host as IWindowHost)?.ActiveWindow as IRenderableWindow;
+                    if (Engine.IsDebugBuild)
+                    {
+                        string str = window?.ToString() ?? redraw.Host.ToString() ?? redraw.Host.GetType().Name;
+                        
+                        name = $"UI-DrawWnd({str})";
+                        rtName = $"UI-RT({str})";
+                    }
+
+                    using (RasterPassDescription desc = renderPass.SetupRasterPass(name, out PassData data))
+                    {
+                        DrawContext drawCtx = redraw.Context;
+
+                        data.Renderer = renderer;
+
+                        data.Shaders = _shaders;
+                        data.DataBlocks = _dataBlocks;
+
+                        data.Redraw = redraw;
+
+                        data.OutColor = redraw.Host.HostTexture ?? FGTexture.Invalid;
+
+                        if (data.OutColor.IsNull)
+                        {
+                            UIManager.Logger?.Warning("Unexpected null host texture when rendering: {h}", name);
+                            continue;
+                        }
+
+                        data.VertexBuffer = desc.CreateBuffer(new FGBufferDesc
+                        {
+                            Width = (uint)(Unsafe.SizeOf<UIVertex>() * drawCtx.Mesh.VertexCount),
+                            Stride = Unsafe.SizeOf<UIVertex>(),
+                            Usage = FGBufferUsage.VertexBuffer | FGBufferUsage.GenericShader
+                        }, "UI-VertexBuf");
+
+                        data.IndexBuffer = desc.CreateBuffer(new FGBufferDesc
+                        {
+                            Width = (uint)(Unsafe.SizeOf<ushort>() * drawCtx.Mesh.IndexCount),
+                            Stride = Unsafe.SizeOf<ushort>(),
+                            Usage = FGBufferUsage.IndexBuffer | FGBufferUsage.GenericShader
+                        }, "UI-IndexBuf");
+
+                        data.GlobalBuffer = desc.CreateBuffer(new FGBufferDesc
+                        {
+                            Width = (uint)Unsafe.SizeOf<GlobalBufferData>(),
+                            Usage = FGBufferUsage.ConstantBuffer | FGBufferUsage.GenericShader | FGBufferUsage.PixelShader
+                        }, "UI-GlobalData");
+
+                        data.MetadataBuffer = desc.CreateBuffer(new FGBufferDesc
+                        {
+                            Width = (uint)drawCtx.Builder.Metadata.Length,
+                            Usage = FGBufferUsage.Raw | FGBufferUsage.GenericShader | FGBufferUsage.PixelShader
+                        }, "UI-Metadata");
+
+                        data.GradientsTexture = gradientsBlackboard?.Gradients ?? FGTexture.Invalid;
+
+                        desc.UseResource(FGResourceUsage.ReadWrite, data.VertexBuffer);
+                        desc.UseResource(FGResourceUsage.ReadWrite, data.IndexBuffer);
+                        desc.UseResource(FGResourceUsage.ReadWrite, data.GlobalBuffer);
+                        desc.UseResource(FGResourceUsage.ReadWrite, data.MetadataBuffer);
+
+                        if (!data.GradientsTexture.IsNull)
+                            desc.UseResource(FGResourceUsage.Read, data.GradientsTexture);
+
+                        if (!data.OutColor.IsExternal)
+                            desc.UseRenderTarget(data.OutColor);
+
+                        desc.SetRenderFunction<PassData>(PassFunction);
+                    }
+                }
+            }
+        }
+
+        private static void PassFunction(RasterPassContext context, PassData data)
+        {
+            RasterCommandBuffer cmd = context.CommandBuffer;
+
+            for (int i = 0; i < data.DataBlocks!.Length; ++i)
+            {
+                PropertyBlock block = data.DataBlocks[i];
+
+                block.SetResource("cbGlobals", data.GlobalBuffer);
+                block.SetResource("baMetadata", data.MetadataBuffer);
+                block.SetResource("txGradients", data.GradientsTexture);
+            }
+
+            {
+                cmd.Upload(data.VertexBuffer, data.Redraw.Context.Mesh.Vertices);
+                cmd.Upload(data.IndexBuffer, data.Redraw.Context.Mesh.Indices);
+                cmd.Upload(data.MetadataBuffer, data.Redraw.Context.Builder.Metadata);
+            }
+
+            cmd.SetVertexBuffer(data.VertexBuffer);
+            cmd.SetIndexBuffer(data.IndexBuffer);
+
+            cmd.ClearRenderTarget(data.OutColor, null);
+
+            cmd.SetRenderTarget(0, data.OutColor);
+
+            Rect contentMetrics = data.Redraw.Host.ContentMetrics;
+
+            Matrix3x2 globalModel =
+                    Matrix3x2.CreateTranslation(Vector2.Truncate(contentMetrics.Size.AsVector2() * -0.5f)) *
+                    Matrix3x2.CreateScale(Vector2.One / contentMetrics.Size.AsVector2() * 2.0f) *
+                    Matrix3x2.CreateScale(1.0f, -1.0f);
+
+            DrawContext drawCtx = data.Redraw.Context;
+
+            ReadOnlySpan<BuiltDrawGroup> groups = drawCtx.Builder.Groups;
+            ReadOnlySpan<BuiltDrawSegment> segments = drawCtx.Builder.Segments;
+
+            int prevMatrixId = -2;
+            int prevClipId = -2;
+
+            int currentStartIndex = 0;
+            for (int i = 0; i < groups.Length; ++i)
+            {
+                ref readonly BuiltDrawGroup group = ref groups[i];
+
+                if (group.MatrixId != prevMatrixId)
+                {
+                    GlobalBufferData bufferData = new GlobalBufferData(group.MatrixId != -1 ? (drawCtx.Painter.Matricies.Get(group.MatrixId) * globalModel) : globalModel);
+                    cmd.Upload(data.GlobalBuffer, bufferData);
+
+                    prevMatrixId = group.MatrixId;
+                }
+
+                if (group.ClipId != prevClipId)
+                {
+                    if (group.ClipId == -1)
+                        cmd.SetScissor(0, null);
+                    else
+                    {
+                        Boundaries boundaries = drawCtx.Painter.ClipRects.Get(group.ClipId);
+                        cmd.SetScissor(0, new FGRect((int)boundaries.Minimum.X, (int)boundaries.Minimum.Y, (int)boundaries.Maximum.X, (int)boundaries.Maximum.Y));
+                    }
+
+                    prevClipId = group.ClipId;
+                }
+
+                if (group.BlendMode != UIBlendMode.Undefined)
+                    throw new NotImplementedException("Blend modes not supported yet");
+
+                int nextLimit = currentStartIndex + group.SegmentCount;
+                for (int j = currentStartIndex; j < nextLimit; ++j)
+                {
+                    ref readonly BuiltDrawSegment segment = ref segments[j];
+                    int nextOffset = j == segments.Length - 1 ? drawCtx.Mesh.IndexCount : segments[j + 1].IndexOffset;
+
+                    PropertyBlock dataBlock = data.DataBlocks![(int)GetDataBlockTarget(segment.Type)];
+                    switch (segment.Type)
+                    {
+                        case BuiltSegmentType.Image:
+                            {
+                                if (segment.Value is TextureAsset texture)
+                                    dataBlock.SetResource("txImage", texture);
+                                else
+                                    dataBlock.SetResource("txImage", (RHITexture)segment.Value!);
+                                break;
+                            }
+                        case BuiltSegmentType.Text: dataBlock.SetResource("txFontAtlas", ((UIFontTypeData)segment.Value!).AtlasTexture!); break;
+                    }
+
+                    cmd.SetPipeline(data.Shaders![(int)segment.Type]);
+                    cmd.SetProperties(dataBlock);
+
+                    cmd.DrawIndexedInstanced(new FGDrawIndexedInstancedDesc((uint)(nextOffset - segment.IndexOffset), StartIndexLocation: (uint)segment.IndexOffset));
+                }
+
+                currentStartIndex += group.SegmentCount;
+            }
+
+            static DataBlockTarget GetDataBlockTarget(BuiltSegmentType type) => type switch
+            {
+                BuiltSegmentType.Points => DataBlockTarget.Default,
+                BuiltSegmentType.Lines => DataBlockTarget.Default,
+                BuiltSegmentType.Rect => DataBlockTarget.Default,
+                BuiltSegmentType.RoundedRect => DataBlockTarget.Default,
+                BuiltSegmentType.Circle => DataBlockTarget.Default,
+                BuiltSegmentType.Triangle => DataBlockTarget.Default,
+                BuiltSegmentType.Image => DataBlockTarget.Image,
+                BuiltSegmentType.Text => DataBlockTarget.Text,
+                _ => throw new NotImplementedException(),
+            };
+        }
+
+        private class PassData : IPassData
+        {
+            public UIRenderer? Renderer;
+
+            public ShaderAsset[]? Shaders;
+            public PropertyBlock[]? DataBlocks;
+
+            public HostRedrawData Redraw;
+            public FGTexture OutColor;
+
+            public FGBuffer VertexBuffer;
+            public FGBuffer IndexBuffer;
+
+            public FGBuffer GlobalBuffer;
+            public FGBuffer MetadataBuffer;
+
+            public FGTexture GradientsTexture;
+
+            public void Clear()
+            {
+                Renderer = null;
+
+                Shaders = null;
+                DataBlocks = null;
+
+                Redraw = default;
+                OutColor = FGTexture.Invalid;
+
+                VertexBuffer = FGBuffer.Invalid;
+                IndexBuffer = FGBuffer.Invalid;
+
+                GlobalBuffer = FGBuffer.Invalid;
+                MetadataBuffer = FGBuffer.Invalid;
+
+                GradientsTexture = FGTexture.Invalid;
+            }
+        }
+
+        internal class BlackboardData : IBlackboardData
+        {
+            public UICompositeRegion[]? Regions;
+            public int RegionCount;
+
+            public void Clear()
+            {
+                if (Regions?.Length > 0)
+                    ArrayPool<UICompositeRegion>.Shared.Return(Regions, true);
+
+                Regions = null;
+                RegionCount = 0;
+            }
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private readonly record struct GlobalBufferData
+        {
+            [FieldOffset(0)]
+            public readonly Vector3 M11_21;
+            [FieldOffset(16)]
+            public readonly Vector3 M22_32;
+
+            public GlobalBufferData(Matrix3x2 model)
+            {
+                M11_21 = new Vector3(model.M11, model.M21, model.M31);
+                M22_32 = new Vector3(model.M12, model.M22, model.M32);
+            }
+        }
+
+        private enum DataBlockTarget : byte
+        {
+            Default = 0,
+            Image,
+            Text
+        }
+    }
+
+    internal readonly record struct UICompositeRegion(IWindowHost Host, FGTexture Texture, Boundaries Region);
+}

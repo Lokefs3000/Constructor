@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "BundleExplorer": {
+      "commandName": "Project",
+      "commandLineArgs": "D:\\source\\repos\\Constructor\\Editor\\SplashData.bundle"
+    }
+  }
+}

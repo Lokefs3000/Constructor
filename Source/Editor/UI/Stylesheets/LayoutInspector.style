@@ -1,0 +1,11 @@
+@use "Editor/UI/Stylesheets/Globals.style";
+
+.preview-background {
+    background-color: Black;
+}
+
+.preview-rect {
+    stroke-width: 1;
+    stroke-color: Maroon;
+    stroke-position: Middle;
+}

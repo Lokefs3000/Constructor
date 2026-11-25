@@ -1,11 +1,9 @@
 ﻿using Editor.Assets.Types;
+using Editor.Geometry;
+using Editor.Geometry.Serialization;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common.Streams;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Assets.Loaders
 {
@@ -33,19 +31,29 @@ namespace Editor.Assets.Loaders
 
             try
             {
-                geoSceneData.UpdateAssetData(geoScene);
-            }
-            finally
-            {
-                
+                using Stream? inputStream = AssetFilesystem.OpenStream(sourcePath, bundleToReadFrom) ??
+                    throw new Exception();
+
+                byte[] sourceData = new byte[inputStream.Length];
+                inputStream.ReadExactly(sourceData);
+
+                GeoScene scene = new GeoScene();
+                SceneDeserializer.Deserialize(sourceData, scene);
+
+                MaterialAsset material = AssetManager.LoadAsset<MaterialAsset>("Editor/Materials/GeoDefault.mat");
+                geoSceneData.UpdateAssetData(geoScene, scene, material);
             }
 #if !DEBUG
             catch (Exception ex)
             {
-                geoSceneData.UpdateAssetFailed(model);
+                geoSceneData.UpdateAssetFailed(geoScene);
                 EdLog.Assets.Error(ex, "Failed to load geo scene: {name}", sourcePath);
             }
 #endif
+            finally
+            {
+
+            }
         }
     }
 }

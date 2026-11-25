@@ -1,29 +1,51 @@
 ﻿using Collections.Pooled;
+using Primary.Common;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace Primary.Profiling
 {
-    internal class ThreadSubProfiler : IDisposable
+    internal sealed class ThreadSubProfiler : IDisposable
     {
         private readonly ProfilingManager _profiler;
+        private readonly string _fallbackTheadName;
+
         private int _threadId;
+        private string _threadName;
 
         private Stack<ThreadProfilingScope> _scopes;
         private PooledList<ProfilingTimestamp> _timestamps;
 
+        //TODO: investiage to see if collisions could happen and if they are impactful
+        private int _scopeCount;
+
+        private bool _isReset;
+
+        private bool _collectAllocated;
+        private bool _collectStacktrace;
+
         private bool _disposedValue;
 
-        internal ThreadSubProfiler(ProfilingManager profiler, int threadId)
+        internal ThreadSubProfiler(ProfilingManager profiler, Thread thread)
         {
             _profiler = profiler;
-            _threadId = threadId;
+            _fallbackTheadName = $"Thread{_threadId}";
+
+            _threadId = thread.ManagedThreadId;
+            _threadName = thread.Name ?? _fallbackTheadName;
 
             _scopes = new Stack<ThreadProfilingScope>();
             _timestamps = new PooledList<ProfilingTimestamp>();
+            
+            _scopeCount = 0;
+
+            _isReset = true;
+
+            _collectAllocated = false;
+            _collectStacktrace = false;
         }
 
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             if (!_disposedValue)
             {
@@ -44,93 +66,90 @@ namespace Primary.Profiling
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [StackTraceHidden]
-        public void BeginProfiling(ref string name, int hash)
+        public void BeginProfiling(ref string name, int hash, long timestamp)
         {
-            _scopes.Push(new ThreadProfilingScope(name, ProfilingManager.IncludeStacktrace ? GetStacktrace() : null, hash, _profiler.TimestampFromStart));
+            long startAllocated = _collectAllocated ? GC.GetAllocatedBytesForCurrentThread() : -1;
+            string? stacktrace = _collectStacktrace ? GetStacktrace() : null;
+
+            if (_isReset)
+            {
+                _threadName = Thread.CurrentThread.Name ?? _fallbackTheadName;
+                _isReset = false;
+            }
+
+            if (_scopes.TryPeek(out ThreadProfilingScope scope))
+                _scopes.Push(new ThreadProfilingScope(name, stacktrace, new ProfilingId(_threadId, GetScopeId(), HashCode.Combine(scope.Id.Hash, hash)), scope.Id.Hash, timestamp, startAllocated));
+            else
+                _scopes.Push(new ThreadProfilingScope(name, stacktrace, new ProfilingId(_threadId, GetScopeId(), hash), null, timestamp, startAllocated));
         }
 
         public void EndProfiling(int hash)
         {
             ThreadProfilingScope scope = _scopes.Pop();
-
-            if (_scopes.TryPeek(out ThreadProfilingScope parent))
-                _timestamps.Add(new ProfilingTimestamp(scope.Name, scope.Stacktrace, parent.Hash, _scopes.Count, scope.StartTimestamp, _profiler.TimestampFromStart));
-            else
-                _timestamps.Add(new ProfilingTimestamp(scope.Name, scope.Stacktrace, -1, _scopes.Count, scope.StartTimestamp, _profiler.TimestampFromStart));
+            _timestamps.Add(new ProfilingTimestamp(scope.Name, scope.Stacktrace, scope.Id, _scopes.Count, scope.StartTimestamp, _profiler.TimestampFromStart, (int)(scope.StartAllocated != -1 ? GC.GetAllocatedBytesForCurrentThread() - scope.StartAllocated : 0)));
         }
 
         private void CaptureActive()
         {
-            long end = _profiler.TimestampFromStart;
-
-            long parentHash = -1;
             int depth = 0;
             foreach (ThreadProfilingScope scope in _scopes)
             {
-                _timestamps.Add(new ProfilingTimestamp(scope.Name, scope.Stacktrace, parentHash, depth++, scope.StartTimestamp, end));
-                parentHash = scope.Hash;
+                _timestamps.Add(new ProfilingTimestamp(scope.Name, scope.Stacktrace, scope.Id, depth++, scope.StartTimestamp, -1, (int)(scope.StartAllocated != -1 ? GC.GetAllocatedBytesForCurrentThread() - scope.StartAllocated : 0)));
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public PooledList<ProfilingTimestamp> GetTimestamps()
+        public ReadOnlySpan<ProfilingTimestamp> GetTimestamps()
         {
             CaptureActive();
-            return _timestamps;
+            return _timestamps.Span;
+        }
+
+        internal void ClearDataForNextFrame()
+        {
+            _timestamps.Clear();
+
+            _isReset = true;
+
+            _collectAllocated = Flags.HasFlag(ProfilingManager.Options, ProfilingOptions.CollectAllocation);
+            _collectStacktrace = Flags.HasFlag(ProfilingManager.Options, ProfilingOptions.CollectStacktrace);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void ClearTimestamps()
+        internal int GetScopeId()
         {
-            _timestamps.Clear();
+            if (_scopeCount >= ushort.MaxValue)
+            {
+                _scopeCount = 1;
+                return 0;
+            }
+
+            return _scopeCount++;
         }
 
-        [StackTraceHidden]
+        [StackTraceHidden, MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static string GetStacktrace()
         {
-            return Environment.StackTrace;
+            return new StackTrace(true).ToString();
         }
+
+        internal int ThreadId => _threadId;
+        internal string ThreadName => _threadName;
     }
 
-    internal readonly record struct ThreadProfilingScope
+    internal readonly record struct ThreadProfilingScope(string Name, string? Stacktrace, ProfilingId Id, int? PrevHashStack, long StartTimestamp, long StartAllocated);
+
+    public readonly record struct ProfilingTimestamp(string Name, string? Stacktrace, ProfilingId Id, int Depth, long StartTimestamp, long EndTimestamp, int Allocated);
+    public readonly record struct ProfilingId(int Code, int Hash)
     {
-        public readonly string Name;
-        public readonly string? Stacktrace;
-        public readonly long Hash;
-
-        public readonly long StartTimestamp;
-
-        public ThreadProfilingScope(string name, string? stacktrace, long hash, long startTimestamp)
+        public ProfilingId(int threadId, int timestampId, int hash) : this(threadId << 16 | timestampId, hash)
         {
-            Name = name;
-            Stacktrace = stacktrace;
-            Hash = hash;
-
-            StartTimestamp = startTimestamp;
+            //TODO: this is prob not the best way to do this
+            Debug.Assert(threadId <= ushort.MaxValue);
+            Debug.Assert(timestampId <= ushort.MaxValue);
         }
-    }
 
-    public readonly record struct ProfilingTimestamp
-    {
-        public readonly string Name;
-        public readonly string? Stacktrace;
-
-        public readonly long ParentHash;
-        public readonly int Depth;
-
-        public readonly long StartTimestamp;
-        public readonly long EndTimestamp;
-
-        public ProfilingTimestamp(string name, string? stacktrace, long parentHash, int depth, long startTimestamp, long endTimestamp)
-        {
-            Name = name;
-            Stacktrace = stacktrace;
-
-            ParentHash = parentHash;
-            Depth = depth;
-
-            StartTimestamp = startTimestamp;
-            EndTimestamp = endTimestamp;
-        }
+        public int ThreadId => Code >> 16 & 0xffff;
+        public int TimestampId => Code & 0xffff;
     }
 }

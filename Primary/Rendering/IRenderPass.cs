@@ -1,11 +1,11 @@
-﻿using Primary.Rendering.Data;
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
 
 namespace Primary.Rendering
 {
-    public interface IRenderPass : IDisposable
+    public interface IRenderPass
     {
-        public void PrepareFrame(IRenderPath path, RenderPassData passData);
-        public void ExecutePass(IRenderPath path, RenderPassData passData);
-        public void CleanupFrame(IRenderPath path, RenderPassData passData);
+        public void SetupPasses(FrameGraphBuilder frameGraph);
     }
 }

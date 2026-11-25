@@ -1,5 +1,5 @@
 ﻿using CommunityToolkit.HighPerformance;
-using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
@@ -66,7 +66,7 @@ namespace Editor.Assets
                 string realFile = source.Substring(find + 1, j - 1 - find);
 
                 string fullRemapPath = Path.Combine(_absolutePath, remapFile);
-                string fullRealPath = Path.Combine(Editor.GlobalSingleton.ProjectPath, realFile);
+                string fullRealPath = Path.Combine(EditorRuntime.GlobalSingleton.ProjectPath, realFile);
 
                 if (File.Exists(fullRemapPath) && File.Exists(fullRealPath))
                 {
@@ -80,13 +80,22 @@ namespace Editor.Assets
             }
         }
 
-        internal void RemapFile(string filePath, string remapPath)
+        internal void RemapFile(string filePath, string? remapPath)
         {
             filePath = filePath.Replace('\\', '/');
-            remapPath = remapPath.Replace('\\', '/');
 
-            _fileRemappings.AddOrUpdate(filePath, remapPath, (_, _) => remapPath);
-            _mappingsModified = true;
+            if (remapPath == null)
+            {
+                _fileRemappings.TryRemove(filePath, out remapPath);
+                _mappingsModified = true;
+            }
+            else
+            {
+                remapPath = remapPath.Replace('\\', '/');
+
+                _fileRemappings.AddOrUpdate(filePath, remapPath, (_, _) => remapPath);
+                _mappingsModified = true;
+            }
         }
 
         internal void FlushFileRemappings()
@@ -105,13 +114,19 @@ namespace Editor.Assets
         }
 
         /// <summary>Thread-safe</summary>
+        public bool IsFileRemapped(string localFilePath)
+        {
+            return _fileRemappings.ContainsKey(localFilePath);
+        }
+
+        /// <summary>Thread-safe</summary>
         public string GetFullPath(string path)
         {
             return Path.Combine(_absolutePath, path);
         }
 
         /// <summary>Thread-safe</summary>
-        public string? ReadString(ReadOnlySpan<char> path)
+        public string? ReadAllText(ReadOnlySpan<char> path)
         {
             if (!path.StartsWith(_namespace))
             {
@@ -126,9 +141,12 @@ namespace Editor.Assets
             else
                 absolutePath = Path.Combine(_absolutePath, localPath);
 
+            if (!File.Exists(absolutePath))
+                return null;
+
             try
             {
-                return File.ReadAllText(absolutePath);
+                return FileUtility.TryReadAllText(absolutePath);
             }
             catch (Exception)
             {
@@ -152,19 +170,24 @@ namespace Editor.Assets
             string absolutePath = string.Empty;
             string localPath = path.ToString();
 
-            AssetPipeline pipeline = Editor.GlobalSingleton.AssetPipeline;
+            bool isRemapped = false;
+
+            AssetPipeline pipeline = EditorRuntime.GlobalSingleton.AssetPipeline;
             if (_fileRemappings.TryGetValue(localPath, out string? remap))
             {
-                if (pipeline != null && pipeline.IsImportingAsset(path))
+                if (pipeline != null && pipeline.IsImportingAsset(localPath))
                 {
                     if (waitIfImportPending)
                     {
                         EdLog.Assets.Information("Waiting on file import: {lc}", path.ToString());
-                        pipeline.ImportChangesOrGetRunning(path)?.Wait();
+
+                        Task? task = pipeline.ImportChangesOrGetRunning(localPath);
+                        task?.Wait(2000);
                     }
                 }
 
-                absolutePath = Path.Combine(Editor.GlobalSingleton.ProjectPath, remap);
+                absolutePath = Path.Combine(EditorRuntime.GlobalSingleton.ProjectPath, remap);
+                isRemapped = true;
             }
             else if (pipeline != null)
             {
@@ -174,11 +197,16 @@ namespace Editor.Assets
                     if (pipeline.CanBeImported(path))
                     {
                         if (waitIfImportPending)
-                            pipeline.ImportChangesOrGetRunning(path)?.Wait();
+                        {
+                            Task? task = pipeline.ImportChangesOrGetRunning(localPath);
+                            task?.Wait(2000);
+                        }
+
                         if (_fileRemappings.TryGetValue(localPath, out remap))
                         {
-                            absolutePath = Path.Combine(Editor.GlobalSingleton.ProjectPath, remap);
+                            absolutePath = Path.Combine(EditorRuntime.GlobalSingleton.ProjectPath, remap);
                             hasNewRemap = true;
+                            isRemapped = true;
                         }
                     }
                 }
@@ -188,6 +216,17 @@ namespace Editor.Assets
             }
             else
                 absolutePath = Path.Combine(_absolutePath, localPath);
+
+            if (!File.Exists(absolutePath))
+            {
+                if (isRemapped)
+                {
+                    RemapFile(localPath, null);
+                    return OpenStream(path);
+                }
+
+                return null;
+            }
 
             return FileUtility.TryWaitOpenNoThrow(absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         }

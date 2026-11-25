@@ -13,8 +13,8 @@ using Vortice.Direct3D;
 using Vortice.Direct3D12;
 using Vortice.Direct3D12.Debug;
 using Vortice.DXGI;
-
-using Terra = TerraFX.Interop.DirectX;
+using D3D12MemAlloc = Interop.D3D12MemAlloc;
+using Feature = Vortice.Direct3D12.Feature;
 
 namespace Primary.RHI.Direct3D12
 {
@@ -23,22 +23,25 @@ namespace Primary.RHI.Direct3D12
         private static ILogger? s_int_logger = null;
 
         private readonly bool _cmdBufferValidation = true;
+        private readonly bool _useCompatibilityDeviceCreation = true;
 
         private bool _isPixEnabled = false;
 
         private IDXGIFactory7 _factory;
         private IDXGIAdapter4 _adapter;
-        private ID3D12SDKConfiguration1 _sdkConfiguration;
-        private ID3D12DeviceFactory _deviceFactory;
+        private ID3D12SDKConfiguration1? _sdkConfiguration;
+        private ID3D12DeviceFactory? _deviceFactory;
         private ID3D12Debug6? _debug;
         private ID3D12InfoQueue? _infoQueue;
         private ID3D12DeviceRemovedExtendedDataSettings1? _dredSettings;
         private ID3D12Device14 _device;
         private ID3D12DeviceConfiguration _deviceConfig;
-        private Terra.D3D12MA_Allocator* _allocator;
+        private D3D12MemAlloc.Allocator* _allocator;
         private ID3D12CommandQueue _graphicsQueue;
         private ID3D12CommandQueue _computeQueue;
         private ID3D12CommandQueue _copyQueue;
+
+        private DeviceCaps _caps;
 
         private UploadManager _uploadManager;
 
@@ -58,6 +61,9 @@ namespace Primary.RHI.Direct3D12
         private ID3D12Fence _synchronizeFence;
         private ManualResetEventSlim _waitForCompletionEvent;
 
+        private Lock _cmdSubmitLock;
+        private Lock _cmdUsageLock;
+
         private string _deviceName;
         private ulong _videoMemory;
 
@@ -65,9 +71,13 @@ namespace Primary.RHI.Direct3D12
 
         private bool _disposedValue;
 
-        internal GraphicsDeviceImpl(ILogger logger)
+        internal GraphicsDeviceImpl(ILogger logger, GraphicsDeviceDescription description)
         {
             s_int_logger = logger;
+            Instance = this;
+
+            _cmdBufferValidation = true;//CommandLine.HasOption("--dx12-cmd-validate");
+            _useCompatibilityDeviceCreation = true;//CommandLine.HasOption("--dx12-compat-device-create");
 
             _commandAllocators = new AllocatorStack[6];
 
@@ -101,12 +111,17 @@ namespace Primary.RHI.Direct3D12
                     ResultChecker.ThrowIfUnhandled(_factory.EnumAdapters1(0, out IDXGIAdapter1 adapter1));
                     ResultChecker.ThrowIfUnhandled(adapter1.QueryInterface(out _adapter!));
                 }
+                if (!_useCompatibilityDeviceCreation)
                 {
                     ResultChecker.ThrowIfUnhandled(D3D12.D3D12GetInterface(D3D12.D3D12SDKConfigurationClsId, out _sdkConfiguration!));
-                    ResultChecker.ThrowIfUnhandled(_sdkConfiguration.CreateDeviceFactory(616, "./D3D12/", out _deviceFactory!));
+                    ResultChecker.ThrowIfUnhandled(_sdkConfiguration.CreateDeviceFactory(618, "./D3D12/", out _deviceFactory!));
                 }
                 {
-                    _deviceFactory.GetConfigurationInterface(D3D12.D3D12DebugClsId, out _debug);
+                    if (_useCompatibilityDeviceCreation)
+                        ResultChecker.PrintIfUnhandled(D3D12.D3D12GetDebugInterface(out _debug));
+                    else
+                        _deviceFactory!.GetConfigurationInterface(D3D12.D3D12DebugClsId, out _debug);
+
                     if (_debug != null)
                     {
                         Logger.Information("Debug layer enabled successfully!");
@@ -122,7 +137,11 @@ namespace Primary.RHI.Direct3D12
                     }
                 }
                 {
-                    _deviceFactory.GetConfigurationInterface(D3D12.D3D12DeviceRemovedExtendedDataClsId, out _dredSettings);
+                    if (_useCompatibilityDeviceCreation)
+                        ResultChecker.PrintIfUnhandled(D3D12.D3D12GetInterface(D3D12.D3D12DeviceRemovedExtendedDataClsId, out _dredSettings));
+                    else
+                        _deviceFactory!.GetConfigurationInterface(D3D12.D3D12DeviceRemovedExtendedDataClsId, out _dredSettings);
+
                     if (_dredSettings != null)
                     {
                         Logger.Information("DRED successfully retrieved!");
@@ -133,7 +152,10 @@ namespace Primary.RHI.Direct3D12
                     }
                 }
                 {
-                    ResultChecker.ThrowIfUnhandled(_deviceFactory.CreateDevice(_adapter, FeatureLevel.Level_12_0, out _device!));
+                    if (_useCompatibilityDeviceCreation)
+                        ResultChecker.ThrowIfUnhandled(D3D12.D3D12CreateDevice(_adapter, FeatureLevel.Level_12_0, out _device!));
+                    else
+                        ResultChecker.ThrowIfUnhandled(_deviceFactory!.CreateDevice(_adapter, FeatureLevel.Level_12_0, out _device!));
                 }
                 {
                     if (_debug != null)
@@ -152,10 +174,17 @@ namespace Primary.RHI.Direct3D12
                                 },
                                 DenyList = new InfoQueueFilterDescription
                                 {
-                                    Categories = [MessageCategory.StateCreation],
                                     Ids = _ignoredIds.ToArray()
                                 }
                             });
+
+                            if (description.BreakOnSeverity)
+                            {
+                                Logger.Information("Prepare your native debugger, were going to break land!");
+
+                                _infoQueue.SetBreakOnSeverity(MessageSeverity.Error, true);
+                                _infoQueue.SetBreakOnSeverity(MessageSeverity.Corruption, true);
+                            }
 
                             //_infoQueue.SetBreakOnSeverity(MessageSeverity.Error | MessageSeverity.Corruption, true);
                         }
@@ -165,17 +194,17 @@ namespace Primary.RHI.Direct3D12
                     ResultChecker.ThrowIfUnhandled(_device.QueryInterface(out _deviceConfig!));
                 }
                 {
-                    Terra.D3D12MA_ALLOCATOR_DESC desc = new()
+                    D3D12MemAlloc.ALLOCATOR_DESC desc = new()
                     {
-                        Flags = Terra.D3D12MA_ALLOCATOR_FLAGS.D3D12MA_ALLOCATOR_FLAG_NONE,
-                        pDevice = (Terra.ID3D12Device*)_device.NativePointer.ToPointer(),
+                        Flags = /*D3D12MemAlloc.ALLOCATOR_FLAGS.ALLOCATOR_FLAG_DONT_USE_TIGHT_ALIGNMENT*/D3D12MemAlloc.ALLOCATOR_FLAGS.ALLOCATOR_FLAG_NONE,
+                        pDevice = _device.NativePointer.ToPointer(),
                         PreferredBlockSize = 0,
                         pAllocationCallbacks = null,
-                        pAdapter = (Terra.IDXGIAdapter*)_adapter.NativePointer.ToPointer()
+                        pAdapter = _adapter.NativePointer.ToPointer()
                     };
 
-                    Terra.D3D12MA_Allocator* allocator = null;
-                    ResultChecker.ThrowIfUnhandled(new Result(Terra.D3D12MemAlloc.D3D12MA_CreateAllocator(&desc, &allocator).Value));
+                    D3D12MemAlloc.Allocator* allocator = null;
+                    ResultChecker.ThrowIfUnhandled(new Result(D3D12MemAlloc.D3D12MA.CreateAllocator(&desc, &allocator)));
 
                     _allocator = allocator;
                 }
@@ -183,6 +212,14 @@ namespace Primary.RHI.Direct3D12
                     ResultChecker.ThrowIfUnhandled(_device.CreateCommandQueue(new CommandQueueDescription(CommandListType.Direct), out _graphicsQueue!));
                     ResultChecker.ThrowIfUnhandled(_device.CreateCommandQueue(new CommandQueueDescription(CommandListType.Compute), out _computeQueue!));
                     ResultChecker.ThrowIfUnhandled(_device.CreateCommandQueue(new CommandQueueDescription(CommandListType.Copy), out _copyQueue!));
+                }
+                {
+                    const Feature Feature_TightAlignment = (Feature)54;
+
+                    Checking.FatalAssert(_device.Options.ResourceHeapTier >= ResourceHeapTier.Tier2);
+
+                    _caps = new DeviceCaps(
+                        HasTightAlignment: _device.CheckFeatureSupport<FeatureDataD3D12TightAlignment>(Feature_TightAlignment).SupportTier >= TightAlignmentTier.Tier1);
                 }
                 {
                     const uint UploadManagerStartSize = 1048576 /*1mb*/;
@@ -208,6 +245,10 @@ namespace Primary.RHI.Direct3D12
                     }
                 }
                 {
+                    _cmdSubmitLock = new Lock();
+                    _cmdUsageLock = new Lock();
+                }
+                {
                     AdapterDescription3 desc = _adapter.Description3;
 
                     _deviceName = desc.Description;
@@ -216,7 +257,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -249,7 +290,7 @@ namespace Primary.RHI.Direct3D12
                 _graphicsQueue.Dispose();
                 _computeQueue.Dispose();
                 _copyQueue.Dispose();
-                if (_allocator != null) _allocator->Release();
+                if (_allocator != null) _allocator->Base.Release();
                 _deviceConfig?.Dispose();
                 _infoQueue?.Dispose();
                 _device?.Dispose();
@@ -277,11 +318,11 @@ namespace Primary.RHI.Direct3D12
 
         public override void SynchronizeDevice(SynchronizeDeviceTargets targets)
         {
-            if (FlagUtility.HasFlag(targets, SynchronizeDeviceTargets.Graphics))
+            if (Flags.HasFlag(targets, SynchronizeDeviceTargets.Graphics))
                 WaitForFenceOnQueue(_graphicsQueue, _synchronizeFence);
-            if (FlagUtility.HasFlag(targets, SynchronizeDeviceTargets.Compute))
+            if (Flags.HasFlag(targets, SynchronizeDeviceTargets.Compute))
                 WaitForFenceOnQueue(_computeQueue, _synchronizeFence);
-            if (FlagUtility.HasFlag(targets, SynchronizeDeviceTargets.Copy))
+            if (Flags.HasFlag(targets, SynchronizeDeviceTargets.Copy))
                 WaitForFenceOnQueue(_copyQueue, _synchronizeFence);
 
             void WaitForFenceOnQueue(ID3D12CommandQueue queue, ID3D12Fence fence)
@@ -355,29 +396,32 @@ namespace Primary.RHI.Direct3D12
                     stack.Ready.Push(allocator);
             }
 
-            DumpMessageQueue();
+            FlushMessageQueue();
         }
 
         public override void Submit(CommandBuffer commandBuffer)
         {
-            ICommandBufferImpl impl = (ICommandBufferImpl)commandBuffer;
-            /*if (impl.ExecutionCompleteFence.CompletedValue < impl.FenceValue)
+            lock (_cmdSubmitLock)
             {
-                Logger.Information("Waiting on fence value: {v}", impl.FenceValue);
-                //TODO: maybe add a bogus Thread.Sleep to ensure no issues occur?
-                if (ResultChecker.PrintIfUnhandled(impl.ExecutionCompleteFence.SetEventOnCompletion(impl.FenceValue, _waitForCompletionEvent.WaitHandle), this));
+                ICommandBufferImpl impl = (ICommandBufferImpl)commandBuffer;
+                /*if (impl.ExecutionCompleteFence.CompletedValue < impl.FenceValue)
                 {
-                    _waitForCompletionEvent.Wait(2000);
-                    _waitForCompletionEvent.Reset();
-                }
-            }*/
+                    Logger.Information("Waiting on fence value: {v}", impl.FenceValue);
+                    //TODO: maybe add a bogus Thread.Sleep to ensure no issues occur?
+                    if (ResultChecker.PrintIfUnhandled(impl.ExecutionCompleteFence.SetEventOnCompletion(impl.FenceValue, _waitForCompletionEvent.WaitHandle), this));
+                    {
+                        _waitForCompletionEvent.Wait(2000);
+                        _waitForCompletionEvent.Reset();
+                    }
+                }*/
 
-            //Logger.Information("Submitting {a} to queue and waiting on {b}", commandBuffer, _lastSubmittedCommandBuffer.Target);
+                //Logger.Information("Submitting {a} to queue and waiting on {b}", commandBuffer, _lastSubmittedCommandBuffer.Target);
 
-            ICommandBufferImpl? previousCommandBuffer = (ICommandBufferImpl?)_lastSubmittedCommandBuffer.Target;
-            impl.SubmitToQueueInternal(previousCommandBuffer?.ExecutionCompleteFence, previousCommandBuffer?.FenceValue ?? 0);
+                ICommandBufferImpl? previousCommandBuffer = (ICommandBufferImpl?)_lastSubmittedCommandBuffer.Target;
+                impl.SubmitToQueueInternal(previousCommandBuffer?.ExecutionCompleteFence, previousCommandBuffer?.FenceValue ?? 0);
 
-            _lastSubmittedCommandBuffer.Target = impl;
+                _lastSubmittedCommandBuffer.Target = impl;
+            }
         }
 
         #region Create functions
@@ -389,7 +433,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -402,7 +446,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -415,7 +459,20 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
+                throw;
+            }
+        }
+
+        public override Sampler CreateSampler(SamplerDescription description)
+        {
+            try
+            {
+                return new SamplerImpl(this, description);
+            }
+            catch (Exception)
+            {
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -428,7 +485,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -441,7 +498,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -454,7 +511,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -467,7 +524,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -480,7 +537,7 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
@@ -493,88 +550,82 @@ namespace Primary.RHI.Direct3D12
             }
             catch (Exception)
             {
-                DumpMessageQueue();
+                FlushMessageQueue();
                 throw;
             }
         }
         #endregion
 
         #region Support
-        private Dictionary<Format, FormatSupport1> _support = new Dictionary<Format, FormatSupport1>();
+        private ConcurrentDictionary<Format, FormatSupport1> _support = new ConcurrentDictionary<Format, FormatSupport1>();
 
         public override bool IsSupported(RenderTargetFormat format)
         {
             Format dxgiFormat = FormatConverter.Convert(format);
-            if (!_support.TryGetValue(dxgiFormat, out FormatSupport1 support1))
+            FormatSupport1 support1 = _support.GetOrAdd(dxgiFormat, (dxgiFormat) =>
             {
                 FeatureDataFormatSupport support = new FeatureDataFormatSupport
                 {
                     Format = dxgiFormat,
                 };
 
-                if (!_device.CheckFeatureSupport(Vortice.Direct3D12.Feature.FormatSupport, ref support))
+                if (!_device.CheckFeatureSupport(Feature.FormatSupport, ref support))
                 {
-                    _support[support.Format] = FormatSupport1.None;
+                    return FormatSupport1.None;
                 }
                 else
                 {
-                    _support[support.Format] = support.Support1;
+                    return support.Support1;
                 }
+            });
 
-                support1 = support.Support1;
-            }
-
-            return FlagUtility.HasFlag((int)support1, (int)FormatSupport1.RenderTarget);
+            return Flags.HasFlag((int)support1, (int)FormatSupport1.RenderTarget);
         }
 
         public override bool IsSupported(DepthStencilFormat format)
         {
             Format dxgiFormat = FormatConverter.Convert(format);
-            if (!_support.TryGetValue(dxgiFormat, out FormatSupport1 support1))
+            FormatSupport1 support1 = _support.GetOrAdd(dxgiFormat, (dxgiFormat) =>
             {
                 FeatureDataFormatSupport support = new FeatureDataFormatSupport
                 {
                     Format = dxgiFormat,
                 };
 
-                if (!_device.CheckFeatureSupport(Vortice.Direct3D12.Feature.FormatSupport, ref support))
+                if (!_device.CheckFeatureSupport(Feature.FormatSupport, ref support))
                 {
-                    _support[support.Format] = FormatSupport1.None;
+                    return FormatSupport1.None;
                 }
                 else
                 {
-                    _support[support.Format] = support.Support1;
+                    return support.Support1;
                 }
+            });
 
-                support1 = support.Support1;
-            }
-
-            return FlagUtility.HasFlag(support1, FormatSupport1.DepthStencil);
+            return Flags.HasFlag(support1, FormatSupport1.DepthStencil);
         }
 
         public override bool IsSupported(TextureFormat format, TextureDimension dimension)
         {
             Format dxgiFormat = FormatConverter.Convert(format);
-            if (!_support.TryGetValue(dxgiFormat, out FormatSupport1 support1))
+            FormatSupport1 support1 = _support.GetOrAdd(dxgiFormat, (dxgiFormat) =>
             {
                 FeatureDataFormatSupport support = new FeatureDataFormatSupport
                 {
                     Format = dxgiFormat,
                 };
 
-                if (!_device.CheckFeatureSupport(Vortice.Direct3D12.Feature.FormatSupport, ref support))
+                if (!_device.CheckFeatureSupport(Feature.FormatSupport, ref support))
                 {
-                    _support[support.Format] = FormatSupport1.None;
+                    return FormatSupport1.None;
                 }
                 else
                 {
-                    _support[support.Format] = support.Support1;
+                    return support.Support1;
                 }
+            });
 
-                support1 = support.Support1;
-            }
-
-            return FlagUtility.HasFlag(support1, dimension switch
+            return Flags.HasFlag(support1, dimension switch
             {
                 TextureDimension.Texture1D => FormatSupport1.Texture1D,
                 TextureDimension.Texture2D => FormatSupport1.Texture2D,
@@ -598,6 +649,7 @@ namespace Primary.RHI.Direct3D12
             _trackers.Remove(tracker);
         }
 
+        /// <summary>Thread-safe</summary>
         internal void InvokeObjectCreationTracking(Resource resource)
         {
             if (_trackers.Count > 0)
@@ -609,6 +661,7 @@ namespace Primary.RHI.Direct3D12
             }
         }
 
+        /// <summary>Thread-safe</summary>
         internal void InvokeObjectDestructionTracking(Resource resource)
         {
             if (_trackers.Count > 0)
@@ -620,6 +673,7 @@ namespace Primary.RHI.Direct3D12
             }
         }
 
+        /// <summary>Thread-safe</summary>
         internal void InvokeObjectRenamingTracking(Resource resource, string newName)
         {
             if (_trackers.Count > 0)
@@ -633,34 +687,35 @@ namespace Primary.RHI.Direct3D12
         #endregion
 
         #region Interface
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void EnqueueDataFree(Action function)
         {
             _deferredResourceFrees.Push(function);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void QueueSwapChainForPresentation(SwapChainImpl swapChain, PresentParameters parameters)
         {
             _queuedSwapChainPresentations.Enqueue((swapChain, parameters));
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void EnqueueForResizeNextFrame(SwapChainImpl swapChain, Vector2 size)
         {
             _pendingResizes[swapChain] = size;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void AddCommandBuffer(ICommandBufferImpl commandBuffer)
         {
-            _commandBuffersUsed.Add(commandBuffer);
+            lock (_cmdUsageLock)
+            {
+                _commandBuffersUsed.Add(commandBuffer);
+            }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void RemoveCommandBuffer(ICommandBufferImpl commandBuffer)
         {
-            _commandBuffersUsed.Remove(commandBuffer);
+            lock (_cmdUsageLock)
+            {
+                _commandBuffersUsed.Remove(commandBuffer);
+            }
         }
 
         internal ID3D12CommandAllocator GetNewCommandAllocator(CommandListType type)
@@ -685,10 +740,10 @@ namespace Primary.RHI.Direct3D12
             MessageId.ClearDepthStencilViewMismatchingClearValue,
             MessageId.ClearRenderTargetViewMismatchingClearValue,
             MessageId.CreateGraphicsPipelineStateDepthStencilViewNotSet,
-            MessageId.CreateGraphicsPipelineStateRenderTargetViewNotSet
+            MessageId.CreateGraphicsPipelineStateRenderTargetViewNotSet,
             ];
 
-        internal void DumpMessageQueue()
+        public override void FlushMessageQueue()
         {
             if (_infoQueue != null)
             {
@@ -712,6 +767,17 @@ namespace Primary.RHI.Direct3D12
                 }
 
                 _infoQueue.ClearStoredMessages();
+            }
+        }
+
+        public override void ReviewError(int code)
+        {
+            if (code == ResultChecker.DXGIDeviceHung ||
+                code == ResultChecker.DXGIDeviceRemoved ||
+                code == ResultChecker.DXGIDeviceReset)
+            {
+                FlushMessageQueue();
+                DumpDREDOutput();
             }
         }
 
@@ -806,16 +872,20 @@ namespace Primary.RHI.Direct3D12
         }
 
         internal bool CmdBufferValidation => _cmdBufferValidation;
+        internal bool UseGlobalRootSignatureSerializer => _useCompatibilityDeviceCreation;
         internal bool IsPixEnabled => _isPixEnabled;
 
         internal IDXGIFactory7 DXGIFactory => _factory;
+        internal IDXGIAdapter4 DXGIAdapter => _adapter;
         internal ID3D12DeviceConfiguration D3D12DeviceConfiguration => _deviceConfig;
         internal ID3D12Device14 D3D12Device => _device;
         internal ID3D12CommandQueue DirectCommandQueue => _graphicsQueue;
         internal ID3D12CommandQueue ComputeCommandQueue => _computeQueue;
         internal ID3D12CommandQueue CopyCommandQueue => _copyQueue;
 
-        internal Terra.D3D12MA_Allocator* D3D12MAAllocator => _allocator;
+        internal ref readonly DeviceCaps Caps => ref _caps;
+
+        internal D3D12MemAlloc.Allocator* D3D12MAAllocator => _allocator;
 
         internal UploadManager UploadManager => _uploadManager;
 
@@ -846,5 +916,20 @@ namespace Primary.RHI.Direct3D12
             public ConcurrentStack<ID3D12CommandAllocator> Ready;
             public ConcurrentStack<ID3D12CommandAllocator> Old;
         }
+
+        private enum TightAlignmentTier : byte
+        {
+            NotSupported = 0,
+            Tier1 = NotSupported + 1,
+            Tier
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        private struct FeatureDataD3D12TightAlignment
+        {
+            public TightAlignmentTier SupportTier;
+        }
     }
+
+    internal readonly record struct DeviceCaps(bool HasTightAlignment);
 }

@@ -1,0 +1,88 @@
+﻿using System.Numerics;
+
+namespace Primary.RHI
+{
+    public unsafe abstract class RHISwapChain : IDisposable, IAsNativeObject<RHISwapChainNative>
+    {
+        protected RHISwapChainDescription _description;
+
+        protected string? _debugName;
+
+        protected bool _disposedValue;
+
+        protected abstract void Dispose(bool disposing);
+        protected abstract void SetDebugName(string? debugName);
+
+        ~RHISwapChain()
+        {
+            Dispose(disposing: false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        public string? DebugName
+        {
+            get => _debugName;
+            set
+            {
+                if (_debugName != value)
+                    SetDebugName(_debugName);
+                _debugName = value;
+            }
+        }
+
+        public abstract void Present();
+        public abstract void Resize(Vector2 newSize);
+
+        public abstract void ResizeBuffersToNewSize();
+
+        public ref RHISwapChainDescription Description => ref _description;
+
+        public abstract ReadOnlySpan<RHISwapChainBackbuffer> Backbuffers { get; }
+        public abstract int CurrentBackbufferIndex { get; }
+
+        public abstract RHISwapChainNative* GetAsNative();
+    }
+
+    public struct RHISwapChainNative
+    {
+        public RHISwapChainDescription Description;
+    }
+
+    public struct RHISwapChainDescription
+    {
+        public nint WindowHandle;
+        public Vector2 WindowSize;
+
+        public RHIFormat BackBufferFormat;
+        public int BackBufferCount;
+
+        public bool EnableComposition;
+
+        public RHISwapChainDescription()
+        {
+            WindowHandle = nint.Zero;
+            WindowSize = Vector2.Zero;
+
+            BackBufferFormat = RHIFormat.Unknown;
+            BackBufferCount = 0;
+
+            EnableComposition = false;
+        }
+
+        public RHISwapChainDescription(RHISwapChainDescription other)
+        {
+            WindowHandle = other.WindowHandle;
+            WindowSize = other.WindowSize;
+
+            BackBufferFormat = other.BackBufferFormat;
+            BackBufferCount = other.BackBufferCount;
+
+            EnableComposition = other.EnableComposition;
+        }
+    }
+}

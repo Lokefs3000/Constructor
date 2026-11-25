@@ -1,0 +1,131 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+    <BuildType Name="ReleaseWithDebug" />
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Demo/">
+    <Project Path="Demo/Game/Game.csproj" Id="f5e1b9fe-217f-441b-8252-60f9ffa4b503">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Demo/VoxelizationDemo/VoxelizationDemo.csproj" Id="f9aba521-8c7c-44bd-8ff2-60efbebd0e4b">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Editor/">
+    <Project Path="D:/source/repos/Constructor/Editor.Geometry/Editor.Geometry.csproj" />
+    <Project Path="D:/source/repos/Constructor/Editor.Interop/Editor.Interop.csproj">
+      <BuildDependency Project="D:/source/repos/Constructor/Native/EditorInterop/EditorInterop.vcxproj" />
+      <BuildDependency Project="D:/source/repos/Constructor/Native/TextureInterop/TextureInterop.vcxproj" />
+    </Project>
+    <Project Path="D:/source/repos/Constructor/Editor.Processors/Editor.Processors.csproj" />
+    <Project Path="D:/source/repos/Constructor/Editor.Shaders/Editor.Shaders.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="D:/source/repos/Constructor/Editor.UI/Editor.UI.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="D:/source/repos/Constructor/Editor/Editor.csproj" />
+  </Folder>
+  <Folder Name="/Editor/Debug/">
+    <Project Path="D:/source/repos/Constructor/ExportValidator/ExportValidator.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Editor/Dedicated/">
+    <Project Path="D:/source/repos/Constructor/ExtConsole/ExtConsole.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="TextureViewer/TextureViewer.csproj" Id="51ae3650-9e27-432e-913b-08df1ce9872d">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Editor/Native/">
+    <Project Path="D:/source/repos/Constructor/Native/EditorInterop/EditorInterop.vcxproj" Id="656e6c57-b883-4a4a-b11a-a62ba4a1965b" />
+    <Project Path="D:/source/repos/Constructor/Native/TextureInterop/TextureInterop.vcxproj" Id="ff671329-e291-4cfa-b380-e6bf9859156e">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Editor/New/">
+    <Project Path="Studio/EditorUI/EditorUI.csproj" Id="6580e9d1-a4a9-47c0-990b-8f5c1bfcaa16">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Studio/PrimaryEditor/PrimaryEditor.csproj" Id="c10a5eaf-b7c4-45a8-af03-c89686a1031b">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Engine/">
+    <Project Path="D:/source/repos/Constructor/Primary.Common/Primary.Common.csproj" />
+    <Project Path="D:/source/repos/Constructor/Primary.Interop/Primary.Interop.csproj" />
+    <Project Path="D:/source/repos/Constructor/Primary.Mathematics/Primary.Mathematics.csproj" Id="4faa09b0-f0c2-44e0-91fc-42d54ab4c90b">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="D:/source/repos/Constructor/Primary.R2.ForwardPlus/Primary.R2.ForwardPlus.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="D:/source/repos/Constructor/Primary.RHI.Direct3D12/Primary.RHI.Direct3D12.csproj" />
+    <Project Path="D:/source/repos/Constructor/Primary.RHI/Primary.RHI.csproj" />
+    <Project Path="D:/source/repos/Constructor/Primary.RHI2/Primary.RHI2.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="D:/source/repos/Constructor/Primary/Primary.csproj" />
+    <Project Path="D:/source/repos/Constructor/Runtime/Runtime.csproj" />
+  </Folder>
+  <Folder Name="/Engine/Generators/">
+    <Project Path="Generators/PhysXBindGen/PhysXBindGen.csproj" Id="760d04e4-0f7d-4adc-99ee-79227e16f57c">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Engine/Interop/">
+    <Project Path="D:/source/repos/Constructor/Interop.D3D12MemAlloc/Interop.D3D12MemAlloc.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="D:/source/repos/Constructor/Interop.NVAftermath/Interop.NVAftermath.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Interop.PhysX/Interop.PhysX.csproj" Id="83e415ed-a8fc-4de7-9640-f8307ad19621">
+      <BuildDependency Project="Native/PhysXInterop/PhysXInterop.vcxproj" />
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Engine/Native/">
+    <Project Path="Native/PhysXInterop/PhysXInterop.vcxproj" Id="1cf2eb97-8e86-4756-8e18-3a0abf11fc3e">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Extra/">
+    <Project Path="D:/source/repos/Constructor/Extra/BundleExplorer/BundleExplorer.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="D:/source/repos/Constructor/ExtraFramework/ExtraFramework.csproj" />
+  </Folder>
+  <Folder Name="/Library/">
+    <Project Path="Library/xxHash/xxHash.csproj" Id="76fbbe98-a0c8-4f04-9a8c-72e4a07273e7">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Folder Name="/SourceGenerators/">
+    <Project Path="D:/source/repos/Constructor/Primary.SourceGenerator/Primary.SourceGenerator.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Testing/">
+    <Project Path="Testing/NewShaderProcessor/NewShaderProcessor.csproj" Id="4aa19abb-1857-44ff-82d8-d1af6531d0db">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Tooling/">
+    <Project Path="Tooling/ConfigUpdater/ConfigUpdater.csproj" Id="fb05eb6c-38a1-42ac-8fa0-e5a8011fe432">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Tooling/InteropGenerator/InteropGenerator.csproj" Id="3236f452-d8be-4265-983e-1ac4db1f10f8">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
+</Solution>

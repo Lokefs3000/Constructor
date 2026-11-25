@@ -1,0 +1,26 @@
+texture = "Content/Textures/Editor/FloatingIcons.png"
+
+[[sprites]]
+name = "Light_Point"
+offset = [0, 0]
+size = [16, 16]
+
+[[sprites]]
+name = "Light_Spot"
+offset = [16, 0]
+size = [16, 16]
+
+[[sprites]]
+name = "Light_Directional"
+offset = [32, 0]
+size = [16, 16]
+
+[[sprites]]
+name = "Light_Area"
+offset = [48, 0]
+size = [16, 16]
+
+[[sprites]]
+name = "Volume_Effect"
+offset = [64, 0]
+size = [16, 16]

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Layout>
+	<Stylesheet Path="Editor/UI/Default.style" />
+	<Stylesheet Path="Editor/UI/Styles/EditorViewToolbar.style" />
+
+	<Window>
+		<RawImage Id="PrimaryView" Position="0.0 0 0.0 23" Size="1.0 0 1.0 -23" />
+		<Element Id="SnippetElement" Position="0.0 0 0.0 23" Size="1.0 0 1.0 -23" />
+
+		<Frame Id="header-bar" Class="header-bar" Size="1.0 0 0.0 22">
+			<ListLayout Direction="Horizontal" Padding="0.0 6" />
+		</Frame>
+	</Window>
+</Layout>

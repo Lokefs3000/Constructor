@@ -1,0 +1,293 @@
+[
+    {
+        "$type": "Field",
+        "name": "Handling.ImageType",
+        "display": "Texture type"
+    },
+    {
+        "$type": "Field",
+        "name": "Handling.ImageFormat",
+        "display": "Texture format"
+    },
+    {
+        "$type": "Field",
+        "name": "Handling.AlphaSource",
+        "display": "Alpha source",
+        "padding": 1
+    },
+    {
+        "$type": "Group",
+        "conditions": [
+            {
+                "name": "Handling.AlphaSource",
+                "values": [ "Source", "Red" ]
+            }
+        ],
+        "values": [
+            {
+                "$type": "Field",
+                "name": "Handling.AlphaCutout",
+                "display": "Cutout"
+            },
+            {
+                "$type": "Group",
+                "conditions": [
+                    {
+                        "name": "Handling.AlphaCutout",
+                        "values": [ true ]
+                    }
+                ],
+                "values": [
+                    {
+                        "$type": "Field",
+                        "name": "Handling.CutoutThreshold",
+                        "display": "Threshold"
+                    },
+                    {
+                        "$type": "Field",
+                        "name": "Handling.CutoutDither",
+                        "display": "Dither"
+                    }
+                ],
+                "indent": 0.5
+            },
+            {
+                "$type": "Field",
+                "name": "Handling.PremultipliedAlpha",
+                "display": "Premultiplied alpha"
+            }
+        ]
+    },
+    {
+        "$type": "Field",
+        "name": "Handling.GammaCorrect",
+        "display": "Gamma correct",
+        "padding": 1
+    },
+    {
+        "$type": "Field",
+        "name": "Handling.FlipVertical",
+        "display": "Flip vertical"
+    },
+    {
+        "$type": "Field",
+        "name": "Mipmaps.GenerateMipmaps",
+        "display": "Generate mipmaps",
+        "padding": 1
+    },
+    {
+        "$type": "Group",
+        "conditions": [
+            {
+                "name": "Mipmaps.GenerateMipmaps",
+                "values": [ true ]
+            }
+        ],
+        "values": [
+            {
+                "$type": "Field",
+                "name": "Mipmaps.MipmapFilter",
+                "display": "Filter"
+            },
+            {
+                "$type": "Field",
+                "name": "Mipmaps.MaxMipMapCount",
+                "display": "Max mip count"
+            },
+            {
+                "$type": "Field",
+                "name": "Mipmaps.MinMipMapSize",
+                "display": "Min mip size"
+            },
+            {
+                "$type": "Field",
+                "name": "Mipmaps.ScaleAlphaForMipMaps",
+                "display": "Scale alpha for mips"
+            },
+            {
+                "$type": "Field",
+                "name": "Visual.MipLODBias",
+                "display": "Mip LOD bias",
+                "padding": 0.5
+            }
+        ]
+    },
+    {
+        "$type": "Preset",
+        "display": "Filter mode",
+        "presets": {
+            "Point": [
+                {
+                    "name": "Visual.ReductionType",
+                    "value": "Standard"
+                },
+                {
+                    "name": "Visual.MinFilter",
+                    "value": "Point"
+                },
+                {
+                    "name": "Visual.MagFilter",
+                    "value": "Point"
+                },
+                {
+                    "name": "Visual.MipFilter",
+                    "value": "Point"
+                }
+            ],
+            "Bilinear": [
+                {
+                    "name": "Visual.ReductionType",
+                    "value": "Standard"
+                },
+                {
+                    "name": "Visual.MinFilter",
+                    "value": "Linear"
+                },
+                {
+                    "name": "Visual.MagFilter",
+                    "value": "Linear"
+                },
+                {
+                    "name": "Visual.MipFilter",
+                    "value": "Point"
+                }
+            ],
+            "Trilinear": [
+                {
+                    "name": "Visual.ReductionType",
+                    "value": "Standard"
+                },
+                {
+                    "name": "Visual.MinFilter",
+                    "value": "Linear"
+                },
+                {
+                    "name": "Visual.MagFilter",
+                    "value": "Linear"
+                },
+                {
+                    "name": "Visual.MipFilter",
+                    "value": "Linear"
+                }
+            ]
+        },
+        "values": [
+            {
+                "$type": "Field",
+                "name": "Visual.ReductionType",
+                "display": "Reduction type"
+            },
+            {
+                "$type": "Field",
+                "name": "Visual.MinFilter",
+                "display": "Min filter"
+            },
+            {
+                "$type": "Field",
+                "name": "Visual.MagFilter",
+                "display": "Mag filter"
+            },
+            {
+                "$type": "Field",
+                "name": "Visual.MipFilter",
+                "display": "Mip filter"
+            }
+        ]
+    },
+    {
+        "$type": "Preset",
+        "display": "Wrap mode",
+        "presets": {
+            "Repeat": [
+                {
+                    "name": "Visual.AddressModeU",
+                    "value": "Repeat"
+                },
+                {
+                    "name": "Visual.AddressModeV",
+                    "value": "Repeat"
+                }
+            ],
+            "Clamp": [
+                {
+                    "name": "Visual.AddressModeU",
+                    "value": "Clamp"
+                },
+                {
+                    "name": "Visual.AddressModeV",
+                    "value": "Clamp"
+                }
+            ],
+            "Mirror": [
+                {
+                    "name": "Visual.AddressModeU",
+                    "value": "Mirror"
+                },
+                {
+                    "name": "Visual.AddressModeV",
+                    "value": "Mirror"
+                }
+            ],
+            "Mirror once": [
+                {
+                    "name": "Visual.AddressModeU",
+                    "value": "MirrorOnce"
+                },
+                {
+                    "name": "Visual.AddressModeV",
+                    "value": "MirrorOnce"
+                }
+            ],
+            "Border": [
+                {
+                    "name": "Visual.AddressModeU",
+                    "value": "Border"
+                },
+                {
+                    "name": "Visual.AddressModeV",
+                    "value": "Border"
+                }
+            ]
+        },
+        "values": [
+            {
+                "$type": "Field",
+                "name": "Visual.AddressModeU",
+                "display": "U"
+            },
+            {
+                "$type": "Field",
+                "name": "Visual.AddressModeV",
+                "display": "V"
+            }
+        ]
+    },
+    {
+        "$type": "Field",
+        "name": "Visual.ComparisonFunction",
+        "display": "Comparison func",
+        "conditions": [
+            {
+                "name": "Visual.ReductionType",
+                "values": [ "Comparison" ]
+            }
+        ]
+    },
+    {
+        "$type": "Field",
+        "name": "Visual.BorderColor",
+        "display": "Border color",
+        "conditions": [
+            {
+                "name": "Visual.AddressModeU",
+                "values": [ "Border" ]
+            },
+            {
+                "name": "Visual.AddressModeV",
+                "values": [ "Border" ]
+            }
+        ],
+        "comparison": "Any",
+        "indent": 1.0
+    }
+]

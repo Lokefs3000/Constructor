@@ -1,0 +1,32 @@
+{
+    "arguments": [
+        {
+            "name": "skip-asset-check",
+            "shorthand": null,
+            "type": null
+        },
+        {
+            "name": "detailed-asset-info",
+            "shorthand": null,
+            "type": null
+        },
+        {
+            "name": "runtime",
+            "shorthand": null,
+            "type": "Integer"
+        },
+        {
+            "name": "runtime-pipe-in",
+            "shorthand": null,
+            "type": "String"
+        },
+        {
+            "name": "runtime-pipe-out",
+            "shorthand": null,
+            "type": "String"
+        }
+    ],
+    "includes": [
+        "CoreArguments.json"
+    ]
+}

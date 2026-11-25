@@ -1,4 +1,4 @@
-﻿using Primary.Scenes;
+﻿using Primary.Scenes.Components;
 
 namespace Primary.Components
 {
@@ -6,21 +6,23 @@ namespace Primary.Components
     {
         public static void RegisterDefault()
         {
-            SceneEntityManager.Register<EntityEnabled>();
-            SceneEntityManager.Register<EntityName>();
-            SceneEntityManager.Register<Transform>();
-            SceneEntityManager.Register<LocalTransform>();
-            SceneEntityManager.Register<WorldTransform>();
-            SceneEntityManager.Register<Camera>();
-            SceneEntityManager.Register<CameraProjectionData>();
-            SceneEntityManager.Register<MeshRenderer>();
-            SceneEntityManager.Register<RenderableAdditionalData>();
-            SceneEntityManager.Register<DirectionalLight>();
-            SceneEntityManager.Register<Light>();
-            SceneEntityManager.Register<LightRenderingData>();
-            SceneEntityManager.Register<EntityScene>();
+            SceneEntityManager.Instance.RegisterComponent<EntityEnabled>();
+            SceneEntityManager.Instance.RegisterComponent<EntityName>();
+            SceneEntityManager.Instance.RegisterComponent<Transform>();
+            SceneEntityManager.Instance.RegisterComponent<LocalTransform>();
+            SceneEntityManager.Instance.RegisterComponent<WorldTransform>();
+            SceneEntityManager.Instance.RegisterComponent<Camera>();
+            SceneEntityManager.Instance.RegisterComponent<CameraProjectionData>();
+            SceneEntityManager.Instance.RegisterComponent<MeshRenderer>();
+            SceneEntityManager.Instance.RegisterComponent<DirectionalLight>();
+            SceneEntityManager.Instance.RegisterComponent<Light>();
+            SceneEntityManager.Instance.RegisterComponent<LightRenderingData>();
+            SceneEntityManager.Instance.RegisterComponent<EntityScene>();
+            SceneEntityManager.Instance.RegisterComponent<RenderBounds>();
+            SceneEntityManager.Instance.RegisterComponent<DontSerializeTag>();
+            SceneEntityManager.Instance.RegisterComponent<RenderOctantInfo>();
 
-            SceneEntityManager.BuildRequirementHierchies();
+            SceneEntityManager.Instance.RebuildDependencyGraph();
         }
     }
 }

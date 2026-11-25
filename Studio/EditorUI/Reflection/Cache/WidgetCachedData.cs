@@ -1,0 +1,61 @@
+﻿using System;
+using System.Collections.Frozen;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
+using System.Text;
+using EditorUI.Styling;
+
+namespace EditorUI.Reflection.Cache
+{
+    public sealed class WidgetCachedData
+    {
+        private readonly Type _widgetType;
+
+        private readonly FrozenDictionary<string, PropertyData> _properties;
+        private readonly FrozenDictionary<string, TriggerData> _triggers;
+
+        private readonly ImmutableArray<PropertyData> _propertyArray;
+
+        private readonly FrozenDictionary<string, MethodInfo> _callbackMethods;
+
+        private readonly ConstructorInfo? _constructor;
+
+        internal WidgetCachedData(Type widgetType, FrozenDictionary<string, PropertyData> properties, FrozenDictionary<string, TriggerData> triggers, FrozenDictionary<string, MethodInfo> callbackMethods, ConstructorInfo? constructor)
+        {
+            _widgetType = widgetType;
+
+            _properties = properties;
+            _triggers = triggers;
+
+            _propertyArray = [.. properties.Values];
+
+            _callbackMethods = callbackMethods;
+
+            _constructor = constructor;
+        }
+
+        public bool TryGetPropertyData(string name, [NotNullWhen(true)] out PropertyData? propertyData)
+        {
+            return _properties.TryGetValue(name, out propertyData);
+        }
+
+        public bool TryGetTriggerData(string name, [NotNullWhen(true)] out TriggerData? triggerData)
+        {
+            return _triggers.TryGetValue(name, out triggerData);
+        }
+
+        public bool TryGetCallbackMethod(string name, [NotNullWhen(true)] out MethodInfo? value)
+        {
+            return _callbackMethods.TryGetValue(name, out value);
+        }
+
+        public ImmutableArray<PropertyData> Properties => _propertyArray;
+        public int TriggerValueCount => _triggers.Count;
+
+        public ConstructorInfo? Constructor => _constructor;
+    }
+
+    public delegate void StyleCallbackDelegate(object target);
+}

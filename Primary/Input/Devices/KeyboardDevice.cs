@@ -1,4 +1,6 @@
-﻿using SDL;
+﻿using Primary.Common;
+using Primary.Mathematics;
+using SDL;
 
 namespace Primary.Input.Devices
 {
@@ -7,10 +9,22 @@ namespace Primary.Input.Devices
         private bool[] _keyStates;
         private Dictionary<KeyCode, KeyState> _newlyUpdatedStates;
 
+        private AnyState _anyKeyState;
+        private int _keysHeld;
+        private KeyModifier _modifiers;
+
+        private int _keyboardFocus;
+
         internal KeyboardDevice()
         {
             _keyStates = new bool[byte.MaxValue];
             _newlyUpdatedStates = new Dictionary<KeyCode, KeyState>();
+
+            _anyKeyState = AnyState.None;
+            _keysHeld = 0;
+            _modifiers = KeyModifier.None;
+
+            _keyboardFocus = 0;
         }
 
         public bool HandleInputEvent(ref readonly SDL_Event @event)
@@ -21,7 +35,28 @@ namespace Primary.Input.Devices
                 if (key != KeyCode.Unknown)
                 {
                     if (!_keyStates[(int)key])
+                    {
                         _newlyUpdatedStates[key] = KeyState.Released;
+                        _anyKeyState |= AnyState.Pressed;
+                        _keysHeld++;
+
+                        switch (key)
+                        {
+                            case KeyCode.LeftShift: _modifiers = Flags.AddFlags(_modifiers, KeyModifier.LeftShift); break;
+                            case KeyCode.LeftControl: _modifiers = Flags.AddFlags(_modifiers, KeyModifier.LeftControl); break;
+                            case KeyCode.LeftAlt: _modifiers = Flags.AddFlags(_modifiers, KeyModifier.LeftAlt); break;
+                            case KeyCode.LeftGui: _modifiers = Flags.AddFlags(_modifiers, KeyModifier.LeftGui); break;
+                            case KeyCode.RightShift: _modifiers = Flags.AddFlags(_modifiers, KeyModifier.RightShift); break;
+                            case KeyCode.RightControl: _modifiers = Flags.AddFlags(_modifiers, KeyModifier.RightControl); break;
+                            case KeyCode.RightAlt: _modifiers = Flags.AddFlags(_modifiers, KeyModifier.RightAlt); break;
+                            case KeyCode.RightGui: _modifiers = Flags.AddFlags(_modifiers, KeyModifier.RightGui); break;
+                        }
+
+                        KeyPressed?.Invoke(key);
+                    }
+
+                    if (@event.key.repeat)
+                        KeyRepeated?.Invoke(key);
 
                     _keyStates[(int)key] = true;
                     return true;
@@ -33,11 +68,44 @@ namespace Primary.Input.Devices
                 if (key != KeyCode.Unknown)
                 {
                     if (_keyStates[(int)key])
+                    {
                         _newlyUpdatedStates[key] = KeyState.Released;
+                        _anyKeyState |= AnyState.Released;
+                        _keysHeld--;
+
+                        switch (key)
+                        {
+                            case KeyCode.LeftShift: _modifiers = Flags.RemoveFlags(_modifiers, KeyModifier.LeftShift); break;
+                            case KeyCode.LeftControl: _modifiers = Flags.RemoveFlags(_modifiers, KeyModifier.LeftControl); break;
+                            case KeyCode.LeftAlt: _modifiers = Flags.RemoveFlags(_modifiers, KeyModifier.LeftAlt); break;
+                            case KeyCode.LeftGui: _modifiers = Flags.RemoveFlags(_modifiers, KeyModifier.LeftGui); break;
+                            case KeyCode.RightShift: _modifiers = Flags.RemoveFlags(_modifiers, KeyModifier.RightShift); break;
+                            case KeyCode.RightControl: _modifiers = Flags.RemoveFlags(_modifiers, KeyModifier.RightControl); break;
+                            case KeyCode.RightAlt: _modifiers = Flags.RemoveFlags(_modifiers, KeyModifier.RightAlt); break;
+                            case KeyCode.RightGui: _modifiers = Flags.RemoveFlags(_modifiers, KeyModifier.RightGui); break;
+                        }
+
+                        KeyReleased?.Invoke(key);
+                    }
 
                     _keyStates[(int)key] = false;
                     return true;
                 }
+            }
+            else if (@event.Type == SDL_EventType.SDL_EVENT_TEXT_INPUT)
+            {
+                char c = '\0';
+
+                unsafe
+                {
+                    if (@event.text.text != null)
+                    {
+                        c = (char)@event.text.text[0];
+                    }
+                }
+
+                if (c != '\0')
+                    TextInput?.Invoke(c);
             }
 
             return false;
@@ -46,6 +114,8 @@ namespace Primary.Input.Devices
         public void UpdateFrame()
         {
             _newlyUpdatedStates.Clear();
+
+            _anyKeyState = AnyState.None;
         }
 
         public int ResolveBindingPath(ReadOnlySpan<char> bindingPath)
@@ -65,11 +135,51 @@ namespace Primary.Input.Devices
             return new DeviceValue(_keyStates[valueId]);
         }
 
+        public bool TakeKeyboardFocus()
+        {
+            if (_keyboardFocus > 0)
+                return false;
+
+            ++_keyboardFocus;
+            return true;
+        }
+
+        public bool TakeKeyboardFocus(Boundaries boundaries)
+        {
+            if (_keyboardFocus > 0)
+                return false;
+
+            ++_keyboardFocus;
+            return true;
+        }
+
+        public void EndKeyboardFocus()
+        {
+            if (_keyboardFocus > 0)
+            {
+                --_keyboardFocus;
+            }
+        }
+
         public bool IsKeyDown(KeyCode key) => _keyStates[(int)key];
         public bool IsKeyPressed(KeyCode key) => _newlyUpdatedStates.TryGetValue(key, out KeyState state) && state == KeyState.Pressed;
         public bool IsKeyReleased(KeyCode key) => _newlyUpdatedStates.TryGetValue(key, out KeyState state) && state == KeyState.Released;
 
-        private static KeyCode TranslateKey(SDL_Keycode keycode) => keycode switch
+        public bool IsAnyKeyPressed => Flags.HasFlag(_anyKeyState, AnyState.Pressed);
+        public bool IsAnyKeyReleased => Flags.HasFlag(_anyKeyState, AnyState.Released);
+
+        public KeyModifier KeyModifiers => _modifiers;
+
+        public bool HasKeyboardFocus => _keyboardFocus > 0;
+
+        public event Action<KeyCode>? KeyPressed;
+        public event Action<KeyCode>? KeyReleased;
+
+        public event Action<KeyCode>? KeyRepeated;
+
+        public event Action<char>? TextInput;
+
+        public static KeyCode TranslateKey(SDL_Keycode keycode) => keycode switch
         {
             SDL_Keycode.SDLK_A => KeyCode.A,
             SDL_Keycode.SDLK_B => KeyCode.B,
@@ -217,6 +327,13 @@ namespace Primary.Input.Devices
         {
             Pressed = 0,
             Released
+        }
+
+        private enum AnyState : byte
+        {
+            None = 0,
+            Pressed = 1 << 0,
+            Released = 1 << 1,
         }
     }
 
@@ -386,5 +503,10 @@ namespace Primary.Input.Devices
         RightShift = 1 << 5,
         RightAlt = 1 << 6,
         RightGui = 1 << 7,
+
+        Control = LeftControl | RightControl,
+        Shift = LeftShift | RightShift,
+        Alt = LeftAlt | RightAlt,
+        Gui = LeftGui | RightGui
     }
 }

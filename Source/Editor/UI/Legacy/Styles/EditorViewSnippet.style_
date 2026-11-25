@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Stylesheet>
+    <Class Name="root-element" Type="Frame">
+        <BackgroundColor Value="#505050" />
+		<CornerRadius Value="8" />
+    </Class>
+
+    <Class Name="move-handle-button" Type="Button">
+        <State Name="Normal">
+            <Size Value="0.0 32 0.0 12" />
+			<CornerRadius Value="8" />
+        </State>
+    </Class>
+
+    <Class Name="move-handle-image" Type="Image">
+        <Position Value="0.5 0 0.5 0" />
+        <Size Value="0.8 0 0.8 0" />
+        <Anchor Value="0.5 0.5" />
+        <Image Value="Editor/UI/Icons/ViewSnippetHandle.png" />
+    </Class>
+
+    <Class Name="tool-button" Type="Button">
+        <State Name="Normal">
+            <Size Value="0.0 32 0.0 32" />
+            <BackgroundColor Value="#404040" />
+            <StrokeColor Value="#101010" />
+			<CornerRadius Value="8" />
+        </State>
+        <State Name="Hovered">
+			<BackgroundColor Value="#6d6d6d" />
+			<StrokeColor Value="#252525" />
+		</State>
+		<State Name="Pressed">
+			<BackgroundColor Value="#3f3f3f" />
+			<StrokeColor Value="#808080" />
+		</State>
+        <State Name="Toggled">
+			<StrokeColor Value="#a2bae0" />
+        </State>
+    </Class>
+
+    <Class Name="tool-button-icon" Type="Image">
+        <Position Value="0.0 1 0.0 1" />
+        <Size Value="1.0 -2 1.0 -2" />
+    </Class>
+</Stylesheet>

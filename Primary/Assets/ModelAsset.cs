@@ -1,217 +1,143 @@
-﻿using System.Numerics;
+﻿using Primary.Assets.Types;
+using Primary.Common;
+using Primary.Mathematics;
+using Primary.Rendering.Assets;
+using Primary.RHI;
+using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Primary.Assets
 {
-    public sealed class ModelAsset : IAssetDefinition
+    public sealed class ModelAsset : BaseAssetDefinition<ModelAsset, ModelAssetData>
     {
-        private readonly ModelAssetData _assetData;
-
-        internal ModelAsset(ModelAssetData assetData)
+        internal ModelAsset(ModelAssetData assetData) : base(assetData)
         {
-            _assetData = assetData;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetRenderMesh(ReadOnlySpan<char> name, out RenderMesh renderMesh)
+        public bool TryGetMesh(ReadOnlySpan<char> name, [NotNullWhen(true)] out MeshAsset? mesh) => TryGetMesh(name, StringComparison.CurrentCulture, out mesh);
+
+        public bool TryGetMesh(ReadOnlySpan<char> name, StringComparison comparison, [NotNullWhen(true)] out MeshAsset? mesh)
         {
-            return _assetData.TryGetRenderMesh(name.ToString(), out renderMesh);
+            if (IsLoaded)
+            {
+                foreach (LazyMesh lazyMesh in AssetData.Meshes)
+                {
+                    if (name.SequenceEqual(lazyMesh.Name))
+                    {
+                        mesh = lazyMesh.Asset.Value;
+                        return true;
+                    }
+                }
+            }
+
+            mesh = null;
+            return false;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public RenderMesh GetRenderMesh(ReadOnlySpan<char> name)
+        public MeshAsset? TryFindMeshOrNull(ReadOnlySpan<char> name) => TryFindMeshOrNull(name, StringComparison.CurrentCulture);
+
+        public MeshAsset? TryFindMeshOrNull(ReadOnlySpan<char> name, StringComparison comparison)
         {
-            if (_assetData.TryGetRenderMesh(name.ToString(), out RenderMesh renderMesh))
-                return renderMesh;
-            throw new KeyNotFoundException($"No render mesh with name: {name}");
+            if (IsLoaded)
+            {
+                foreach (LazyMesh lazyMesh in AssetData.Meshes)
+                {
+                    if (name.SequenceEqual(lazyMesh.Name))
+                    {
+                        return lazyMesh.Asset.Value;
+                    }
+                }
+            }
+
+            return null;
         }
 
-        internal ModelAssetData AssetData => _assetData;
+        public ImmutableArray<LazyMesh> Meshes => IsLoaded ? AssetData.Meshes : ImmutableArray<LazyMesh>.Empty;
+        public ModelNode? RootNode => IsLoaded ? AssetData.Root : null;
 
-        public RHI.Buffer? VertexBuffer => _assetData.VertexBuffer;
-        public RHI.Buffer? IndexBuffer => _assetData.IndexBuffer;
-
-        public ResourceStatus Status => _assetData.Status;
-
-        public string Name => _assetData.Name;
-        public AssetId Id => _assetData.Id;
+        public IRenderMeshSource MeshSource => AssetData;
     }
 
-    internal sealed class ModelAssetData : IInternalAssetData
+    public sealed class ModelAssetData : BaseInternalAssetData<ModelAsset>, IRenderMeshSource
     {
-        private readonly WeakReference _asset;
-
-        private ResourceStatus _status;
-
-        private readonly AssetId _id;
-        private string _name;
-
-        private RenderMesh[] _meshes;
+        private ImmutableArray<LazyMesh> _meshes;
         private ModelNode? _node;
 
-        private RHI.Buffer? _vertexBuffer;
-        private RHI.Buffer? _indexBuffer;
+        private RHIBuffer? _vertexBuffer;
+        private RHIBuffer? _indexBuffer;
 
-        internal ModelAssetData(AssetId id)
+        internal ModelAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
-            _asset = new WeakReference(null);
-
-            _status = ResourceStatus.Pending;
-
-            _id = id;
-            _name = string.Empty;
-
-            _meshes = Array.Empty<RenderMesh>();
+            _meshes = ImmutableArray<LazyMesh>.Empty;
             _node = null;
 
             _vertexBuffer = null;
             _indexBuffer = null;
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
-            _status = ResourceStatus.Disposed;
+            base.Dispose();
 
             _vertexBuffer?.Dispose();
             _indexBuffer?.Dispose();
 
-            _asset.Target = null;
-
-            foreach (RenderMesh rm in _meshes)
-                rm.FreeHandle();
-
-            _meshes = Array.Empty<RenderMesh>();
+            _meshes = ImmutableArray<LazyMesh>.Empty;
             _node = null;
 
             _vertexBuffer = null;
             _indexBuffer = null;
         }
 
-        public void SetAssetInternalStatus(ResourceStatus status)
+        internal void UpdateAssetData(ModelAsset asset, ImmutableArray<LazyMesh> meshes, ModelNode node, RHIBuffer vertexBuffer, RHIBuffer indexBuffer)
         {
-            _status = status;
-        }
+            base.UpdateAssetData(asset);
 
-        public void SetAssetInternalName(string name)
-        {
-            _name = name;
-        }
-
-        internal void UpdateAssetData(ModelAsset asset, RenderMesh[] meshes, ModelNode node, RHI.Buffer vertexBuffer, RHI.Buffer indexBuffer)
-        {
-            _asset.Target = asset;
             _meshes = meshes;
             _node = node;
             _vertexBuffer = vertexBuffer;
             _indexBuffer = indexBuffer;
-
-            _status = ResourceStatus.Success;
         }
 
-        internal void UpdateAssetFailed(ModelAsset asset)
-        {
-            _asset.Target = asset;
+        public ImmutableArray<LazyMesh> Meshes => _meshes;
+        public ModelNode? Root => _node;
 
-            _status = ResourceStatus.Error;
-        }
+        RHIBuffer? IRenderMeshSource.VertexBuffer => _vertexBuffer;
+        RHIBuffer? IRenderMeshSource.IndexBuffer => _indexBuffer;
 
-        internal bool TryGetRenderMesh(string id, out RenderMesh renderMesh)
-        {
-            for (int i = 0; i < _meshes.Length; i++)
-            {
-                ref RenderMesh rm = ref _meshes[i];
-                if (rm.Id == id)
-                {
-                    renderMesh = rm;
-                    return true;
-                }
-            }
-
-            Unsafe.SkipInit(out renderMesh);
-            return false;
-        }
-
-        internal RHI.Buffer? VertexBuffer => _vertexBuffer;
-        internal RHI.Buffer? IndexBuffer => _indexBuffer;
-
-        internal ResourceStatus Status => _status;
-
-        internal AssetId Id => _id;
-        internal string Name => _name;
-
-        public Type AssetType => typeof(ModelAsset);
-        public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
+        bool IRenderMeshSource.IsLoaded => Status == ResourceStatus.Success;
     }
 
-    public class RenderMesh
-    {
-        private readonly ModelAsset _model;
-        private readonly string _id;
-        private readonly GCHandle _gc;
-        private readonly nint _handle;
-
-        private readonly uint _vertexOffset;
-        private readonly uint _indexOffset;
-
-        private readonly uint _indexCount;
-
-        internal RenderMesh(ModelAsset modelAsset, string id, uint vertexOffset, uint indexOffset, uint indexCount)
-        {
-            _model = modelAsset;
-            _id = id;
-            _gc = GCHandle.Alloc(this, GCHandleType.Normal);
-            _handle = GCHandle.ToIntPtr(_gc);
-            _vertexOffset = vertexOffset;
-            _indexOffset = indexOffset;
-            _indexCount = indexCount;
-        }
-
-        internal void FreeHandle()
-        {
-            _gc.Free();
-        }
-
-        public ModelAsset Model => _model;
-        public string Id => _id;
-
-        internal nint Handle => _handle;
-
-        public uint VertexOffset => _vertexOffset;
-        public uint IndexOffset => _indexOffset;
-
-        public uint IndexCount => _indexCount;
-    }
+    public readonly record struct LazyMesh(Lazy<MeshAsset> Asset, int LocalId, string Name);
 
     public sealed record class ModelNode
     {
         private readonly ModelAsset _model;
-        private readonly ModelNode? _parent;
-        private readonly ModelNode[] _children;
+        private readonly ImmutableArray<ModelNode> _children;
 
         private readonly ModelTransform _transform;
 
         private readonly string _name;
-        private readonly string? _meshId;
+        private readonly Lazy<MeshAsset>? _mesh;
 
-        internal ModelNode(ModelAsset model, ModelNode? parent, ModelNode[] children, ModelTransform transform, string name, string? meshId)
+        internal ModelNode(ModelAsset model, ImmutableArray<ModelNode> children, ModelTransform transform, string name, Lazy<MeshAsset>? mesh)
         {
             _model = model;
-            _parent = parent;
             _children = children;
             _transform = transform;
             _name = name;
-            _meshId = meshId;
+            _mesh = mesh;
         }
 
         public ModelAsset Model => _model;
-        public ModelNode? Parent => _parent;
-        public IReadOnlyCollection<ModelNode> Children => _children;
+        public ImmutableArray<ModelNode> Children => _children;
 
         public ModelTransform Transform => _transform;
 
         public string Name => _name;
-        public string? MeshId => _meshId;
+        public MeshAsset? Mesh => _mesh?.Value;
     }
 
     public readonly record struct ModelTransform(Vector3 Position, Quaternion Quaternion, Vector3 Scale);

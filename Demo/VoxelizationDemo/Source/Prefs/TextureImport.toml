@@ -1,0 +1,6 @@
+use_bc7_in_editor = false
+use_bc7_in_build = true
+bc1_effort_in_editor = 6
+bc1_effort_in_build = 12
+bc7_effort_in_editor = 3
+bc7_effort_in_build = 4

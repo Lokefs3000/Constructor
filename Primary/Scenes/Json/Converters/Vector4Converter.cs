@@ -1,0 +1,56 @@
+﻿using Arch.Core;
+using System;
+using System.Collections.Generic;
+using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
+
+namespace Primary.Scenes.Json.Converters
+{
+    internal static class Vector4Converter
+    {
+        public static bool TryDeserialize(ref Utf8JsonReader reader, ref Vector4 result)
+        {
+            Unsafe.SkipInit(out result);
+
+            if (reader.TokenType != JsonTokenType.StartArray)
+                goto ReturnBad;
+
+            for (int i = 0; i < 4; ++i)
+            {
+                reader.Read();
+                if (reader.TokenType != JsonTokenType.Number)
+                    goto ReturnBad;
+
+                if (reader.TryGetSingle(out float value))
+                    result[i] = value;
+                else
+                    goto ReturnBad;
+            }
+
+            reader.Read();
+            if (reader.TokenType != JsonTokenType.EndArray)
+                return false;
+
+            return true;
+        ReturnBad:
+
+            reader.TrySkip();
+            return false;
+        }
+
+        public static bool TrySerialize(Utf8JsonWriter writer, ref Vector4 value)
+        {
+            writer.WriteStartArray();
+            writer.WriteNumberValue(value.X);
+            writer.WriteNumberValue(value.Y);
+            writer.WriteNumberValue(value.Z);
+            writer.WriteNumberValue(value.W);
+            writer.WriteEndArray();
+
+            return true;
+        }
+    }
+}

@@ -6,6 +6,8 @@
         public abstract ref readonly GraphicsPipelineBytecode Bytecode { get; }
         public abstract string Name { set; }
 
+        public abstract nint Handle { get; }
+
         public abstract void Dispose();
     }
 
@@ -37,6 +39,9 @@
         public BoundResourceDescription[] BoundResources;
         public KeyValuePair<uint, ImmutableSamplerDescription>[] ImmutableSamplers;
         public uint ExpectedConstantsSize;
+
+        public int Num32BitValues; //HACK: Bad override to allow more advanced control
+        public bool HasConstantBuffer;
     }
 
     public record struct GraphicsPipelineBytecode
@@ -251,7 +256,7 @@
         MinLinearMagPointMipLinear,
         MinMagLinearMipPoint,
         Linear,
-        MinMagAnisotropicMipPoint,
+        Anisotropic,
     }
 
     public enum TextureAddressMode : byte

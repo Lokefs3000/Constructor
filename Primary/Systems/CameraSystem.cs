@@ -1,7 +1,9 @@
 ﻿using Arch.Core;
 using Primary.Components;
-using Primary.Rendering;
+using Primary.Mathematics;
+using Primary.Profiling;
 using Primary.Scenes;
+using Primary.Windowing;
 using Schedulers;
 using System.Numerics;
 
@@ -11,8 +13,11 @@ namespace Primary.Systems
     {
         public void Schedule(World world, JobScheduler scheduler)
         {
-            SceneManager manager = Engine.GlobalSingleton.SceneManager;
-            manager.World.InlineQuery<CameraSystem, Camera, CameraProjectionData, WorldTransform>(s_query, ref this);
+            using (new ProfilingScope("Camera"))
+            {
+                SceneManager manager = Engine.GlobalSingleton.SceneManager;
+                manager.World.InlineQuery<CameraSystem, Camera, CameraProjectionData, WorldTransform>(s_query, ref this);
+            }
         }
 
         public void Update(ref Camera camera, ref CameraProjectionData projectionData, ref WorldTransform transform)
@@ -20,9 +25,9 @@ namespace Primary.Systems
             Vector2 clientSize = Vector2.Zero;
             if (true)
             {
-                Window? window = Engine.GlobalSingleton.RenderingManager.DefaultWindow;
+                Window? window = WindowManager.Instance.PrimaryWindow!;
                 if (window != null)
-                    clientSize = window.ClientSize;
+                    clientSize = window.ClientSize.AsVector2();
             }
 
             if (camera.IsDirty || projectionData.ClientSize != clientSize)

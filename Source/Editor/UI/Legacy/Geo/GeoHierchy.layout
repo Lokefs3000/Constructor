@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Layout>
+	<Stylesheet Path="Editor/UI/Default.style" />
+
+	<Window>
+		<Element Id="ContentElement" Size="1.0 0 1.0 0">
+			<Frame ClipDescendents="True" Id="header-bar" Class="header-bar" Size="1.0 0 0.0 22">
+				<ListLayout Direction="Horizontal" Padding="0.0 6" />
+				
+				<Button Id="header-save-button">
+					<FitterLayout Axis="Both" Margin="0.0 4 0.0 2" />
+					<Label IsActive="False" Text="Save to disk" AutoSize="FitBoundsToText" />
+				</Button>
+			</Frame>
+
+			<TreeView Mode="VerticalAndHorizontal" Id="Hierchy" Position="0.0 0 0.0 22" Size="1.0 0 1.0 -22" />
+		</Element>
+		<Label Id="PlaceholderText" Size="1.0 0 1.0 0" FontSize="1" Overflow="WrapWords"
+			Alignment="MiddleCenter" Text="No active geo
+scene asset selected" />
+	</Window>
+</Layout>

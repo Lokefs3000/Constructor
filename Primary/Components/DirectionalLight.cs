@@ -2,6 +2,7 @@
 
 namespace Primary.Components
 {
+    [Component]
     [ComponentRequirements(typeof(Transform))]
     public record struct DirectionalLight : IComponent
     {

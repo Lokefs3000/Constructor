@@ -1,0 +1,11 @@
+texture = "Editor/UI/Icons/HierchyTreeIcons.png"
+
+[[sprites]]
+name = "Visible"
+offset = [0, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Hidden"
+offset = [32, 0]
+size = [32, 32]

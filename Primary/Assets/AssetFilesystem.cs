@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets.Types;
 using Primary.Common.Streams;
 using System.Runtime.CompilerServices;
 
@@ -11,14 +12,11 @@ namespace Primary.Assets
         private List<ISubFilesystem> _filesystem;
         private bool _disposedValue;
 
-        private ShaderLibrary _shaderLibrary;
-
         internal AssetFilesystem()
         {
             s_instance = this;
 
             _filesystem = new List<ISubFilesystem>();
-            _shaderLibrary = new ShaderLibrary();
         }
 
         public void AddFilesystem(ISubFilesystem filesystem)
@@ -45,7 +43,7 @@ namespace Primary.Assets
             {
                 ISubFilesystem filesystem = _filesystem[i];
                 if (filesystem.Exists(path))
-                    return filesystem.ReadString(path);
+                    return filesystem.ReadAllText(path);
             }
 
             return null;
@@ -94,7 +92,6 @@ namespace Primary.Assets
             {
                 if (disposing)
                 {
-                    _shaderLibrary.Dispose();
                     s_instance = null;
                 }
 
@@ -108,13 +105,26 @@ namespace Primary.Assets
             GC.SuppressFinalize(this);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string? ReadString(ReadOnlySpan<char> path, BundleReader? bundleToReadFrom = null) => s_instance!.ReadAsString(path, bundleToReadFrom);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Stream? OpenStream(ReadOnlySpan<char> path, BundleReader? bundleToReadFrom = null) => s_instance!.OpenAsStream(path, bundleToReadFrom);
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool Exists(ReadOnlySpan<char> path, BundleReader? bundleToReadFrom = null) => s_instance!.DoesFileExist(path, bundleToReadFrom);
 
-        public static ShaderLibrary ShaderLibrary => s_instance!._shaderLibrary;
+        public static string? ReadString(AssetId id)
+        {
+            AssetManager assets = Engine.GlobalSingleton.AssetManager;
+            return assets.IdProvider.TryGetAnyPathForId(id, out string? path) ? ReadString(path) : null;
+        }
+
+        public static Stream? OpenStream(AssetId id)
+        {
+            AssetManager assets = Engine.GlobalSingleton.AssetManager;
+            return assets.IdProvider.TryGetAnyPathForId(id, out string? path) ? OpenStream(path) : null;
+        }
+
+        public static bool Exists(AssetId id)
+        {
+            AssetManager assets = Engine.GlobalSingleton.AssetManager;
+            return assets.IdProvider.TryGetAnyPathForId(id, out string? path) ? Exists(path) : false;
+        }
     }
 }

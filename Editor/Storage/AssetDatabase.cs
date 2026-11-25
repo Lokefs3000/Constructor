@@ -1,4 +1,5 @@
-﻿using Primary.Assets;
+﻿using Primary.Assets.Types;
+using Primary.Profiling;
 using System.Collections.Concurrent;
 
 namespace Editor.Storage
@@ -14,9 +15,12 @@ namespace Editor.Storage
 
         internal void HandlePendingUpdates()
         {
-            foreach (var kvp in _categories)
+            using (new ProfilingScope("AssetDbUpdate"))
             {
-                kvp.Value.HandlePendingUpdates();
+                foreach (var kvp in _categories)
+                {
+                    kvp.Value.HandlePendingUpdates();
+                }
             }
         }
 
@@ -66,5 +70,22 @@ namespace Editor.Storage
 
             return category;
         }
+
+        /// <summary>Thread-safe</summary>
+        public AssetCategoryDatabase? GetCategory(Type type, bool createIfNull = true)
+        {
+            if (!_categories.TryGetValue(type, out AssetCategoryDatabase? category))
+            {
+                if (!createIfNull)
+                    return null;
+
+                category = new AssetCategoryDatabase(type);
+                category = _categories.GetOrAdd(type, category);
+            }
+
+            return category;
+        }
+
+        public IEnumerable<AssetCategoryDatabase> Categories => _categories.Values;
     }
 }

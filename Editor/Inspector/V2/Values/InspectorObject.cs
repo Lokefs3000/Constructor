@@ -1,0 +1,10 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace Editor.Inspector.V2.Values
+{
+    public sealed class InspectorObject<T> : InspectorValue<T>, IInspectorObject
+    {
+    }
+}

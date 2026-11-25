@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Collections.Pooled.V2" Version="2.2.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Interop.D3D12MemAlloc\Interop.D3D12MemAlloc.csproj" />
+    <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
+    <ProjectReference Include="..\Primary.RHI2\Primary.RHI2.csproj" />
+    <ProjectReference Include="..\Primary\Primary.csproj" />
+  </ItemGroup>
+</Project>

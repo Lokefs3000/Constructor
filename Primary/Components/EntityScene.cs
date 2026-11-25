@@ -2,8 +2,9 @@
 
 namespace Primary.Components
 {
+    [Component, DontSerializeComponent]
     [InspectorHidden]
-    internal struct EntityScene : IComponent
+    internal record struct EntityScene : IComponent
     {
         public int SceneId;
     }

@@ -1,0 +1,7 @@
+shader = "Engine/Shaders/ForwardPlus/LitDefault.shader"
+
+[resources]
+Diffuse = "Editor/Textures/Geo/DefaultTile_Diffuse.png"
+Normal = "Editor/Textures/Geo/DefaultTile_Normal.png"
+
+[properties]

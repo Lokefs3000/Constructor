@@ -1,9 +1,7 @@
 ﻿using Editor.Interaction;
 using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Components;
-using Primary.Rendering;
-using Primary.Rendering.Data;
-using Primary.Rendering.Raw;
 using Primary.Scenes;
 using System.Diagnostics;
 using System.Numerics;
@@ -93,11 +91,12 @@ namespace Editor.Rendering
             using (RasterPassDescription pass = renderPass.CreateRasterPass())
             {
                 pass.SetThreadingPolicy(RenderPassThreadingPolicy.None);
+                pass.SetDebugName("Selection");
                 pass.SetFunction(PassFunction);
             }
         }
 
-        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData)
+        private void PassFunction(RasterCommandBuffer commandBuffer, RenderPassData passData, object? userArg)
         {
             _meshes.Clear();
             for (int i = 0; i < _renderableEntities.Count; i++)
@@ -207,12 +206,12 @@ namespace Editor.Rendering
                     commandBuffer.Unmap(_matrixBuffer!);
                 }
 
-                ModelAsset? meshModel = ro.Mesh.Model;
-                if (meshModel.VertexBuffer == null || meshModel.IndexBuffer == null)
+                IRenderMeshSource? meshSource = ro.Mesh.Source;
+                if (meshSource.VertexBuffer == null || meshSource.IndexBuffer == null)
                     continue;
 
-                commandBuffer.SetVertexBuffer(0, meshModel.VertexBuffer);
-                commandBuffer.SetIndexBuffer(meshModel.IndexBuffer);
+                commandBuffer.SetVertexBuffer(0, meshSource.VertexBuffer);
+                commandBuffer.SetIndexBuffer(meshSource.IndexBuffer);
                 commandBuffer.DrawIndexedInstanced(new RHI.DrawIndexedInstancedArgs(ro.Mesh.IndexCount, ro.Mesh.IndexOffset, (int)ro.Mesh.VertexOffset));
             }
         }
@@ -230,7 +229,7 @@ namespace Editor.Rendering
             commandBuffer.DrawInstanced(new RHI.DrawInstancedArgs(3));
         }
 
-        private readonly record struct RenderObject(RenderMesh Mesh, SceneEntity Entity);
+        private readonly record struct RenderObject(RawRenderMesh Mesh, SceneEntity Entity);
 
         private readonly record struct SampleConstants(float Near, float Far);
     }

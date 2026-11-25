@@ -1,6 +1,4 @@
-﻿using Primary.Rendering;
-
-namespace Editor.Rendering
+﻿namespace Editor.Rendering
 {
     internal sealed class RenderPathManager
     {

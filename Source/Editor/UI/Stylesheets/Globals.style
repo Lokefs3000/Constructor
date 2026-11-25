@@ -1,0 +1,16 @@
+// Fonts
+$primary-font-family: url(Editor/Fonts/Inter.uifont);
+
+// Colours
+$primary-text-colour: #e7f2ec;
+$primary-bg-colour: #303030;
+$primary-deep-bg-colour: #101010;
+$selected-highlight-color: #569fee8f;
+
+// Buttons
+$default-button-colour: #505050;
+$default-button-border-colour: #909090;
+$hovered-button-colour: #656565;
+$hovered-button-border-colour: #afafaf;
+$held-button-colour: #151515;
+$held-button-border-colour: #656565;

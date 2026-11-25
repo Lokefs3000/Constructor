@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Snippet>
+    <Stylesheet Path="Editor/UI/Styles/EditorViewSnippet.style" />
+
+    <Frame Position="0.0 8 0.0 8" Class="root-element">
+        <ListLayout Direction="Vertical" Padding="0.0 4" />
+        <FitterLayout Axis="Both" Margin="0.0 3 0.0 3" />
+
+        <Button Id="move-handle" Class="move-handle-button">
+            <Image IsActive="False" Class="move-handle-image" />
+        </Button>
+
+        <ToggleButton Id="translate-btn" Class="tool-button">
+            <Image IsActive="False" Class="tool-button-icon" Image="Editor/UI/Icons/DefaultToolIcons.png" UVMin="0.0 0.0" UVMax="0.333 1.0" />
+        </ToggleButton>
+        <ToggleButton Id="rotate-btn" Class="tool-button">
+            <Image IsActive="False" Class="tool-button-icon" Image="Editor/UI/Icons/DefaultToolIcons.png" UVMin="0.333 0.0" UVMax="0.667 1.0" />
+        </ToggleButton>
+        <ToggleButton Id="scale-btn" Class="tool-button">
+            <Image IsActive="False" Class="tool-button-icon" Image="Editor/UI/Icons/DefaultToolIcons.png" UVMin="0.667 0.0" UVMax="1.0 1.0" />
+        </ToggleButton>
+    </Frame>
+</Snippet>

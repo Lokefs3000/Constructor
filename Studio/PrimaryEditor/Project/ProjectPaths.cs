@@ -1,0 +1,63 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace PrimaryEditor.Project
+{
+    public sealed class ProjectPaths
+    {
+        private string _rootFolder;
+        private string _contentFolder;
+        private string _sourceFolder;
+        private string _libraryFolder;
+        private string _prefsFolder;
+
+        private string _librarySavedFolder;
+        private string _libraryConfigFolder;
+        private string _libraryImportedFolder;
+        private string _libraryCacheFolder;
+
+        internal ProjectPaths()
+        {
+            _contentFolder = string.Empty;
+            _sourceFolder = string.Empty;
+            _libraryFolder = string.Empty;
+            _prefsFolder = string.Empty;
+
+            _librarySavedFolder = string.Empty;
+            _libraryConfigFolder = string.Empty;
+            _libraryImportedFolder = string.Empty;
+            _libraryCacheFolder = string.Empty;
+        }
+
+        internal void SetupPaths(string projectDir)
+        {
+            if (OperatingSystem.IsWindows())
+                projectDir = projectDir.Replace('/', '\\');
+            else
+                projectDir = projectDir.Replace('\\', '/');
+
+            _rootFolder = projectDir;
+            _contentFolder = Path.Combine(projectDir, "Content");
+            _sourceFolder = Path.Combine(projectDir, "Source");
+            _libraryFolder = Path.Combine(projectDir, "Library");
+            _prefsFolder = Path.Combine(projectDir, "Prefs");
+
+            _librarySavedFolder = Path.Combine(_libraryFolder, "Saved");
+            _libraryConfigFolder = Path.Combine(_libraryFolder, "Config");
+            _libraryImportedFolder = Path.Combine(_libraryFolder, "Imported");
+            _libraryCacheFolder = Path.Combine(_libraryFolder, "Cache");
+        }
+
+        public string RootFolder => _rootFolder;
+        public string ContentFolder => _contentFolder;
+        public string SourceFolder => _sourceFolder;
+        public string LibraryFolder => _libraryFolder;
+        public string PrefsFolder => _prefsFolder;
+
+        public string LibrarySavedFolder => _librarySavedFolder;
+        public string LibraryConfigFolder => _libraryConfigFolder;
+        public string LibraryImportedFolder => _libraryImportedFolder;
+        public string LibraryCacheFolder => _libraryCacheFolder;
+    }
+}

@@ -72,10 +72,17 @@ namespace Primary.Common
             A = (byte)clamped.W;
         }
 
-        public uint RGBA => ((uint)R << 24) | ((uint)G << 16) | ((uint)B << 8) | ((uint)A);
-        public uint BGRA => ((uint)B << 24) | ((uint)G << 16) | ((uint)R << 8) | ((uint)A);
-        public uint ARGB => ((uint)A << 24) | ((uint)R << 16) | ((uint)G << 8) | ((uint)B);
-        public uint ABGR => ((uint)A << 24) | ((uint)B << 16) | ((uint)G << 8) | ((uint)R);
+        public readonly Color ToColor()
+        {
+            return new Color(new Vector4(R, G, B, A) / new Vector4(255.0f));
+        }
+
+        public readonly Color32 FlipRGB() => new Color32(B, G, R, A);
+
+        public readonly uint RGBA => ((uint)R << 24) | ((uint)G << 16) | ((uint)B << 8) | ((uint)A);
+        public readonly uint BGRA => ((uint)B << 24) | ((uint)G << 16) | ((uint)R << 8) | ((uint)A);
+        public readonly uint ARGB => ((uint)A << 24) | ((uint)R << 16) | ((uint)G << 8) | ((uint)B);
+        public readonly uint ABGR => ((uint)A << 24) | ((uint)B << 16) | ((uint)G << 8) | ((uint)R);
 
         public static Color32 FromHex(ReadOnlySpan<char> hex)
         {

@@ -1,4 +1,4 @@
-﻿using Primary.Assets;
+﻿using Primary.Assets.Types;
 
 namespace Editor.Assets
 {
@@ -19,17 +19,50 @@ namespace Editor.Assets
         {
             AssetId id = _pipeline.Identifier.GetOrRegisterAsset(localPath);
 
-            string sourcePath = Path.Combine(EditorFilepaths.LibraryAssetsPath, $"{id}_{keyword}.dat");
+            string sourcePath = Path.Combine(EditorFilepaths.LibraryAssetsPath, $"{id}_{keyword}.toml");
             return sourcePath;
         }
 
         /// <summary>Thread-safe</summary>
-        public bool DoesFileHaveConfig(string localPath, string keyword)
+        public string? GetFilePathOrLocal(string localPath, string keyword, out bool isLocal)
         {
             AssetId id = _pipeline.Identifier.GetOrRegisterAsset(localPath);
 
-            string sourcePath = Path.Combine(EditorFilepaths.LibraryAssetsPath, $"{id}_{keyword}.dat");
-            return File.Exists(sourcePath);
+            string sourcePath = Path.Combine(EditorFilepaths.LibraryAssetsPath, $"{id.ToString("N")}_{keyword}.toml");
+            if (!File.Exists(sourcePath))
+            {
+                sourcePath = Path.ChangeExtension(localPath, ".toml");
+                if (!AssetPipeline.TryGetFullPathFromLocal(sourcePath, out string? fullPath) || !File.Exists(fullPath))
+                {
+                    isLocal = false;
+                    return null;
+                }
+
+                isLocal = true;
+                return sourcePath;
+            }
+            else
+            {
+                isLocal = false;
+                return sourcePath;
+            }
+        }
+
+        /// <summary>Thread-safe</summary>
+        public bool DoesFileHaveConfig(string localPath, string keyword, bool allowLocalConfig = true)
+        {
+            if (AssetPipeline.TryGetFullPathFromLocal(localPath, out string? fullPath))
+                localPath = fullPath;
+            else
+                EdLog.Assets.Warning("Failed to get full path from local path: {p}", localPath);
+
+            AssetId id = _pipeline.Identifier.GetOrRegisterAsset(localPath);
+
+            string sourcePath = Path.Combine(EditorFilepaths.LibraryAssetsPath, $"{id}_{keyword}.toml");
+            if (File.Exists(sourcePath))
+                return true;
+
+            return allowLocalConfig && File.Exists(Path.ChangeExtension(localPath, ".toml"));
         }
     }
 }

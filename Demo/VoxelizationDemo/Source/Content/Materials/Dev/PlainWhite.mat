@@ -1,0 +1,6 @@
+shader = "Content/Materials/Sets/Lit.shaderset"
+
+[properties]
+"Diffuse Tint" = "[1.0, 1.0, 1.0, 1.0]"
+"Roughness Scale" = "0.5"
+"Metallic Scale" = "0.0"

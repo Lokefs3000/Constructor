@@ -14,7 +14,9 @@ namespace Primary.Timing
         private double _deltaTimeDouble;
         private float _deltaTime;
 
-        private int _frameIndex;
+        private long _frameIndex;
+
+        private double _maxDeltaTime;
 
         internal Time()
         {
@@ -27,6 +29,8 @@ namespace Primary.Timing
             _deltaTime = 0;
 
             _frameIndex = 0;
+
+            _maxDeltaTime = 1.0 / 3.0;
         }
 
         public void BeginNewFrame()
@@ -42,20 +46,22 @@ namespace Primary.Timing
             }
             else
             {
-                _deltaTimeDouble = (timestampThisFrame - _lastFrameTimestamp) / (double)Stopwatch.Frequency;
+                _deltaTimeDouble = Math.Min((timestampThisFrame - _lastFrameTimestamp) / (double)Stopwatch.Frequency, _maxDeltaTime);
                 _deltaTime = (float)_deltaTimeDouble;
             }
 
             _lastFrameTimestamp = timestampThisFrame;
 
-            _frameIndex++;
+            ++_frameIndex;
         }
+
+        public static int GetFrameDifference(long a, long b) => (int)(a > b ? (uint)a - (uint)b : (uint)b - (uint)a);
 
         public static double DeltaTimeDouble => Instance._deltaTimeDouble;
         public static float DeltaTime => Instance._deltaTime;
 
         public static long TimestampForActiveFrame => Instance._lastFrameTimestamp;
 
-        public static int FrameIndex => Instance._frameIndex;
+        public static long FrameIndex => Instance._frameIndex;
     }
 }

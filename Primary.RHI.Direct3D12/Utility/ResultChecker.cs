@@ -7,11 +7,11 @@ namespace Primary.RHI.Direct3D12.Utility
     internal static class ResultChecker
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        [DebuggerHidden]
+        [StackTraceHidden]
         public static void ThrowIfUnhandled(Result result, GraphicsDeviceImpl? device = null)
         {
             if (result.Failure)
-                throw new RHIException(GetErrorString(result), device);
+                throw new RHIException(GetErrorString(result), result.Code, device);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -29,12 +29,12 @@ namespace Primary.RHI.Direct3D12.Utility
             {
                 try
                 {
-                    throw new RHIException("An api returned an invalid value.", device);
+                    throw new RHIException("An api returned an invalid value.", result.Code, device);
                 }
                 catch (RHIException ex)
                 {
                     GraphicsDeviceImpl.Logger.Error(ex, GetErrorString(result));
-                    device?.DumpMessageQueue();
+                    device?.FlushMessageQueue();
                 }
             }
         }
@@ -107,9 +107,9 @@ namespace Primary.RHI.Direct3D12.Utility
 
     internal sealed class RHIException : Exception
     {
-        internal RHIException(string message, GraphicsDeviceImpl? device) : base(message)
+        internal RHIException(string message, int code, GraphicsDeviceImpl? device) : base($"[0x{((uint)code).ToString("x")}]: {message}")
         {
-            device?.DumpMessageQueue();
+            device?.FlushMessageQueue();
         }
     }
 }

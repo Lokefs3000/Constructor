@@ -1,0 +1,23 @@
+<Widget Size="1.0 0 1.0 0">
+    <Stylesheet Path="Editor/UI/Stylesheets/UIDesigner.style" />
+    <Stylesheet Path="Editor/UI/Stylesheets/Main.style" />
+
+    <!-- <MenuBar Source="" /> -->
+
+    <Widget Position="0.0 0 0.0 32" Size="1.0 0 1.0 -32">
+        <LayoutFrame Id="panel-left" Size="0.2 -1 1.0 0" ItemPadding="1">
+            <Widget Id="hierchy-view" Class="background" Size="1.0 0 0.65 -1">
+
+            </Widget>
+            <Widget Id="stylesheet-view" Class="background" Size="1.0 0 0.35 0">
+
+            </Widget>
+        </LayoutFrame>
+        <Widget Id="panel-center" Class="background preview-bg" Position="0.2 0 0.0 0" Size="0.55 0 1.0 0">
+
+        </Widget>
+        <LayoutFrame Id="panel-right" Class="background" Position="0.75 1 0.0 0" Size="0.25 -1 1.0 0">
+
+        </LayoutFrame>
+    </Widget>
+</Widget>

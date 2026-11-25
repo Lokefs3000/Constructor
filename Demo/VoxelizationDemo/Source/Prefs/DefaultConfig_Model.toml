@@ -1,0 +1,3 @@
+index_stride_mode = "Automatic"
+uv_channels = 0xff
+scale = 1.0

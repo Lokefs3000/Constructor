@@ -1,13 +1,8 @@
 ﻿using Editor.Interaction.Tools;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.Interaction.Controls
 {
-    internal interface IControlTool
+    public interface IControlTool
     {
         public ReadOnlySpan<IToolTransform> Transforms { get; }
 

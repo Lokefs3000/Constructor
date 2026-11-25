@@ -1,12 +1,8 @@
 ﻿using Editor.Geometry;
 using Editor.Geometry.Shapes;
 using Editor.Interaction;
-using System;
-using System.Collections.Generic;
+using Editor.Interaction.Logic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Editor.GeoEdit
 {
@@ -15,6 +11,17 @@ namespace Editor.GeoEdit
 
     }
 
+    internal abstract class SelectedGeoShapeBase : SelectedGeoObjectBase
+    {
+        public readonly GeoBrush Brush;
+
+        internal SelectedGeoShapeBase(GeoBrush brush)
+        {
+            Brush = brush;
+        }
+    }
+
+    [SelectionLogic(typeof(GeoSelectionLogic))]
     internal sealed class SelectedGeoBrush : SelectedGeoObjectBase
     {
         public readonly GeoBrush Brush;
@@ -25,17 +32,16 @@ namespace Editor.GeoEdit
         }
     }
 
-    internal sealed class SelectedGeoBoxShape : SelectedGeoObjectBase
+    [SelectionLogic(typeof(GeoSelectionLogic))]
+    internal sealed class SelectedGeoBoxShape : SelectedGeoShapeBase
     {
-        public readonly GeoBrush Brush;
         public readonly GeoBoxShape Shape;
         public readonly int FaceIndex;
 
-        public SelectedGeoBoxShape(GeoBrush brush, int faceIndex)
+        public SelectedGeoBoxShape(GeoBrush brush, int faceIndex) : base(brush)
         {
             Debug.Assert(brush.Shape is GeoBoxShape);
 
-            Brush = brush;
             Shape = (GeoBoxShape)brush.Shape!;
             FaceIndex = faceIndex;
         }

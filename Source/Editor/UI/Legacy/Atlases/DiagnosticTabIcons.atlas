@@ -1,0 +1,11 @@
+texture = "Editor/UI/Icons/DiagnosticTabIcons.png"
+
+[[sprites]]
+name = "LayoutTab"
+offset = [0, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "InteractionTab"
+offset = [32, 0]
+size = [32, 32]

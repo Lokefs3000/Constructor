@@ -1,0 +1,5 @@
+@use "Editor/UI/Stylesheets/Globals.style";
+
+.preview-bg {
+    background-color: $primary-deep-bg-colour;
+}

@@ -1,0 +1,2 @@
+"Default" = "Content/Shaders/LitGeneric.shader"
+"Shadow" = "Content/Shaders/Shadow/ShadowGeneric.shader"

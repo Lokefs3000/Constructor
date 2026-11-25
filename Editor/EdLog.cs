@@ -4,10 +4,16 @@ namespace Editor
 {
     internal static class EdLog
     {
+        public static readonly ILogger Core = Create("Core");
         public static readonly ILogger Assets = Create("Assets");
         public static readonly ILogger Gui = Create("Gui");
         public static readonly ILogger Reflection = Create("Refl");
         public static readonly ILogger Serialization = Create("Serialize");
+        public static readonly ILogger History = Create("History");
+        public static readonly ILogger Interaction = Create("Interaction");
+        public static readonly ILogger Geo = Create("Geo");
+        public static readonly ILogger Inspector = Create("Inspector");
+        public static readonly ILogger ExtConsole = Create("EXTCON");
 
         private static ILogger Create(string prefix)
         {

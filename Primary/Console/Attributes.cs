@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Primary.Console
+﻿namespace Primary.Console
 {
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     internal class CommandClassNamespaceAttribute : Attribute
@@ -30,5 +24,26 @@ namespace Primary.Console
         }
 
         internal string Alias => _alias;
+    }
+
+    internal interface IConsoleVarModifier
+    {
+
+    }
+
+    [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
+    internal class ConsoleVarRangeAttribute : Attribute, IConsoleVarModifier
+    {
+        private readonly int _min;
+        private readonly int _max;
+
+        internal ConsoleVarRangeAttribute(int min, int max)
+        {
+            _min = min;
+            _max = max;
+        }
+
+        internal int Min => _min;
+        internal int Max => _max;
     }
 }

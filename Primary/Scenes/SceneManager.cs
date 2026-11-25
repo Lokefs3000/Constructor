@@ -1,6 +1,8 @@
 ﻿using Arch.Core;
 using Primary.Assets;
+using Primary.Collections.ReadOnly;
 using Primary.Components;
+using Primary.Profiling;
 
 namespace Primary.Scenes
 {
@@ -9,7 +11,7 @@ namespace Primary.Scenes
         private World _world;
         private List<Scene> _scenes;
 
-        private SceneEntityManager _entityManager;
+        private Components.SceneEntityManager _entityManager;
         private SceneDeserializer _deserializer;
 
         private bool _disposedValue;
@@ -19,10 +21,19 @@ namespace Primary.Scenes
             _world = World.Create();
             _scenes = new List<Scene>();
 
-            _entityManager = new SceneEntityManager(_world);
+            _entityManager = new Components.SceneEntityManager();
             _deserializer = new SceneDeserializer();
 
             RegisterComponentsDefault.RegisterDefault();
+        }
+
+        /// <summary>Not thread-safe</summary>
+        public void UpdateScenes()
+        {
+            using (new ProfilingScope("UpdateScenes"))
+            {
+                _entityManager.HandleRemovedEntities();
+            }
         }
 
         /// <summary>Not thread-safe</summary>
@@ -51,7 +62,6 @@ namespace Primary.Scenes
             }
 
             Scene scene = new Scene(CreateSceneId(), name, _world, _entityManager);
-
             _scenes.Add(scene);
 
             SceneLoaded?.Invoke(scene);
@@ -73,14 +83,13 @@ namespace Primary.Scenes
             }
 
             Scene scene = new Scene(CreateSceneId(), Path.GetFileNameWithoutExtension(path), _world, _entityManager);
+            _scenes.Add(scene);
 
-            string? source = AssetFilesystem.ReadString(path);
+            using Stream? source = AssetFilesystem.OpenStream(path);
             if (source != null)
                 _deserializer.Deserialize(source, scene);
             else
                 EngLog.Scene.Error("Failed to read scene file string: {p}", path);
-
-            _scenes.Add(scene);
 
             SceneLoaded?.Invoke(scene);
             return scene;
@@ -116,10 +125,10 @@ namespace Primary.Scenes
 
         public World World => _world;
 
-        internal SceneEntityManager EntityManager => _entityManager;
+        public Components.SceneEntityManager EntityManager => _entityManager;
         public SceneDeserializer Deserializer => _deserializer;
 
-        public IReadOnlyList<Scene> Scenes => _scenes;
+        public ROList<Scene> Scenes => _scenes;
 
         public event Action<Scene>? SceneLoaded;
         public event Action<Scene>? SceneUnloaded;

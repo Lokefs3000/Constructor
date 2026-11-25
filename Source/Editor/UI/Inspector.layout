@@ -1,0 +1,8 @@
+<Widget Size="1.0 0 1.0 0">
+    <Stylesheet Path="Editor/UI/Stylesheets/Inspector.style" />
+    <Stylesheet Path="Editor/UI/Stylesheets/Main.style" />
+
+    <LayoutFrame Id="values-view" Class="background root-values" Size="1.0 0 1.0 0">
+
+    </LayoutFrame>
+</Widget>

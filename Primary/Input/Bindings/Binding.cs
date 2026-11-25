@@ -12,7 +12,7 @@ namespace Primary.Input.Bindings
 
         private DeviceValue _value;
 
-        internal Binding()
+        public Binding()
         {
             _name = string.Empty;
             _bindingPath = string.Empty;

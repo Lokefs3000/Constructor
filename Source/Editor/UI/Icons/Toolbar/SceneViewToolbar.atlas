@@ -1,0 +1,36 @@
+texture = "Editor/UI/Icons/Toolbar/SceneViewToolbar.png"
+
+[[sprites]]
+name = "SnappingOff"
+offset = [0, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "SnappingOn"
+offset = [32, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "SpaceLocal"
+offset = [64, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "SpaceGlobal"
+offset = [96, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "OriginPivot"
+offset = [128, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "OriginCenter"
+offset = [160, 0]
+size = [32, 32]
+
+[[sprites]]
+name = "Effects"
+offset = [192, 0]
+size = [32, 32]

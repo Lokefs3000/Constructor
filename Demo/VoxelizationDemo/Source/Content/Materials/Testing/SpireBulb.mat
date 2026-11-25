@@ -1,0 +1,9 @@
+shader = "Content/Materials/Sets/Lit.shaderset"
+
+[resources]
+Diffuse = "Content/Materials/Testing/Facade/Facade004_1K-JPG_Color.jpg"
+Normal = "Content/Materials/Testing/Facade/Facade004_1K-JPG_NormalGL.jpg"
+Mask = "Content/Materials/Testing/Facade/Facade004_Mask.texcomp"
+
+[properties]
+"UV Scale" = "[0.5, 0.5]"

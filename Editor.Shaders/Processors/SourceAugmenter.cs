@@ -1,0 +1,1191 @@
+﻿using CommunityToolkit.HighPerformance;
+using Editor.Shaders.Attributes;
+using Editor.Shaders.Data;
+using Primary.Collections;
+using Primary.Common;
+using System;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
+using TerraFX.Interop.Windows;
+using TerraFX.Interop.WinRT;
+
+namespace Editor.Shaders.Processors
+{
+    internal ref struct SourceAugmenter
+    {
+        private readonly ShaderProcessor _processor;
+        private readonly ShaderData _data;
+
+        private List<char[]> _structFunctions;
+
+        private bool _encounteredErrors;
+
+        private string _diagFile;
+
+        internal SourceAugmenter(ShaderProcessor processor, ShaderData data, string sourceFileName)
+        {
+            _processor = processor;
+            _data = data;
+
+            _structFunctions = new List<char[]>();
+
+            _encounteredErrors = false;
+
+            _diagFile = sourceFileName;
+        }
+
+        internal string? Augment(string orignalSource, int primaryFunctionIndex)
+        {
+            _structFunctions.Clear();
+
+            using RentedArray<char> augment = RentedArray<char>.Rent(orignalSource.Length);
+            orignalSource.CopyTo(augment.Span);
+
+            HeaderFeatures features = HeaderFeatures.None;
+            bool areConstantsSolo = false;
+            int headerBytesize = 0;
+
+            int variableCount = CountTotalVariablesUsed();
+            using RentedArray<RawVariableData> variableDatas = RentedArray<RawVariableData>.Rent(variableCount);
+
+            HashSet<ReferenceIndex> referenceIndices = CreateReferenceIndexSet(primaryFunctionIndex);
+
+            FillAndSortVariables(variableDatas.Span, out features);
+            CalculateHeaderBinding(variableDatas.Span, out headerBytesize, out areConstantsSolo);
+
+            StringBuilder sb = new StringBuilder();
+
+            RemoveOldDirectives(augment.Span);
+            RegenerateStructs(sb);
+            RegenerateStaticSamplers(sb);
+            GenerateNewHeader(sb, features, headerBytesize, areConstantsSolo, variableDatas.Span, referenceIndices, out int additionalOffset);
+
+            sb.Append(augment.Span);
+            string str = AppendBindlessResources(sb, sb.ToString(), additionalOffset, areConstantsSolo, variableDatas.Span, referenceIndices);
+
+            _data.AreConstantsSeparated = areConstantsSolo;
+            _data.HeaderBytesize = headerBytesize;
+
+            return _encounteredErrors ? null : str;
+        }
+
+        private void RemoveOldDirectives(Span<char> source)
+        {
+            foreach (ref readonly FunctionData function in _data.Functions)
+            {
+                foreach (ref readonly AttributeData attribute in function.Attributes.AsSpan())
+                {
+                    if (attribute.Signature is AttributeNumThreads)
+                        continue;
+
+                    for (int i = attribute.DeclerationRange.Start; i < attribute.DeclerationRange.End; i++)
+                    {
+                        if (!char.IsWhiteSpace(source[i]))
+                            source[i] = ' ';
+                    }
+                }
+            }
+
+            foreach (ref readonly ResourceData resource in _data.Resources)
+            {
+                for (int i = resource.DeclerationRange.Start; i < resource.DeclerationRange.End; i++)
+                {
+                    if (!char.IsWhiteSpace(source[i]))
+                        source[i] = ' ';
+                }
+
+                foreach (ref readonly AttributeData attribute in resource.Attributes.AsSpan())
+                {
+                    for (int i = attribute.DeclerationRange.Start; i < attribute.DeclerationRange.End; i++)
+                    {
+                        if (!char.IsWhiteSpace(source[i]))
+                            source[i] = ' ';
+                    }
+                }
+            }
+
+            foreach (ref readonly PropertyData property in _data.Properties)
+            {
+                //for (int i = property.DeclerationRange.Start; i < property.DeclerationRange.End; i++)
+                //{
+                //    if (!char.IsWhiteSpace(source[i]))
+                //        source[i] = ' ';
+                //}
+
+                foreach (ref readonly AttributeData attribute in property.Attributes.AsSpan())
+                {
+                    for (int i = attribute.DeclerationRange.Start; i < attribute.DeclerationRange.End; i++)
+                    {
+                        if (!char.IsWhiteSpace(source[i]))
+                            source[i] = ' ';
+                    }
+                }
+            }
+
+            foreach (ref readonly StructData @struct in _data.Structs)
+            {
+                foreach (FunctionData function in @struct.Functions)
+                {
+                    _structFunctions.Add(source.Slice(function.DeclerationRange.Start, function.DeclerationRange.Length).ToArray());
+                }
+
+                for (int i = @struct.DeclerationRange.Start; i < @struct.DeclerationRange.End; i++)
+                {
+                    if (!char.IsWhiteSpace(source[i]))
+                        source[i] = ' ';
+                }
+
+                foreach (ref readonly AttributeData attribute in @struct.Attributes.AsSpan())
+                {
+                    for (int i = attribute.DeclerationRange.Start; i < attribute.DeclerationRange.End; i++)
+                    {
+                        if (!char.IsWhiteSpace(source[i]))
+                            source[i] = ' ';
+                    }
+                }
+            }
+
+            foreach (ref readonly StaticSamplerData staticSampler in _data.StaticSamplers)
+            {
+                //bool doClear = false;
+                //for (int i = staticSampler.DeclerationRange.Start; i < staticSampler.DeclerationRange.End; i++)
+                //{
+                //    if (doClear)
+                //    {
+                //        if (!char.IsWhiteSpace(source[i]))
+                //            source[i] = ' ';
+                //    }
+                //    else if (source[i] == ':' || source[i] == '{')
+                //    {
+                //        doClear = true;
+                //        i--;
+                //    }
+                //}
+
+                for (int i = staticSampler.DeclerationRange.Start; i < staticSampler.DeclerationRange.End; i++)
+                {
+                    if (!char.IsWhiteSpace(source[i]))
+                        source[i] = ' ';
+                }
+
+                foreach (ref readonly AttributeData attribute in staticSampler.Attributes.AsSpan())
+                {
+                    for (int i = attribute.DeclerationRange.Start; i < attribute.DeclerationRange.End; i++)
+                    {
+                        if (!char.IsWhiteSpace(source[i]))
+                            source[i] = ' ';
+                    }
+                }
+            }
+        }
+
+        private void RegenerateStructs(StringBuilder sb)
+        {
+            int funcIdx = 0;
+
+            foreach (ref readonly StructData @struct in _data.Structs)
+            {
+                sb.Append("struct ");
+                sb.AppendLine(@struct.Name);
+                sb.AppendLine("{");
+
+                foreach (ref readonly VariableData varData in @struct.Variables.AsSpan())
+                {
+                    sb.Append("    ");
+                    SerializeGeneric(sb, varData.Generic, varData.Name);
+                    sb.Append(' ');
+                    sb.Append(varData.Name);
+
+                    if (varData.Semantic != null)
+                    {
+                        VarSemantic semantic = varData.Semantic.Value;
+
+                        sb.Append(" : ");
+                        sb.Append(semantic.Semantic);
+
+                        if (semantic.Index > 0)
+                            sb.Append(semantic.Index);
+                    }
+
+                    sb.AppendLine(";");
+                }
+
+                if (@struct.Functions.Length > 0)
+                {
+                    foreach (ref readonly FunctionData funcData in @struct.Functions.AsSpan())
+                    {
+                        sb.AppendLine();
+                        sb.Append("    ");
+                        sb.Append(_structFunctions[funcIdx++]);
+                    }
+
+                    sb.AppendLine();
+                }
+
+                sb.AppendLine("};");
+                sb.AppendLine();
+            }
+        }
+
+        private void RegenerateStaticSamplers(StringBuilder sb)
+        {
+            int i = 0;
+            foreach (ref readonly StaticSamplerData staticSampler in _data.StaticSamplers)
+            {
+                sb.Append("SamplerState ");
+                sb.Append(staticSampler.Name);
+                sb.Append(" : register(s");
+                sb.Append(i++);
+                sb.AppendLine(");");
+            }
+
+            sb.AppendLine();
+        }
+
+        private void GenerateNewHeader(StringBuilder sb, HeaderFeatures features, int headerBytesize, bool areConstantsSolo, Span<RawVariableData> span, HashSet<ReferenceIndex> usedReferences, out int additionalOffset)
+        {
+            additionalOffset = -1;
+
+            {
+                sb.AppendLine("struct __BG_HEADER");
+                sb.AppendLine("{");
+
+                foreach (ref readonly RawVariableData varData in span)
+                {
+                    if (varData.Usage == RawVariableUsage.Property && varData.Type == RawVariableDataType.Property && !_data.GeneratePropertiesInHeader)
+                        continue;
+
+                    if (!usedReferences.Contains(varData.AsReferenceIndex()))
+                    {
+                        if (varData.Usage == RawVariableUsage.Constants)
+                        {
+                            if (areConstantsSolo)
+                            {
+                                areConstantsSolo = false;
+                                continue;
+                            }
+                        }
+                        else
+                            continue;
+                    }
+
+                    sb.Append("    ");
+
+                    switch (varData.Usage)
+                    {
+                        case RawVariableUsage.Global:
+                        case RawVariableUsage.Property:
+                        case RawVariableUsage.Resource:
+                            {
+                                switch (varData.Type)
+                                {
+                                    case RawVariableDataType.Struct:
+                                        {
+                                            ValueDataRef generic = varData.Generic;
+                                            if (generic.Generic == ValueGeneric.Custom)
+                                            {
+                                                ref readonly StructData @struct = ref _data.GetRefSource(generic);
+                                                if (Unsafe.IsNullRef(in @struct))
+                                                {
+                                                    ReportErrorMessage("Failed to find struct for global data: {d}", varData.Name);
+                                                    return;
+                                                }
+
+                                                sb.Append(@struct.Name);
+                                            }
+                                            else
+                                            {
+                                                sb.Append(s_genericVarNames[(int)generic.Generic]);
+                                                if (generic.Rows > 1)
+                                                {
+                                                    sb.Append(generic.Rows);
+                                                    if (generic.Columns > 1)
+                                                    {
+                                                        sb.Append('x');
+                                                        sb.Append(generic.Columns);
+                                                    }
+                                                }
+                                            }
+
+                                            break;
+                                        }
+                                    case RawVariableDataType.Resource:
+                                        {
+                                            sb.Append("uint");
+                                            break;
+                                        }
+                                    case RawVariableDataType.Property:
+                                        {
+                                            if (_data.GeneratePropertiesInHeader)
+                                            {
+                                                SerializeGeneric(sb, varData.Generic, varData.Name);
+                                            }
+                                            break;
+                                        }
+                                }
+
+                                break;
+                            }
+                        case RawVariableUsage.Constants:
+                            {
+                                if (areConstantsSolo)
+                                    continue;
+
+                                ValueDataRef generic = varData.Generic;
+                                if (generic.Generic == ValueGeneric.Custom)
+                                {
+                                    ref readonly StructData @struct = ref _data.GetRefSource(generic);
+                                    if (Unsafe.IsNullRef(in @struct))
+                                    {
+                                        ReportErrorMessage("Failed to find struct for global data: {d}", varData.Name);
+                                        return;
+                                    }
+
+                                    sb.Append(@struct.Name);
+                                }
+                                else
+                                {
+                                    sb.Append(s_genericVarNames[(int)generic.Generic]);
+                                    if (generic.Rows > 1)
+                                    {
+                                        sb.Append(generic.Rows);
+                                        if (generic.Columns > 1)
+                                        {
+                                            sb.Append('x');
+                                            sb.Append(generic.Columns);
+                                        }
+                                    }
+                                }
+
+                                break;
+                            }
+                    }
+
+                    sb.Append(' ');
+                    if (varData.Usage == RawVariableUsage.Constants)
+                        sb.Append("CON_Raw");
+                    else
+                    {
+                        sb.Append(varData.Usage == RawVariableUsage.Property ? "RAW_" : "IDX_");
+                        sb.Append(varData.Name);
+                    }
+                    sb.AppendLine(";");
+                }
+
+                sb.AppendLine("};");
+                sb.AppendLine();
+            }
+
+            if (areConstantsSolo)
+            {
+                int constantsIndex = span.FindIndex((x) => x.Usage == RawVariableUsage.Constants);
+                ref readonly RawVariableData varData = ref span[constantsIndex];
+
+                sb.AppendLine("ConstantBuffer<__BG_HEADER> __HEADER_CB : register(b1);");
+                sb.AppendLine();
+
+                sb.AppendLine("#ifdef __spirv__");
+                sb.AppendLine("[[vk::push_constant]]");
+                sb.AppendLine("#endif");
+                sb.Append("ConstantBuffer<");
+
+                ValueDataRef generic = varData.Generic;
+                if (generic.Generic == ValueGeneric.Custom)
+                {
+                    ref readonly StructData @struct = ref _data.GetRefSource(generic);
+                    if (Unsafe.IsNullRef(in @struct))
+                    {
+                        ReportErrorMessage("Failed to find struct for global data: {d}", varData.Name);
+                        return;
+                    }
+
+                    sb.Append(@struct.Name);
+                }
+                else
+                {
+                    sb.Append(s_genericVarNames[(int)generic.Generic]);
+                    if (generic.Rows > 1)
+                    {
+                        sb.Append(generic.Rows);
+                        if (generic.Columns > 1)
+                        {
+                            sb.Append('x');
+                            sb.Append(generic.Columns);
+                        }
+                    }
+                }
+
+                sb.Append("> ");
+                sb.Append(varData.Name);
+                sb.AppendLine(" : register(b0);");
+            }
+            else
+            {
+                sb.AppendLine("#ifdef __spirv__");
+                sb.AppendLine("[[vk::push_constant]]");
+                sb.AppendLine("#endif");
+                sb.AppendLine("ConstantBuffer<__BG_HEADER> __HEADER_CB : register(b0);");
+            }
+
+            sb.AppendLine();
+            additionalOffset = sb.Length;
+        }
+
+        private string AppendBindlessResources(StringBuilder sb, string @string, int additionalOffset, bool areConstantsSolo, Span<RawVariableData> span, HashSet<ReferenceIndex> usedReferences)
+        {
+            StringBuilder sb2 = new StringBuilder();
+
+            Dictionary<int, RawVariableData> vars = new Dictionary<int, RawVariableData>();
+
+            foreach (ref readonly FunctionData function in _data.Functions)
+            {
+                vars.Clear();
+
+                ReadOnlySpan<char> interestingPortion = @string.AsSpan().Slice(function.BodyRange.Start + additionalOffset, function.BodyRange.End - function.BodyRange.Start);
+                SearchForVariables(_data, span, interestingPortion, false);
+
+                if (_data.PropertySourceTemplate != null)
+                {
+                    if (Array.Exists(function.Attributes, (x) => x.Signature is AttributePixel))
+                    {
+                        int byteOffset = 0;
+
+                        sb2.Clear();
+                        foreach (ref readonly RawVariableData varData in span)
+                        {
+                            if (varData.Type == RawVariableDataType.Property)
+                            {
+                                string template = ResolvePropertyTemplate(_data.PropertySourceTemplate, in varData, in function, byteOffset);
+                                SearchForVariables(_data, span, template, true);
+
+                                sb2.Append(varData.Name);
+                                sb2.Append(" = ");
+                                sb2.Append(template);
+                                sb2.Append(';');
+
+                                byteOffset += _data.CalculateSize(varData.Generic);
+                            }
+                        }
+                    }
+                }
+
+                sb.Clear();
+                if (vars.Count > 0)
+                {
+                    foreach (var kvp in vars)
+                    {
+                        RawVariableData varData = kvp.Value;
+                        bool isActuallyReferenced = usedReferences.Contains(new ReferenceIndex(ReferenceType.Resource, varData.Index));
+
+                        if (varData.Usage == RawVariableUsage.Constants)
+                        {
+                            if (areConstantsSolo)
+                                continue;
+
+                            // TODO: decide what to do as i dont think it can just be culled since it could be referred to by a pass in "SetConstants"
+                            //if (!isActuallyReferenced)
+                            //throw new NotImplementedException();
+
+                            SerializeGeneric(sb, varData.Generic, varData.Name);
+                            sb.Append(' ');
+                            sb.Append(varData.Name);
+                            sb.Append(" = __HEADER_CB.CON_Raw;");
+                        }
+                        else if (varData.Usage != RawVariableUsage.Property)
+                        {
+                            ref readonly ResourceData resourceData = ref _data.Resources[varData.Index];
+
+                            if (resourceData.IsReadWrite)
+                                sb.Append("RW");
+                            sb.Append(resourceData.Type.ToString());
+                            if (varData.Generic.IsSpecified)
+                            {
+                                sb.Append('<');
+                                SerializeGeneric(sb, varData.Generic, varData.Name);
+                                sb.Append('>');
+                            }
+                            sb.Append(' ');
+                            sb.Append(varData.Name);
+                            sb.Append(" = (");
+                            if (resourceData.IsReadWrite)
+                                sb.Append("RW");
+                            sb.Append(resourceData.Type.ToString());
+                            if (varData.Generic.IsSpecified)
+                            {
+                                sb.Append('<');
+                                SerializeGeneric(sb, varData.Generic, varData.Name);
+                                sb.Append('>');
+                            }
+                            sb.Append(resourceData.Type == ResourceType.SamplerState ? ")SamplerDescriptorHeap[" : ")ResourceDescriptorHeap[");
+                            if (isActuallyReferenced)
+                            {
+                                sb.Append("__HEADER_CB.IDX_");
+                                sb.Append(varData.Name);
+                            }
+                            else
+                                sb.Append('0');
+                            sb.Append("];");
+                        }
+                    }
+                }
+
+                if (sb2.Length > 0)
+                {
+                    sb.Append(sb2);
+                }
+
+                if (sb.Length > 0)
+                {
+                    @string = @string.Insert(function.BodyRange.Start + additionalOffset - 1, sb.ToString());
+                    additionalOffset += sb.Length;
+                }
+            }
+
+            return @string;
+
+            void SearchForVariables(ShaderData data, Span<RawVariableData> span, ReadOnlySpan<char> interestingPortion, bool addAsReference)
+            {
+                for (int i = 0; i < interestingPortion.Length;)
+                {
+                    int start = i;
+                    char c = interestingPortion[i++];
+
+                    if (char.IsLetter(c))
+                    {
+                        while (char.IsLetterOrDigit(interestingPortion[i]) || interestingPortion[i] == '_')
+                        {
+                            if (++i >= interestingPortion.Length)
+                                return;
+                        }
+
+                        ReadOnlySpan<char> identifier = interestingPortion.Slice(start, i - start);
+
+                        bool found = false;
+
+                        start = i;
+                        while (char.IsWhiteSpace(interestingPortion[i]))
+                        {
+                            if (++i >= interestingPortion.Length)
+                                break;
+
+                            if (interestingPortion[i] == '/')
+                            {
+                                MoveUntilOutOfComment(interestingPortion, ref i);
+                            }
+                        }
+
+                        if (i < interestingPortion.Length)
+                            found = interestingPortion[i] == '=';
+
+                        if (!found && data.TryFindReference(identifier.ToString(), out ReferenceIndex index) && index.Type == ReferenceType.Resource && !vars.ContainsKey((int)index.Data))
+                        {
+                            bool eventuallyFound = false;
+                            for (int j = 0; j < span.Length; j++)
+                            {
+                                ref RawVariableData rvd = ref span.DangerousGetReferenceAt(j);
+                                if (rvd.Type == RawVariableDataType.Resource && rvd.Index == index.Index)
+                                {
+                                    vars.Add((int)index.Data, rvd);
+                                    if (addAsReference)
+                                        usedReferences.Add(rvd.AsReferenceIndex());
+                                    eventuallyFound = true;
+                                    break;
+                                }
+                            }
+
+                            //if (!eventuallyFound)
+                            //{
+                            //    ReportErrorMessage("Failed to find suitable variable for reference: {ref}", index);
+                            //}
+                        }
+                    }
+
+                    span.Sort(static (x, y) =>
+                    {
+                        int r = x.Type.CompareTo(y.Type);
+                        return x.Type == y.Type ? x.Index.CompareTo(y.Index) : (x.Type == RawVariableDataType.Property ? 1 : 0).CompareTo(y.Type == RawVariableDataType.Property ? 1 : 0);
+                    });
+                }
+
+                static void MoveUntilOutOfComment(ReadOnlySpan<char> source, ref int index)
+                {
+                    int followingIndex = index + 1;
+                    if (followingIndex >= source.Length)
+                        return;
+
+                    char nextChar = source[followingIndex];
+                    if (nextChar == '/')
+                    {
+                        index = followingIndex;
+                        do
+                        {
+                            index++;
+                        } while (index < source.Length && source[index] != '\n');
+                    }
+                    else if (nextChar == '*')
+                    {
+                        index = followingIndex;
+                        do
+                        {
+                            if (source[index] == '*')
+                            {
+                                followingIndex = index + 1;
+                                if (followingIndex < source.Length && source[followingIndex] == '/')
+                                    break;
+                            }
+
+                            index++;
+                        } while (index < source.Length);
+                    }
+                }
+            }
+        }
+
+        private int CountTotalVariablesUsed() => _data.Resources.Length + _data.Properties.Length;
+        private void FillAndSortVariables(Span<RawVariableData> variableDatas, out HeaderFeatures features)
+        {
+            features = HeaderFeatures.None;
+
+            Dictionary<string, int> bindGroupIndices = new Dictionary<string, int>();
+
+            int offset = 0;
+
+            int resId = 0;
+            int propId = 0;
+
+            foreach (ref readonly ResourceData resource in _data.Resources)
+            {
+                RawVariableUsage usage = RawVariableUsage.Resource;
+                int bindGroup = 0;
+
+                foreach (ref readonly AttributeData attribute in resource.Attributes.AsSpan())
+                {
+                    if (attribute.Signature is AttributeGlobal)
+                    {
+                        usage = RawVariableUsage.Global;
+                        bindGroup = -1;
+
+                        features |= HeaderFeatures.HasGlobals;
+                    }
+                    else if (attribute.Signature is AttributeConstants)
+                    {
+                        usage = RawVariableUsage.Constants;
+
+                        features |= HeaderFeatures.HasConstants;
+                    }
+                    else if (attribute.Signature is AttributeBindGroup bg)
+                    {
+                        if (!bindGroupIndices.TryGetValue(bg.Name, out bindGroup))
+                        {
+                            bindGroup = bindGroupIndices.Count + 1;
+                            bindGroupIndices.Add(bg.Name, bindGroup);
+                        }
+                    }
+                    //else if (attribute.Signature is AttributeProperty)
+                    //{
+                    //    usage = RawVariableUsage.Property;
+                    //    features |= HeaderFeatures.HasProperties;
+                    //}
+                }
+
+                if (usage == RawVariableUsage.Property)
+                {
+                    if (!_data.GeneratePropertiesInHeader)
+                        continue;
+                    variableDatas[offset++] = new RawVariableData(RawVariableDataType.Property, usage, propId++, resource.Name, bindGroup, resource.Value);
+                }
+                else
+                {
+                    variableDatas[offset++] = new RawVariableData(RawVariableDataType.Resource, usage, resId++, resource.Name, bindGroup, resource.Value);
+                }
+            }
+
+            foreach (ref readonly PropertyData property in _data.Properties)
+            {
+                RawVariableUsage usage = RawVariableUsage.Property;
+                int bindGroup = 0;
+
+                foreach (ref readonly AttributeData attribute in property.Attributes.AsSpan())
+                {
+                    if (attribute.Signature is AttributeGlobal)
+                    {
+                        usage = RawVariableUsage.Global;
+                        bindGroup = -1;
+
+                        features |= HeaderFeatures.HasGlobals;
+                    }
+                    else if (attribute.Signature is AttributeBindGroup bg)
+                    {
+                        if (!bindGroupIndices.TryGetValue(bg.Name, out bindGroup))
+                        {
+                            bindGroup = bindGroupIndices.Count + 1;
+                            bindGroupIndices.Add(bg.Name, bindGroup);
+                        }
+                    }
+                }
+
+                if (usage == RawVariableUsage.Property)
+                    features |= HeaderFeatures.HasProperties;
+                variableDatas[offset++] = new RawVariableData(RawVariableDataType.Property, usage, propId++, property.Name, bindGroup, property.Generic);
+            }
+
+            variableDatas.Sort();
+        }
+
+        private void CalculateHeaderBinding(Span<RawVariableData> variableDatas, out int headerBytesize, out bool areConstantsSolo)
+        {
+            headerBytesize = 0;
+            areConstantsSolo = false;
+
+            int constantsSize = 0;
+
+            foreach (ref readonly ResourceData resource in _data.Resources)
+            {
+                AttributeData data = Array.Find(resource.Attributes, (x) => x.Signature is AttributeConstants);
+                if (data != default)
+                {
+                    constantsSize += _data.CalculateSize(resource.Value);
+                }
+                else
+                {
+                    headerBytesize += sizeof(uint);
+                }
+            }
+
+            if (_data.GeneratePropertiesInHeader)
+            {
+                foreach (ref readonly PropertyData property in _data.Properties)
+                {
+                    headerBytesize += _data.CalculateSize(property.Generic);
+                }
+            }
+
+            //a separate buffer costs 4 bytes i believe
+            if (headerBytesize + constantsSize > ShaderProcessor.MaxConstantsBufferSize - 4)
+            {
+                areConstantsSolo = true;
+            }
+            else
+            {
+                headerBytesize += constantsSize;
+                areConstantsSolo = false;
+            }
+        }
+
+        private HashSet<ReferenceIndex> CreateReferenceIndexSet(int primaryFunctionIndex)
+        {
+            HashSet<ReferenceIndex> indices = new HashSet<ReferenceIndex>();
+            HashSet<ReferenceIndex> entrypointIndices = new HashSet<ReferenceIndex>();
+
+            ReadOnlySpan<PropertyData> properties = _data.Properties;
+            for (int i = 0; i < properties.Length; ++i)
+            {
+                indices.Add(new ReferenceIndex(ReferenceType.Property, i));
+                entrypointIndices.Add(new ReferenceIndex(ReferenceType.Property, i));
+            }
+
+            if (_data.PropertySourceTemplate != null)
+            {
+                SearchForVariables(_data, _data.PropertySourceTemplate);
+            }
+
+            if (primaryFunctionIndex == -1)
+            {
+                foreach (ref FunctionData function in _data.Functions)
+                {
+                    foreach (AttributeData attribute in function.Attributes)
+                    {
+                        if (attribute.Signature is AttributeVertex or AttributePixel)
+                        {
+                            if (entrypointIndices.Count > 0)
+                            {
+                                FunctionIncludeData includeData = function.IncludeData;
+
+                                HashSet<ReferenceIndex> copyIndices = [.. entrypointIndices];
+                                foreach (ReferenceIndex index in includeData.Indices)
+                                {
+                                    copyIndices.Remove(index);
+                                }
+
+                                if (copyIndices.Count > 0)
+                                {
+                                    ReferenceIndex[] newArray = new ReferenceIndex[includeData.Indices.Length + copyIndices.Count];
+
+                                    IndexRange functionRange = default;
+                                    IndexRange resourceRange = default;
+                                    IndexRange propertyRange = default;
+
+                                    int currentOffset = 0;
+                                    {
+                                        functionRange.Start = currentOffset;
+
+                                        includeData.UsedFunctionIndices.CopyTo(newArray.AsSpan(currentOffset));
+                                        currentOffset += includeData.UsedFunctionIndices.Length;
+
+                                        foreach (ReferenceIndex index in copyIndices)
+                                        {
+                                            if (index.Type == ReferenceType.Function)
+                                            {
+                                                newArray[currentOffset++] = index;
+                                            }
+                                        }
+
+                                        functionRange.End = currentOffset;
+                                    }
+
+                                    {
+                                        resourceRange.Start = currentOffset;
+
+                                        includeData.UsedResourceIndices.CopyTo(newArray.AsSpan(currentOffset));
+                                        currentOffset += includeData.UsedResourceIndices.Length;
+
+                                        foreach (ReferenceIndex index in copyIndices)
+                                        {
+                                            if (index.Type == ReferenceType.Resource)
+                                            {
+                                                newArray[currentOffset++] = index;
+                                            }
+                                        }
+
+                                        resourceRange.End = currentOffset;
+                                    }
+
+                                    {
+                                        propertyRange.Start = currentOffset;
+
+                                        includeData.UsedPropertyIndices.CopyTo(newArray.AsSpan(currentOffset));
+                                        currentOffset += includeData.UsedPropertyIndices.Length;
+
+                                        foreach (ReferenceIndex index in copyIndices)
+                                        {
+                                            if (index.Type == ReferenceType.Property)
+                                            {
+                                                newArray[currentOffset++] = index;
+                                            }
+                                        }
+
+                                        propertyRange.End = currentOffset;
+                                    }
+
+                                    function.IncludeData = new FunctionIncludeData(newArray, functionRange, resourceRange, propertyRange);
+                                }
+                            }
+
+                            RecursiveIncludeTravel(_data, function.IncludeData);
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                ref FunctionData function = ref _data.Functions[primaryFunctionIndex];
+                RecursiveIncludeTravel(_data, function.IncludeData);
+            }
+
+            return indices;
+
+            void RecursiveIncludeTravel(ShaderData data, FunctionIncludeData includeData)
+            {
+                foreach (ReferenceIndex index in includeData.Indices)
+                {
+                    switch (index.Type)
+                    {
+                        case ReferenceType.Function:
+                            {
+                                indices.Add(index);
+                                RecursiveIncludeTravel(data, data.Functions[index.Index].IncludeData);
+                                break;
+                            }
+                        default: indices.Add(index); break;
+                    }
+                }
+            }
+
+            void SearchForVariables(ShaderData data, ReadOnlySpan<char> interestingPortion)
+            {
+                for (int i = 0; i < interestingPortion.Length;)
+                {
+                    int start = i;
+                    char c = interestingPortion[i++];
+
+                    if (char.IsLetter(c))
+                    {
+                        while (char.IsLetterOrDigit(interestingPortion[i]) || interestingPortion[i] == '_')
+                        {
+                            if (++i >= interestingPortion.Length)
+                                return;
+                        }
+
+                        ReadOnlySpan<char> identifier = interestingPortion.Slice(start, i - start);
+
+                        bool found = false;
+
+                        start = i;
+                        while (char.IsWhiteSpace(interestingPortion[i]))
+                        {
+                            if (++i >= interestingPortion.Length)
+                                break;
+
+                            if (interestingPortion[i] == '/')
+                            {
+                                MoveUntilOutOfComment(interestingPortion, ref i);
+                            }
+                        }
+
+                        if (i < interestingPortion.Length)
+                            found = interestingPortion[i] == '=';
+
+                        if (!found && data.TryFindReference(identifier.ToString(), out ReferenceIndex index) && index.Type == ReferenceType.Resource)
+                        {
+                            indices.Add(index);
+                            entrypointIndices.Add(index);
+                        }
+                    }
+                }
+
+                static void MoveUntilOutOfComment(ReadOnlySpan<char> source, ref int index)
+                {
+                    int followingIndex = index + 1;
+                    if (followingIndex >= source.Length)
+                        return;
+
+                    char nextChar = source[followingIndex];
+                    if (nextChar == '/')
+                    {
+                        index = followingIndex;
+                        do
+                        {
+                            index++;
+                        } while (index < source.Length && source[index] != '\n');
+                    }
+                    else if (nextChar == '*')
+                    {
+                        index = followingIndex;
+                        do
+                        {
+                            if (source[index] == '*')
+                            {
+                                followingIndex = index + 1;
+                                if (followingIndex < source.Length && source[followingIndex] == '/')
+                                    break;
+                            }
+
+                            index++;
+                        } while (index < source.Length);
+                    }
+                }
+            }
+        }
+
+        private string ResolvePropertyTemplate(string template, ref readonly RawVariableData varData, ref readonly FunctionData function, int byteOffset)
+        {
+            //TODO: improve this with "PooledStringBuilder" in append mode
+
+            string copy = template;
+
+            int index = 0;
+            while ((index = copy.IndexOf('$')) != -1)
+            {
+                int last = copy.IndexOf('$', index + 1);
+                if (last == -1)
+                {
+                    ReportErrorMessage("Property source template macro at {i} is not properly terminated", index);
+                    return string.Empty;
+                }
+
+                ReadOnlySpan<char> subsection = copy.AsSpan().Slice(index + 1, last - index - 1);
+                if (subsection.Equals("GENERIC", StringComparison.OrdinalIgnoreCase))
+                {
+                    copy = copy.Remove(index, subsection.Length + 2);
+                    copy = copy.Insert(index, SerializeGenericAsString(varData.Generic, varData.Name));
+                }
+                else if (subsection.Equals("SV_INSTANCEID", StringComparison.OrdinalIgnoreCase))
+                {
+                    string? path = SearchForSemanticPath(_data, SemanticName.SV_InstanceId, function.Arguments);
+                    if (path == null)
+                    {
+                        ReportErrorMessage("Failed to find a variable with a \"SV_InstanceID\" semantic decleration in function {f} input arguments.", function.Name);
+                        return string.Empty;
+                    }
+
+                    copy = copy.Remove(index, subsection.Length + 2);
+                    copy = copy.Insert(index, path);
+                }
+                else if (subsection.Equals("PNAME", StringComparison.OrdinalIgnoreCase))
+                {
+                    copy = copy.Remove(index, subsection.Length + 2);
+                    copy = copy.Insert(index, varData.Name);
+                }
+                else if (subsection.Equals("BYTEOFFSET", StringComparison.OrdinalIgnoreCase))
+                {
+                    copy = copy.Remove(index, subsection.Length + 2);
+                    copy = copy.Insert(index, byteOffset.ToString());
+                }
+            }
+
+            return copy;
+
+            static string? SearchForSemanticPath(ShaderData shaderData, SemanticName semanticName, Span<VariableData> variables, string? previousPath = null)
+            {
+                foreach (ref readonly VariableData data in variables)
+                {
+                    if (data.Semantic.HasValue && data.Semantic.Value.Semantic == semanticName)
+                    {
+                        return previousPath + data.Name;
+                    }
+                    else if (data.Generic.Generic == ValueGeneric.Custom)
+                    {
+                        ref readonly StructData @struct = ref shaderData.GetRefSource(data.Generic);
+                        if (Unsafe.IsNullRef(in @struct))
+                            continue;
+
+                        string? ret = SearchForSemanticPath(shaderData, semanticName, @struct.Variables, data.Name + ".");
+                        if (ret != null)
+                            return ret;
+                    }
+                }
+
+                return null;
+            }
+        }
+
+        private void SerializeGeneric(StringBuilder sb, ValueDataRef generic, in string name)
+        {
+            if (generic.IsSpecified)
+            {
+                if (generic.Generic == ValueGeneric.Custom)
+                {
+                    ref readonly StructData @struct = ref _data.GetRefSource(generic);
+                    if (Unsafe.IsNullRef(in @struct))
+                    {
+                        ReportErrorMessage("Failed to find struct for global data: {d}", name);
+                        return;
+                    }
+
+                    sb.Append(@struct.Name);
+                }
+                else
+                {
+                    sb.Append(s_genericVarNames[(int)generic.Generic]);
+                    if (generic.Rows > 1)
+                    {
+                        sb.Append(generic.Rows);
+                        if (generic.Columns > 1)
+                        {
+                            sb.Append('x');
+                            sb.Append(generic.Columns);
+                        }
+                    }
+                }
+            }
+        }
+
+        private string SerializeGenericAsString(ValueDataRef generic, in string name)
+        {
+            if (generic.IsSpecified)
+            {
+                if (generic.Generic == ValueGeneric.Custom)
+                {
+                    ref readonly StructData @struct = ref _data.GetRefSource(generic);
+                    if (Unsafe.IsNullRef(in @struct))
+                    {
+                        ReportErrorMessage("Failed to find struct for global data: {d}", name);
+                        return string.Empty;
+                    }
+
+                    return @struct.Name;
+                }
+                else
+                {
+                    if (generic.Rows > 1)
+                    {
+                        if (generic.Columns > 1)
+                        {
+                            return $"{s_genericVarNames[(int)generic.Generic]}{generic.Rows}x{generic.Columns}";
+                        }
+                        else
+                        {
+                            return $"{s_genericVarNames[(int)generic.Generic]}{generic.Rows}";
+                        }
+                    }
+                    else
+                        return s_genericVarNames[(int)generic.Generic];
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private void ReportErrorMessage(string message, params object?[]? objects)
+        {
+            if (objects != null && objects.Length > 0)
+                _processor.Logger.Error("[{f}] " + message, [_diagFile, .. objects]);
+            else
+                _processor.Logger.Error("[{f}] " + message, _diagFile);
+        }
+
+        private static readonly string[] s_genericVarNames = [
+            "float",
+            "double",
+            "int",
+            "uint",
+            "float16_t",
+            "int16_t",
+            "uint16_t"
+            ];
+
+        private readonly record struct RawVariableData(RawVariableDataType Type, RawVariableUsage Usage, int Index, string Name, int BindGroup, ValueDataRef Generic) : IComparable<RawVariableData>
+        {
+            public int CompareTo(RawVariableData other)
+            {
+                int x = 0;
+
+                if ((x = (Usage != RawVariableUsage.Constants).CompareTo(other.Usage != RawVariableUsage.Constants)) != 0) return x;
+                if ((x = BindGroup.CompareTo(other.BindGroup)) != 0) return x;
+                if ((x = Usage.CompareTo(other.Usage)) != 0) return x;
+                if ((x = Type.CompareTo(other.Type)) != 0) return x;
+                return Name.CompareTo(other.Name, StringComparison.Ordinal);
+            }
+
+            public ReferenceIndex AsReferenceIndex()
+            {
+                switch (Type)
+                {
+                    case RawVariableDataType.Property: return new ReferenceIndex(ReferenceType.Property, Index);
+                    case RawVariableDataType.Struct: return new ReferenceIndex(ReferenceType.Property, Index);
+                    case RawVariableDataType.Resource: return new ReferenceIndex(ReferenceType.Resource, Index);
+                }
+
+                throw new NotImplementedException();
+            }
+        }
+
+        private enum RawVariableDataType : byte
+        {
+            Property,
+            Struct,
+            Resource
+        }
+
+        private enum RawVariableUsage : byte
+        {
+            Global = 0,
+            Constants,
+            Property,
+            Resource,
+        }
+
+        [Flags]
+        private enum HeaderFeatures : byte
+        {
+            None = 0,
+
+            HasGlobals = 1 << 0,
+            HasConstants = 1 << 1,
+            HasProperties = 1 << 2,
+        }
+    }
+}

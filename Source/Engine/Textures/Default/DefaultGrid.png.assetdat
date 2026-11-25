@@ -1,0 +1,36 @@
+asset_id = "01a1359847ee7ab7b61ecb6efc44768e"
+meta_version = 1
+sub_assets = []
+[unique_config]
+[unique_config.handling]
+image_type = 0
+image_format = 0
+alpha_source = 1
+source = 0
+alpha_cutout = false
+cutout_threshold = 127
+cutout_dither = false
+gamma_correct = false
+premultiplied_alpha = false
+flip_vertical = false
+[unique_config.mipmaps]
+generate_mipmaps = true
+mipmap_filter = 0
+max_mip_map_count = 2147483647
+min_mip_map_size = 1
+scale_alpha_for_mip_maps = false
+[unique_config.visual]
+swizzle = ["R", "G", "B", "A"]
+reduction_type = 0
+min_filter = 1
+mag_filter = 1
+mip_filter = 0
+address_mode_u = 0
+address_mode_v = 0
+address_mode_w = 0
+comparison_function = 0
+border_color = [0.0, 0.0, 0.0, 0.0]
+mip_lod_bias = 1.0
+min_lod = 0.0
+max_lod = +inf
+max_anisotropy = 0

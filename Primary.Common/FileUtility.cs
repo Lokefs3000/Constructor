@@ -32,6 +32,14 @@
                     fs = File.Open(fullPath, mode, access, share);
                     return fs;
                 }
+                catch (FileNotFoundException)
+                {
+                    return null;
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    return null;
+                }
                 catch (Exception)
                 {
                     fs?.Dispose();
@@ -51,6 +59,14 @@
                 {
                     return File.ReadAllText(fullPath);
                 }
+                catch (FileNotFoundException)
+                {
+                    return null;
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    return null;
+                }
                 catch (Exception)
                 {
                     fs?.Dispose();
@@ -59,6 +75,108 @@
             }
 
             return null;
+        }
+
+        public static byte[]? TryReadAllBytes(string fullPath, int maxTries = 10, int timeoutMs = 250)
+        {
+            for (int i = 0; i < maxTries; i++)
+            {
+                FileStream? fs = null;
+                try
+                {
+                    return File.ReadAllBytes(fullPath);
+                }
+                catch (FileNotFoundException)
+                {
+                    return null;
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    return null;
+                }
+                catch (Exception)
+                {
+                    fs?.Dispose();
+                    Thread.Sleep(timeoutMs);
+                }
+            }
+
+            return null;
+        }
+
+        public static bool TryDelete(string path)
+        {
+            try
+            {
+                File.Delete(path);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        public static bool TryMove(string sourceFileName, string destFileName, bool overwrite = true)
+        {
+            try
+            {
+                File.Move(sourceFileName, destFileName, overwrite);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        public static bool TryCopy(string sourceFileName, string destFileName, bool overwrite = true)
+        {
+            try
+            {
+                File.Copy(sourceFileName, destFileName, overwrite);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        public static bool TryWriteAllText(string fullPath, ReadOnlySpan<char> contents, int maxTries = 10, int timeoutMs = 250)
+        {
+            for (int i = 0; i < maxTries; i++)
+            {
+                try
+                {
+                    File.WriteAllText(fullPath, contents);
+                    return true;
+                }
+                catch (Exception)
+                {
+                    Thread.Sleep(timeoutMs);
+                }
+            }
+
+            return false;
+        }
+
+        public static bool TryWriteAllBytes(string fullPath, ReadOnlySpan<byte> contents, int maxTries = 10, int timeoutMs = 250)
+        {
+            for (int i = 0; i < maxTries; i++)
+            {
+                try
+                {
+                    File.WriteAllBytes(fullPath, contents);
+                    return true;
+                }
+                catch (Exception)
+                {
+                    Thread.Sleep(timeoutMs);
+                }
+            }
+
+            return false;
         }
 
         public static string FormatSize(long size, string? format = "G", IFormatProvider? provider = null)

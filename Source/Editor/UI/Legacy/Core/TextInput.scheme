@@ -1,0 +1,17 @@
+{
+    "Name": "UIc_TextInput",
+    "Actions": [
+        {
+            "Name": "SelectUp",
+            "CanRepeat": true,
+            "Control": "Button",
+            "Bindings": [
+                {
+                    "$type": "Binding",
+                    "Name": "Key",
+                    "Path": "<Keyboard>/Up"
+                }
+            ]
+        }
+    ]
+}

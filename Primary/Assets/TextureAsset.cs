@@ -1,118 +1,102 @@
-﻿using System.Runtime.CompilerServices;
+﻿using Primary.Assets.Types;
+using Primary.RHI;
+using Primary.Serialization.Json;
+using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace Primary.Assets
 {
-    public sealed class TextureAsset : IAssetDefinition
+    [JsonConverter(typeof(AssetJsonConverter))]
+    public class TextureAsset : BaseAssetDefinition<TextureAsset, TextureAssetData>
     {
-        private readonly TextureAssetData _assetData;
-
-        internal TextureAsset(TextureAssetData assetData)
+        public TextureAsset(TextureAssetData assetData) : base(assetData)
         {
-            _assetData = assetData;
         }
 
-        internal TextureAssetData AssetData => _assetData;
-        internal RHI.Texture? Texture => _assetData.Texture;
+        public RHITexture? RawRHITexture => IsReady ? AssetData.Texture : null;
+        public RHISampler? RawRHISampler => IsReady ? AssetData.Sampler : null;
 
-        public ResourceStatus Status => _assetData.Status;
+        public int Width => IsReady ? AssetData.Width : 0;
+        public int Height => IsReady ? AssetData.Height : 0;
+        public RHIFormat Format => IsReady ? AssetData.Format : RHIFormat.Unknown;
 
-        public string Name => _assetData.Name;
-        public AssetId Id => _assetData.Id;
-
-        public int Width => _assetData.Width;
-        public int Height => _assetData.Height;
-        public RHI.TextureFormat Format => _assetData.Format;
-
-        public nint Handle => _assetData.Texture?.Handle ?? nint.Zero;
+        public CubemapSHL2? SHL2 => IsReady ? AssetData.SHL2 : null;
     }
 
-    internal sealed class TextureAssetData : IInternalAssetData
+    public class TextureAssetData : BaseInternalAssetData<TextureAsset>
     {
-        private readonly WeakReference _asset;
-
-        private ResourceStatus _status;
-
-        private readonly AssetId _id;
-        private string _name;
-
-        private RHI.Texture? _texture;
+        private RHITexture? _texture;
+        private RHISampler? _sampler;
 
         private int _width;
         private int _height;
-        private RHI.TextureFormat _format;
+        private RHIFormat _format;
 
-        internal TextureAssetData(AssetId id)
+        private CubemapSHL2? _shl2;
+
+        internal TextureAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
-            _asset = new WeakReference(null);
-
-            _status = ResourceStatus.Pending;
-
-            _id = id;
-            _name = string.Empty;
-
             _texture = null;
+            _sampler = null;
 
             _width = 0;
             _height = 0;
-            _format = RHI.TextureFormat.Undefined;
+            _format = RHIFormat.Unknown;
+
+            _shl2 = null;
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
-            _status = ResourceStatus.Disposed;
-
-            _asset.Target = null;
+            base.Dispose();
 
             _texture?.Dispose();
             _texture = null;
 
+            _sampler?.Dispose();
+            _sampler = null;
+
             _width = 0;
             _height = 0;
-            _format = RHI.TextureFormat.Undefined;
+            _format = RHIFormat.Unknown;
+
+            _shl2 = null;
         }
 
-        public void SetAssetInternalStatus(ResourceStatus status)
+        public void UpdateAssetData(TextureAsset asset, RHITexture texture, RHISampler sampler, CubemapSHL2? shl2)
         {
-            _status = status;
-        }
-
-        public void SetAssetInternalName(string name)
-        {
-            _name = name;
-        }
-
-        internal void UpdateAssetData(TextureAsset asset, RHI.Texture texture)
-        {
-            _asset.Target = asset;
-
-            _status = ResourceStatus.Success;
+            base.UpdateAssetData(asset);
 
             _texture = texture;
+            _sampler = sampler;
 
-            _width = (int)texture.Description.Width;
-            _height = (int)texture.Description.Height;
+            _width = texture.Description.Width;
+            _height = texture.Description.Height;
             _format = texture.Description.Format;
+
+            _shl2 = shl2;
         }
 
-        internal void UpdateAssetFailed(TextureAsset asset)
-        {
-            _asset.Target = asset;
-
-            _status = ResourceStatus.Error;
-        }
-
-        internal ResourceStatus Status => _status;
-
-        internal AssetId Id => _id;
-        internal string Name => _name;
-
-        internal RHI.Texture? Texture => _texture;
+        internal RHITexture? Texture => _texture;
+        internal RHISampler? Sampler => _sampler;
 
         internal int Width => _width;
         internal int Height => _height;
-        internal RHI.TextureFormat Format => _format;
+        internal RHIFormat Format => _format;
 
-        public Type AssetType => typeof(TextureAsset);
-        public IAssetDefinition? Definition => Unsafe.As<IAssetDefinition>(_asset.Target);
+        internal CubemapSHL2? SHL2 => _shl2;
+    }
+
+    [InlineArray(9)]
+    public struct CubemapSHL2
+    {
+        private Color _value;
+
+        public record struct Color
+        {
+            public float R;
+            public float G;
+            public float B;
+        }
     }
 }

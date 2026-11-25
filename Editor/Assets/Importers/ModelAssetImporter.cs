@@ -1,9 +1,10 @@
-﻿using CsToml;
+﻿using CommunityToolkit.HighPerformance;
 using Editor.Processors;
 using Editor.Storage;
 using K4os.Compression.LZ4.Streams;
 using Primary.Assets;
 using Primary.Assets.Loaders;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Utility;
 using System.Runtime.CompilerServices;
@@ -28,6 +29,9 @@ namespace Editor.Assets.Importers
         {
             string localInputFile = fullFilePath.Substring(filesystem.AbsolutePath.Length);
 
+            AssetId id = pipeline.Identifier.GetOrRegisterAsset(localInputFile);
+            pipeline.Associator.ClearAssocations(id);
+
             bool hasLocalConfig = false;
             string configFile = pipeline.Configuration.GetFilePath(localInputFile, "Texture");
             if (!File.Exists(configFile))
@@ -36,9 +40,12 @@ namespace Editor.Assets.Importers
                 hasLocalConfig = true;
                 if (!File.Exists(configFile))
                     return false;
+
+                AssetId configId = pipeline.Identifier.GetOrRegisterAsset(Path.ChangeExtension(localInputFile, ".toml"));
+                pipeline.Associator.MakeAssocations(id, new ReadOnlySpan<AssetId>(in configId));
             }
 
-            TomlTable rootConfig = Toml.ToModel<TomlTable>(File.ReadAllText(configFile));
+            TomlTable rootConfig = TomlSerializer.Deserialize<TomlTable>(File.ReadAllText(configFile))!;
             ModelProcessorArgs args = ReadTomlDocument(rootConfig);
 
             args.AbsoluteFilepath = fullFilePath;
@@ -56,17 +63,14 @@ namespace Editor.Assets.Importers
             filesystem.RemapFile(localInputFile, localOutputFile);
             pipeline.ReloadAsset(pipeline.Identifier.GetOrRegisterAsset(localInputFile));
 
-            if (hasLocalConfig)
-                pipeline.MakeFileAssociations(localInputFile, configFile);
-
             AssetId modelId = pipeline.Identifier.GetOrRegisterAsset(localInputFile);
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localInputFile));
+            EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localInputFile, true));
 
-            AssetCategoryDatabase category = Editor.GlobalSingleton.AssetDatabase.GetCategory<RenderMesh>()!;
+            AssetCategoryDatabase category = EditorRuntime.GlobalSingleton.AssetDatabase.GetCategory<Mesh>()!;
             for (int i = 0; i < proc.MeshInfos.Length; i++)
             {
                 ref ModelMeshInfo mmi = ref proc.MeshInfos[i];
-                category.AddEntry(new AssetDatabaseEntry(modelId, mmi.Name));
+                category.AddEntry(new AssetDatabaseEntry(modelId, mmi.Name, true));
             }
 
             return true;
@@ -94,30 +98,36 @@ namespace Editor.Assets.Importers
         public void Preload(string localFilePath, ProjectSubFilesystem filesystem, AssetPipeline pipeline)
         {
             using Stream? stream = filesystem.OpenStream(localFilePath);
+            AssetId modelId = pipeline.Identifier.GetOrRegisterAsset(localFilePath);
 
-            if (stream == null)
+            if (stream == null || stream.Length < Unsafe.SizeOf<PMFHeader>())
+            {
+                EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, false));
                 return;
+            }
 
             PMFHeader header = stream.Read<PMFHeader>();
             if (header.Header != PMFHeader.ConstHeader || header.Version != PMFHeader.ConstVersion)
+            {
+                EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, false));
                 return;
+            }
 
-            AssetId modelId = pipeline.Identifier.GetOrRegisterAsset(localFilePath);
-            Editor.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath));
+            EditorRuntime.GlobalSingleton.AssetDatabase.AddEntry<ModelAsset>(new AssetDatabaseEntry(modelId, localFilePath, true));
 
-            AssetCategoryDatabase category = Editor.GlobalSingleton.AssetDatabase.GetCategory<RenderMesh>()!;
+            AssetCategoryDatabase category = EditorRuntime.GlobalSingleton.AssetDatabase.GetCategory<Mesh>()!;
 
             Stream dataReadStream = stream;
-            if (FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.IsCompressed))
+            if (Flags.HasFlag(header.Flags, PMFHeaderFlags.IsCompressed))
                 dataReadStream = LZ4Stream.Decode(stream);
 
             using BinaryReader br = new BinaryReader(dataReadStream);
 
-            int indexStride = FlagUtility.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? 4 : 2;
+            int indexStride = Flags.HasFlag(header.Flags, PMFHeaderFlags.LargeIndices) ? 4 : 2;
             for (int i = 0; i < header.MeshCount; i++)
             {
                 string meshName = br.ReadString();
-                category.AddEntry(new AssetDatabaseEntry(modelId, meshName));
+                category.AddEntry(new AssetDatabaseEntry(modelId, meshName, true));
 
                 uint vertexCount = br.ReadUInt32();
                 uint indexCount = br.ReadUInt32();
@@ -127,6 +137,8 @@ namespace Editor.Assets.Importers
 
                 br.Skip((int)vertexCount * (int)vertexStride + (int)indexCount * indexStride);
             }
+
+            return;
         }
 
         public static ModelProcessorArgs ReadTomlDocument(TomlTable document)

@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using Primary.Logging;
+using Serilog;
 
 namespace Primary
 {
@@ -8,15 +9,30 @@ namespace Primary
         internal static readonly ILogger Systems = Create("Systems");
         internal static readonly ILogger Scene = Create("Scene");
         internal static readonly ILogger Console = Create("Console");
+        internal static readonly ILogger Render = Create("Render");
+        internal static readonly ILogger NRD = Create("NRD");
+        internal static readonly ILogger RHI = Create("RHI");
+        internal static readonly ILogger ImGui = Create("ImGui");
+        internal static readonly ILogger Script = Create("Script");
+        internal static readonly ILogger Thread = Create("Thread");
+        internal static readonly ILogger Core = Create("Core");
+        internal static readonly ILogger Physics = Create("Physics");
+
+        internal static void ThrowFatal() => throw new FatalException();
 
         private static ILogger Create(string prefix)
         {
             return new LoggerConfiguration()
                 .WriteTo.Console(outputTemplate: $"[{{Timestamp:HH:mm:ss}} {{Level:u3}}] [P{prefix}] {{Message:lj}}{{NewLine}}{{Exception}}")
+                .WriteTo.Logbook()
 #if DEBUG
                 .MinimumLevel.Debug()
 #endif
                 .CreateLogger();
         }
+    }
+
+    public sealed class FatalException : Exception
+    {
     }
 }

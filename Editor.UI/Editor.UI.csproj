@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <FileVersion>1.0.3.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Editor.Interop\Editor.Interop.csproj" />
+    <ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
+    <ProjectReference Include="..\Primary\Primary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Elements\Menu\" />
+    <Folder Include="IO\" />
+    <Folder Include="Snippets\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Diagnostics" Version="8.4.2" />
+    <PackageReference Include="Sigil" Version="5.0.0" />
+  </ItemGroup>
+
+</Project>

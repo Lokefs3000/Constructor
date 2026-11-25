@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Snippet>
+    <Stylesheet Path="Editor/UI/Default.style" />
+    <Stylesheet Path="Editor/UI/Styles/DebugStats.style" />
+
+    <Frame IsActive="False" Class="root-element rstat-background">
+        <ListLayout Direction="Vertical" Padding="0.0 0" />
+        <FitterLayout Axis="Both" Margin="0.0 4 0.0 4" />
+
+        <Label IsActive="False" Id="fps-stats" Class="rstat-label rstat-fps" AutoSize="FitBoundsToText" Text="FPS: 000 [0.00 MS]
+AVG: 000 [0.00 MS]
+MIN: 000 NAX: 000" />
+        <Label Id="render-stats" Class="rstat-label rstat-render" AutoSize="FitBoundsToText" Text="RENDER: 0.00 MS" />
+        <Label Id="octree-stats" Class="rstat-label rstat-octree" AutoSize="FitBoundsToText" Text="OCTANTS: 0
+OCTANT OBJS: 0
+OCTANT PASSED: 0
+AVG OBJS: 0.00
+AVG PASSED: 000.0%" />
+        <Label Id="draw-stats" Class="rstat-label rstat-draw" AutoSize="FitBoundsToText" Text="DRAW CALLS: 0
+DRAW FRAG: 000.0%
+SHADERS: 0
+FLAGS: 0" />
+        <Label Id="gpu-mem-stats" Class="rstat-label rstat-gpumem" AutoSize="FitBoundsToText" Text="GPU MEM TOTAL: 000.00 MB
+GPU MEM RES: 000.00 MB
+GPU MEM FG: 000.00 MB" />
+        <Label Id="gc-stats" Class="rstat-label rstat-gc" AutoSize="FitBoundsToText" Text="GC RATE: 000.00 KB
+GC TOTAL: 000.00 MB
+GC FRAG: 000.00 MB
+GC COST: 0.00
+GC TIME: 0.00 MS [000.0 %]
+GC TIME AVG: 0.000 MS
+GC TIME MAX: 0.000 MS" />
+    </Frame>
+</Snippet>

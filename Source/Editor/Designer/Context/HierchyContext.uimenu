@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ContextMenu>
+    <Item Name="Base_Add" Text="Add">
+        
+    </Item>
+    <Separator />
+    <Item Name="Base_Expand" Text="Expand" />
+    <Item Name="Base_Collapse" Text="Collapse" Enabled="False" />
+    <Item Name="Base_Move" Text="Move">
+        <Item Name="Move_Up" Text="Up" />
+        <Item Name="Move_Down" Text="Down" />
+    </Item>
+    <Separator />
+    <Item Name="Base_Cut" Text="Cut" />
+    <Item Name="Base_Copy" Text="Copy" />
+    <Item Name="Base_Pase" Text="Paste" Enabled="False" />
+    <Item Name="Base_Delete" Text="Delete" />
+    <Item Name="Base_Rename" Text="Rename" />
+    <Separator />
+    <Item Name="Base_Properties" Text="Properties" />
+</ContextMenu>

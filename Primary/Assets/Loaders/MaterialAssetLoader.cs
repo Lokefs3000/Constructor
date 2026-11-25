@@ -1,16 +1,28 @@
-﻿using CsToml;
+﻿using CommunityToolkit.HighPerformance;
+using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Common.Streams;
-using Primary.Rendering;
-using System.Collections.Frozen;
+using Primary.Rendering.Assets;
+using Primary.Serialization.Toml;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text.Json.Serialization;
+using Tomlyn;
+using Tomlyn.Model;
+using Tomlyn.Serialization;
+using Tomlyn.Text;
 
 namespace Primary.Assets.Loaders
 {
-    internal unsafe class MaterialAssetLoader : IAssetLoader
+    internal sealed class MaterialAssetLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new MaterialAssetData(id);
+            return new MaterialAssetData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
@@ -21,121 +33,335 @@ namespace Primary.Assets.Loaders
             return new MaterialAsset(materialData);
         }
 
-        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, BundleReader? bundleToReadFrom)
+        public void FactoryLoad(IAssetDefinition asset, IInternalAssetData assetData, string sourcePath, string localPath, BundleReader? bundleToReadFrom)
         {
             if (asset is not MaterialAsset material)
                 throw new ArgumentException(nameof(asset));
             if (assetData is not MaterialAssetData materialData)
                 throw new ArgumentException(nameof(assetData));
 
-            try
+            materialData.Dispose();
+
+            string? source = AssetFilesystem.ReadString(sourcePath, bundleToReadFrom);
+            if (source == null)
             {
-                using Stream? stream = AssetFilesystem.OpenStream(sourcePath, bundleToReadFrom);
-                if (stream == null)
+                materialData.UpdateAssetFailed(material);
+                throw new AssetLoadException("Failed to read material data source");
+
+            }
+
+            MaterialTomlOutput? toml = TomlSerializer.Deserialize<MaterialTomlOutput>(source, MaterialTomlSerializerContext.Default);
+            if (toml == null)
+            {
+                materialData.UpdateAssetFailed(material);
+                throw new AssetLoadException("Failed to parse material data");
+            }
+
+            ShaderSetAsset shaderSet = AssetManager.LoadAsset<ShaderSetAsset>(toml.Shader).WaitIfNotLoaded();
+            if (shaderSet.Status != ResourceStatus.Success)
+            {
+                materialData.UpdateAssetFailed(material);
+                throw new AssetLoadException("Material shader set failed to load");
+            }
+
+            MaterialShader[] shaderTypes = new MaterialShader[Enum.GetNames<MaterialShaderType>().Length];
+
+            MaterialShaderType shaderType = 0;
+            foreach (string name in Enum.GetNames<MaterialShaderType>())
+            {
+                if (shaderSet.TryGetShader(name, out ShaderAsset? shader))
                 {
-                    materialData.UpdateAssetFailed(material);
-                    return;
-                }
+                    shader.WaitIfNotLoaded();
 
-                ExceptionUtility.Assert(stream != null);
-
-                TomlDocument document = CsTomlSerializer.Deserialize<TomlDocument>(stream!);
-                TomlDocumentNode root = document.RootNode;
-
-                string shader = string.Empty;
-                ExceptionUtility.Assert(root["shader"u8].TryGetString(out shader));
-
-                ShaderAsset? shaderAsset = AssetManager.LoadAsset<ShaderAsset>(shader, true);
-                if (shaderAsset == null)
-                {
-                    materialData.ChangeCurrentShader(shaderAsset, FrozenDictionary<string, MaterialProperty>.Empty, null);
-                    materialData.UpdateAssetData(material);
-
-                    return;
-                }
-
-                ShaderBindGroup defaultGroup = shaderAsset.CreateDefaultBindGroup();
-                Dictionary<string, MaterialProperty> properties = new Dictionary<string, MaterialProperty>();
-
-                foreach (ShaderVariable variable in shaderAsset.Variables.Values)
-                {
-                    if (variable.BindGroup == defaultGroup.GroupName)
+                    if (shader.IsReady)
                     {
-                        int idx = Array.FindIndex(variable.Attributes, (x) => x.Type == ShaderAttributeType.Property);
-                        if (idx >= 0)
+                        PropertyBlock block = shader.CreatePropertyBlock();
+                        shaderTypes[(int)shaderType++] = new MaterialShader(shader, block);
+
+                        foreach (ref readonly ShaderProperty property in shader.Properties)
                         {
-                            ref ShaderVariableAttribute attribute = ref variable.Attributes[idx];
-                            ShaderVariableAttribProperty property = (ShaderVariableAttribProperty)attribute.Value!;
+                            if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Property) || Flags.HasEither(property.Flags, ShPropertyFlags.Global | ShPropertyFlags.HasParent))
+                                continue;
 
-                            properties.Add(property.Name, new MaterialProperty
+                            switch (property.Type)
                             {
-                                Type = variable.Type switch
-                                {
-                                    ShaderVariableType.Texture1D => MaterialVariableType.Texture,
-                                    ShaderVariableType.Texture2D => MaterialVariableType.Texture,
-                                    ShaderVariableType.Texture3D => MaterialVariableType.Texture,
-                                    ShaderVariableType.TextureCube => MaterialVariableType.Texture,
-                                    _ => throw new NotSupportedException(variable.Type.ToString())
-                                },
-                                VariableName = variable.Name,
-                            });
-
-                            defaultGroup.SetResource(variable.Name, property.Default switch
-                            {
-                                ShaderPropertyDefault.White => AssetManager.Static.DefaultWhite,
-                                ShaderPropertyDefault.Normal => AssetManager.Static.DefaultNormal,
-                                _ => AssetManager.Static.DefaultWhite
-                            });
-                        }
-                    }
-                }
-
-                TomlDocumentNode propertiesNode = root["properties"];
-                if (propertiesNode.HasValue)
-                {
-                    foreach (var kvp in properties)
-                    {
-                        TomlDocumentNode child = propertiesNode[kvp.Key];
-                        if (child.HasValue)
-                        {
-                            switch (kvp.Value.Type)
-                            {
-                                case MaterialVariableType.Texture:
+                                case ShPropertyType.Texture:
                                     {
-                                        TextureAsset? textureAsset = null;
-                                        if (child.TryGetInt64(out long id))
+                                        if (!toml.Resources.TryGetValue(property.DisplayName, out AssetId assetId))
                                         {
-                                            textureAsset = AssetManager.LoadAsset<TextureAsset>(new AssetId((ulong)id));
+                                            // EngLog.Assets.Error("[a:{path}]: Failed to find property: {prop}", sourcePath, property.DisplayName);
+
+                                            block.SetResource(property.DisplayName, property.Default switch
+                                            {
+                                                ShPropertyDefault.NumOne => AssetManager.Static.DefaultWhite,
+                                                ShPropertyDefault.NumZero => AssetManager.Static.DefaultBlack,
+                                                ShPropertyDefault.NumIdentity => AssetManager.Static.DefaultWhite,
+                                                ShPropertyDefault.TexWhite => AssetManager.Static.DefaultWhite,
+                                                ShPropertyDefault.TexBlack => AssetManager.Static.DefaultBlack,
+                                                ShPropertyDefault.TexMask => AssetManager.Static.DefaultMask,
+                                                ShPropertyDefault.TexNormal => AssetManager.Static.DefaultNormal,
+                                                _ => throw new NotImplementedException(),
+                                            });
                                         }
-                                        else if (!child.TryGetString(out string value))
+                                        else
                                         {
-                                            textureAsset = AssetManager.LoadAsset<TextureAsset>(value);
+                                            TextureAsset texture = AssetManager.LoadAsset<TextureAsset>(assetId);
+                                            block.SetResource(property.DisplayName, texture);
                                         }
 
-                                        if (textureAsset != null)
-                                            defaultGroup.SetResource(kvp.Value.VariableName, textureAsset);
                                         break;
                                     }
+                                case ShPropertyType.Single:
+                                    {
+                                        if (!toml.Properties.TryGetValue(property.DisplayName, out string? valueStr) ||
+                                            !float.TryParse(valueStr, CultureInfo.InvariantCulture, out float valueReal))
+                                        {
+                                            EngLog.Assets.Error("[a:{path}]: Failed to find or parse property: {prop}", sourcePath, property.DisplayName);
+
+                                            block.SetSingle(property.DisplayName, property.Default switch
+                                            {
+                                                ShPropertyDefault.NumOne => 1.0f,
+                                                ShPropertyDefault.NumZero => 0.0f,
+                                                ShPropertyDefault.NumIdentity => 0.0f,
+                                                _ => throw new NotImplementedException(),
+                                            });
+                                        }
+                                        else
+                                        {
+                                            block.SetSingle(property.DisplayName, valueReal);
+                                        }
+
+                                        break;
+                                    }
+                                case ShPropertyType.Double:
+                                    {
+                                        if (!toml.Properties.TryGetValue(property.DisplayName, out string? valueStr) ||
+                                            !double.TryParse(valueStr, CultureInfo.InvariantCulture, out double valueReal))
+                                        {
+                                            EngLog.Assets.Error("[a:{path}]: Failed to find or parse property: {prop}", sourcePath, property.DisplayName);
+
+                                            block.SetDouble(property.DisplayName, property.Default switch
+                                            {
+                                                ShPropertyDefault.NumOne => 1.0,
+                                                ShPropertyDefault.NumZero => 0.0,
+                                                ShPropertyDefault.NumIdentity => 0.0,
+                                                _ => throw new NotImplementedException(),
+                                            });
+                                        }
+                                        else
+                                        {
+                                            block.SetDouble(property.DisplayName, valueReal);
+                                        }
+
+                                        break;
+                                    }
+                                case ShPropertyType.UInt32:
+                                    {
+                                        if (!toml.Properties.TryGetValue(property.DisplayName, out string? valueStr) ||
+                                            !uint.TryParse(valueStr, CultureInfo.InvariantCulture, out uint valueReal))
+                                        {
+                                            EngLog.Assets.Error("[a:{path}]: Failed to find or parse property: {prop}", sourcePath, property.DisplayName);
+
+                                            block.SetUInt(property.DisplayName, property.Default switch
+                                            {
+                                                ShPropertyDefault.NumOne => 1,
+                                                ShPropertyDefault.NumZero => 0,
+                                                ShPropertyDefault.NumIdentity => 0,
+                                                _ => throw new NotImplementedException(),
+                                            });
+                                        }
+                                        else
+                                        {
+                                            block.SetUInt(property.DisplayName, valueReal);
+                                        }
+
+                                        break;
+                                    }
+                                case ShPropertyType.Int32:
+                                    {
+                                        if (!toml.Properties.TryGetValue(property.DisplayName, out string? valueStr) ||
+                                            !int.TryParse(valueStr, CultureInfo.InvariantCulture, out int valueReal))
+                                        {
+                                            EngLog.Assets.Error("[a:{path}]: Failed to find or parse property: {prop}", sourcePath, property.DisplayName);
+
+                                            block.SetSingle(property.DisplayName, property.Default switch
+                                            {
+                                                ShPropertyDefault.NumOne => 1,
+                                                ShPropertyDefault.NumZero => 0,
+                                                ShPropertyDefault.NumIdentity => 0,
+                                                _ => throw new NotImplementedException(),
+                                            });
+                                        }
+                                        else
+                                        {
+                                            block.SetInt(property.DisplayName, valueReal);
+                                        }
+
+                                        break;
+                                    }
+                                case ShPropertyType.Vector2:
+                                    {
+                                        if (!toml.Properties.TryGetValue(property.DisplayName, out string? valueStr) ||
+                                            !Vector2TryParse(valueStr, out Vector2 valueReal))
+                                        {
+                                            EngLog.Assets.Error("[a:{path}]: Failed to find or parse property: {prop}", sourcePath, property.DisplayName);
+
+                                            block.SetVector2(property.DisplayName, property.Default switch
+                                            {
+                                                ShPropertyDefault.NumOne => Vector2.Zero,
+                                                ShPropertyDefault.NumZero => Vector2.Zero,
+                                                ShPropertyDefault.NumIdentity => Vector2.Zero,
+                                                _ => throw new NotImplementedException(),
+                                            });
+                                        }
+                                        else
+                                        {
+                                            block.SetVector2(property.DisplayName, valueReal);
+                                        }
+
+                                        break;
+                                    }
+                                case ShPropertyType.Vector3:
+                                    {
+                                        if (!toml.Properties.TryGetValue(property.DisplayName, out string? valueStr) ||
+                                            !Vector3TryParse(valueStr, out Vector3 valueReal))
+                                        {
+                                            EngLog.Assets.Error("[a:{path}]: Failed to find or parse property: {prop}", sourcePath, property.DisplayName);
+
+                                            block.SetVector3(property.DisplayName, property.Default switch
+                                            {
+                                                ShPropertyDefault.NumOne => Vector3.One,
+                                                ShPropertyDefault.NumZero => Vector3.Zero,
+                                                ShPropertyDefault.NumIdentity => Vector3.Zero,
+                                                _ => throw new NotImplementedException(),
+                                            });
+                                        }
+                                        else
+                                        {
+                                            block.SetVector3(property.DisplayName, valueReal);
+                                        }
+
+                                        break;
+                                    }
+                                case ShPropertyType.Vector4:
+                                    {
+                                        if (!toml.Properties.TryGetValue(property.DisplayName, out string? valueStr) ||
+                                            !Vector4TryParse(valueStr, out Vector4 valueReal))
+                                        {
+                                            EngLog.Assets.Error("[a:{path}]: Failed to find or parse property: {prop}", sourcePath, property.DisplayName);
+
+                                            block.SetVector4(property.DisplayName, property.Default switch
+                                            {
+                                                ShPropertyDefault.NumOne => Vector4.One,
+                                                ShPropertyDefault.NumZero => Vector4.Zero,
+                                                ShPropertyDefault.NumIdentity => Vector4.Zero,
+                                                _ => throw new NotImplementedException(),
+                                            });
+                                        }
+                                        else
+                                        {
+                                            block.SetVector4(property.DisplayName, valueReal);
+                                        }
+
+                                        break;
+                                    }
+                                case ShPropertyType.Matrix4x4: //TODO: implement
+                                    throw new NotImplementedException("lazy :/");
                             }
                         }
                     }
+                    else
+                    {
+                        shaderTypes[(int)shaderType++] = default;
+                    }
                 }
-
-                materialData.ChangeCurrentShader(shaderAsset, properties.ToFrozenDictionary(), defaultGroup);
-                materialData.UpdateAssetData(material);
+                else
+                {
+                    shaderTypes[(int)shaderType++] = default;
+                }
             }
-#if DEBUG
-            finally
-            {
 
-            }
-#else
-            catch (Exception ex)
+            materialData.UpdateAssetData(material, shaderSet, shaderTypes);
+
+            [DoesNotReturn]
+            void ThrowException(string message, params object?[] args)
             {
                 materialData.UpdateAssetFailed(material);
-                EngLog.Assets.Error(ex, "Failed to load shader: {name}", sourcePath);
+
+                EngLog.Assets.Error("[a:{path}]: " + message, [localPath, .. args]);
+                throw new Exception("Unexpected error");
             }
-#endif
+
+            static bool Vector2TryParse(string serialized, out Vector2 value)
+            {
+                Unsafe.SkipInit(out value);
+                Span<float> values = MemoryMarshal.CreateSpan(ref Unsafe.As<Vector2, float>(ref value), 2);
+                return TryParseGenericSpan(serialized, ref values);
+            }
+
+            static bool Vector3TryParse(string serialized, out Vector3 value)
+            {
+                Unsafe.SkipInit(out value);
+                Span<float> values = MemoryMarshal.CreateSpan(ref Unsafe.As<Vector3, float>(ref value), 3);
+                return TryParseGenericSpan(serialized, ref values);
+            }
+
+            static bool Vector4TryParse(string serialized, out Vector4 value)
+            {
+                Unsafe.SkipInit(out value);
+                Span<float> values = MemoryMarshal.CreateSpan(ref Unsafe.As<Vector4, float>(ref value), 4);
+                return TryParseGenericSpan(serialized, ref values);
+            }
+
+            static bool TryParseGenericSpan(string serialized, ref Span<float> values)
+            {
+                ReadOnlySpan<char> span = serialized.AsSpan();
+                if (span.Length < 3 || span[0] != '[' || span[^1] != ']')
+                    return false;
+
+                int currentIndex = 1;
+                for (int i = 0; i < values.Length; ++i)
+                {
+                    while (char.IsWhiteSpace(span[currentIndex]))
+                    {
+                        if (++currentIndex >= span.Length)
+                            return false;
+                    }
+
+                    int start = currentIndex;
+                    while (span[currentIndex] != ',' && span[currentIndex] != ']')
+                    {
+                        if (++currentIndex >= span.Length)
+                            return false;
+                    }
+
+                    ReadOnlySpan<char> valueSpan = span[start..currentIndex];
+                    if (!float.TryParse(valueSpan, CultureInfo.InvariantCulture, out float value))
+                        return false;
+
+                    values[i] = value;
+                    ++currentIndex;
+                }
+
+                return true;
+            }
         }
+    }
+
+    public sealed class MaterialTomlOutput
+    {
+        [TomlRequired]
+        public AssetId Shader { get; set; } = AssetId.Invalid;
+
+        public Dictionary<string, AssetId> Resources { get; set; } = [];
+        public Dictionary<string, string> Properties { get; set; } = [];
+    }
+
+    [TomlSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower, Converters = [
+        typeof(AssetIdTomlConverter)
+        ])]
+    [TomlSerializable(typeof(MaterialTomlOutput))]
+    public partial class MaterialTomlSerializerContext : TomlSerializerContext
+    {
     }
 }

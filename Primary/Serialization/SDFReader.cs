@@ -128,7 +128,7 @@ namespace Primary.Serialization
         [DoesNotReturn, StackTraceHidden]
         private void ThrowParseException(string message) => throw new SDFParseException($"[{_line}:{_index - _lineIndex}]: {message}");
 
-        public bool IsEOF => _index >= _source.Length;
+        public readonly bool IsEOF => _index >= _source.Length;
 
         private static bool IsDeliminationCapable(char c) => char.IsWhiteSpace(c) || char.IsControl(c);
         private static bool IsIdentifierCapable(char c) => char.IsLetterOrDigit(c) || c == '.' || c == '_';

@@ -1,0 +1,27 @@
+[Button]
+x = 0
+y = 0
+
+[Canvas]
+x = 1
+y = 0
+
+[Element]
+x = 2
+y = 0
+
+[Frame]
+x = 3
+y = 0
+
+[Image]
+x = 0
+y = 1
+
+[Label]
+x = 1
+y = 1
+
+[SplitContainer]
+x = 2
+y = 1

@@ -1,0 +1,25 @@
+asset_id = "01a14964412478bea8b4a13240bd740b"
+meta_version = 1
+[unique_config]
+index_stride_mode = 0
+uv_channels = 255
+scale = 0.01
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 768985107
+name = "Door"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 1527965359
+name = "Handle"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 614034361
+name = "Inside"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -1185998831
+name = "Top.001"

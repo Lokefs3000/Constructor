@@ -1,9 +1,8 @@
 ﻿using Collections.Pooled;
 using CommunityToolkit.HighPerformance;
-using Primary.Assets;
+using Primary.Assets.Types;
 using Primary.Common;
 using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Xml.Linq;
 
@@ -64,7 +63,7 @@ namespace Editor.Assets
                 try
                 {
                     FileAttributes attributes = File.GetAttributes(b.FullPath);
-                    if (FlagUtility.HasFlag(attributes, FileAttributes.Directory))
+                    if (Flags.HasFlag(attributes, FileAttributes.Directory))
                     {
                         string localDirectory = b.FullPath.Substring(_rootDirectory.Length + 1).Replace('\\', '/');
                         AddLocalDirectory(null, b.FullPath, localDirectory);
@@ -132,7 +131,7 @@ namespace Editor.Assets
                 try
                 {
                     FileAttributes attributes = File.GetAttributes(b.FullPath);
-                    if (FlagUtility.HasFlag(attributes, FileAttributes.Directory))
+                    if (Flags.HasFlag(attributes, FileAttributes.Directory))
                     {
                         string oldLocalDirectory = b.OldFullPath.Substring(_rootDirectory.Length + 1).Replace('\\', '/');
                         string newLocalDirectory = b.FullPath.Substring(_rootDirectory.Length + 1).Replace('\\', '/');
@@ -175,7 +174,7 @@ namespace Editor.Assets
                 try
                 {
                     FileAttributes attributes = File.GetAttributes(b.FullPath);
-                    if (!FlagUtility.HasFlag(attributes, FileAttributes.Directory))
+                    if (!Flags.HasFlag(attributes, FileAttributes.Directory))
                     {
                         string localFile = b.FullPath.Substring(_rootDirectory.Length + 1).Replace('\\', '/');
                         if (_activeFiles.TryGetValue(localFile, out AssetFile file))
@@ -527,7 +526,7 @@ namespace Editor.Assets
 
         private void FlushFilesystemData()
         {
-            int length = Editor.GlobalSingleton.ProjectPath.Length;
+            int length = EditorRuntime.GlobalSingleton.ProjectPath.Length;
 
             StringBuilder sb = new StringBuilder();
             foreach (var kvp in _activeFiles)
@@ -561,7 +560,7 @@ namespace Editor.Assets
             Queue<string> activeQueue = new Queue<string>();
             HashSet<string> newExistingFiles = new HashSet<string>();
 
-            string projectPath = Editor.GlobalSingleton.ProjectPath;
+            string projectPath = EditorRuntime.GlobalSingleton.ProjectPath;
 
             while (true)
             {

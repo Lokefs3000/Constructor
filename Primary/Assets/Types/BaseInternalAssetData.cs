@@ -1,0 +1,72 @@
+﻿using System.Runtime.CompilerServices;
+
+namespace Primary.Assets.Types
+{
+    public abstract class BaseInternalAssetData<T> : IInternalAssetData where T : class, IAssetDefinition
+    {
+        private readonly WeakReference _asset;
+        private readonly AssetId _id;
+        private readonly int _uniqueIndex;
+
+        private ResourceStatus _status;
+        private string _name;
+
+        private int _loadIndex;
+
+        protected BaseInternalAssetData(AssetId id, int uniqueIndex)
+        {
+            _asset = new WeakReference(id);
+            _id = id;
+            _uniqueIndex = uniqueIndex;
+
+            _status = ResourceStatus.Pending;
+            _name = string.Empty;
+
+            _loadIndex = -1;
+        }
+
+        public virtual void Dispose()
+        {
+            _asset.Target = null;
+
+            _status = ResourceStatus.Disposed;
+            // _name = string.Empty;
+
+            GC.SuppressFinalize(this);
+        }
+
+        public virtual void UpdateAssetData(T asset)
+        {
+            _asset.Target = asset;
+
+            ++_loadIndex;
+            _status = ResourceStatus.Success;
+        }
+
+        public virtual void UpdateAssetFailed(T asset)
+        {
+            _asset.Target = asset;
+
+            ++_loadIndex;
+            _status = ResourceStatus.Error;
+        }
+
+        void IInternalAssetData.UpdateAssetFailed(IAssetDefinition asset) => UpdateAssetFailed((T)asset);
+
+        public virtual void SetAssetInternalName(string name) => _name = name;
+        public virtual void SetAssetInternalStatus(ResourceStatus status) => _status = status;
+
+        IAssetDefinition? IInternalAssetData.Definition => Unsafe.As<T>(_asset.Target);
+
+        public AssetId Id => _id;
+        public int UniqueIndex => _uniqueIndex;
+        public T? Definition => Unsafe.As<T>(_asset.Target);
+
+        public ResourceStatus Status => _status;
+        public string Name => _name;
+
+        public int LoadIndex => _loadIndex;
+
+        public Type AssetType => typeof(T);
+    }
+}

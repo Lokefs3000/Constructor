@@ -1,0 +1,52 @@
+#define TileWidth 48
+#define TileHeight 48
+
+struct Rect2D
+{
+    int2 Minimum;
+    int2 Maximum;
+};
+
+enum class RoundedCorner : uint
+{
+    TopLeft = 1 << 0,
+    TopRight = 1 << 1,
+    BottomLeft = 1 << 2,
+    BottomRight = 1 << 3
+};
+
+struct CmdRectangle
+{
+    Rect2D Bounds;
+
+
+    RoundedCorner Corners;
+    float Rounding;
+};
+
+void RzDrawRectangle(int dataOffset, uint2 dispatchPixelOffset, int2 basePixel)
+{
+    CmdRectangle cmd = load(dataOffset);
+    
+    uint2 baseOffset = max(basePixel - cmd.Bounds.Minimum, 0);
+    uint2 maxOffset = min(cmd.Bounds.Maximum - basePixel, int2(TileWidth, TileHeight));
+
+    for (uint y = baseOffset.y; y < maxOffset.y; ++y)
+    {
+        for (uint x = baseOffset.x; x < maxOffset.x; ++x)
+        {
+            uint2 pixel = dispatchPixelOffset + uint2(x, y);
+            
+        }
+    }
+}
+
+[kernel]
+[numthreads(8, 8, 1)]
+void CSDrawTiled(uint3 dispatchId : SV_DispatchThreadID)
+{
+    for (int i = 0; i < count; ++i)
+    {
+        
+    }
+}

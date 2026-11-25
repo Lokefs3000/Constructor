@@ -1,0 +1,22 @@
+{
+    "structs": [
+
+    ],
+    "classes": [
+        {
+            "typeName": "physx::PxPhysics",
+            "functions": [
+                "void release()",
+                "physx::PxFoundation& getFoundation()",
+                "physx::PxInsertionCallback& getPhysicsInsertionCallback()",
+                "physx::PxOmniPvd* getOmniPvd()",
+                "physx::PxTolerancesScale& getTolerancesScale()",
+                "physx::PxAggregate* createAggregate(physx::PxU32 maxActor, physx::PxU32 maxShape, physx::PxAggregateFilterHint filterHint)",
+                "physx::PxU32 getNbAggregates()",
+                "physx::PxTriangleMesh* createTriangleMesh(physx::PxInputStream& stream)",
+                "physx::PxU32 getNbTriangleMeshes()",
+                "physx::PxU"
+            ]
+        }
+    ]
+}

@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Vortice.Direct3D12;
 using Vortice.DXGI;
+using D3D12MemAlloc = Interop.D3D12MemAlloc;
 using Terra = TerraFX.Interop.DirectX;
 
 namespace Primary.RHI.Direct3D12
@@ -23,7 +24,7 @@ namespace Primary.RHI.Direct3D12
         private nint _handlePtr;
 
         private ID3D12Resource _resource;
-        private Terra.D3D12MA_Allocation* _allocation;
+        private D3D12MemAlloc.Allocation* _allocation;
         private DescriptorHeapAllocation _descriptor;
         private ResourceStates _defaultState;
         private Format _indexStrideFormat;
@@ -72,7 +73,7 @@ namespace Primary.RHI.Direct3D12
             if (desc.Memory == MemoryUsage.Staging)
                 _defaultState |= ResourceStates.GenericRead;
 
-            if (FlagUtility.HasFlag(desc.CpuAccessFlags, CPUAccessFlags.Read))
+            if (Flags.HasFlag(desc.CpuAccessFlags, CPUAccessFlags.Read))
             {
                 heapType = HeapType.Readback;
                 _defaultState |= ResourceStates.CopySource;
@@ -106,29 +107,29 @@ namespace Primary.RHI.Direct3D12
                 resDesc.Width = (ulong)(desc.ByteWidth + (-desc.ByteWidth & mask));
             }
 
-            Terra.D3D12MA_ALLOCATION_DESC allocDesc = new Terra.D3D12MA_ALLOCATION_DESC
+            D3D12MemAlloc.ALLOCATION_DESC allocDesc = new D3D12MemAlloc.ALLOCATION_DESC
             {
-                Flags = Terra.D3D12MA_ALLOCATION_FLAGS.D3D12MA_ALLOCATION_FLAG_NONE,
+                Flags = D3D12MemAlloc.ALLOCATION_FLAGS.ALLOCATION_FLAG_NONE,
                 HeapType = (Terra.D3D12_HEAP_TYPE)heapType,
                 ExtraHeapFlags = Terra.D3D12_HEAP_FLAGS.D3D12_HEAP_FLAG_NONE,
                 CustomPool = null,
                 pPrivateData = null,
             };
 
-            Terra.D3D12MA_Allocation* ptr = null;
+            D3D12MemAlloc.Allocation* ptr = null;
             void* outPtr = null;
             Guid guid = typeof(ID3D12Resource).GUID;
 
-            ResultChecker.ThrowIfUnhandled(device.D3D12MAAllocator->CreateResource(&allocDesc, (Terra.D3D12_RESOURCE_DESC*)&resDesc, (Terra.D3D12_RESOURCE_STATES)usingState, null, &ptr, &guid, &outPtr).Value, device);
+            ResultChecker.ThrowIfUnhandled(D3D12MemAlloc.Allocator.CreateResource(device.D3D12MAAllocator, &allocDesc, (Terra.D3D12_RESOURCE_DESC*)&resDesc, (Terra.D3D12_RESOURCE_STATES)usingState, null, &ptr, &guid, &outPtr), device);
 
             _allocation = ptr;
             _resource = new ID3D12Resource((nint)outPtr);
 
-            if (FlagUtility.HasFlag(desc.Usage, BufferUsage.ConstantBuffer) || FlagUtility.HasFlag(desc.Usage, BufferUsage.ShaderResource))
+            if (Flags.HasFlag(desc.Usage, BufferUsage.ConstantBuffer) || Flags.HasFlag(desc.Usage, BufferUsage.ShaderResource))
             {
                 _descriptor = device.CpuSRVCBVUAVDescriptors.Rent(1);
 
-                if (FlagUtility.HasFlag(desc.Usage, BufferUsage.ConstantBuffer))
+                if (Flags.HasFlag(desc.Usage, BufferUsage.ConstantBuffer))
                 {
                     device.D3D12Device.CreateConstantBufferView(new ConstantBufferViewDescription
                     {
@@ -136,7 +137,7 @@ namespace Primary.RHI.Direct3D12
                         SizeInBytes = (uint)resDesc.Width
                     }, _descriptor.GetCpuHandle());
                 }
-                else if (FlagUtility.HasFlag(desc.Usage, BufferUsage.ShaderResource))
+                else if (Flags.HasFlag(desc.Usage, BufferUsage.ShaderResource))
                 {
                     Checking.Assert(desc.Stride > 0 && desc.Stride <= desc.ByteWidth, $"Buffer stride must be more then 0 and less than the total byte width of the buffer (width: {desc.ByteWidth}, stride: {desc.Stride})");
 
@@ -170,7 +171,7 @@ namespace Primary.RHI.Direct3D12
             _gpuVirtualAddress = _resource.GPUVirtualAddress;
             _resourceName = _resource.Name;
 
-            if (FlagUtility.HasFlag(desc.Usage, BufferUsage.IndexBuffer))
+            if (Flags.HasFlag(desc.Usage, BufferUsage.IndexBuffer))
             {
                 _indexStrideFormat = desc.Stride switch
                 {
@@ -201,7 +202,7 @@ namespace Primary.RHI.Direct3D12
                     if (!_descriptor.IsNull)
                         _device.CpuSRVCBVUAVDescriptors.Return(_descriptor);
                     if (_allocation != null)
-                        _allocation->Release();
+                        _allocation->Base.Release();
                     _resource?.Dispose();
                 });
 
@@ -319,11 +320,13 @@ namespace Primary.RHI.Direct3D12
         internal Format IndexStrideFormat => _indexStrideFormat;
 
         public bool IsShaderVisible => !_descriptor.IsNull;
-        public ResourceType Type => FlagUtility.HasFlag(_description.Usage, BufferUsage.ShaderResource) ? ResourceType.ShaderBuffer : ResourceType.ConstantBuffer;
+        public ResourceType Type => Flags.HasFlag(_description.Usage, BufferUsage.ShaderResource) ? ResourceType.ShaderBuffer : ResourceType.ConstantBuffer;
         public string ResourceName => _resourceName;
         public CpuDescriptorHandle CpuDescriptor => _descriptor.GetCpuHandle();
         public ResourceStates GenericState => ResourceStates.Common;
         public ResourceStates CurrentState => _currentState;
+
+        internal ID3D12Resource D3D12Resource => _resource;
 
         internal class DescriptorImpl : Descriptor, ICommandDescriptor
         {
@@ -354,7 +357,7 @@ namespace Primary.RHI.Direct3D12
             internal DescriptorImpl(BufferImpl owner, DescriptorKey key, BufferCBDescriptorDescription description) : this(owner, key, new DescriptorDescription { BufferCB = description })
             {
                 _bindType = ResourceType.ConstantBuffer;
-                _isDynamic = FlagUtility.HasFlag(description.Flags, DescriptorFlags.Dynamic);
+                _isDynamic = Flags.HasFlag(description.Flags, DescriptorFlags.Dynamic);
 
                 if (!_isDynamic)
                 {
@@ -485,5 +488,13 @@ namespace Primary.RHI.Direct3D12
             ConstantBuffer,
             ShaderResource
         }
+    }
+
+    public readonly record struct BufferInternal(Buffer Buffer)
+    {
+        public ID3D12Resource Resource => Unsafe.As<BufferImpl>(Buffer).D3D12Resource;
+        public CpuDescriptorHandle CpuDescriptorHandle => Unsafe.As<BufferImpl>(Buffer).CpuDescriptor;
+
+        public static implicit operator BufferInternal(Buffer buffer) => new BufferInternal(buffer);
     }
 }

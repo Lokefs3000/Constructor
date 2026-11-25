@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Stylesheet>
+    <Class Type="ToolbarItem">
+        <Padding Value="3 2" />
+        <InnerSpacing Value="2" />
+        <SplitterColor Value="#1b1b1b" />
+    </Class>
+</Stylesheet>

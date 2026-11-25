@@ -1,0 +1,20 @@
+@use "Editor/UI/Stylesheets/Globals.style";
+
+.tabs-left {
+    background-color: $primary-deep-bg-colour;
+}
+
+.highlight-label {
+    text-color: #b8e3b8;
+    font-weight: Bold;
+}
+
+.number-list {
+    stroke-width: 1;
+    stroke-color: $held-button-colour;
+    stroke-position: Outside;
+
+    &:all-children {
+        font-size: 14;
+    }
+}

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Layout>
+	<Stylesheet Path="Editor/UI/Default.style" />
+
+	<Window>
+		<TreeView Mode="VerticalAndHorizontal" Id="Hierchy" Position="0.0 0 0.0 28" Size="1.0 0 1.0 -28" />
+	</Window>
+</Layout>

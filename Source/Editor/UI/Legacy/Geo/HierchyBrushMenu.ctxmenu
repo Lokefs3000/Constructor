@@ -1,0 +1,69 @@
+{
+    "Font": "Editor/Fonts/Inter.uifont",
+    "Stylesheets": [
+        "Editor/UI/Default.style"
+    ],
+    "Items": [
+        {
+            "Type": "Item",
+            "Text": "Add brush",
+            "Items": [
+                {
+                    "Type": "Item",
+                    "Id": "AddBrushCamera",
+                    "Text": "At camera",
+                    "Image": [ "Editor/UI/Atlases/GeoContextMenuIcons.atlas", "AtCamera" ]
+                },
+                {
+                    "Type": "Item",
+                    "Id": "AddBrushCenter",
+                    "Text": "At center",
+                    "Image": [ "Editor/UI/Atlases/GeoContextMenuIcons.atlas", "AtCenter" ]
+                }
+            ],
+            "Image": [ "Editor/UI/Atlases/GeoContextMenuIcons.atlas", "NewBrush" ]
+        },
+        {
+            "Type": "Separator"
+        },
+        {
+            "Type": "Item",
+            "Id": "SnapVertices",
+            "Text": "Snap vertices",
+            "Image": [ "Editor/UI/Atlases/GeoContextMenuIcons.atlas", "SnapVertices" ]
+        },
+        {
+            "Type": "Separator"
+        },
+        {
+            "Type": "Item",
+            "Id": "Rename",
+            "Text": "Rename",
+            "Image": [ "Editor/UI/Atlases/ContextMenuIcons.atlas", "Rename" ]
+        },
+        {
+            "Type": "Item",
+            "Id": "Cut",
+            "Text": "Cut",
+            "Image": [ "Editor/UI/Atlases/ContextMenuIcons.atlas", "Cut" ]
+        },
+        {
+            "Type": "Item",
+            "Id": "Copy",
+            "Text": "Copy",
+            "Image": [ "Editor/UI/Atlases/ContextMenuIcons.atlas", "Copy" ]
+        },
+        {
+            "Type": "Item",
+            "Id": "Paste",
+            "Text": "Paste",
+            "Image": [ "Editor/UI/Atlases/ContextMenuIcons.atlas", "Paste" ]
+        },
+        {
+            "Type": "Item",
+            "Id": "Delete",
+            "Text": "Delete",
+            "Image": [ "Editor/UI/Atlases/ContextMenuIcons.atlas", "Delete" ]
+        }
+    ]
+}
