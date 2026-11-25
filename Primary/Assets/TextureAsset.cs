@@ -13,12 +13,14 @@ namespace Primary.Assets
         {
         }
 
-        public RHITexture? RawRHITexture => IsLoaded ? AssetData.Texture : null;
-        public RHISampler? RawRHISampler => IsLoaded ? AssetData.Sampler : null;
+        public RHITexture? RawRHITexture => IsReady ? AssetData.Texture : null;
+        public RHISampler? RawRHISampler => IsReady ? AssetData.Sampler : null;
 
-        public int Width => IsLoaded ? AssetData.Width : 0;
-        public int Height => IsLoaded ? AssetData.Height : 0;
-        public RHIFormat Format => IsLoaded ? AssetData.Format : RHIFormat.Unknown;
+        public int Width => IsReady ? AssetData.Width : 0;
+        public int Height => IsReady ? AssetData.Height : 0;
+        public RHIFormat Format => IsReady ? AssetData.Format : RHIFormat.Unknown;
+
+        public CubemapSHL2? SHL2 => IsReady ? AssetData.SHL2 : null;
     }
 
     public class TextureAssetData : BaseInternalAssetData<TextureAsset>
@@ -30,7 +32,9 @@ namespace Primary.Assets
         private int _height;
         private RHIFormat _format;
 
-        internal TextureAssetData(AssetId id) : base(id)
+        private CubemapSHL2? _shl2;
+
+        internal TextureAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
             _texture = null;
             _sampler = null;
@@ -38,6 +42,8 @@ namespace Primary.Assets
             _width = 0;
             _height = 0;
             _format = RHIFormat.Unknown;
+
+            _shl2 = null;
         }
 
         public override void Dispose()
@@ -53,9 +59,11 @@ namespace Primary.Assets
             _width = 0;
             _height = 0;
             _format = RHIFormat.Unknown;
+
+            _shl2 = null;
         }
 
-        public void UpdateAssetData(TextureAsset asset, RHITexture texture, RHISampler sampler)
+        public void UpdateAssetData(TextureAsset asset, RHITexture texture, RHISampler sampler, CubemapSHL2? shl2)
         {
             base.UpdateAssetData(asset);
 
@@ -65,6 +73,8 @@ namespace Primary.Assets
             _width = texture.Description.Width;
             _height = texture.Description.Height;
             _format = texture.Description.Format;
+
+            _shl2 = shl2;
         }
 
         internal RHITexture? Texture => _texture;
@@ -73,5 +83,20 @@ namespace Primary.Assets
         internal int Width => _width;
         internal int Height => _height;
         internal RHIFormat Format => _format;
+
+        internal CubemapSHL2? SHL2 => _shl2;
+    }
+
+    [InlineArray(9)]
+    public struct CubemapSHL2
+    {
+        private Color _value;
+
+        public record struct Color
+        {
+            public float R;
+            public float G;
+            public float B;
+        }
     }
 }

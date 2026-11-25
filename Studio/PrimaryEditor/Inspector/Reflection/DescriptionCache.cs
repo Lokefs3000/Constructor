@@ -27,6 +27,27 @@ namespace PrimaryEditor.Inspector.Reflection
             _descriptions = new Dictionary<Type, InspectorDescription?>();
         }
 
+        internal void RemoveEntriesReferencing(Assembly assembly)
+        {
+            using RentedList<Type> keysToRemove = new RentedList<Type>();
+            foreach (var (type, desc) in _descriptions)
+            {
+                if (type.Assembly == assembly ||
+                    (desc != null && desc.HasReferencesTo(assembly)))
+                {
+                    keysToRemove.Add(type);
+                }
+            }
+
+            if (!keysToRemove.IsEmpty)
+            {
+                foreach (Type key in keysToRemove)
+                {
+                    _descriptions.Remove(key);
+                }
+            }
+        }
+
         private InspectorDescription? SetupDescriptions(Type type)
         {
             if (type.GetCustomAttribute<InspectorHiddenAttribute>() != null)

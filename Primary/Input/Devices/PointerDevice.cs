@@ -31,6 +31,8 @@ namespace Primary.Input.Devices
                     if (!Flags.HasFlag(_states[(int)button], ButtonState.Held))
                     {
                         _states[(int)button] |= ButtonState.Held | ButtonState.Updated;
+
+                        OnMousePressed?.Invoke(button);
                         return true;
                     }
                 }
@@ -43,6 +45,8 @@ namespace Primary.Input.Devices
                     if (Flags.HasFlag(_states[(int)button], ButtonState.Held))
                     {
                         _states[(int)button] = ButtonState.Updated;
+
+                        OnMouseReleased?.Invoke(button);
                         return true;
                     }
                 }
@@ -58,6 +62,7 @@ namespace Primary.Input.Devices
                     _globalMousePosition = globalPos.AsInt2();
                 }
 
+                OnMouseMotion?.Invoke(_mousePosition);
                 return true;
             }
             else if (@event.Type == SDL_EventType.SDL_EVENT_MOUSE_WHEEL)
@@ -130,6 +135,8 @@ namespace Primary.Input.Devices
 
         public Int2 GlobalMousePosition => _globalMousePosition;
 
+        public event Action<MouseButton>? OnMousePressed;
+        public event Action<MouseButton>? OnMouseReleased;
         public event Action<Vector2>? OnMouseMotion;
 
         public static MouseButton TranslateButton(SDLButton button) => button switch

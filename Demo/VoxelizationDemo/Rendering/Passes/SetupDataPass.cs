@@ -22,29 +22,21 @@ namespace VoxelizationDemo.Rendering.Passes
             RenderStageBlackboard pathBlackboard = frameGraph.GetBlackboard<RenderStageBlackboard>()!;
             BufferDataBlackboard bufferData = frameGraph.AddBlackboard<BufferDataBlackboard>();
 
-            if (pathBlackboard.RenderList != null)
-            {
-                if (bufferData.MaterialOffsets.Length < pathBlackboard.RenderList.MaterialIds.Count)
-                {
-                    bufferData.MaterialOffsets = new uint[MemoryHelper.AlignUp(pathBlackboard.RenderList.MaterialIds.Count, 16)];
-                }
-            }
-
             using (RasterPassBuilder desc = frameGraph.AddRasterPass("SetupData", out PassData data))
             {
                 data.RenderFlagBuffer = pathBlackboard.RenderList == null ? BufferHandle.Null : desc.CreateBuffer(new FGBufferDesc
                 {
                     Name = "RenderFlagBuffer",
-                    ElementCount = pathBlackboard.RenderList.TotalFlagCount,
-                    Stride = Unsafe.SizeOf<RenderFlag>(),
+                    ElementCount = pathBlackboard.RenderList.Matricies.Length,
+                    Stride = Unsafe.SizeOf<Matrix4x4>(),
                     Target = FGBufferTarget.Structured
                 });
 
                 data.MaterialDataBuffer = pathBlackboard.RenderList == null ? BufferHandle.Null : desc.CreateBuffer(new FGBufferDesc
                 {
                     Name = "MaterialDataBuffer",
-                    ElementCount = Math.Max(MemoryHelper.AlignUp((int)pathBlackboard.RenderList.MaterialByteSize, 4), 4),
-                    Stride = 1,
+                    ElementCount = (Math.Max(MemoryHelper.AlignUp((int)pathBlackboard.RenderList.MaterialByteSize, 4), 4) + 3) / 4,
+                    Stride = 4,
                     Target = FGBufferTarget.Raw
                 });
 
@@ -129,24 +121,16 @@ namespace VoxelizationDemo.Rendering.Passes
 
             if (passData.RenderList != null)
             {
-                using (FGMappedSubresource<RenderFlag> mapped = cmd.Map<RenderFlag>(passData.RenderFlagBuffer))
-                {
-                    int flagBufferOffset = 0;
-                    foreach (ShaderRenderBatcher renderBatcher in passData.RenderList.ShaderBatchers)
-                    {
-                        renderBatcher.Flags.CopyTo(mapped.Span[flagBufferOffset..]);
-                        flagBufferOffset += renderBatcher.Flags.Length;
-                    }
-                }
+                cmd.UploadBuffer(passData.RenderFlagBuffer, 0, passData.RenderList.Matricies);
 
                 if (passData.RenderList.MaterialByteSize > 0)
                 {
                     using (FGMappedSubresource<byte> mapped = cmd.Map<byte>(passData.MaterialDataBuffer))
                     {
                         int materialDataOffset = 0;
-                        foreach (var (material, index) in passData.RenderList.MaterialIds)
+                        foreach (MaterialAsset material in passData.RenderList.Materials)
                         {
-                            bufferData.MaterialOffsets[index] = (uint)materialDataOffset;
+                            bufferData.MaterialOffsets[material] = (uint)materialDataOffset;
 
                             if (material.IsLoaded)
                             {
@@ -154,6 +138,13 @@ namespace VoxelizationDemo.Rendering.Passes
                                 materialDataOffset += MemoryHelper.AlignUp(material.GetPropertyBlockOrNull(MaterialShaderType.Default)!.BlockSize, 4);
                             }
                         }
+                    }
+                }
+                else
+                {
+                    foreach (MaterialAsset material in passData.RenderList.Materials)
+                    {
+                        bufferData.MaterialOffsets[material] = 0;
                     }
                 }
             }
@@ -223,7 +214,7 @@ namespace VoxelizationDemo.Rendering.Passes
         public BufferHandle PointLightsBuffer;
         public BufferHandle DirectionalLightBuffer;
 
-        public uint[] MaterialOffsets = [];
+        public Dictionary<MaterialAsset, uint> MaterialOffsets = [];
 
         public void Clear()
         {
@@ -233,6 +224,8 @@ namespace VoxelizationDemo.Rendering.Passes
             CameraDataBuffer = BufferHandle.Null;
             PointLightsBuffer = BufferHandle.Null;
             DirectionalLightBuffer = BufferHandle.Null;
+
+            MaterialOffsets.Clear();
         }
     }
 }

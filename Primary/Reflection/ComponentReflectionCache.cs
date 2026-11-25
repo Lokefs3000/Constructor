@@ -1,4 +1,6 @@
-﻿using Primary.Collections.ReadOnly;
+﻿using Primary.Collections;
+using Primary.Collections.ReadOnly;
+using Primary.Components;
 using Primary.Scenes;
 using Primary.Scenes.Components;
 using System.Collections.Concurrent;
@@ -22,6 +24,17 @@ namespace Primary.Reflection
             _emptyCache = new ComponentReflection(null, Array.Empty<FieldInfo>());
         }
 
+        internal void RemoveEntriesFromAssembly(Assembly assembly)
+        {
+            if (_assemblyCaches.TryRemove(assembly, out AssemblyCacheList cacheList))
+            {
+                foreach (var (key, _) in cacheList.Components)
+                {
+                    _componentCaches.TryRemove(key, out _);
+                }
+            }
+        }
+
         public ComponentReflection GetReflection(string fullName)
         {
             if (_componentCaches.TryGetValue(fullName, out ComponentReflection reflectionCache))
@@ -34,24 +47,25 @@ namespace Primary.Reflection
             }
             else
             {
-                FieldInfo[] fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-                int validIndex = 0;
+                using RentedList<FieldInfo> validFields = new RentedList<FieldInfo>();
 
-                for (int i = 0; i < fields.Length; i++)
+                Type sourceType = type;
+                do
                 {
-                    FieldInfo field = fields[i];
-                    if (field.GetCustomAttribute<IgnoreDataMemberAttribute>() == null)
+                    FieldInfo[] fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+                    for (int i = 0; i < fields.Length; i++)
                     {
-                        fields[validIndex++] = field;
+                        FieldInfo field = fields[i];
+                        if (field.GetCustomAttribute<IgnoreDataMemberAttribute>() == null)
+                        {
+                            validFields.Add(field);
+                        }
                     }
-                }
+                } while ((type = type.BaseType) != null && type.IsAssignableTo(typeof(IComponent)));
 
-                FieldInfo[] validFields = new FieldInfo[validIndex];
-                Array.Copy(fields, validFields, validFields.Length);
+                ComponentReflection reflection = new ComponentReflection(sourceType, [.. validFields]);
 
-                ComponentReflection reflection = new ComponentReflection(type, validFields);
-
-                AssemblyCacheList cacheList = _assemblyCaches.GetOrAdd(type.Assembly, static (x) => new AssemblyCacheList(new ConcurrentDictionary<string, ComponentReflection>()));
+                AssemblyCacheList cacheList = _assemblyCaches.GetOrAdd(sourceType.Assembly, static (x) => new AssemblyCacheList(new ConcurrentDictionary<string, ComponentReflection>()));
                 if (cacheList.Components.TryAdd(fullName, reflection))
                     _componentCaches.TryAdd(fullName, reflection);
 

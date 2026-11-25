@@ -64,7 +64,7 @@ namespace VoxelizationDemo.Editor.Windows
                         tools.ChangeTool<TranslateTool>();
 
                     ImGui.TableNextColumn();
-                    ToolButton("SPACE"u8, '\0', tools.RelativeMode.HasFlags(ToolRelativeMode.World) ? _toolIconsAtlas.TryFindSpriteOrNull("SpaceWorld") : _toolIconsAtlas.TryFindSpriteOrNull("SpaceLocal"), false);
+                    ToolButton("SPACE"u8, '\0', tools.RelativeMode.HasFlags(ToolRelativeMode.World) ? _toolIconsAtlas.TryFindSpriteOrNull("SpaceWorld") : (tools.RelativeMode.HasFlags(ToolRelativeMode.Absolute) ? _toolIconsAtlas.TryFindSpriteOrNull("SpaceAbsolute") : _toolIconsAtlas.TryFindSpriteOrNull("SpaceLocal")), false);
                     if (ImGui.BeginPopupContextItem(ImGuiPopupFlags.MouseButtonLeft))
                     {
                         if (ToolButton("LOCAL"u8, '\0', _toolIconsAtlas.TryFindSpriteOrNull("SpaceLocal"), tools.RelativeMode.HasFlags(ToolRelativeMode.Local), 32.0f))
@@ -76,6 +76,12 @@ namespace VoxelizationDemo.Editor.Windows
                         if (ToolButton("WORLD"u8, '\0', _toolIconsAtlas.TryFindSpriteOrNull("SpaceWorld"), tools.RelativeMode.HasFlags(ToolRelativeMode.World), 32.0f))
                         {
                             tools.RelativeMode = ToolRelativeMode.World;
+                            ImGui.CloseCurrentPopup();
+                        }
+
+                        if (ToolButton("ABSOLUTE"u8, '\0', _toolIconsAtlas.TryFindSpriteOrNull("SpaceAbsolute"), tools.RelativeMode.HasFlags(ToolRelativeMode.Absolute), 32.0f))
+                        {
+                            tools.RelativeMode = ToolRelativeMode.Absolute;
                             ImGui.CloseCurrentPopup();
                         }
 

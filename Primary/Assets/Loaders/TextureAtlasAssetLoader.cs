@@ -13,9 +13,9 @@ namespace Primary.Assets.Loaders
 {
     internal sealed class TextureAtlasAssetLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new TextureAtlasAssetData(id);
+            return new TextureAtlasAssetData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)

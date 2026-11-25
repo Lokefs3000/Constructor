@@ -1,0 +1,425 @@
+asset_id = "01a1bacb78297c90810ad3717c09e7c3"
+meta_version = 1
+[unique_config]
+index_stride_mode = 0
+uv_channels = 255
+scale = 1.0
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -444446836
+name = "acer_9_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -29712465
+name = "LOD0.021"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42885396
+name = "LOD0.044"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 638376110
+name = "LOD1.021"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 634116073
+name = "LOD1.040"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42688563
+name = "LOD2.012"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -46882931
+name = "LOD2.030"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 1630474676
+name = "acer_10_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -29778004
+name = "LOD0.022"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42688791
+name = "LOD0.041"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 638572717
+name = "LOD1.022"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 634378221
+name = "LOD1.044"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42623028
+name = "LOD2.013"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -52977752
+name = "LOD2.024"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 1055610773
+name = "acer_11_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -29843539
+name = "LOD0.023"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -35872887
+name = "LOD0.036"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 638507180
+name = "LOD1.023"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 634050536
+name = "LOD1.041"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42819637
+name = "LOD2.014"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -46817396
+name = "LOD2.031"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 2012946890
+name = "acer_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -29384790
+name = "LOD0.024"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -36462714
+name = "LOD0.039"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 638179499
+name = "LOD1.024"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 640014407
+name = "LOD1.039"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42754102
+name = "LOD2.015"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -52715612
+name = "LOD2.028"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -191344729
+name = "acer_2_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -29450325
+name = "LOD0.025"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -35807352
+name = "LOD0.037"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 638113962
+name = "LOD1.025"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 640407625
+name = "LOD1.037"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42950711
+name = "LOD2.016"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -52781147
+name = "LOD2.029"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -1276651018
+name = "acer_12_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -29515864
+name = "LOD0.026"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42623256
+name = "LOD0.040"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 638310569
+name = "LOD1.026"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 640276555
+name = "LOD1.035"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42885176
+name = "LOD2.017"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -46751857
+name = "LOD2.032"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -448369978
+name = "acer_3_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -29581399
+name = "LOD0.027"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -36069492
+name = "LOD0.033"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 638245032
+name = "LOD1.027"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 633985003
+name = "LOD1.042"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42033209
+name = "LOD2.018"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -47145079
+name = "LOD2.034"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 309237217
+name = "acer_4_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -30171226
+name = "LOD0.028"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -36528249
+name = "LOD0.038"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 637917351
+name = "LOD1.028"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 639948870
+name = "LOD1.038"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -41967674
+name = "LOD2.019"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -47079544
+name = "LOD2.035"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -1939786752
+name = "acer_5_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -30236761
+name = "LOD0.029"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42557717
+name = "LOD0.043"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 637851814
+name = "LOD1.029"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 633919466
+name = "LOD1.043"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -53239892
+name = "LOD2.020"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -46686322
+name = "LOD2.033"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -1639751901
+name = "acer_6_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -36003953
+name = "LOD0.030"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -42492182
+name = "LOD0.042"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 640473166
+name = "LOD1.030"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 640342088
+name = "LOD1.036"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -53305427
+name = "LOD2.021"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -53174357
+name = "LOD2.027"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -307135934
+name = "acer_7_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -35938418
+name = "LOD0.031"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -35676278
+name = "LOD0.035"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 640538703
+name = "LOD1.031"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 640211018
+name = "LOD1.034"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -53370962
+name = "LOD2.022"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -53108822
+name = "LOD2.026"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -622614163
+name = "acer_8_Billboard_LOD3.001"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -36135027
+name = "LOD0.032"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -35741813
+name = "LOD0.034"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 640604236
+name = "LOD1.032"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = 640669773
+name = "LOD1.033"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -53436497
+name = "LOD2.023"
+
+[[sub_assets]]
+asset_type = "Primary.Assets.MeshAsset, Primary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+local_id = -53043287
+name = "LOD2.025"

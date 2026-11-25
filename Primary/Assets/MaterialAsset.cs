@@ -4,6 +4,7 @@ using Primary.Assets;
 using Primary.Assets.Types;
 using Primary.Common;
 using Primary.Rendering.Assets;
+using Primary.Rendering.Batching;
 using Primary.RHI;
 using Primary.Threading;
 using static Primary.Rendering.Resources.FGResourceDesc;
@@ -181,7 +182,7 @@ namespace Primary.Assets
 
         #region Get
         /// <inheritdoc cref="PropertyBlock.GetSingle(int)">
-        public float GetSingle(MaterialShaderType shaderType,  string id) => AssetData.Shaders.DangerousGetReferenceAt((int)shaderType).Block?.GetSingle(id) ?? default;
+        public float GetSingle(MaterialShaderType shaderType, string id) => AssetData.Shaders.DangerousGetReferenceAt((int)shaderType).Block?.GetSingle(id) ?? default;
         /// <inheritdoc cref="PropertyBlock.GetDouble(int)">
         public double GetDouble(MaterialShaderType shaderType, string id) => AssetData.Shaders.DangerousGetReferenceAt((int)shaderType).Block?.GetDouble(id) ?? default;
         /// <inheritdoc cref="PropertyBlock.GetUInt(int)">
@@ -225,7 +226,7 @@ namespace Primary.Assets
 
         private MaterialShader[] _shaderTypes;
 
-        internal MaterialAssetData(AssetId id) : base(id)
+        internal MaterialAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
             _shaderSet = null;
 
@@ -235,6 +236,10 @@ namespace Primary.Assets
         public override void Dispose()
         {
             base.Dispose();
+
+            if (Definition != null)
+                Engine.GlobalSingleton.RenderingManager.Services.GetService<MaterialPassCollection>()
+                    .UnregisterMaterial(Definition!);
 
             if (_shaderSet != null)
                 AssetManager.ListenForAssetLoad(_shaderSet, this, null);
@@ -281,10 +286,16 @@ namespace Primary.Assets
             {
                 ThreadHelper.ExecuteOnMainThread(() => OnShaderSetLoaded(shaderSet, false));
             }
+
+            if (Definition != null)
+                Engine.GlobalSingleton.RenderingManager.Services.GetService<MaterialPassCollection>()
+                    .RegisterMaterial(Definition!);
         }
 
         private void OnShaderSetLoaded(ShaderSetAsset shaderSet, bool wasReloaded)
         {
+            bool didAnythingChange = false;
+
             MaterialShaderType shaderType = 0;
             foreach (string name in Enum.GetNames<MaterialShaderType>())
             {
@@ -302,13 +313,24 @@ namespace Primary.Assets
                         {
                             currentVal = new MaterialShader(shader, shader.CreatePropertyBlock());
                         }
+
+                        didAnythingChange = true;
                     }
                 }
                 else
                 {
+                    if (currentVal.Block != null || currentVal.Shader != null)
+                        didAnythingChange = true;
+
                     currentVal.Block?.Dispose();
                     _shaderTypes[(int)shaderType++] = default;
                 }
+            }
+
+            if (didAnythingChange && Definition != null)
+            {
+                Engine.GlobalSingleton.RenderingManager.Services.GetService<MaterialPassCollection>()
+                    .UpdateMaterial(Definition!);
             }
         }
 

@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text;
+using Primary.Scripting;
 
 namespace Primary.Reflection
 {
@@ -20,6 +21,14 @@ namespace Primary.Reflection
             int index = key.IndexOf('?');
             if (index == -1)
                 return null;
+
+            if (Engine.GlobalSingleton.ScriptingManager.TryGetAssemblyContext(key.AsSpan(0, index), out ScriptContext? context))
+            {
+                using (context.EnterContextualReflection())
+                {
+                    return Type.GetType($"{key[(index + 1)..]}, {key[..index]}");
+                }
+            }
 
             return Type.GetType($"{key[(index + 1)..]}, {key[..index]}");
         }

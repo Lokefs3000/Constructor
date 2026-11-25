@@ -45,5 +45,7 @@ namespace VoxelizationDemo.Editor.Windows.Inspector.Widgets
         }
 
         internal WidgetRelationship Relationships => _relationships;
+
+        public float TopMargin => _topMargin;
     }
 }

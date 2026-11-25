@@ -11,8 +11,8 @@ namespace Primary.Rendering.Data
 
         public WorldTransform Transform { get; private set; }
 
-        public TextureHandle ColorTexture { get; internal set; }
-        public TextureHandle DepthTexture { get; internal set; }
+        public TextureHandle ColorTexture { get; set; }
+        public TextureHandle DepthTexture { get; set; }
 
         public Matrix4x4 View { get; private set; }
         public Matrix4x4 Projection { get; private set; }

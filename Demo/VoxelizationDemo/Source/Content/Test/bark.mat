@@ -1,0 +1,6 @@
+shader = "Content/Materials/Sets/Lit.shaderset"
+
+[resources]
+Diffuse = "Content/Test/bark.png"
+Normal = "Content/Test/bark_normal.png"
+Mask = "Content/Test/bark_mask.texcomp"

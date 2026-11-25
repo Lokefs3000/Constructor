@@ -4,8 +4,10 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using System.Reflection;
 using System.Text;
 using Primary.Assets.Types;
+using Primary.Collections;
 using Primary.Common;
 using VoxelizationDemo.Editor.Serialization.Converters;
 
@@ -18,6 +20,26 @@ namespace VoxelizationDemo.Editor.Serialization
         internal ConverterDatabase()
         {
             _entries = new ConcurrentDictionary<Type, ITypeConverter?>();
+        }
+
+        internal void RemoveEntriesFromAssembly(Assembly assembly)
+        {
+            using RentedList<Type> keysToRemove = new RentedList<Type>();
+            foreach (var (type, _) in _entries)
+            {
+                if (type.Assembly == assembly)
+                {
+                    keysToRemove.Add(type);
+                }
+            }
+
+            if (!keysToRemove.IsEmpty)
+            {
+                foreach (Type key in keysToRemove)
+                {
+                    _entries.TryRemove(key, out _);
+                }
+            }
         }
 
         internal bool TryGetConverter(Type type, [NotNullWhen(true)] out ITypeConverter? typeConverter)

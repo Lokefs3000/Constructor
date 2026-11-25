@@ -28,6 +28,7 @@ namespace Primary.Scenes.Entities
 
         void ICRef.DestroyInternal()
         {
+            _entity = SceneEntity.Null;
             _isNull = true;
         }
 

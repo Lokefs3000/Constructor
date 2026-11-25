@@ -1,99 +1,39 @@
 ﻿using Primary.Common;
 using Primary.Mathematics;
 using System.Numerics;
-using Primary.Scenes;
-using Primary.Components;
-using System.Runtime.CompilerServices;
-using Primary.Timing;
-using Primary.Rendering.Tree;
+using Primary.Rendering.Partitioning;
 
 namespace Primary.Rendering.Diagnostics
 {
     public static class OctreeVisualizer
     {
-        public static void Visualize(OctreeManager manager, in Frustrum cullingFrustrum, in Vector3 origin)
+        public static void Visualize(PartitioningManager manager, in Frustrum cullingFrustrum, in Vector3 origin)
         {
-            using RentedArray<ushort> octantMask = new RentedArray<ushort>(255);
-
-            int isInsideAnyOctant = 0;
-            foreach (RenderOctree octree in manager.Regions.Values)
+            foreach (var (_, chunk) in manager.Regions)
             {
-                bool isWithinOctree = false;
-                if (octree.CurrentExtents.AsAABB().Intersects(origin))
-                {
-                    if (isInsideAnyOctant > 0)
-                        octantMask.Span[..isInsideAnyOctant].Fill(0);
-                    isInsideAnyOctant = 0;
+                Color color = new Color(
+                    (chunk.GridPoint.X % 8) * 0.05f + 0.6f,
+                    (chunk.GridPoint.Y % 8) * 0.05f + 0.6f,
+                    (chunk.GridPoint.Z % 8) * 0.05f + 0.6f);
 
-                    if (octree.Octants != null)
+                if (chunk.CurrentExtents.AsAABB().Intersects(origin))
+                {
+                    foreach (ref readonly RenderableChunk renderableChunk in chunk.Chunks)
                     {
-                        foreach (RenderOctant octant in octree.Octants)
+                        foreach (ref readonly Renderable renderable in renderableChunk.Renderables)
                         {
-                            DrawOctantRecursive(octant, 0, in cullingFrustrum, in origin, FrustrumIntersection.Inside, octantMask.Span, ref isInsideAnyOctant);
+                            FrustrumIntersection intersection = renderable.Extents.Intersect(in cullingFrustrum);
+                            if (intersection == FrustrumIntersection.Outside)
+                                continue;
+
+                            Gizmos.DrawWireAABB(renderable.Extents.AsAABB(), intersection == FrustrumIntersection.Inside ? Color.NavyBlue : Color.Cyan);
                         }
                     }
 
-                    octantMask[0] = ushort.MaxValue;
-                    isInsideAnyOctant = Math.Max(isInsideAnyOctant, 1);
-
-                    isWithinOctree = true;
-                }
-                else
-                {
-                    isInsideAnyOctant = 0;
+                    Gizmos.DrawText(chunk.SourceExtents.Center, $"Entities: {chunk.EntityCount}");
                 }
 
-                Gizmos.DrawWireAABB(octree.CurrentExtents.AsAABB(), new Color(1.0f, 1.0f, 0.0f, isWithinOctree ? 1.0f : 0.2f));
-                
-                if (isInsideAnyOctant > 0)
-                {
-                    foreach (ref readonly EntityChunk chunk in octree.Chunks)
-                    {
-                        foreach (ref RenderableEntity entity in chunk.Entities)
-                        {
-                            if (((octantMask[entity.OctantIndex] >> entity.OctantBitshift) & 0x3) > 0)
-                            {
-                                Gizmos.DrawWireAABB(entity.Extents.AsAABB(), Color.NavyBlue);
-                            }
-                        }
-                    }
-                }
-
-                if (isWithinOctree)
-                    Gizmos.DrawText(octree.CurrentExtents.Center, $"Entities: {octree.EntityCount}");
-            }
-
-            void DrawOctantRecursive(RenderOctant octant, int depth, in Frustrum cullingFrustrum, in Vector3 origin, FrustrumIntersection octantIntersection, Span<ushort> visibilityMask, ref int isInAnyOctant)
-            {
-
-                if (octant.Octants != null)
-                {
-                    foreach (RenderOctant subOctant in octant.Octants)
-                    {
-                        FrustrumIntersection intersection = octantIntersection == FrustrumIntersection.Partial ?
-                            cullingFrustrum.IntersectWhere(octant.CurrentExtents.AsAABB()) :
-                            FrustrumIntersection.Inside;
-
-                        if (intersection == FrustrumIntersection.Outside)
-                            continue;
-
-                        DrawOctantRecursive(subOctant, depth + 1, in cullingFrustrum, in origin, intersection, visibilityMask, ref isInAnyOctant);
-                    }
-                }
-
-                float perc = depth / (float)RenderOctree.MaxTreeDepth;
-
-                Color arrowColor = new Color(0.0f);
-                arrowColor[2 - (int)octantIntersection] = 1.0f - perc;
-
-                if (octant.CurrentExtents.AsAABB().Intersects(origin))
-                {
-                    Gizmos.DrawWireAABB(octant.CurrentExtents.AsAABB(), arrowColor);
-                    Gizmos.DrawText(octant.CurrentExtents.Center, $"Entities: {octant.EntityCount}");
-
-                    visibilityMask[octant.EntityIndex] |= (ushort)(0x3 << octant.EntityBitShift);
-                    isInAnyOctant = Math.Max(isInAnyOctant, octant.EntityIndex + 1);
-                }
+                Gizmos.DrawWireAABB(chunk.CurrentExtents.AsAABB(), color);
             }
         }
     }

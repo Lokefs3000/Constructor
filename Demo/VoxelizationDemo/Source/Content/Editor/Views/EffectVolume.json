@@ -1,0 +1,55 @@
+[
+    {
+        "$type": "Field",
+        "name": "IsGlobal",
+        "display": "Is Global"
+    },
+    {
+        "$type": "Group",
+        "conditions": [
+            {
+                "name": "IsGlobal",
+                "values": [ false ]
+            }
+        ],
+        "values": [
+            {
+                "$type": "Field",
+                "name": "Shape",
+                "display": "Shape"
+            },
+            {
+                "$type": "Field",
+                "name": "BoxExtents",
+                "display": "Extents",
+                "conditions": [
+                    {
+                        "name": "Shape",
+                        "values": [ "Box" ]
+                    }
+                ]
+            },
+            {
+                "$type": "Field",
+                "name": "SphereRadius",
+                "display": "Radius",
+                "conditions": [
+                    {
+                        "name": "Shape",
+                        "values": [ "Sphere" ]
+                    }
+                ]
+            },
+            {
+                "$type": "Field",
+                "name": "BlendDistance",
+                "display": "Blend Distance"
+            }
+        ]
+    },
+    {
+        "$type": "Field",
+        "name": "Asset",
+        "display": "Asset"
+    }
+]

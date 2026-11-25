@@ -9,7 +9,6 @@ using Primary.Mathematics;
 using Primary.Rendering.Diagnostics;
 using Primary.Timing;
 using VoxelizationDemo.Core;
-using VoxelizationDemo.Logic;
 
 namespace VoxelizationDemo.Editor.Gizmo
 {
@@ -400,7 +399,7 @@ namespace VoxelizationDemo.Editor.Gizmo
             if (_hoverHit == TranslateGizmoHit.None || !_isEnabled || _currentHit != TranslateGizmoHit.None)
                 return false;
 
-            CameraManager camera = VoxelRuntime.Instance.CameraManager;
+            CameraManager camera = EditorManager.Instance.ViewportManager.Camera;
 
             _currentHit = _hoverHit;
 
@@ -441,7 +440,7 @@ namespace VoxelizationDemo.Editor.Gizmo
                 return false;
             }
 
-            CameraManager camera = VoxelRuntime.Instance.CameraManager;
+            CameraManager camera = EditorManager.Instance.ViewportManager.Camera;
 
             Ray cameraRay = camera.ProjectViewportToRayInverse(camera.MouseViewport);
             Quaternion worldRot = IsSingleAxis(_currentHit) ? ProjectForAxisRadians(snapScale, cameraRay) : ProjectForAngledQuat(snapScale, cameraRay);

@@ -1,6 +1,6 @@
 ﻿namespace Primary.Components
 {
-    [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public sealed class ComponentRequirementsAttribute : Attribute
     {
         private Type[] _required;

@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 using Primary.Components;
 using Primary.Components.Behaviour;
 using Primary.Scenes.Entities;
 
 namespace Primary.Worlds.Volume
 {
+    [ComponentRequirements(typeof(WorldTransform))]
     public abstract class WorldVolume : EntityBehaviour, ITransformUpdateListener
     {
         private bool _isGlobal;
@@ -17,8 +19,10 @@ namespace Primary.Worlds.Volume
         private float _weight;
         private int _priority;
 
-        private VolumeShapeData _shapeData;
+        private Vector3 _boxExtents;
+        private float _sphereRadius;
 
+        [IgnoreDataMember]
         private CRef<WorldTransform> _transform;
 
         public WorldVolume()
@@ -30,7 +34,7 @@ namespace Primary.Worlds.Volume
             _weight = 1.0f;
             _priority = 0;
 
-            _shapeData = new VolumeShapeData(Vector3.One);
+            _boxExtents = Vector3.One;
         }
 
         protected internal override void OnEarlyInit()
@@ -50,18 +54,8 @@ namespace Primary.Worlds.Volume
         public float Weight { get => _weight; set => _weight = value; }
         public int Priority { get => _priority; set => _priority = value; }
 
-        public Vector3 BoxExtents { get => _shapeData.Extents; set => _shapeData.Extents = value; }
-        public float SphereRadius { get => _shapeData.Radius; set => _shapeData.Radius = value; }
-
-        [StructLayout(LayoutKind.Explicit)]
-        private struct VolumeShapeData
-        {
-            [FieldOffset(0)] public Vector3 Extents;
-            [FieldOffset(0)] public float Radius;
-
-            public VolumeShapeData(Vector3 extents) => Extents = extents;
-            public VolumeShapeData(float radius) => Radius = radius;
-        }
+        public Vector3 BoxExtents { get => _boxExtents; set => _boxExtents = value; }
+        public float SphereRadius { get => _sphereRadius; set => _sphereRadius = value; }
     }
 
     public enum VolumeShape : byte

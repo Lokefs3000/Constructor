@@ -11,7 +11,7 @@ namespace Primary.Assets
 
     internal sealed class Texture2DAssetData : TextureAssetData
     {
-        internal Texture2DAssetData(AssetId id) : base(id)
+        internal Texture2DAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
 
         }

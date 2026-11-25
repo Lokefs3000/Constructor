@@ -25,7 +25,7 @@ namespace VoxelizationDemo.Editor
             {
                 if (gizmo.IsEnabled)
                 {
-                    gizmo.UpdateScreenData(VoxelRuntime.Instance.CameraManager, InputSystem.Pointer.MousePosition);
+                    gizmo.UpdateScreenData(EditorManager.Instance.ViewportManager.Camera, InputSystem.Pointer.MousePosition);
                 }
             }
         }

@@ -133,6 +133,17 @@ namespace PrimaryEditor.Assets.Importers
                 throw new AssetLoadException();
             }
 
+            TextureFlags flags = TextureFlags.None;
+            if (config is CubemapConfiguration)
+            {
+                flags |= TextureFlags.Cubemap;
+
+                if (textureData.Featues.HasFlags(TextureDataFeatures.SphericalHarmonicsL2))
+                    flags |= TextureFlags.SHL2;
+                if (textureData.Featues.HasFlags(TextureDataFeatures.RadianceIBLMap))
+                    flags |= TextureFlags.RadianceMap;
+            }
+
             context.OutputStream.Seek(0, SeekOrigin.Begin);
             context.OutputStream.Write(new TextureHeader
             {
@@ -144,7 +155,7 @@ namespace PrimaryEditor.Assets.Importers
                 Depth = 1,
 
                 Format = GetFormatToFileEquivalent(textureData.Format),
-                Flags = (config is CubemapConfiguration) ? TextureFlags.Cubemap : TextureFlags.None,
+                Flags = flags,
 
                 MipLevels = (ushort)textureData.MipCount,
                 ArraySize = (ushort)textureData.ArraySize

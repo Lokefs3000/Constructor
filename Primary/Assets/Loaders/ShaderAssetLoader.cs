@@ -16,9 +16,9 @@ namespace Primary.Assets.Loaders
 {
     internal sealed class ShaderAssetLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new ShaderAssetData(id);
+            return new ShaderAssetData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
@@ -227,8 +227,8 @@ namespace Primary.Assets.Loaders
                             else
                             {
                                 SBCValueGeneric generic = (SBCValueGeneric)(size & 0xf);
-                                int rows = (size >> 12) & 0xf;
-                                int columns = (size >> 9) & 0xf;
+                                int rows = (size >> 12) & 0x7;
+                                int columns = (size >> 9) & 0x7;
 
                                 switch (generic)
                                 {
@@ -402,7 +402,7 @@ namespace Primary.Assets.Loaders
                     int globalByteOffset = 0;
 
                     int propertyByteOffset = 0;
-  
+
                     Queue<(string, int)> propertyQueue = new Queue<(string, int)>();
 
                     outputProperties = new ShaderProperty[actualUnique];
@@ -528,7 +528,7 @@ namespace Primary.Assets.Loaders
                                 if (!Flags.HasFlag(property.Flags, ShPropertyFlags.Global))
                                     propertyBlockSize += property.ByteWidth;
 
-                                outputProperties[outputIdx++] = new ShaderProperty(property.Name, property.DisplayName, (ushort)byteOffset, property.ByteWidth, ushort.MaxValue, property.Type, property.Default, property.Stages, property.Flags | ShPropertyFlags.Property, property.Display);
+                                outputProperties[outputIdx++] = new ShaderProperty(property.Name, property.DisplayName, (ushort)resourceIndex, property.ByteWidth, ushort.MaxValue, property.Type, property.Default, property.Stages, property.Flags | ShPropertyFlags.Property, property.Display);
 
                                 customNameDict.TryGetValue(sourceIndex, out string? customName);
                                 remapTable.Add((customName ?? property.Name).GetDjb2HashCode(), outputIdx - 1);

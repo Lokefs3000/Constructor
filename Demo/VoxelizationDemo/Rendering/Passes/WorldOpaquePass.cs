@@ -5,10 +5,11 @@ using Primary.Assets;
 using Primary.Rendering;
 using Primary.Rendering.Assets;
 using Primary.Rendering.Batching;
+using Primary.Rendering.Commands;
 using Primary.Rendering.Data;
 using Primary.Rendering.Recording;
 using Primary.Rendering.Resources;
-using Primary.Rendering.Commands;
+using TerraFX.Interop.Windows;
 
 namespace VoxelizationDemo.Rendering.Passes
 {
@@ -49,53 +50,61 @@ namespace VoxelizationDemo.Rendering.Passes
             cmd.SetRenderTarget(0, passData.OutColor);
             cmd.SetDepthStencil(passData.OutDepth);
 
-            MaterialAsset? currentMaterial = null;
-            IRenderMeshSource? currentMeshSource = null;
+            ShaderAsset? currentShader = null;
+            ROPropertyBlock currentMaterial = null;
+            ModelAsset? currentModel = null;
 
-            int currentAppendOffset = 0;
-            foreach (ShaderRenderBatcher renderBatcher in passData.RenderList!.ShaderBatchers)
+            foreach (RenderListRange range in passData.RenderList!.Ranges)
             {
-                cmd.SetShader(renderBatcher.ActiveShader!);
-
-                foreach (RenderSegment segment in renderBatcher.Segments)
+                if (currentShader != range.Pass.Shader)
                 {
-                    if (!segment.Material.IsLoaded)
+                    currentShader = range.Pass.Shader;
+                    if (currentShader == null || !currentShader.IsReady)
+                    {
+                        currentShader = null;
                         continue;
-
-                    if (currentMaterial != segment.Material)
-                    {
-                        currentMaterial = segment.Material;
-                        cmd.SetProperties(segment.Material.GetPropertyBlockOrNull(MaterialShaderType.Default)!);
                     }
 
-                    if (currentMeshSource != segment.Mesh.MeshSource)
-                    {
-                        currentMeshSource = segment.Mesh.MeshSource;
-                        if (currentMeshSource == null)
-                            continue;
-
-                        cmd.SetVertexBuffer(currentMeshSource.VertexBuffer);
-                        cmd.SetIndexBuffer(currentMeshSource.IndexBuffer);
-                    }
-                    else
-                    {
-                        if (currentMeshSource == null)
-                            continue;
-                    }
-
-                    ConstantsData constantsData = new ConstantsData(
-                        (uint)(segment.FlagIndexStart + currentAppendOffset),
-                        bufferData.MaterialOffsets[segment.MaterialIndex]);
-                    cmd.SetConstants(constantsData);
-
-                    ref readonly RenderMeshDrawArgs drawArgs = ref segment.Mesh.Args;
-                    if (drawArgs.NeedsIndexedDraw)
-                        cmd.DrawIndexedInstanced(drawArgs.VertexOrIndexCount, (uint)(segment.FlagIndexEnd - segment.FlagIndexStart), drawArgs.IndexOffset, (int)drawArgs.VertexOffset, 0);
-                    else
-                        cmd.DrawInstanced(drawArgs.VertexOrIndexCount, (uint)(segment.FlagIndexEnd - segment.FlagIndexStart), drawArgs.VertexOffset, 0);
+                    cmd.SetShader(currentShader);
                 }
 
-                currentAppendOffset += renderBatcher.Flags.Length;
+                if (currentMaterial != range.Pass.Properties)
+                {
+                    currentMaterial = range.Pass.Properties;
+                    if (currentMaterial.IsNull)
+                    {
+                        currentMaterial = null;
+                        continue;
+                    }
+
+                    cmd.SetProperties(range.Pass.Properties);
+                }
+
+                if (currentModel != range.Model)
+                {
+                    currentModel = range.Model;
+                    if (!currentModel.IsReady)
+                    {
+                        currentModel = null;
+                        continue;
+                    }
+
+                    IRenderMeshSource source = range.Model.MeshSource;
+                    cmd.SetVertexBuffer(source.VertexBuffer);
+                    cmd.SetIndexBuffer(source.IndexBuffer);
+                }
+
+                ConstantsData constantsData = new ConstantsData(
+                    (uint)range.MatrixOffset,
+                    bufferData.MaterialOffsets[range.Pass.Material]);
+
+                cmd.SetConstants(constantsData);
+
+                ref readonly RenderMeshDrawArgs drawArgs = ref range.Mesh.Args;
+                if (drawArgs.NeedsIndexedDraw)
+                    cmd.DrawIndexedInstanced(drawArgs.VertexOrIndexCount, (uint)range.InstanceCount, drawArgs.IndexOffset, (int)drawArgs.VertexOffset, 0);
+                else
+                    cmd.DrawInstanced(drawArgs.VertexOrIndexCount, (uint)range.InstanceCount, drawArgs.VertexOffset, 0);
             }
         }
 

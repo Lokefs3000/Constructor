@@ -12,10 +12,11 @@ using Primary.Rendering.Data;
 using Primary.Rendering.Diagnostics;
 using Primary.Rendering.Passes;
 using Primary.Rendering.Playback;
-using Primary.Rendering.Tree;
+using Primary.Rendering.Partitioning;
 using Primary.Rendering.Utility;
 using Primary.RHI;
 using Primary.Scenes;
+using Primary.Services;
 using Primary.Threading;
 using Primary.Utility;
 using Primary.Windowing;
@@ -28,14 +29,17 @@ namespace Primary.Rendering
         private readonly RHISampler _defaultSampler;
         private readonly IPlaybackDevice _playbackDevice;
 
+        private readonly ServiceGroup _services;
+
         private readonly FrameGraph _frameGraph;
         private readonly ShaderGlobalsManager _globalsManager;
         private readonly SwapChainCache _swapChainCache;
         private readonly RenderContextPool _renderContextPool;
 
         private readonly RenderWorld _renderWorld;
-        private readonly OctreeManager _octreeManager;
+        private readonly PartitioningManager _partitioningManager;
         private readonly BatchingManager _batchingManager;
+        private readonly MaterialPassCollection _materialPassCollection;
 
         private readonly DebugManager _debugManager;
 
@@ -48,8 +52,10 @@ namespace Primary.Rendering
         private readonly PresentOutputPass _presentPass;
 
         private readonly TransientEventList<CompiledRenderPlan> _inspectRenderPlan;
+        private readonly TransientEventList _setupPreRender;
 
         private RenderContextContainer? _currentContextContainer;
+        private RenderContextContainer _root;
 
         private readonly HashSet<Window> _renderedWindows;
 
@@ -63,32 +69,40 @@ namespace Primary.Rendering
             _defaultSampler = _graphicsDevice.CreateSampler(new RHISamplerDescription(), "Default")!;
             _playbackDevice = PlaybackDeviceFactory.CreateDevice(_graphicsDevice);
 
+            _services = new ServiceGroup();
+
             _frameGraph = new FrameGraph();
             _globalsManager = new ShaderGlobalsManager(_frameGraph);
             _swapChainCache = new SwapChainCache(this);
             _renderContextPool = new RenderContextPool();
 
             _renderWorld = new RenderWorld();
-            _octreeManager = new OctreeManager();
+            _partitioningManager = new PartitioningManager(this);
             _batchingManager = new BatchingManager(this);
+            _materialPassCollection = new MaterialPassCollection();
 
             _debugManager = new DebugManager();
 
             _renderPrimitives = new RenderPrimitives();
 
             _renderStages = new List<IRenderStage>();
-
+    
             _setupCameraPass = new SetupCameraPass();
             _setupWindowPass = new SetupWindowPass();
             _presentPass = new PresentOutputPass();
 
             _inspectRenderPlan = new TransientEventList<CompiledRenderPlan>();
+            _setupPreRender = new TransientEventList();
 
             _currentContextContainer = null;
+            _root = new RenderContextContainer();
 
             _renderedWindows = new HashSet<Window>();
 
             _currentPlaybackJob = JobHandle.Completed;
+
+            _services.AddService(_batchingManager);
+            _services.AddService(_materialPassCollection);
 
             _debugManager.TrySetupAfterRenderInit(this);
 
@@ -156,7 +170,7 @@ namespace Primary.Rendering
         {
             using (new ProfilingScope("Render"))
             {
-                JobHandle octreeManager;
+                JobHandle prepareJob;
                 using (new ProfilingScope("Prepare"))
                 {
                     _renderedWindows.Clear();
@@ -164,14 +178,22 @@ namespace Primary.Rendering
                     _graphicsDevice.IncrementFrame();
 
                     _renderContextPool.ResetPoolForNewRender();
-                    octreeManager = _octreeManager.SchedulePending(JobHandle.Completed);
                     _renderWorld.SetupWorld();
 
-                    octreeManager.WaitForCompletion();
+                    JobHandle updateMaterials = _materialPassCollection.ScheduleUpdates();
+                    JobHandle partitioningManager = _partitioningManager.SchedulePending(updateMaterials);
+
+                    prepareJob = partitioningManager;
+                    prepareJob.WaitForCompletion();
                 }
 
                 using (new ProfilingScope("Setup"))
                 {
+                    using (new ProfilingScope("PreRenderEvent"))
+                    {
+                        _setupPreRender.InvokeAndClear();
+                    }
+
                     if (_renderStages.Count > 0)
                     {
                         for (int i = 0; i < _renderWorld.Outputs.Length; i++)
@@ -202,7 +224,10 @@ namespace Primary.Rendering
                 }
 
                 CompiledRenderPlan renderPlan = _frameGraph.CreateRenderPlan();
-                _inspectRenderPlan.InvokeAndClear(renderPlan);
+                using (new ProfilingScope("InspectRenderPlanEvent"))
+                {
+                    _inspectRenderPlan.InvokeAndClear(renderPlan);
+                }
 
                 if (renderPlan.RenderPasses.Count > 0)
                 {
@@ -216,6 +241,7 @@ namespace Primary.Rendering
 
                 _globalsManager.CleanupTransitional();
                 _frameGraph.CleanupForEndOfFrame();
+                _batchingManager.ClearAllRenderLists();
 
                 _debugManager.FinishCurrentRender();
 
@@ -225,7 +251,7 @@ namespace Primary.Rendering
 
         private void RenderFromPerspective(RenderOutputData outputData, out TextureHandle usedTexture)
         {
-            using (new ProfilingScope(Engine.IsDebugBuild ? $"Cam-{outputData.Entity.Name}" : "Cam-Default"))
+            using (new ProfilingScope(Engine.IsDebugBuild && !outputData.Entity.IsNull ? $"Cam-{outputData.Entity.Name}" : "Cam-Default"))
             {
                 usedTexture = TextureHandle.Null;
 
@@ -277,7 +303,7 @@ namespace Primary.Rendering
 
         private void SetupContextForOutput(RenderOutputData outputData, out RenderContextContainer context)
         {
-            context = _renderContextPool.GetCameraContext();
+            context = _root; //_renderContextPool.GetCameraContext();
             _currentContextContainer = context;
 
             RenderStateData stateData = context.GetOrCreate(static () => new RenderStateData());
@@ -291,7 +317,7 @@ namespace Primary.Rendering
 
                 if (cameraData.OutputData.TargetTexture == null)
                 {
-                    cameraData.ColorTexture = _frameGraph.ResourceManager.CreateTexture(new FGTextureDesc(cameraData.ClientSize.X, cameraData.ClientSize.Y, RHIFormat.RGB10A2_UNorm, FGTextureTarget.RenderTarget, "CamColor"));
+                    cameraData.ColorTexture = _frameGraph.ResourceManager.CreateTexture(new FGTextureDesc(cameraData.ClientSize.X, cameraData.ClientSize.Y, RHIFormat.RGBA16_Float, FGTextureTarget.RenderTarget, "CamColor"));
                 }
                 else
                 {
@@ -306,7 +332,7 @@ namespace Primary.Rendering
 
         private void SetupContextForWindow(Window window, ref TextureHandle outputTexture, out RenderContextContainer context)
         {
-            context = _renderContextPool.GetWindowContext();
+            context = _root; //_renderContextPool.GetWindowContext();
             _currentContextContainer = context;
 
             RenderStateData stateData = context.GetOrCreate(static () => new RenderStateData());
@@ -335,21 +361,23 @@ namespace Primary.Rendering
             _frameGraph.PushRenderPass(renderPass, _currentContextContainer!);
         }
 
-        public JobHandle RequestBatch(RenderList renderList, in BatchingOptions options)
+        public JobHandle RequestBatch(RenderList renderList, BatchingOptions options, JobHandle parentJob)
         {
-            _batchingManager.BatchWorld(renderList, new BatchWorldSetup(_octreeManager, options));
-            return JobHandle.Completed;
+            return _batchingManager.BatchWorld(renderList, options, parentJob);
         }
 
         public void InspectRenderPlan(Action<CompiledRenderPlan> action) => _inspectRenderPlan.Subscribe(action);
+        public void SetupPreRender(Action action) => _setupPreRender.Subscribe(action);
 
         public RHIDevice GraphicsDevice => _graphicsDevice;
         public RHISampler DefaultSampler => _defaultSampler;
 
         internal IPlaybackDevice PlaybackDevice => _playbackDevice;
 
+        public ROServiceGroup Services => _services;
+
         public FrameGraph FrameGraph => _frameGraph;
-        public OctreeManager OctreeManager => _octreeManager;
+        public PartitioningManager PartitioningManager => _partitioningManager;
         public RenderWorld RenderWorld => _renderWorld;
         public BatchingManager BatchingManager => _batchingManager;
         public DebugManager DebugManager => _debugManager;

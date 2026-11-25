@@ -19,9 +19,9 @@ namespace Primary.Assets.Loaders
 {
     internal unsafe class TextureAssetLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new TextureAssetData(id);
+            return new TextureAssetData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
@@ -121,6 +121,13 @@ namespace Primary.Assets.Loaders
                     }
                 }
 
+                CubemapSHL2? shl2 = null;
+                if (header.Flags.HasFlags(TextureFlags.SHL2))
+                {
+                    TextureSHL2Info blobInfo = stream.Read<TextureSHL2Info>();
+                    shl2 = Unsafe.As<TextureSHL2Info, CubemapSHL2>(ref blobInfo);
+                }
+
                 RHIFormat rhiFormat = header.Format switch
                 {
                     TextureFormat.BC7 => RHIFormat.BC7_UNorm,
@@ -187,7 +194,7 @@ namespace Primary.Assets.Loaders
                 }, sourcePath);
 
                 Debug.Assert(rhiTexture != null && rhiSampler != null);
-                textureData.UpdateAssetData(texture, rhiTexture!, rhiSampler!);
+                textureData.UpdateAssetData(texture, rhiTexture!, rhiSampler!, shl2);
             }
 #if DEBUG && false
             finally
@@ -396,7 +403,6 @@ namespace Primary.Assets.Loaders
         }
     }
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct TextureHeader
     {
         public uint FileHeader;
@@ -413,10 +419,21 @@ namespace Primary.Assets.Loaders
         public ushort ArraySize;
 
         public const uint Header = 0x44584554;
-        public const uint Version = 2;
+        public const uint Version = 3;
     }
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct TextureSHL2Info
+    {
+        public InlineArray9<Color> Values;
+
+        public struct Color
+        {
+            public float R;
+            public float G;
+            public float B;
+        }
+    }
+
     public struct TextureSampler
     {
         public TextureSwizzle Swizzle;
@@ -441,7 +458,6 @@ namespace Primary.Assets.Loaders
         public byte MaxAnisotropy;
     }
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public record struct TextureSwizzle
     {
         public ushort Code;
@@ -519,7 +535,9 @@ namespace Primary.Assets.Loaders
     public enum TextureFlags : ushort
     {
         None = 0,
-        Cubemap
+        Cubemap = 1 << 0,
+        SHL2 = 1 << 1,
+        RadianceMap = 1 << 2
     }
 
     public enum TextureSwizzleChannel : byte

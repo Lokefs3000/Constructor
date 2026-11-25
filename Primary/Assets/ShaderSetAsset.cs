@@ -40,7 +40,7 @@ namespace Primary.Assets
     {
         private FrozenDictionary<FastStringHash, ShaderAsset> _shaders;
 
-        public ShaderSetAssetData(AssetId id) : base(id)
+        public ShaderSetAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
             _shaders = FrozenDictionary<FastStringHash, ShaderAsset>.Empty;
         }

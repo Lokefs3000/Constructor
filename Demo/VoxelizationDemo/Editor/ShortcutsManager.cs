@@ -109,6 +109,11 @@ namespace VoxelizationDemo.Editor
 
                         break;
                     }
+                case KeyCode.F5:
+                    {
+                        EditorManager.Instance.RuntimeManager.StartRuntime();
+                        break;
+                    }
             }
         }
     }

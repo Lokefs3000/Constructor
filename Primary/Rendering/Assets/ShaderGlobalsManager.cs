@@ -63,7 +63,13 @@ namespace Primary.Rendering.Assets
 
         internal bool TryGetPropertyValue(string propertyName, out PropertyData data)
         {
-            return _globalProperties.TryGetValue(propertyName, out data);
+            if (!_globalProperties.TryGetValue(propertyName, out data))
+            {
+                data = PropertyData.Null;
+                return false;
+            }
+
+            return true;
         }
 
         #region Public

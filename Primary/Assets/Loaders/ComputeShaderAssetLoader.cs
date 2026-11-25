@@ -23,9 +23,9 @@ namespace Primary.Assets.Loaders
 {
     internal sealed class ComputeShaderAssetLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new ComputeShaderAssetData(id);
+            return new ComputeShaderAssetData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)

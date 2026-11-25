@@ -61,18 +61,18 @@ namespace Primary.Rendering
 
                 void AddFace(Vector3 v, Vector3 x, Vector3 y, Vector3 normal)
                 {
-                    indices[++idxOffset] = (ushort)(vtxOffset + 1);
-                    indices[++idxOffset] = (ushort)(vtxOffset + 2);
-                    indices[++idxOffset] = (ushort)vtxOffset;
+                    indices[idxOffset++] = (ushort)(vtxOffset + 1);
+                    indices[idxOffset++] = (ushort)(vtxOffset + 2);
+                    indices[idxOffset++] = (ushort)vtxOffset;
 
-                    indices[++idxOffset] = (ushort)(vtxOffset + 3);
-                    indices[++idxOffset] = (ushort)(vtxOffset + 2);
-                    indices[++idxOffset] = (ushort)(vtxOffset + 1);
+                    indices[idxOffset++] = (ushort)(vtxOffset + 3);
+                    indices[idxOffset++] = (ushort)(vtxOffset + 2);
+                    indices[idxOffset++] = (ushort)(vtxOffset + 1);
 
-                    vertices[++vtxOffset] = new GenericVertex(v, normal, Vector3.Zero, Vector3.Zero, Vector2.Zero);
-                    vertices[++vtxOffset] = new GenericVertex(v + x, normal, Vector3.Zero, Vector3.Zero, Vector2.UnitX);
-                    vertices[++vtxOffset] = new GenericVertex(v + y, normal, Vector3.Zero, Vector3.Zero, Vector2.UnitY);
-                    vertices[++vtxOffset] = new GenericVertex(v + (x + y), normal, Vector3.Zero, Vector3.Zero, Vector2.One);
+                    vertices[vtxOffset++] = new GenericVertex(v, normal, Vector3.Zero, Vector3.Zero, Vector2.Zero);
+                    vertices[vtxOffset++] = new GenericVertex(v + x, normal, Vector3.Zero, Vector3.Zero, Vector2.UnitX);
+                    vertices[vtxOffset++] = new GenericVertex(v + y, normal, Vector3.Zero, Vector3.Zero, Vector2.UnitY);
+                    vertices[vtxOffset++] = new GenericVertex(v + (x + y), normal, Vector3.Zero, Vector3.Zero, Vector2.One);
                 }
             }
 

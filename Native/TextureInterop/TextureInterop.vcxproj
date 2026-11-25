@@ -123,6 +123,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <FloatingPointModel>Fast</FloatingPointModel>
+      <AdditionalIncludeDirectories>$(ProjectDir)miniz;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -148,6 +149,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <FloatingPointModel>Fast</FloatingPointModel>
+      <AdditionalIncludeDirectories>$(ProjectDir)miniz;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -173,7 +175,11 @@
     <ClInclude Include="bc7enc_rdo\rgbcx_table4.h" />
     <ClInclude Include="bc7enc_rdo\rgbcx_table4_small.h" />
     <ClInclude Include="bc7enc_rdo\utils.h" />
+    <ClInclude Include="miniz\miniz.h" />
     <ClInclude Include="Shared.hpp" />
+    <ClInclude Include="tinyexr\exr_reader.hh" />
+    <ClInclude Include="tinyexr\streamreader.hh" />
+    <ClInclude Include="tinyexr\tinyexr.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BC15.cpp" />
@@ -183,6 +189,7 @@
     <ClCompile Include="bc7enc_rdo\rgbcx.cpp" />
     <ClCompile Include="bc7enc_rdo\utils.cpp" />
     <ClCompile Include="Image.cpp" />
+    <ClCompile Include="miniz\miniz.c" />
   </ItemGroup>
   <ItemGroup>
     <Object Include="bc7enc_rdo\bc7e.obj">

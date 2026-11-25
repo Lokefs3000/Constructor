@@ -185,20 +185,29 @@ namespace VoxelizationDemo.Editor.Windows
                                 if (ImGui.BeginPopupContextItem(ImGuiPopupFlags.MouseButtonLeft))
                                 {
                                     SceneEntityManager entityManager = SceneEntityManager.Instance;
-                                    foreach (var (type, entry) in entityManager.Registry.Entries)
+                                    foreach (var (assembly, list) in entityManager.Registry.Assemblies)
                                     {
-                                        if (!entry.Behaviour.CanBeAdded)
-                                            continue;
-
-                                        if (ImGui.MenuItem(type.Name, false, !entityContext.Entity.HasComponent(type)))
+                                        if (ImGui.BeginMenu(assembly.GetName().Name))
                                         {
-                                            foreach (InspectorContext context in _activeContext)
+                                            foreach (Type type in list.Types)
                                             {
-                                                if (context is EntityInspectorContext entityContextLoop)
+                                                ref readonly ComponentRegistryEntry entry = ref entityManager.Registry.FindComponentEntry(type);
+                                                if (!entry.Behaviour.CanBeAdded)
+                                                    continue;
+
+                                                if (ImGui.MenuItem(type.Name, false, !entityContext.Entity.HasComponent(type)))
                                                 {
-                                                    entityContextLoop.Entity.AddComponent(type);
+                                                    foreach (InspectorContext context in _activeContext)
+                                                    {
+                                                        if (context is EntityInspectorContext entityContextLoop)
+                                                        {
+                                                            entityContextLoop.Entity.AddComponent(type);
+                                                        }
+                                                    }
                                                 }
                                             }
+
+                                            ImGui.EndMenu();
                                         }
                                     }
 
@@ -271,49 +280,76 @@ namespace VoxelizationDemo.Editor.Windows
                                 break;
                         }
 
-                        bool shouldDrawInside = ImGui.TableNextColumn();
-
-                        if (shouldDrawInside)
+                        if (hasMetAllConditions)
                         {
-                            textCursor = new Boundaries(window.DC.CursorPos, window.DC.CursorPos + new Vector2(ImGui.GetContentRegionAvail().X, itemHeight));
-                            field.DrawSelf(window.DrawList, textCursor.Minimum, textCursor.Maximum);
+                            bool shouldDrawInside = ImGui.TableNextColumn();
 
-                            ImGui.Dummy(textCursor.Size);
-                        }
-
-                        shouldDrawInside = ImGui.TableNextColumn();
-
-                        if (shouldDrawInside)
-                        {
-                            widgetCursor = new Boundaries(window.DC.CursorPos, window.DC.CursorPos + new Vector2(ImGui.GetContentRegionAvail().X, itemHeight));
-
-                            IInspectorValue firstValue = field.InspectorValues[0];
-                            ImGui.PushID(firstValue.FullTargetName);
-
-                            Type type = firstValue.TargetType;
-                            if (s_builtInTypes.Contains(type))
+                            if (shouldDrawInside)
                             {
-                                ViewBuiltInTypeValue(widgetCursor, field.InspectorValues, hasMetAllConditions, type);
-                            }
-                            else if (s_builtInStructs.Contains(type))
-                            {
-                                ViewBuiltInStructValue(widgetCursor, field.InspectorValues, hasMetAllConditions, type);
-                            }
-                            else if (type.IsAssignableTo(typeof(IAssetDefinition)) || type == typeof(Sprite) || type == typeof(IRawRenderMesh))
-                            {
-                                DrawAssetSelector(widgetCursor, field.InspectorValues, hasMetAllConditions);
-                            }
-                            else
-                            {
-                                ImGui.Dummy(widgetCursor.Size);
+                                textCursor = new Boundaries(window.DC.CursorPos, window.DC.CursorPos + new Vector2(ImGui.GetContentRegionAvail().X, itemHeight));
+                                field.DrawSelf(window.DrawList, textCursor.Minimum, textCursor.Maximum);
+
+                                ImGui.Dummy(textCursor.Size);
                             }
 
-                            ImGui.PopID();
+                            shouldDrawInside = ImGui.TableNextColumn();
+
+                            if (shouldDrawInside)
+                            {
+                                widgetCursor = new Boundaries(window.DC.CursorPos, window.DC.CursorPos + new Vector2(ImGui.GetContentRegionAvail().X, itemHeight));
+
+                                IInspectorValue firstValue = field.InspectorValues[0];
+                                ImGui.PushID(firstValue.FullTargetName);
+
+                                Type type = firstValue.TargetType;
+                                if (s_builtInTypes.Contains(type))
+                                {
+                                    ViewBuiltInTypeValue(widgetCursor, field.InspectorValues, hasMetAllConditions, type);
+                                }
+                                else if (s_builtInStructs.Contains(type))
+                                {
+                                    ViewBuiltInStructValue(widgetCursor, field.InspectorValues, hasMetAllConditions, type);
+                                }
+                                else if (type.IsAssignableTo(typeof(IAssetDefinition)) || type == typeof(Sprite) || type == typeof(IRawRenderMesh))
+                                {
+                                    DrawAssetSelector(widgetCursor, field.InspectorValues, hasMetAllConditions);
+                                }
+                                else
+                                {
+                                    ImGui.Dummy(widgetCursor.Size);
+                                }
+
+                                ImGui.PopID();
+                            }
                         }
                     }
                     else if (widget is InspectorWidgetGroup group)
                     {
+                        bool hasMetAllConditions = true;
+                        foreach (WidgetCondition condition in group.Conditions)
+                        {
+                            foreach (IInspectorValue valueToCompare in condition.Values)
+                            {
+                                if (!condition.View.HasPassedCondition(valueToCompare))
+                                {
+                                    hasMetAllConditions = false;
+                                    break;
+                                }
+                            }
 
+                            if (!hasMetAllConditions)
+                                break;
+                        }
+
+                        if (hasMetAllConditions)
+                        {
+                            if (group.TopMargin > 0.0f)
+                            {
+                                window.DC.CursorPos.Y += group.TopMargin;
+                            }
+
+                            DrawWidgetsRecursive(id, group.Relationships);
+                        }
                     }
                     else if (widget is InspectorWidgetPreset preset)
                     {

@@ -5,7 +5,7 @@ using Primary.Console;
 
 namespace Primary.Rendering.Configuration
 {
-    [ConsoleName("r", false)]
+    [ConsoleName("r")]
     public sealed class FrameGraphOptions
     {
         [ConsoleName("asyncCompute")]

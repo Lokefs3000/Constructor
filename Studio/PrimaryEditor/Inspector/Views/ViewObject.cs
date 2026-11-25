@@ -49,6 +49,8 @@ namespace PrimaryEditor.Inspector.Views
             _relativeOffset = (new Vector2(indentOffset, paddingValue) * 24.0f).AsInt2();
         }
 
+        internal abstract bool HasReferencesTo(Assembly assembly);
+
         public ImmutableArray<ViewCondition> Conditions => _conditions;
         public ViewConditionMode ConditionMode => _conditionMode;
 

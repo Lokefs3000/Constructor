@@ -42,6 +42,9 @@ namespace VoxelizationDemo.Editor
 
         private void OnKeyPressed(KeyCode key)
         {
+            if (InputSystem.Pointer.IsButtonHeld(MouseButton.Right))
+                return;
+
             foreach (KeybindContext context in _contexts)
             {
                 if (context.TryInvokeBinding(key, InputSystem.Keyboard.KeyModifiers))

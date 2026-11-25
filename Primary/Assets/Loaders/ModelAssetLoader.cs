@@ -21,9 +21,9 @@ namespace Primary.Assets.Loaders
 {
     internal unsafe class ModelAssetLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new ModelAssetData(id);
+            return new ModelAssetData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)

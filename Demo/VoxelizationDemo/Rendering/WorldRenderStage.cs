@@ -9,6 +9,8 @@ using Primary.Rendering.Batching;
 using Primary.Rendering.Data;
 using Primary.Rendering.Diagnostics;
 using Primary.Threading;
+using VoxelizationDemo.Rendering.Compositing;
+using VoxelizationDemo.Rendering.Compositing.Effects;
 using VoxelizationDemo.Rendering.Diagnostics;
 using VoxelizationDemo.Rendering.Passes;
 
@@ -18,6 +20,7 @@ namespace VoxelizationDemo.Rendering
     {
         private RenderList? _renderList;
         private LightCollector? _lightCollector;
+        private CompositingManager? _compositingManager;
 
         private SetupDataPass? _setupDataPass;
         private ClusterLightsPass? _clusterLightsPass;
@@ -26,9 +29,10 @@ namespace VoxelizationDemo.Rendering
         public void Install(RenderingManager manager)
         {
             _renderList = manager.BatchingManager.CreateRenderList();
-            _renderList.DefaultMaterial = AssetManager.LoadAsset<MaterialAsset>("Content/Materials/Missing.mat");
+            // _renderList.DefaultMaterial = AssetManager.LoadAsset<MaterialAsset>("Content/Materials/Missing.mat");
 
             _lightCollector = new LightCollector();
+            _compositingManager = new CompositingManager();
 
             _setupDataPass = new SetupDataPass();
             _clusterLightsPass = new ClusterLightsPass();
@@ -41,6 +45,7 @@ namespace VoxelizationDemo.Rendering
             _renderList = null;
 
             _lightCollector = null;
+            _compositingManager = null;
 
             _setupDataPass = null;
             _clusterLightsPass = null;
@@ -51,31 +56,24 @@ namespace VoxelizationDemo.Rendering
         {
             RenderCameraData cameraData = context.Get<RenderCameraData>();
 
-            manager.RequestBatch(_renderList!, new BatchingOptions
+            JobHandle batchWorldJob = manager.RequestBatch(_renderList!, new BatchingOptions
             {
                 Origin = cameraData.Transform.Position,
                 MaxViewingDistance = cameraData.ZFar,
 
                 ViewFrustrum = cameraData.ViewFrustrum,
-            });
+            }, JobHandle.Completed);
 
-            RenderStageBlackboard generalBlackboard = blackboard.Add<RenderStageBlackboard>();
-            generalBlackboard.RenderList = _renderList!.IsEmpty ? null : _renderList;
+            RentedList<JobHandle> jobHandleList = [batchWorldJob];
+            _lightCollector!.CollectLights(cameraData.ViewFrustrum, cameraData.Transform.Transformation.Translation, ref jobHandleList);
 
-            if (generalBlackboard.RenderList != null)
+            _compositingManager!.UpdateEffects(cameraData.Transform.Position);
+
+            JobScheduler.CombineAll(jobHandleList.AsSpan()).WaitForCompletion();
+            if (!_renderList!.IsEmpty)
             {
-                RentedList<JobHandle> jobHandleList = new RentedList<JobHandle>();
-                _lightCollector!.CollectLights(cameraData.ViewFrustrum, cameraData.Transform.Transformation.Translation, ref jobHandleList);
-
-                if (jobHandleList.Count > 0)
-                {
-                    JobHandle monolith = JobScheduler.CombineAll(jobHandleList.AsSpan());
-                    JobScheduler.Flush(jobHandleList.AsSpan());
-
-                    monolith.WaitForCompletion();
-                }
-
-                jobHandleList.Dispose();
+                RenderStageBlackboard generalBlackboard = blackboard.Add<RenderStageBlackboard>();
+                generalBlackboard.RenderList = _renderList;
 
                 // foreach (PointLightData light in _lightCollector.PointLights)
                 // {
@@ -85,12 +83,19 @@ namespace VoxelizationDemo.Rendering
 
                 generalBlackboard.LightCollector = _lightCollector;
             }
+            else
+            {
+                blackboard.Add<RenderStageBlackboard>();
+            }
 
             manager.PushRenderPass(_setupDataPass!);
             manager.PushRenderPass(_clusterLightsPass!);
             manager.PushRenderPass(_worldOpaquePass!);
+            _compositingManager.TryFlushActiveEffect<SkyboxEffect.Data>(manager, blackboard, context);
+            _compositingManager.TryFlushActiveEffect<TonemappingEffect.Data>(manager, blackboard, context);
 
-            OctreeVisualizer.Visualize(manager.OctreeManager, cameraData.ViewFrustrum, cameraData.Transform.Position);
+            //OctreeVisualizer.Visualize(manager.PartitioningManager, cameraData.ViewFrustrum, cameraData.Transform.Position);
+            jobHandleList.Dispose();
         }
 
         public void FlushPassesForWindow(RenderingManager manager, RenderPassBlackboard blackboard, RenderContextContainer context)
@@ -99,5 +104,6 @@ namespace VoxelizationDemo.Rendering
 
         public RenderList? RenderList => _renderList;
         public LightCollector? LightCollector => _lightCollector;
+        public CompositingManager CompositingManager => _compositingManager!;
     }
 }

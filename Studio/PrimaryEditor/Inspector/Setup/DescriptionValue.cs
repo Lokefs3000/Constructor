@@ -12,9 +12,9 @@ namespace PrimaryEditor.Inspector.Setup
         public IInspectorValue Instantiate(Type parentType, IInspectorObject? parentObject, string name)
         {
             if (Description != null)
-                return (IInspectorValue)Activator.CreateInstance(typeof(InspectorObject<,>).MakeGenericType(parentType, ValueType), BindingFlags.Instance | BindingFlags.NonPublic, null, [parentObject, ValueSource, name], null)!;
+                return (IInspectorValue)Activator.CreateInstance(typeof(InspectorObject<,>).MakeGenericType(ValueSource.DeclaringType, ValueType), BindingFlags.Instance | BindingFlags.NonPublic, null, [parentObject, ValueSource, name], null)!;
             else
-                return (IInspectorValue)Activator.CreateInstance(typeof(InspectorValue<,>).MakeGenericType(parentType, ValueType), BindingFlags.Instance | BindingFlags.NonPublic, null, [parentObject, ValueSource, name], null)!;
+                return (IInspectorValue)Activator.CreateInstance(typeof(InspectorValue<,>).MakeGenericType(ValueSource.DeclaringType, ValueType), BindingFlags.Instance | BindingFlags.NonPublic, null, [parentObject, ValueSource, name], null)!;
         }
 
         public override string ToString() => ValueType.FullName!;

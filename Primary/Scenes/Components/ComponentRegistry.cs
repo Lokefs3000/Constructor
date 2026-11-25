@@ -1,6 +1,7 @@
 ﻿using Arch.Core;
 using Arch.Core.Extensions;
 using CommunityToolkit.HighPerformance;
+using Primary.Collections;
 using Primary.Collections.ReadOnly;
 using Primary.Components;
 using Primary.Scenes.Json;
@@ -15,6 +16,8 @@ namespace Primary.Scenes.Components
     {
         private readonly SceneEntityManager _entityManager;
 
+        private readonly MethodInfo _registerComponentTemplated;
+
         private readonly Dictionary<Type, ComponentRegistryEntry> _entries;
         private readonly Dictionary<Assembly, AssemblyList> _assemblies;
 
@@ -24,10 +27,41 @@ namespace Primary.Scenes.Components
         {
             _entityManager = entityManager;
 
+            _registerComponentTemplated = GetType().GetMethod(nameof(RegisterComponentTemplated), BindingFlags.Instance | BindingFlags.NonPublic)!;
+
             _entries = new Dictionary<Type, ComponentRegistryEntry>();
             _assemblies = new Dictionary<Assembly, AssemblyList>();
 
             _entryTypeLookups = new Dictionary<string, Type>();
+        }
+
+        internal void UnregisterComponentsFrom(Assembly assembly)
+        {
+            using RentedList<Type> typesToRemove = new RentedList<Type>();
+            foreach (var (type, _) in _entries)
+            {
+                if (type.Assembly == assembly)
+                {
+                    typesToRemove.Add(type);
+                }
+            }
+
+            if (!typesToRemove.IsEmpty)
+            {
+                foreach (Type type in typesToRemove)
+                {
+                    _entries.Remove(type);
+                    _entryTypeLookups.Remove(SceneJsonSerializer.GetComponentKey(type)!);
+                }
+            }
+
+            _assemblies.Remove(assembly);
+        }
+
+        internal void RegisterComponent(Type type)
+        {
+            Action registerAction = _registerComponentTemplated.MakeGenericMethod(type).CreateDelegate<Action>(this);
+            registerAction();
         }
 
         /// <summary>Not thread-safe</summary>
@@ -97,14 +131,15 @@ namespace Primary.Scenes.Components
         }
 
         /// <summary>Not thread-safe</summary>
-        internal ref readonly ComponentRegistryEntry FindComponentEntry(Type type) => ref CollectionsMarshal.GetValueRefOrNullRef(_entries, type);
+        public ref readonly ComponentRegistryEntry FindComponentEntry(Type type) => ref CollectionsMarshal.GetValueRefOrNullRef(_entries, type);
 
         internal Type? FindComponentFromFullName(string fullName) => _entryTypeLookups.TryGetValue(fullName, out Type? type) ? type : null;
 
         public RODictionary<Type, ComponentRegistryEntry> Entries => _entries;
-
-        private readonly record struct AssemblyList(HashSet<Type> Types);
+        public RODictionary<Assembly, AssemblyList> Assemblies => _assemblies;
     }
+
+    public readonly record struct AssemblyList(HashSet<Type> Types);
 
     public readonly record struct ComponentRegistryEntry
     {

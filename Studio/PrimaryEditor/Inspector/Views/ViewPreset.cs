@@ -65,6 +65,26 @@ namespace PrimaryEditor.Inspector.Views
             }
         }
 
+        internal override bool HasReferencesTo(Assembly assembly)
+        {
+            foreach (var (_, array) in _presets)
+            {
+                foreach (ViewConstant constant in array)
+                {
+                    if (constant.HasReferencesTo(assembly))
+                        return true;
+                }
+            }
+
+            foreach (ViewObject obj in _values)
+            {
+                if (obj.HasReferencesTo(assembly))
+                    return true;
+            }
+
+            return false;
+        }
+
         public string DisplayName => _displayName;
         public FrozenDictionary<string, ImmutableArray<ViewConstant>> Presets => _presets;
         public ImmutableArray<ViewObject> Values => _values;

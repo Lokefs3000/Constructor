@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using Primary.Collections.ReadOnly;
 using PrimaryEditor.Core;
@@ -94,7 +95,21 @@ namespace PrimaryEditor.Inspector
             }
         }
 
-        public Type Type => _type;
+        internal virtual bool HasReferencesTo(Assembly assembly)
+        {
+            if (_type?.Assembly == assembly)
+                return true;
+
+            foreach (IInspectorValue inspectorValue in _values)
+            {
+                if (inspectorValue.TargetType.Assembly == assembly)
+                    return true;
+            }
+
+            return false;
+        }
+
+        public Type Type => _type!;
         public ROList<IInspectorValue> Values => _values;
 
         public abstract int UniqueHash { get; }

@@ -173,6 +173,7 @@ namespace VoxelizationDemo.Editor.Tools
     public enum ToolRelativeMode : byte
     {
         Local = 0,
-        World
+        World,
+        Absolute
     }
 }

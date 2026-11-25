@@ -22,7 +22,9 @@ namespace VoxelizationDemo.Editor.Rendering.Icons
         internal WorldIconManager()
         {
             _iconSources = [
-                new PointLightIcons()
+                new PointLightIcons(),
+                new DirectionalLightIcons(),
+                new EffectVolumeIcons()
                 ];
 
             _totalIconCount = 0;
@@ -32,15 +34,13 @@ namespace VoxelizationDemo.Editor.Rendering.Icons
         {
             using (new ProfilingScope("WorldIcons"))
             {
-                ref WorldTransform worldTransform = ref VoxelRuntime.Instance.CameraManager.Entity.GetComponent<WorldTransform>();
-                ref CameraProjectionData projectionData = ref VoxelRuntime.Instance.CameraManager.Entity.GetComponent<CameraProjectionData>();
-
-                Frustrum frustrum = new Frustrum(projectionData.ViewMatrix * projectionData.ProjectionMatrix);
+                Vector3 position = EditorManager.Instance.ViewportManager.Camera.Position;
+                Frustrum frustrum = EditorManager.Instance.ViewportManager.Camera.Frustrum;
 
                 using RentedList<JobHandle> handles = new RentedList<JobHandle>(_iconSources.Count);
                 foreach (WorldIconSource source in _iconSources)
                 {
-                    source.SetParameters(frustrum, worldTransform.Position);
+                    source.SetParameters(frustrum, position);
                     handles.Add(JobScheduler.Schedule(source, JobPriority.Realtime));
                 }
 

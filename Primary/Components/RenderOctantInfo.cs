@@ -1,6 +1,6 @@
 ﻿using Primary.Editor;
 using Primary.Mathematics;
-using Primary.Rendering.Tree;
+using Primary.Rendering.Partitioning;
 
 namespace Primary.Components
 {
@@ -8,14 +8,14 @@ namespace Primary.Components
     [InspectorHidden]
     internal struct RenderOctantInfo : IComponent
     {
-        public RenderOctree? Octree;
+        public RenderGridChunk? Chunk;
         public int RenderableId;
 
         public long LastUpdateFrame;
 
         public RenderOctantInfo()
         {
-            Octree = null;
+            Chunk = null;
             RenderableId = -1;
 
             LastUpdateFrame = -1;

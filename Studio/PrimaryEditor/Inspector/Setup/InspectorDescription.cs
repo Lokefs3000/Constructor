@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Reflection;
 using System.Text;
 
 namespace PrimaryEditor.Inspector.Setup
@@ -15,6 +16,17 @@ namespace PrimaryEditor.Inspector.Setup
         {
             _type = type;
             _values = values;
+        }
+
+        internal bool HasReferencesTo(Assembly assembly)
+        {
+            foreach (DescriptionValue value in _values)
+            {
+                if (value.Description?.HasReferencesTo(assembly) ?? (value.ValueType.Assembly == assembly))
+                    return true;
+            }
+
+            return _type.Assembly == assembly;
         }
 
         public override string ToString() => $"{_type.FullName}({_values.Length})";

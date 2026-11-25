@@ -37,6 +37,7 @@ namespace PrimaryEditor.Inspector.Contexts.Texture
         }
 
         public override ROList<InspectorGroup> Groups => _groups;
+        public override Type ContextType => _config.GetType();
 
         private static TextureInspectorConfig CreateConfigFromAsset(AssetId assetId)
         {

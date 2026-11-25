@@ -13,7 +13,6 @@ using Primary.Rendering.Diagnostics;
 using Primary.Threading;
 using Primary.Windowing;
 using VoxelizationDemo.Core;
-using VoxelizationDemo.Logic;
 
 namespace VoxelizationDemo.Editor
 {

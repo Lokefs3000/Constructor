@@ -4,6 +4,38 @@ using System.Text;
 
 namespace Primary.Rendering.Utility
 {
+    internal sealed class TransientEventList
+    {
+        private readonly List<Action> _actions;
+
+        internal TransientEventList()
+        {
+            _actions = new List<Action>();
+        }
+
+        internal void Subscribe(Action action)
+        {
+            _actions.Add(action);
+        }
+
+        internal void InvokeAndClear()
+        {
+            foreach (Action action in _actions)
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    EngLog.Render.Warning(ex, "Subscriber in event list threw an exception");
+                }
+            }
+
+            _actions.Clear();
+        }
+    }
+
     internal sealed class TransientEventList<T>
     {
         private readonly List<Action<T>> _actions;

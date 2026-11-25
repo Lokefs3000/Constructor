@@ -6,16 +6,18 @@ namespace Primary.Assets.Types
     {
         private readonly WeakReference _asset;
         private readonly AssetId _id;
+        private readonly int _uniqueIndex;
 
         private ResourceStatus _status;
         private string _name;
 
         private int _loadIndex;
 
-        protected BaseInternalAssetData(AssetId id)
+        protected BaseInternalAssetData(AssetId id, int uniqueIndex)
         {
             _asset = new WeakReference(id);
             _id = id;
+            _uniqueIndex = uniqueIndex;
 
             _status = ResourceStatus.Pending;
             _name = string.Empty;
@@ -57,6 +59,7 @@ namespace Primary.Assets.Types
         IAssetDefinition? IInternalAssetData.Definition => Unsafe.As<T>(_asset.Target);
 
         public AssetId Id => _id;
+        public int UniqueIndex => _uniqueIndex;
         public T? Definition => Unsafe.As<T>(_asset.Target);
 
         public ResourceStatus Status => _status;

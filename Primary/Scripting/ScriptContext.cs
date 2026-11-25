@@ -1,37 +1,40 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Text;
+using System.Xml.Linq;
+using Primary.Collections.ReadOnly;
+using Primary.Common;
 
 namespace Primary.Scripting
 {
     public sealed class ScriptContext : IDisposable
     {
         private readonly ScriptingManager _manager;
-        private readonly AssemblyLoadContext _loadContext;
+        private readonly string _name;
+
+        private WeakReference _loadContext;
 
         private readonly HashSet<Assembly> _loadedAssemblies;
 
+        private bool _isUnloaded;
         private bool _disposedValue;
 
         internal ScriptContext(ScriptingManager manager, string name)
         {
             _manager = manager;
-            _loadContext = new AssemblyLoadContext(name, true);
+            _name = name;
+
+            _loadContext = new WeakReference(null, trackResurrection: true);
 
             _loadedAssemblies = new HashSet<Assembly>();
 
-
-            _loadContext.Unloading += OnUnloading;
-        }
-
-        private void OnUnloading(AssemblyLoadContext ctx)
-        {
-            EngLog.Script.Debug("Unloading script context: {ctx}\n    ", ctx, ctx.Assemblies);
-
-            //_manager.RegisterAsUnloaded(this);
+            _isUnloaded = false;
         }
 
         private void Dispose(bool disposing)
@@ -62,11 +65,21 @@ namespace Primary.Scripting
 
             ObjectDisposedException.ThrowIf(_disposedValue, this);
 
+            AssemblyLoadContext? alc = _loadContext.Target as AssemblyLoadContext;
+            if (alc == null)
+            {
+                alc = new AssemblyLoadContext(_name, true);
+                _loadContext.Target = alc;
+            }
+
             Assembly? assembly = null;
 
             try
             {
-                assembly = _loadContext.LoadFromAssemblyPath(path);
+                using FileStream binaryStream = File.OpenRead(path);
+                using FileStream? symbolsStream = FileUtility.TryWaitOpenNoThrow(Path.ChangeExtension(path, ".pdb"), FileMode.Open, FileAccess.Read, FileShare.Read, 1);
+
+                assembly = alc.LoadFromStream(binaryStream, symbolsStream);
             }
             catch (FileLoadException ex)
             {
@@ -84,10 +97,10 @@ namespace Primary.Scripting
             if (assembly == null)
                 return false;
 
-            foreach (Assembly currentAssembly in _loadContext.Assemblies)
+            foreach (Assembly currentAssembly in alc.Assemblies)
             {
-                _manager.RegisterNewAssembly(this, currentAssembly);
-                _loadedAssemblies.Add(currentAssembly);
+                if (_loadedAssemblies.Add(currentAssembly))
+                    _manager.RegisterNewAssembly(this, currentAssembly);
             }
 
             _manager.RegisterNewAssembly(this, assembly);
@@ -96,19 +109,58 @@ namespace Primary.Scripting
             return true;
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         internal void UnloadAssemblies()
         {
-            foreach (Assembly assembly in _loadedAssemblies)
+            // IMPORTANT: No references that relate to this ALC are allowed to exist when this is called.
+
+            string? alcName = _name;
+            string?[] alcAssemblies = [.. _loadedAssemblies.Select(static (x) => x.FullName)];
+
             {
-                _manager.UnregisterAssembly(assembly);
+                foreach (Assembly assembly in _loadedAssemblies!)
+                {
+                    _manager.UnregisterAssembly(assembly);
+                }
+
+                _loadedAssemblies.Clear();
             }
 
-            _loadContext.Unload();
-            _loadedAssemblies.Clear();
+            {
+                AssemblyLoadContext? alc = _loadContext.Target as AssemblyLoadContext;
+                alc?.Unload();
+                alc = null;
+            }
+
+            for (int i = 0; _loadContext.IsAlive && (i < 10); ++i)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+
+                Thread.Yield();
+            }
+
+            if (_loadContext.IsAlive)
+            {
+                EngLog.Scene.Error("Failed to unload script context: {ctx}\n    {asms}", alcName, alcAssemblies);
+            }
+            else
+            {
+                EngLog.Script.Debug("Fully unloaded script context: {ctx}\n    {asms}", alcName, alcAssemblies);
+                _isUnloaded = true;
+            }
         }
 
-        public string Name => _loadContext.Name!;
+        internal AssemblyLoadContext.ContextualReflectionScope EnterContextualReflection()
+        {
+            return (_loadContext.Target as AssemblyLoadContext)?.EnterContextualReflection() ?? default;
+        }
 
-        public HashSet<Assembly> LoadedAssemblies => _loadedAssemblies;
+        public string Name => _name;
+
+        public ROHashSet<Assembly> LoadedAssemblies => _loadedAssemblies;
+
+        public bool IsDisposed => _disposedValue;
+        public bool IsUnloaded => _isUnloaded;
     }
 }

@@ -77,6 +77,9 @@ namespace Primary.Rendering.Resources
 
         internal void FinishLifetimeEvaluation()
         {
+            if (_firstLifetimes.Length == 0 || _lastLifetimes.Length == 0)
+                return;
+
             _firstLifetimes.Sort();
             _lastLifetimes.Sort();
 

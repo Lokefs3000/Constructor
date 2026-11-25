@@ -813,6 +813,7 @@ namespace Primary.RHI.Direct3D12
                 }
 
                 TerraFX.Interop.Windows.Windows.WaitForSingleObject(_videoBudgetChangeEvent, TerraFX.Interop.Windows.Windows.INFINITE);
+                break;
             }
         }
 

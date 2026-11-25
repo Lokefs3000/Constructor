@@ -15,6 +15,7 @@ using Primary.Windowing;
 using Primary.Logging;
 using System.Diagnostics;
 using Primary.Rendering;
+using Primary.Physics;
 
 namespace Primary
 {
@@ -41,6 +42,7 @@ namespace Primary
         protected readonly InputSystem _inputSystem;
         protected readonly ImGuiManager _imguiManager;
         protected readonly JobScheduler _jobScheduler;
+        protected readonly PhysicsManager _physicsManager;
 
         public Engine(ReadOnlySpan<string> args)
         {
@@ -74,6 +76,7 @@ namespace Primary
             _inputSystem = new InputSystem();
             _imguiManager = new ImGuiManager();
             _jobScheduler = new JobScheduler();
+            _physicsManager = new PhysicsManager();
         }
 
         public virtual void Dispose()
@@ -83,6 +86,7 @@ namespace Primary
             _assetManager.Dispose();
             _renderingManager.Dispose();
             _sceneManager.Dispose();
+            _physicsManager.Dispose();
             _windowManager.Dispose();
             _eventManager.Dispose();
             _profilingManager.Dispose();
@@ -121,6 +125,7 @@ namespace Primary
         public InputSystem InputSystem => _inputSystem;
         public ImGuiManager ImGuiManager => _imguiManager;
         public JobScheduler JobScheduler => _jobScheduler;
+        public PhysicsManager PhysicsManager => _physicsManager;
 
         public static Engine GlobalSingleton => s_instance!;
 

@@ -336,6 +336,9 @@ namespace Primary.Rendering.Playback.D3D12
                                     using (new ProfilingScope(passName))
                                     {
                                         ID3D12GraphicsCommandList10* commandList = _commandPool.GetDirectCommandList();
+#if DEBUG
+                                        ResourceHelper.SetResourceName((ID3D12Object*)commandList, passName);
+#endif
 
                                         if (_hasPixAvailable)
                                         {
@@ -374,6 +377,9 @@ namespace Primary.Rendering.Playback.D3D12
                                     using (new ProfilingScope(passName))
                                     {
                                         ID3D12GraphicsCommandList10* commandList = _commandPool.GetComputeCommandList();
+#if DEBUG
+                                        ResourceHelper.SetResourceName((ID3D12Object*)commandList, passName);
+#endif
 
                                         if (_hasPixAvailable)
                                         {

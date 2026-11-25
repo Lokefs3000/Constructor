@@ -98,7 +98,7 @@ namespace PrimaryEditor.Assets
         private UILayoutNode? _rootNode;
         private ImmutableArray<StylesheetAsset> _stylesheets;
 
-        public UILayoutData(AssetId id) : base(id)
+        public UILayoutData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
             _rootNode = null;
             _stylesheets = default;

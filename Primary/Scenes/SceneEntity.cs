@@ -29,16 +29,25 @@ namespace Primary.Scenes
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [UnscopedRef]
-        public ref T AddComponent<T>() where T : struct, IComponent
+        public ref T AddComponent<T>() where T : IComponent
         {
             if (IsNull)
                 throw new NullReferenceException();
-            return ref SceneEntityManager.Instance.AddComponent<T>(in _entity);
+
+            if (typeof(T).IsClass)
+            {
+                SceneEntityManager.Instance.AddComponent(in _entity, typeof(T));
+                return ref _entity.Get<T>();
+            }
+            else
+            {
+                return ref SceneEntityManager.Instance.AddComponent<T>(in _entity);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [UnscopedRef]
-        public bool RemoveComponent<T>() where T : struct, IComponent
+        public bool RemoveComponent<T>() where T : IComponent
         {
             if (IsNull)
                 throw new NullReferenceException();
@@ -47,7 +56,7 @@ namespace Primary.Scenes
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [UnscopedRef]
-        public ref T GetComponent<T>() where T : struct, IComponent
+        public ref T GetComponent<T>() where T : IComponent
         {
             if (IsNull)
                 throw new NullReferenceException();
@@ -56,7 +65,7 @@ namespace Primary.Scenes
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [UnscopedRef]
-        public ref T SetComponent<T>(T value) where T : struct, IComponent
+        public ref T SetComponent<T>(T value) where T : IComponent
         {
             if (IsNull)
                 throw new NullReferenceException();
@@ -65,7 +74,7 @@ namespace Primary.Scenes
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [UnscopedRef]
-        public bool HasComponent<T>() where T : struct, IComponent
+        public bool HasComponent<T>() where T : IComponent
         {
             if (IsNull)
                 throw new NullReferenceException();

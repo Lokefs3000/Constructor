@@ -4,6 +4,7 @@
     {
         public AssetId Id { get; }
         public IAssetDefinition? Definition { get; }
+        public int UniqueIndex { get; }
 
         public ResourceStatus Status { get; }
         public string Name { get; }

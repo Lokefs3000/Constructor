@@ -44,7 +44,7 @@ namespace Primary.Assets
     {
         private FrozenDictionary<FastStringHash, ComputeShaderKernel> _kernels;
 
-        public ComputeShaderAssetData(AssetId id) : base(id)
+        public ComputeShaderAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
             _kernels = FrozenDictionary<FastStringHash, ComputeShaderKernel>.Empty;
         }

@@ -41,7 +41,7 @@ namespace VoxelizationDemo.Editor.Windows
                 Vector2 contentAvail = ImGui.GetContentRegionAvail();
                 Vector2 cursorPos = window.DC.CursorPos + contentAvail * 0.5f;
 
-                Matrix4x4 mat = Matrix4x4.CreateLookTo(Vector3.Zero, Vector3.Transform(Vector3.UnitZ, runtime.CameraManager.ViewQuaternion), Vector3.Transform(Vector3.UnitY, runtime.CameraManager.ViewQuaternion));
+                Matrix4x4 mat = Matrix4x4.CreateLookTo(Vector3.Zero, Vector3.Transform(Vector3.UnitZ, EditorManager.Instance.ViewportManager.Camera.ViewQuaternion), Vector3.Transform(Vector3.UnitY, EditorManager.Instance.ViewportManager.Camera.ViewQuaternion));
                 Vector3 posAxisX = Vector3.Transform(Vector3.UnitX, mat);
                 Vector3 posAxisY = Vector3.Transform(Vector3.UnitY, mat);
                 Vector3 posAxisZ = Vector3.Transform(Vector3.UnitZ, mat);

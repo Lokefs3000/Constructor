@@ -100,6 +100,11 @@ namespace Primary.Rendering
             _uninitializedTextures.Add(handle.Index);
         }
 
+        internal void RemoveUninitializedTexture(TextureHandle texture)
+        {
+            _uninitializedTextures.Remove(texture.Index);
+        }
+
         internal void InitializeRenderTarget(TextureHandle handle) => _uninitializedTextures.Remove(handle.Index);
         internal void InitializeDepthStencil(TextureHandle handle) => _uninitializedTextures.Remove(handle.Index);
 

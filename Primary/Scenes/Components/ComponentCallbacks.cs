@@ -18,7 +18,7 @@ namespace Primary.Scenes.Components
             _callbacks = new Dictionary<Type, Callbacks>();
         }
 
-        internal void RemoveListenersFrom(HashSet<Assembly> assemblies)
+        internal void RemoveListenersFrom(Assembly assembly)
         {
             using RentedList<Type> pendingRemovals = new RentedList<Type>();
 
@@ -29,14 +29,14 @@ namespace Primary.Scenes.Components
                 for (int i = 0; i < callbacks.Add.Count; i++)
                 {
                     ComponentCallback callback = callbacks.Add[i];
-                    if (assemblies.Contains(callback.GetType().Assembly))
+                    if (callback.Method.DeclaringType?.Assembly == assembly)
                         callbacks.Add.RemoveAt(i--);
                 }
 
                 for (int i = 0; i < callbacks.Removed.Count; i++)
                 {
                     ComponentCallback callback = callbacks.Removed[i];
-                    if (assemblies.Contains(callback.GetType().Assembly))
+                    if (callback.Method.DeclaringType?.Assembly == assembly)
                         callbacks.Removed.RemoveAt(i--);
                 }
 

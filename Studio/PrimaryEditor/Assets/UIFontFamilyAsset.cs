@@ -22,7 +22,7 @@ namespace PrimaryEditor.Assets
     {
         private FontFamily? _fontFamily;
 
-        public UIFontFamilyData(AssetId id) : base(id)
+        public UIFontFamilyData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
             _fontFamily = null;
         }

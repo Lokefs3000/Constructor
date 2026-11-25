@@ -3,11 +3,14 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Primary;
 using Primary.Collections.ReadOnly;
+using Primary.Scripting;
 using PrimaryEditor.Inspector.Caching;
 using PrimaryEditor.Inspector.Pooling;
 using PrimaryEditor.Inspector.Reflection;
 using PrimaryEditor.Inspector.Views;
+using TerraFX.Interop.Windows;
 
 namespace PrimaryEditor.Inspector
 {
@@ -38,6 +41,34 @@ namespace PrimaryEditor.Inspector
 
             _contexts = new List<InspectorContext>();
             _primaryContext = null;
+
+            ScriptingManager scripting = Engine.GlobalSingleton.ScriptingManager;
+            scripting.AssemblyUnloading += OnAssemblyUnloading;
+        }
+
+        private void OnAssemblyUnloading(Assembly assembly)
+        {
+            for (int i = 0; i < _contexts.Count; ++i)
+            {
+                InspectorContext inspectorContext = _contexts[i];
+                if (inspectorContext.ContextType.Assembly == assembly ||
+                    inspectorContext.Groups.Any((x) => x.Type.Assembly == assembly || x.HasReferencesTo(assembly)))
+                {
+                    _contexts.RemoveAt(i);
+                    OnInspectEnd?.Invoke(inspectorContext);
+
+                    --i;
+                }
+            }
+
+            if (_primaryContext != null && !_contexts.Contains(_primaryContext))
+                _primaryContext = _contexts.FirstOrDefault();
+
+            _valueSourceGenerator.RemoveAllSourcesReferencing(assembly);
+            _descriptionCache.RemoveEntriesReferencing(assembly);
+            _viewManager.RemoveEntriesReferencing(assembly);
+
+            _enumValueCache.RemoveEntriesReferencing(assembly);
         }
 
         public void UpdateContexts()
@@ -83,6 +114,8 @@ namespace PrimaryEditor.Inspector
                 if (inspectorContext.MatchesContext(ref context))
                 {
                     _contexts.RemoveAt(i);
+                    if (_primaryContext == inspectorContext)
+                        _primaryContext = _contexts.FirstOrDefault();
                     OnInspectEnd?.Invoke(inspectorContext);
                     return true;
                 }

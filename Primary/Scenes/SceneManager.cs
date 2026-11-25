@@ -125,7 +125,7 @@ namespace Primary.Scenes
 
         public World World => _world;
 
-        internal Components.SceneEntityManager EntityManager => _entityManager;
+        public Components.SceneEntityManager EntityManager => _entityManager;
         public SceneDeserializer Deserializer => _deserializer;
 
         public ROList<Scene> Scenes => _scenes;

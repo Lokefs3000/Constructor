@@ -40,7 +40,7 @@ namespace PrimaryEditor.Assets
             return _altImporterLookup.TryGetValue(path[index..], out importerData);
         }
 
-        internal void RegisterImporter<T>(params string[] extensions) where T : class, IAssetImporter, new()
+        public void RegisterImporter<T>(params string[] extensions) where T : class, IAssetImporter, new()
         {
             IAssetImporter importer = new T();
 

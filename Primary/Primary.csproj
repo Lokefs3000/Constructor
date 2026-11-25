@@ -6,6 +6,7 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<Configurations>Debug;Release;ReleaseWithDebug</Configurations>
 		<FileVersion>1.0.700.0</FileVersion>
+		<ProduceReferenceAssembly>true</ProduceReferenceAssembly>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseWithDebug|AnyCPU'">
 		<DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
@@ -32,6 +33,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Interop.D3D12MemAlloc\Interop.D3D12MemAlloc.csproj" />
 		<ProjectReference Include="..\Interop.NVAftermath\Interop.NVAftermath.csproj" />
+		<ProjectReference Include="..\Interop.PhysX\Interop.PhysX.csproj" />
 		<ProjectReference Include="..\Primary.Common\Primary.Common.csproj" />
 		<ProjectReference Include="..\Primary.Interop\Primary.Interop.csproj" />
 		<ProjectReference Include="..\Primary.Mathematics\Primary.Mathematics.csproj" />
@@ -44,7 +46,6 @@
 		<Folder Include="Mathematics\" />
 		<Folder Include="Networking\" />
 		<Folder Include="Expression\" />
-		<Folder Include="Physics\" />
 	</ItemGroup>
 	<ItemGroup>
 		<None Include="Components\CRef.Transform.cs" />

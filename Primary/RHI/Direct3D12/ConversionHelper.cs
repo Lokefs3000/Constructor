@@ -249,6 +249,7 @@ namespace Primary.RHI.Direct3D12
             RHIDimension.Texture1D => ResourceDimension.Texture1D,
             RHIDimension.Texture2D => ResourceDimension.Texture2D,
             RHIDimension.Texture3D => ResourceDimension.Texture3D,
+            RHIDimension.TextureCube => ResourceDimension.Texture2D,
             _ => ResourceDimension.Unknown,
         };
 

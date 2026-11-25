@@ -26,7 +26,7 @@ namespace Editor.Rendering.Debugging
                 {
                     using (new ProfilingScope("Octree"))
                     {
-                        OctreeManager octree = EditorRuntime.GlobalSingleton.RenderingManager.OctreeManager;
+                        OctreeManager octree = EditorRuntime.GlobalSingleton.RenderingManager.PartitioningManager;
                         foreach (var (point, tree) in octree.Regions)
                         {
                             DrawOctantRecursive(point, tree.RootOctant);

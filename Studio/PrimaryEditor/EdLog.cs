@@ -12,6 +12,7 @@ namespace PrimaryEditor
         internal static readonly ILogger Assets = CreateLogger();
         internal static readonly ILogger Reflection = CreateLogger();
         internal static readonly ILogger Inspector = CreateLogger();
+        internal static readonly ILogger Script = CreateLogger();
 
         private static ILogger CreateLogger() => new LoggerConfiguration()
             .WriteTo.Console()

@@ -8,7 +8,6 @@ using Primary.Input;
 using Primary.Mathematics;
 using SharpGen.Runtime;
 using VoxelizationDemo.Core;
-using VoxelizationDemo.Logic;
 
 namespace VoxelizationDemo.Editor.Gizmo
 {
@@ -417,7 +416,7 @@ namespace VoxelizationDemo.Editor.Gizmo
             if (_hoverHit == TranslateGizmoHit.None || !_isEnabled || _currentHit != TranslateGizmoHit.None)
                 return false;
 
-            CameraManager camera = VoxelRuntime.Instance.CameraManager;
+            CameraManager camera = EditorManager.Instance.ViewportManager.Camera;
 
             _currentHit = _hoverHit;
 
@@ -463,7 +462,7 @@ namespace VoxelizationDemo.Editor.Gizmo
 
         public bool TryUpdateDrag(float snapScale, out Vector3 delta)
         {
-            CameraManager camera = VoxelRuntime.Instance.CameraManager;
+            CameraManager camera = EditorManager.Instance.ViewportManager.Camera;
 
             Ray cameraRay = camera.ProjectViewportToRayInverse(camera.MouseViewport);
             Vector3 worldHit = _lastWorldHit;

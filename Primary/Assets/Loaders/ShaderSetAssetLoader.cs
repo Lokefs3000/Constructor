@@ -12,9 +12,9 @@ namespace Primary.Assets.Loaders
 {
     internal sealed class ShaderSetAssetLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new ShaderSetAssetData(id);
+            return new ShaderSetAssetData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)

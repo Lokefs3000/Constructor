@@ -35,6 +35,7 @@
 
 	<ItemGroup>
 	  <Folder Include="Editor\Reflection\" />
+	  <Folder Include="IPC\" />
 	  <Folder Include="Source\Content\Shaders\Compute\" />
 	  <Folder Include="Source\Content\Shaders\Lighting\" />
 	</ItemGroup>

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Primary.Assets;
 using Primary.Assets.Types;
 
 namespace Primary.Serialization.Json
@@ -22,7 +23,16 @@ namespace Primary.Serialization.Json
                 if (reader.TokenType != JsonTokenType.String)
                     throw new JsonException("Expected GUID for asset id");
                 if (!reader.TryGetGuid(out Guid guid))
-                    throw new JsonException("Failed to parse GUID");
+                {
+                    if (Engine.GlobalSingleton.AssetManager.IdProvider?.TryLookupIdForPath(reader.GetString()!, out FileId fileId) ?? false)
+                    {
+                        guid = fileId.Guid;
+                    }
+                    else
+                    {
+                        throw new JsonException("Failed to parse GUID");
+                    }
+                }
 
                 reader.Read();
 
@@ -43,7 +53,16 @@ namespace Primary.Serialization.Json
                 if (reader.TokenType != JsonTokenType.String)
                     throw new JsonException("Expected GUID for asset id");
                 if (!reader.TryGetGuid(out Guid guid))
-                    throw new JsonException("Failed to parse GUID");
+                {
+                    if (Engine.GlobalSingleton.AssetManager.IdProvider?.TryLookupIdForPath(reader.GetString()!, out FileId fileId) ?? false)
+                    {
+                        guid = fileId.Guid;
+                    }
+                    else
+                    {
+                        throw new JsonException("Failed to parse GUID");
+                    }
+                }
 
                 return new AssetId((FileId)guid);
             }

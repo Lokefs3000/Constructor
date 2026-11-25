@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
 using System.Text;
 using Primary.Scenes;
 
@@ -7,8 +8,15 @@ namespace Primary.Components
 {
     public abstract class EntityBehaviour : IComponent
     {
+        [IgnoreDataMember]
         private SceneEntity _entity;
+        [IgnoreDataMember]
         private BehaviourFeatures _features;
+
+        public EntityBehaviour()
+        {
+
+        }
 
         internal void SetBehaviourParams(SceneEntity entity, BehaviourFeatures features)
         {

@@ -6,6 +6,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 
+#define TINYEXR_IMPLEMENTATION
+#include "tinyexr/tinyexr.h"
+
 #pragma pack(push, 1)
 
 struct ImageLoadData
@@ -190,6 +193,57 @@ extern "C"
 		metrics->Stride = tj3Get(tj, TJPARAM_COLORSPACE) == TJCS_GRAY ? 1 : 3;
 
 		tj3Destroy(tj);
+		return true;
+	}
+
+	__declspec(dllexport) bool LoadEXRHDR(ImageLoadData* imageData, ImageBitmapHDR* output, const char** errorOutput)
+	{
+		if (LoadEXRFromMemory(&output->Pixels, (int*)&output->Width, (int*)&output->Height, imageData->Data, imageData->Length, errorOutput) != TINYEXR_SUCCESS)
+		{
+			return false;
+		}
+
+		output->Stride = 4;
+		return true;
+	}
+
+	__declspec(dllexport) void FreeEXR(ImageBitmapHDR* bitmap)
+	{
+		free(bitmap->Pixels);
+	}
+
+	__declspec(dllexport) void FreeEXRError(const char* errorOutput)
+	{
+		FreeEXRErrorMessage(errorOutput);
+	}
+
+	__declspec(dllexport) bool QueryEXR(ImageLoadData* imageData, ImageMetrics* metrics, const char** errorOutput)
+	{
+		EXRVersion exr_version;
+		EXRHeader exr_header;
+
+		InitEXRHeader(&exr_header);
+		int ret = ParseEXRVersionFromMemory(&exr_version, imageData->Data, imageData->Length);
+		if (ret != TINYEXR_SUCCESS)
+		{
+			std::stringstream ss;
+			ss << "Failed to parse EXR version. code(" << ret << ")";
+			tinyexr::SetErrorMessage(ss.str(), errorOutput);
+			return ret;
+		}
+
+		ret = ParseEXRHeaderFromMemory(&exr_header, &exr_version, imageData->Data, imageData->Length, errorOutput);
+		if (ret != TINYEXR_SUCCESS)
+		{
+			FreeEXRHeader(&exr_header);
+			return ret;
+		}
+
+		metrics->Width = exr_header.display_window.max_x - exr_header.display_window.min_x + 1;
+		metrics->Height = exr_header.display_window.max_y - exr_header.display_window.min_y + 1;
+		metrics->Stride = 4;
+
+		FreeEXRHeader(&exr_header);
 		return true;
 	}
 }

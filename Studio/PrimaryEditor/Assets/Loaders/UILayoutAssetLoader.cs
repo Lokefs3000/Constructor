@@ -13,9 +13,9 @@ namespace PrimaryEditor.Assets.Loaders
 {
     internal class UILayoutAssetLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new UILayoutData(id);
+            return new UILayoutData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)

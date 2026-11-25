@@ -8,6 +8,7 @@ namespace PrimaryEditor.Project
     {
         private string _rootFolder;
         private string _contentFolder;
+        private string _sourceFolder;
         private string _libraryFolder;
         private string _prefsFolder;
 
@@ -19,6 +20,7 @@ namespace PrimaryEditor.Project
         internal ProjectPaths()
         {
             _contentFolder = string.Empty;
+            _sourceFolder = string.Empty;
             _libraryFolder = string.Empty;
             _prefsFolder = string.Empty;
 
@@ -37,6 +39,7 @@ namespace PrimaryEditor.Project
 
             _rootFolder = projectDir;
             _contentFolder = Path.Combine(projectDir, "Content");
+            _sourceFolder = Path.Combine(projectDir, "Source");
             _libraryFolder = Path.Combine(projectDir, "Library");
             _prefsFolder = Path.Combine(projectDir, "Prefs");
 
@@ -48,6 +51,7 @@ namespace PrimaryEditor.Project
 
         public string RootFolder => _rootFolder;
         public string ContentFolder => _contentFolder;
+        public string SourceFolder => _sourceFolder;
         public string LibraryFolder => _libraryFolder;
         public string PrefsFolder => _prefsFolder;
 

@@ -2,6 +2,7 @@
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -22,9 +23,30 @@ namespace PrimaryEditor.Inspector.Views
             _customViews = TryFindAllCustomViews();
         }
 
+        internal void RemoveEntriesReferencing(Assembly assembly)
+        {
+            using RentedList<Type> keysToRemove = new RentedList<Type>();
+            foreach (var (type, desc) in _customViews)
+            {
+                if (type.Assembly == assembly || desc.HasReferencesTo(assembly))
+                {
+                    keysToRemove.Add(type);
+                }
+            }
+
+            if (!keysToRemove.IsEmpty)
+            {
+                foreach (Type key in keysToRemove)
+                {
+                    _customViews.Remove(key);
+                }
+            }
+        }
+
         private Dictionary<Type, ViewDescription> TryFindAllCustomViews()
         {
-            using Stream? stream = AssetFilesystem.OpenStream("Editor/Inspector/CustomViews.toml");
+            using Stream? stream = AssetFilesystem.OpenStream("Editor/Inspector/CustomViews.toml") ??
+                AssetFilesystem.OpenStream("Content/CustomViews.toml");
             if (stream == null)
             {
                 EdLog.Inspector.Error("Failed to read custom views configuration file");
@@ -114,7 +136,7 @@ namespace PrimaryEditor.Inspector.Views
                     }
                     else
                     {
-                        viewObject = new ViewField(ref typeResolver, descriptionValue.ValueSource.TargetName[(sourceTypeNameLength + 1)..], descriptionValue.Name, 0.0f, currentIndent);
+                        viewObject = new ViewField(ref typeResolver, descriptionValue.ValueSource.LocalName, descriptionValue.Name, 0.0f, currentIndent);
                     }
 
                     viewObjects.Add(viewObject);

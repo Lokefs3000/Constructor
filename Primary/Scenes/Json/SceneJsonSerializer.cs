@@ -1,8 +1,4 @@
-﻿using Arch.Core;
-using Primary.Common;
-using Primary.Components;
-using Primary.Utility;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Generic;
@@ -10,16 +6,22 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using Arch.Core;
+using Primary.Collections;
+using Primary.Common;
+using Primary.Components;
+using Primary.Utility;
+using SharpGen.Runtime;
 
 namespace Primary.Scenes.Json
 {
     public sealed class SceneJsonSerializer
     {
-        private FrozenDictionary<string, ComponentSerializer> _deserializers;
+        private Dictionary<string, ComponentSerializer> _deserializers;
 
         internal SceneJsonSerializer()
         {
-            _deserializers = FrozenDictionary<string, ComponentSerializer>.Empty;
+            _deserializers = new Dictionary<string, ComponentSerializer>();
 
             Assembly thisAssembly = typeof(RegisterComponentsDefault).Assembly;
             Assembly? entryAssembly = Assembly.GetEntryAssembly();
@@ -29,8 +31,64 @@ namespace Primary.Scenes.Json
                 DiscoverAssembly(entryAssembly);
         }
 
+        internal void ForgetDeserializersFrom(Assembly assembly)
+        {
+            using RentedList<string> keysToRemove = new RentedList<string>();
+            foreach (var (key, serializer) in _deserializers)
+            {
+                if (serializer.DeserializerType.Assembly == assembly || serializer.TargetType.Assembly == assembly)
+                {
+                    keysToRemove.Add(key);
+                }
+            }
+
+            if (!keysToRemove.IsEmpty)
+            {
+                foreach (string key in keysToRemove)
+                {
+                    _deserializers.Remove(key);
+                }
+            }
+        }
+
+        internal void TryRegisterDeserializer(Type type, ComponentDeserializerAttribute? attribute = null)
+        {
+            attribute ??= type.GetCustomAttribute<ComponentDeserializerAttribute>()!;
+            if (!attribute.Target.IsAssignableTo(typeof(IComponent)))
+            {
+                EngLog.Scene.Error("Deserializer {c} target is not a real component", type);
+                return;
+            }
+
+            string? assemblyName = attribute.Target.Assembly.GetName().Name;
+            if (assemblyName != null && attribute.Target.FullName != null)
+            {
+                string keyName = $"{assemblyName}?{attribute.Target.FullName}";
+                if (!_deserializers.ContainsKey(keyName))
+                {
+                    DeserializeDelegate? deserialize = type.GetMethod("Deserialize", BindingFlags.Static | BindingFlags.Public)?.CreateDelegate<DeserializeDelegate>();
+                    if (deserialize == null)
+                    {
+                        EngLog.Scene.Error("Deserializer {c} is missing a proper Deserialize method", type);
+                        return;
+                    }
+
+                    AddDelegate? add = type.GetMethod("Add", BindingFlags.Static | BindingFlags.Public)?.CreateDelegate<AddDelegate>();
+                    if (add == null)
+                    {
+                        EngLog.Scene.Error("Deserializer {c} is missing a proper Add method", type);
+                        return;
+                    }
+
+                    _deserializers.Add(keyName, new ComponentSerializer(type, attribute.Target, deserialize, add));
+                }
+                else
+                    EngLog.Scene.Warning("Component {c} already has a serializer registered", attribute.Target);
+            }
+        }
+
         [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
-        private void DiscoverAssembly(Assembly assembly)
+        internal void DiscoverAssembly(Assembly assembly)
         {
             EngLog.Scene.Information("Discovering assembly for deserializers: {n}", assembly.GetName().Name ?? assembly.FullName);
 
@@ -45,46 +103,10 @@ namespace Primary.Scenes.Json
                 }
             });
 
-            Dictionary<string, ComponentSerializer> tempDict = _deserializers.ToDictionary();
-
             while (potentialSerializers.TryTake(out Type? result))
             {
-                ComponentDeserializerAttribute attribute = result.GetCustomAttribute<ComponentDeserializerAttribute>()!;
-                
-                if (!attribute.Target.IsAssignableTo(typeof(IComponent)))
-                {
-                    EngLog.Scene.Error("Deserializer {c} target is not a real component", result);
-                    continue;
-                }
-
-                string? assemblyName = attribute.Target.Assembly.GetName().Name;
-                if (assemblyName != null && attribute.Target.FullName != null)
-                {
-                    string keyName = $"{assemblyName}?{attribute.Target.FullName}";
-                    if (!_deserializers.ContainsKey(keyName))
-                    {
-                        DeserializeDelegate? deserialize = result.GetMethod("Deserialize", BindingFlags.Static | BindingFlags.Public)?.CreateDelegate<DeserializeDelegate>();
-                        if (deserialize == null)
-                        {
-                            EngLog.Scene.Error("Deserializer {c} is missing a proper Deserialize method", result);
-                            continue;
-                        }
-                        
-                        AddDelegate? add = result.GetMethod("Add", BindingFlags.Static | BindingFlags.Public)?.CreateDelegate<AddDelegate>();
-                        if (add == null)
-                        {
-                            EngLog.Scene.Error("Deserializer {c} is missing a proper Add method", result);
-                            continue;
-                        }
-
-                        tempDict.Add(keyName, new ComponentSerializer(attribute.Target, deserialize, add));
-                    }
-                    else
-                        EngLog.Scene.Warning("Component {c} already has a serializer registered", attribute.Target);
-                }
+                TryRegisterDeserializer(result);
             }
-
-            _deserializers = tempDict.ToFrozenDictionary();
         }
 
         internal bool CreateComponent(SceneEntity entity, string componentKey)
@@ -146,7 +168,7 @@ namespace Primary.Scenes.Json
             return assemblyName == null ? null : $"{assemblyName}?{type.FullName}";
         }
 
-        private readonly record struct ComponentSerializer(Type TargetType, DeserializeDelegate Deserialize, AddDelegate Add);
+        private readonly record struct ComponentSerializer(Type DeserializerType, Type TargetType, DeserializeDelegate Deserialize, AddDelegate Add);
 
         private delegate void DeserializeDelegate(ref Utf8JsonReader reader, ref SceneEntity entity);
         private delegate void AddDelegate(ref SceneEntity entity);

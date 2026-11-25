@@ -107,7 +107,7 @@ namespace VoxelizationDemo.Procedural
                 float theta = i * goldenAngle;
 
                 Vector3 position = new Vector3(MathF.Cos(theta), 0.0f, MathF.Sin(theta)) * radius + center;
-                
+
                 SceneEntity spire = scene.CreateEntity(SceneEntity.Null);
                 spire.Name = $"Sprire_{i}";
                 ++entityCount;
@@ -135,7 +135,7 @@ namespace VoxelizationDemo.Procedural
                     meshRenderer.Mesh = cylinderMesh;
                     meshRenderer.Material = spireBodyMat;
 
-                            ++entityCount;
+                    ++entityCount;
                 }
 
                 {
@@ -182,7 +182,7 @@ namespace VoxelizationDemo.Procedural
                 transform.Rotation = Quaternion.CreateFromRotationMatrix(Matrix4x4.CreateLookAt(Vector3.Zero, new Vector3(1.0f, 2.0f, 1.0f), Vector3.UnitY));
 
                 ref DirectionalLight light = ref dirLight.AddComponent<DirectionalLight>();
-                light.Intensity = 0.75f;
+                light.Intensity = 1.75f;
 
                 ++entityCount;
             }

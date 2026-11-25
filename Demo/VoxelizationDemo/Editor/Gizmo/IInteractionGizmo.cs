@@ -4,7 +4,6 @@ using System.Numerics;
 using System.Text;
 using Primary.Collections;
 using Primary.Mathematics;
-using VoxelizationDemo.Logic;
 
 namespace VoxelizationDemo.Editor.Gizmo
 {

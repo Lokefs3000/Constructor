@@ -55,7 +55,7 @@ namespace Primary.Assets
     {
         private ImmutableArray<Sprite> _sprites;
 
-        public TextureAtlasAssetData(AssetId id) : base(id)
+        public TextureAtlasAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
             _sprites = [];
         }

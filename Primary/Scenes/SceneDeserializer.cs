@@ -5,6 +5,7 @@ using Primary.Components;
 using Primary.Reflection;
 using Primary.Scenes.Json;
 using Primary.Scenes.Types;
+using Primary.Scripting;
 using Primary.Serialization;
 using Primary.Serialization.Structural;
 using System.Numerics;
@@ -22,6 +23,22 @@ namespace Primary.Scenes
         {
             _componentCache = new ComponentReflectionCache();
             _jsonSerializer = new SceneJsonSerializer();
+
+            ScriptingManager scripting = Engine.GlobalSingleton.ScriptingManager;
+            scripting.AssemblyUnloading += OnAssemblyUnloading;
+
+            scripting.TypeLoader.AddCallbackForTypeLoad<ComponentDeserializerAttribute>(OnDeserializerTypeLoaded);
+        }
+
+        private void OnAssemblyUnloading(Assembly assembly)
+        {
+            _componentCache.RemoveEntriesFromAssembly(assembly);
+            _jsonSerializer.ForgetDeserializersFrom(assembly);
+        }
+
+        private void OnDeserializerTypeLoaded(Type type, Attribute attribute, ReadOnlySpan<Attribute> allAttributes)
+        {
+            _jsonSerializer.TryRegisterDeserializer(type);
         }
 
         public void Deserialize(Stream source, Scene scene)

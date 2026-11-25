@@ -1,26 +1,35 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
-using System.Text;
+using Primary.Collections.ReadOnly;
 
 namespace Primary.Scripting
 {
     public sealed class ScriptingManager : IDisposable
     {
-        private List<ScriptContext> _contexts;
-        private List<ScriptContext> _pendingUnloads;
+        private readonly AssemblyTypeLoader _typeLoader;
 
-        private Dictionary<Assembly, ScriptContext> _assemblies;
+        private readonly List<ScriptContext> _contexts;
+        private readonly List<ScriptContext> _pendingUnloads;
+
+        private readonly Dictionary<Assembly, ScriptContext> _assemblies;
+        private readonly Dictionary<string, ScriptContext> _assemblyNames;
+
+        private readonly Dictionary<string, ScriptContext>.AlternateLookup<ReadOnlySpan<char>> _assemblyNamesAlt;
 
         private bool _disposedValue;
 
         internal ScriptingManager()
         {
+            _typeLoader = new AssemblyTypeLoader(this);
+
             _contexts = new List<ScriptContext>();
             _pendingUnloads = new List<ScriptContext>();
 
             _assemblies = new Dictionary<Assembly, ScriptContext>();
+            _assemblyNames = new Dictionary<string, ScriptContext>();
+
+            _assemblyNamesAlt = _assemblyNames.GetAlternateLookup<ReadOnlySpan<char>>();
         }
 
         private void Dispose(bool disposing)
@@ -49,7 +58,11 @@ namespace Primary.Scripting
         {
             if (_assemblies.TryAdd(assembly, context))
             {
+                _assemblyNames.Add(assembly.GetName().Name!, context);
+
                 EngLog.Scene.Debug("Registed new assembly: {asm}", assembly);
+
+                _typeLoader.LoadTypesOnAssembly(assembly);
 
                 try
                 {
@@ -65,6 +78,7 @@ namespace Primary.Scripting
         internal void UnregisterAssembly(Assembly assembly)
         {
             _assemblies.Remove(assembly);
+            _assemblyNames.Remove(assembly.GetName().Name!);
 
             try
             {
@@ -86,9 +100,13 @@ namespace Primary.Scripting
         {
             if (_pendingUnloads.Count > 0)
             {
+                Engine.GlobalSingleton.JobScheduler.WaitForAllJobs();
+
                 for (int i = 0; i < _pendingUnloads.Count; i++)
                 {
                     ScriptContext ctx = _pendingUnloads[i];
+                    ContextUnloading?.Invoke(ctx);
+
                     ctx.UnloadAssemblies();
                 }
 
@@ -96,6 +114,7 @@ namespace Primary.Scripting
                 GC.WaitForPendingFinalizers();
 
                 _pendingUnloads.Clear();
+                OnUnloadingFinished?.Invoke();
             }
         }
 
@@ -117,9 +136,20 @@ namespace Primary.Scripting
             return context;
         }
 
+        public bool TryGetAssemblyContext(ReadOnlySpan<char> qualifiedName, [NotNullWhen(true)] out ScriptContext? context)
+        {
+            return _assemblyNamesAlt.TryGetValue(qualifiedName, out context);
+        }
+
+        public AssemblyTypeLoader TypeLoader => _typeLoader;
+
+        public ROList<ScriptContext> Contexts => _contexts;
+
         public event Action<Assembly>? NewAssemblyLoaded;
         public event Action<Assembly>? AssemblyUnloading;
 
         public event Action<ScriptContext>? ContextUnloading;
+
+        public event Action? OnUnloadingFinished;
     }
 }

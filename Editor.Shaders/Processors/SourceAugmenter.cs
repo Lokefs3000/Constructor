@@ -601,6 +601,12 @@ namespace Editor.Shaders.Processors
                             //}
                         }
                     }
+
+                    span.Sort(static (x, y) =>
+                    {
+                        int r = x.Type.CompareTo(y.Type);
+                        return x.Type == y.Type ? x.Index.CompareTo(y.Index) : (x.Type == RawVariableDataType.Property ? 1 : 0).CompareTo(y.Type == RawVariableDataType.Property ? 1 : 0);
+                    });
                 }
 
                 static void MoveUntilOutOfComment(ReadOnlySpan<char> source, ref int index)

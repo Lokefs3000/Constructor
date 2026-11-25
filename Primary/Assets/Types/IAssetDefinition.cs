@@ -6,5 +6,6 @@
 
         public string Name { get; }
         public AssetId Id { get; }
+        public int UniqueIndex { get; }
     }
 }

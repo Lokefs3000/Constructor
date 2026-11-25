@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -12,6 +13,8 @@ namespace PrimaryEditor.Inspector.Views
     {
         public abstract bool Matches(IInspectorValue inspectorValue);
         public abstract bool Apply(IInspectorValue inspectorValue);
+
+        internal abstract bool HasReferencesTo(Assembly assembly);
 
         public sealed record class ValueType<T>(ViewSource Source, T Value) : ViewConstant(Source) where T : unmanaged
         {
@@ -40,6 +43,23 @@ namespace PrimaryEditor.Inspector.Views
 
                 inspectorValue.SetValueType(Value);
                 return true;
+            }
+
+            internal override bool HasReferencesTo(Assembly assembly)
+            {
+                if (typeof(T).Assembly == assembly || Source.Type.Assembly == assembly)
+                    return true;
+
+                if (Source.Opaque is FieldInfo)
+                {
+                    FieldInfo fieldInfo = Source.Field!;
+                    return fieldInfo.FieldType.Assembly == assembly || fieldInfo.DeclaringType?.Assembly == assembly;
+                }
+                else
+                {
+                    PropertyInfo propertyInfo = Source.Property!;
+                    return propertyInfo.PropertyType.Assembly == assembly || propertyInfo.DeclaringType?.Assembly == assembly;
+                }
             }
 
             private static ValueType<T> ResolvePresetValue(ViewSource source, PresetValueJson sourceData)
@@ -131,6 +151,23 @@ namespace PrimaryEditor.Inspector.Views
 
                 inspectorValue.SetObject(Value);
                 return true;
+            }
+
+            internal override bool HasReferencesTo(Assembly assembly)
+            {
+                if (typeof(T).Assembly == assembly || Source.Type.Assembly == assembly)
+                    return true;
+
+                if (Source.Opaque is FieldInfo)
+                {
+                    FieldInfo fieldInfo = Source.Field!;
+                    return fieldInfo.FieldType.Assembly == assembly || fieldInfo.DeclaringType?.Assembly == assembly;
+                }
+                else
+                {
+                    PropertyInfo propertyInfo = Source.Property!;
+                    return propertyInfo.PropertyType.Assembly == assembly || propertyInfo.DeclaringType?.Assembly == assembly;
+                }
             }
 
             private static Object<T> ResolvePresetValue(ViewSource source, PresetValueJson sourceData)

@@ -70,6 +70,7 @@ namespace VoxelizationDemo.Editor.Tools
                 }
             }
 
+            UndoHistory.RecordTransform(_entity, position: _storedPosition + delta);
             transform.Position = _storedPosition + delta;
         }
 
@@ -86,6 +87,7 @@ namespace VoxelizationDemo.Editor.Tools
                     delta *= Quaternion.CreateFromRotationMatrix(parentWorld.Transformation);
             }
 
+            UndoHistory.RecordTransform(_entity, rotation: delta * _storedRotation);
             transform.Rotation = delta * _storedRotation;
         }
 
@@ -105,6 +107,7 @@ namespace VoxelizationDemo.Editor.Tools
                         parentWorld.Transformation.Z.AsVector3().LengthSquared()));
             }
 
+            UndoHistory.RecordTransform(_entity, scale: _storedScale + delta);
             transform.Scale = _storedScale + delta;
         }
 

@@ -8,6 +8,9 @@
     <Platform Name="x86" />
   </Configurations>
   <Folder Name="/Demo/">
+    <Project Path="Demo/Game/Game.csproj" Id="f5e1b9fe-217f-441b-8252-60f9ffa4b503">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
     <Project Path="Demo/VoxelizationDemo/VoxelizationDemo.csproj" Id="f9aba521-8c7c-44bd-8ff2-60efbebd0e4b">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
@@ -71,11 +74,20 @@
     <Project Path="D:/source/repos/Constructor/Primary/Primary.csproj" />
     <Project Path="D:/source/repos/Constructor/Runtime/Runtime.csproj" />
   </Folder>
+  <Folder Name="/Engine/Generators/">
+    <Project Path="Generators/PhysXBindGen/PhysXBindGen.csproj" Id="760d04e4-0f7d-4adc-99ee-79227e16f57c">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+  </Folder>
   <Folder Name="/Engine/Interop/">
     <Project Path="D:/source/repos/Constructor/Interop.D3D12MemAlloc/Interop.D3D12MemAlloc.csproj">
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
     <Project Path="D:/source/repos/Constructor/Interop.NVAftermath/Interop.NVAftermath.csproj">
+      <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
+    </Project>
+    <Project Path="Interop.PhysX/Interop.PhysX.csproj" Id="83e415ed-a8fc-4de7-9640-f8307ad19621">
+      <BuildDependency Project="Native/PhysXInterop/PhysXInterop.vcxproj" />
       <BuildType Solution="ReleaseWithDebug|*" Project="Release" />
     </Project>
   </Folder>

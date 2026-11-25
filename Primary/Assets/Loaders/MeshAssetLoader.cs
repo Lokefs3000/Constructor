@@ -14,9 +14,9 @@ namespace Primary.Assets.Loaders
 {
     public sealed class MeshAssetLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new MeshAssetData(id);
+            return new MeshAssetData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
@@ -84,7 +84,7 @@ namespace Primary.Assets.Loaders
                     RenderMeshDrawArgs drawArgs = new RenderMeshDrawArgs(parentModel.InternalAssetData, vertexOffset, indexOffset, mesh.IndexCount, true);
 
                     meshAssetData.SetAssetInternalName(meshName);
-                    meshAssetData.UpdateAssetData(meshAsset, parentModel, boundaries, drawArgs);
+                    meshAssetData.UpdateAssetData(meshAsset, parentModel, boundaries, drawArgs, (ushort)currentMeshIndex);
 
                     return;
                 }

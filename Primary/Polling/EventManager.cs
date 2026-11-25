@@ -1,4 +1,5 @@
 ﻿using Primary.Profiling;
+using Primary.Windowing;
 using SDL;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -59,7 +60,10 @@ namespace Primary.Polling
                             _removing.Clear();
                         }
 
-                        PumpOnRecieve(ref @event);
+                        if (WindowManager.Instance.OwnsWindow((uint)@event.window.windowID))
+                        {
+                            PumpOnRecieve(ref @event);
+                        }
                     }
                 }
             }

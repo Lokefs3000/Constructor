@@ -397,7 +397,7 @@ namespace PrimaryEditor.Assets
             {
                 splash?.ActionName = "Registering importers..";
 
-                _importerRegistry.RegisterImporter<TextureImporter>(".png", ".jpg", ".jpeg", ".cubemap", ".texcomp");
+                _importerRegistry.RegisterImporter<TextureImporter>(".png", ".jpg", ".jpeg", ".exr", ".cubemap", ".texcomp");
                 _importerRegistry.RegisterImporter<ShaderImporter>(".shader");
                 _importerRegistry.RegisterImporter<TextureAtlasImporter>(".atlas");
                 _importerRegistry.RegisterImporter<ModelImporter>(".obj", ".fbx", ".gltf", ".glb");

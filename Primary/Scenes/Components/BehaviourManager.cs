@@ -2,6 +2,7 @@
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -25,6 +26,51 @@ namespace Primary.Scenes.Components
 
             _featureDict = new Dictionary<Type, BehaviourFeatures>();
             _behaviours = new Dictionary<SceneEntity, RentedList<EntityBehaviour>>();
+        }
+
+        internal void UnregisterBehavioursFrom(Assembly assembly)
+        {
+            using RentedList<Type> typesToRemove = new RentedList<Type>();
+            foreach (var (type, _) in _featureDict)
+            {
+                if (type.Assembly == assembly)
+                {
+                    typesToRemove.Add(type);
+                }
+            }
+
+            if (!typesToRemove.IsEmpty)
+            {
+                foreach (Type type in typesToRemove)
+                {
+                    _featureDict.Remove(type);
+                }
+            }
+        }
+
+        internal void DestroyBehavioursFrom(Assembly assembly)
+        {
+            List<(SceneEntity, EntityBehaviour)> behavioursToRemove = new List<(SceneEntity, EntityBehaviour)>();
+
+            foreach (var (entity, list) in _behaviours)
+            {
+                for (int i = 0; i < list.Count; ++i)
+                {
+                    EntityBehaviour behaviour = list[i];
+                    if (behaviour.GetType().Assembly == assembly)
+                    {
+                        behavioursToRemove.Add((entity, behaviour));
+                    }
+                }
+            }
+
+            if (behavioursToRemove.Count > 0)
+            {
+                foreach ((SceneEntity entity, EntityBehaviour behaviour) in behavioursToRemove)
+                {
+                    entity.RemoveComponent(behaviour.GetType());
+                }
+            }
         }
 
         internal void RegisterBehaviour(Type type)
@@ -53,7 +99,7 @@ namespace Primary.Scenes.Components
             ref BehaviourFeatures features = ref CollectionsMarshal.GetValueRefOrNullRef(_featureDict, behaviour.GetType());
             if (Unsafe.IsNullRef(in features))
             {
-                EngLog.Scene.Error("Expected entity behaviour '{t}' to have been already registerer", behaviour.GetType());
+                EngLog.Scene.Error("Expected entity behaviour '{t}' to have been already registered", behaviour.GetType());
 
                 RegisterBehaviour(behaviour.GetType());
                 features = ref CollectionsMarshal.GetValueRefOrNullRef(_featureDict, behaviour.GetType());
@@ -81,14 +127,21 @@ namespace Primary.Scenes.Components
             ref RentedList<EntityBehaviour> behaviourList = ref CollectionsMarshal.GetValueRefOrNullRef(_behaviours, entity);
             if (!Unsafe.IsNullRef(in behaviourList))
             {
-                if (behaviourList.Remove(behaviour))
+                for (int i = 0; i < behaviourList.Count; ++i)
                 {
-                    behaviour.OnDestroy();
-
-                    if (behaviourList.IsEmpty)
+                    EntityBehaviour behaviourOnEntity = behaviourList[i];
+                    if (object.ReferenceEquals(behaviourOnEntity, behaviour))
                     {
-                        behaviourList.Dispose();
-                        _behaviours.Remove(entity);
+                        behaviourList.RemoveAt(i);
+                        behaviour.OnDestroy();
+
+                        if (behaviourList.IsEmpty)
+                        {
+                            behaviourList.Dispose();
+                            _behaviours.Remove(entity);
+                        }
+
+                        break;
                     }
                 }
             }

@@ -191,6 +191,8 @@ namespace Primary.Windowing
                 return null;
         }
 
+        public bool OwnsWindow(uint id) => _windows.ContainsKey(id);
+
         public Window? PrimaryWindow { get => _primaryWindow; set => _primaryWindow = value; }
         public Window? ActiveWindow => _activeWindow;
 

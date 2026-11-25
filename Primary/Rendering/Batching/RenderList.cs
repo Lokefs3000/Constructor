@@ -1,8 +1,13 @@
 ﻿using CommunityToolkit.HighPerformance;
 using Primary.Assets;
 using Primary.Assets.Types;
+using Primary.Collections;
 using Primary.Collections.ReadOnly;
+using Primary.Common;
+using Primary.Memory;
+using Primary.Profiling;
 using Primary.Rendering.Assets;
+using Primary.Threading;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -19,47 +24,37 @@ namespace Primary.Rendering.Batching
 
         private MaterialAsset? _defaultMaterial;
 
-        private readonly Dictionary<ShaderAsset, ShaderRenderBatcher> _shaderBatchers;
-        private readonly Dictionary<ShaderAsset, ShaderKeyRange> _shaderKeyRanges;
+        private readonly ConcurrentBag<GridChunkBatcher> _finishedBatchers;
+        
+        private readonly Dictionary<RenderMesh, int> _batchMetrics;
+        private int _totalMatrixCount;
 
-        private readonly Dictionary<ShaderAsset, ushort> _shaderIds;
-        private readonly Dictionary<IRenderMeshSource, ushort> _modelIds;
-        private readonly Dictionary<MaterialAsset, uint> _materialIds;
+        private readonly HashSet<int> _uniqueMaterials;
+        private readonly List<MaterialAsset> _materials;
+        private int _materialByteSize;
 
-        private uint _materialByteSize;
+        private readonly Dictionary<RenderMesh, int> _renderMeshOffsets;
+        private readonly List<RenderListRange> _renderListRanges;
 
-        private readonly Lock _shaderIdsLock;
-        private readonly Lock _modelIdsLock;
-        private readonly Lock _materialIdsLock;
-
-        private readonly List<ShaderRenderBatcher> _usedBatchers;
-
-        private RenderKey[]? _rentedKeys;
-        private int _rentedKeyCount;
+        private Matrix4x4[] _matricies;
 
         internal RenderList(BatchingManager manager)
         {
             _manager = manager;
 
-            _defaultMaterial = AssetManager.LoadAsset<MaterialAsset>("Engine/Materials/Missing.mat");
+            _defaultMaterial = null;
 
-            _shaderBatchers = new Dictionary<ShaderAsset, ShaderRenderBatcher>();
-            _shaderKeyRanges = new Dictionary<ShaderAsset, ShaderKeyRange>();
+            _finishedBatchers = new ConcurrentBag<GridChunkBatcher>();
+            _batchMetrics = new Dictionary<RenderMesh, int>();
 
-            _shaderIds = new Dictionary<ShaderAsset, ushort>();
-            _modelIds = new Dictionary<IRenderMeshSource, ushort>();
-            _materialIds = new Dictionary<MaterialAsset, uint>();
-
+            _uniqueMaterials = new HashSet<int>();
+            _materials = new List<MaterialAsset>();
             _materialByteSize = 0;
 
-            _shaderIdsLock = new Lock();
-            _modelIdsLock = new Lock();
-            _materialIdsLock = new Lock();
+            _renderMeshOffsets = new Dictionary<RenderMesh, int>();
+            _renderListRanges = new List<RenderListRange>();
 
-            _usedBatchers = new List<ShaderRenderBatcher>();
-
-            _rentedKeys = null;
-            _rentedKeyCount = 0;
+            _matricies = [];
         }
 
         private void Dispose(bool disposing)
@@ -68,14 +63,8 @@ namespace Primary.Rendering.Batching
             {
                 if (disposing)
                 {
-                    ClearFrameData();
-
-                    foreach (ShaderRenderBatcher batcher in _shaderBatchers.Values)
-                    {
-                        batcher.Dispose();
-                    }
-
-                    _shaderBatchers.Clear();
+                    Clear();
+                    _manager.RemoveRenderList(this);
                 }
 
                 _disposedValue = true;
@@ -88,177 +77,137 @@ namespace Primary.Rendering.Batching
             GC.SuppressFinalize(this);
         }
 
-        internal void ClearFrameData()
+        internal void Clear()
         {
-            _shaderKeyRanges.Clear();
+            while (_finishedBatchers.TryTake(out GridChunkBatcher? chunkBatcher))
+            {
+                _manager.ReturnGridChunkBatcher(chunkBatcher);
+            }
 
-            _shaderIds.Clear();
-            _modelIds.Clear();
-            _materialIds.Clear();
+            _batchMetrics.Clear();
+            _totalMatrixCount = 0;
 
+            _uniqueMaterials.Clear();
+            _materials.Clear();
             _materialByteSize = 0;
 
-            _usedBatchers.Clear();
-
-            if (_rentedKeys != null)
-                ReturnKeys();
+            _renderMeshOffsets.Clear();
+            _renderListRanges.Clear();
         }
 
-        internal void FinishDispatch(MaterialShaderType shaderType)
+        internal void FinishBatching(GridChunkBatcher chunkBatcher)
         {
-            foreach (var (material, _) in _materialIds)
-            {
-                _materialByteSize += (uint)material.GetPropertyBlockOrNull(shaderType)!.BlockSize;
-            }
+            _finishedBatchers.Add(chunkBatcher);
         }
 
-        internal void SetupShaderBatchers()
+        private void CalculateMetrics(ReadOnlySpan<GridChunkBatcher> chunkBatchers)
         {
-            _usedBatchers.Clear();
-
-            foreach (var kvp in _shaderIds)
+            foreach (GridChunkBatcher chunkBatcher in chunkBatchers)
             {
-                if (!_shaderBatchers.TryGetValue(kvp.Key, out ShaderRenderBatcher? batcher))
+                foreach (var (renderMesh, matricies) in chunkBatcher.Batches)
                 {
-                    batcher = new ShaderRenderBatcher();
-                    _shaderBatchers.Add(kvp.Key, batcher);
-                }
+                    ref int count = ref CollectionsMarshal.GetValueRefOrAddDefault(_batchMetrics, renderMesh, out bool exists);
+                    if (!exists)
+                    {
+                        count = 0;
+                    }
 
-                batcher.ClearFrameData(kvp.Key);
-                _usedBatchers.Add(batcher);
+                    count += matricies.Count;
+                    _totalMatrixCount += matricies.Count;
+
+                    int materialIndex = MaterialPass.GetMaterialIndex(renderMesh.PassId);
+                    if (_uniqueMaterials.Add(materialIndex))
+                    {
+                        MaterialAsset asset = AssetManager.GetAssetFromIndex<MaterialAsset>(materialIndex)!;
+
+                        _materials.Add(asset);
+                        _materialByteSize += asset.GetPropertyBlockOrNull(MaterialPass.GetShaderType(renderMesh.PassId)).BlockSize;
+                    }
+                }
             }
         }
 
-        internal void ExecuteActiveBatchers(ReadOnlySpan<OctreeRenderBatcher> batchers)
+        private void CombineBatches(ReadOnlySpan<GridChunkBatcher> chunkBatchers)
         {
-            foreach (var kvp in _shaderIds)
+            MaterialPassCollection materialPasses = Engine.GlobalSingleton.RenderingManager.Services.GetService<MaterialPassCollection>();
+
+            int currentOffset = 0;
+
+            if (_matricies.Length < _totalMatrixCount)
             {
-                if (_shaderBatchers.TryGetValue(kvp.Key, out ShaderRenderBatcher? batcher))
-                {
-                    batcher.Execute(this, batchers);
-                }
+                _matricies = new Matrix4x4[MemoryHelper.AlignUp(_totalMatrixCount, 256)];
+            }
 
-                Debug.Assert(batcher != null);
+            foreach (GridChunkBatcher chunkBatcher in chunkBatchers)
+            {
+                foreach (var (renderMesh, matricies) in chunkBatcher.Batches)
+                {
+                    ref int offset = ref CollectionsMarshal.GetValueRefOrAddDefault(_renderMeshOffsets, renderMesh, out bool exists);
+                    if (!exists || offset == -1)
+                    {
+                        if (_batchMetrics.TryGetValue(renderMesh, out int totalMatrixCount) &&
+                            materialPasses.TryGetPass(renderMesh.PassId, out MaterialPass pass))
+                        {
+                            ModelAsset model = AssetManager.GetAssetFromIndex<ModelAsset>(renderMesh.ModelIndex)!;
+                            if (!model.IsReady || renderMesh.MeshIndex >= model.Meshes.Length)
+                                continue;
+
+                            _renderListRanges.Add(new RenderListRange(pass, model, model.Meshes[renderMesh.MeshIndex].Asset.Value, currentOffset, totalMatrixCount));
+
+                            offset = currentOffset;
+                            currentOffset += totalMatrixCount;
+                        }
+                        else
+                        {
+                            offset = -1;
+                            continue;
+                        }
+                    }
+
+                    matricies.Span.CopyTo(_matricies.AsSpan(offset, matricies.Count));
+                    offset += matricies.Count;
+                }
             }
         }
 
-        internal void AddRange(ShaderAsset asset, ShaderKeyRange range)
+#if DEBUG
+        internal int FinishedBatchers => _finishedBatchers.Count;
+#endif
+
+        public int MaterialByteSize => _materialByteSize;
+        public ROList<MaterialAsset> Materials => _materials;
+        public int MaterialCount => _uniqueMaterials.Count;
+
+        public ROList<RenderListRange> Ranges => _renderListRanges;
+        public ReadOnlySpan<Matrix4x4> Matricies => _matricies.AsSpan();
+
+        public bool IsEmpty => _renderListRanges.Count == 0 || _totalMatrixCount == 0;
+
+        internal readonly record struct CombineGridBatches(RenderList RenderList) : IJob
         {
-            _shaderKeyRanges.Add(asset, range);
-        }
+            public void Execute()
+            {
+                using (new ProfilingScope("CombineGridBatches"))
+                {
+                    using RentedList<GridChunkBatcher> chunkBatchers = new RentedList<GridChunkBatcher>();
+                    while (RenderList._finishedBatchers.TryTake(out GridChunkBatcher? chunkBatcher))
+                    {
+                        chunkBatchers.Add(chunkBatcher);
+                    }
 
-        internal Span<RenderKey> RentKeys(int count)
-        {
-            if (_rentedKeys != null)
-                ArrayPool<RenderKey>.Shared.Return(_rentedKeys);
+                    using (new ProfilingScope("Metrics"))
+                    {
+                        RenderList.CalculateMetrics(chunkBatchers.AsSpan());
+                    }
 
-            _rentedKeys = ArrayPool<RenderKey>.Shared.Rent(count);
-            _rentedKeyCount = count;
-
-            return _rentedKeys.AsSpan(0, count);
-        }
-
-        internal void ReturnKeys()
-        {
-            if (_rentedKeys != null)
-                ArrayPool<RenderKey>.Shared.Return(_rentedKeys);
-            _rentedKeys = null;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ushort GetShaderId(ShaderAsset asset) => GetIdFromDictionaryWithLock(_shaderIds, _shaderIdsLock, asset);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ushort GetModelId(IRenderMeshSource asset) => GetIdFromDictionaryWithLock(_modelIds, _modelIdsLock, asset);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal uint GetMaterialId(MaterialAsset asset) => GetIdFromDictionaryWithLock(_materialIds, _materialIdsLock, asset);
-
-        private TValue GetIdFromDictionaryWithLock<TKey, TValue>(Dictionary<TKey, TValue> dict, Lock @lock, TKey key) where TKey : class where TValue : struct, IUnsignedNumber<TValue>
-        {
-            // too large to inline anyway
-            using var _ = @lock.EnterScope();
-
-            ref TValue id = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, key, out bool exists);
-            if (exists)
-                return id;
-
-            if (typeof(TValue) == typeof(ushort))
-                id = Unsafe.BitCast<ushort, TValue>((ushort)(dict.Count - 1));
-            else if (typeof(TValue) == typeof(uint))
-                id = Unsafe.BitCast<uint, TValue>((uint)(dict.Count - 1));
-            else
-                throw new NotSupportedException();
-
-            return id;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool GetKeyRangeForShader(ShaderAsset asset, out ShaderKeyRange keyRange) => _shaderKeyRanges.TryGetValue(asset, out keyRange);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Span<RenderKey> GetSlicedKeyRange(ShaderKeyRange keyRange)
-        {
-            Debug.Assert(_rentedKeys != null);
-            return _rentedKeys.AsSpan(keyRange.FlagIdxStart, keyRange.FlagIdxEnd - keyRange.FlagIdxStart);
-        }
-
-        public MaterialAsset? DefaultMaterial { get => _defaultMaterial; set => _defaultMaterial = value ?? AssetManager.LoadAsset<MaterialAsset>("Engine/Materials/R2DefaultMat.mat2", AssetId.NoLocalId, true); }
-
-        public int TotalFlagCount => _rentedKeyCount;
-        public ROList<ShaderRenderBatcher> ShaderBatchers => _usedBatchers;
-
-        public RODictionary<ShaderAsset, ushort> ShaderIds => _shaderIds;
-        public RODictionary<IRenderMeshSource, ushort> ModelIds => _modelIds;
-        public RODictionary<MaterialAsset, uint> MaterialIds => _materialIds;
-
-        public uint MaterialByteSize => _materialByteSize;
-
-        public bool IsEmpty => _rentedKeyCount == 0 || _shaderIds.Count == 0 || _modelIds.Count == 0 || _materialIds.Count == 0;
-    }
-
-    /*
-        Primary (59 bits):
-            ShaderId (16 bits / 65535)
-            ModelId (16 bits / 65535)
-            MaterialId (17 bits / 131070)
-            MeshId (10 bits / 1023)
-        Auxiliary: (1 bits):
-            Transparent (1 bit / 1)
-    */
-    public struct RenderKey(ushort ShaderId, ushort ModelId, uint MaterialId, ushort MeshId, int ListIndex, byte BatcherIndex) : IComparable<RenderKey>, IComparer<RenderKey>, IEquatable<RenderKey>
-    {
-        public ulong Key = Create(ShaderId, ModelId, MaterialId, MeshId);
-        public uint ListIndex = (((uint)BatcherIndex) << 24) | ((uint)ListIndex);
-
-        public readonly ushort ShaderId => (ushort)((Key >> 43) & 0xffffu);
-        public readonly ushort ModelId => (ushort)((Key >> 27) & 0xffffu);
-        public readonly uint MaterialId => (uint)((Key >> 10) & 0x1ffffu);
-        public readonly ushort MeshId => (ushort)(Key & 0x3ffu);
-
-        public readonly int Index => (int)((ListIndex) & 0xffffff);
-        public readonly int Batcher => (byte)((ListIndex >> 24) & 0xff);
-
-        public readonly int Compare(RenderKey x, RenderKey y) => x.Key.CompareTo(y.Key);
-        public readonly int CompareTo(RenderKey other) => Key.CompareTo(other.Key);
-        public readonly bool Equals(RenderKey other) => Key.Equals(other.Key);
-
-        public static ulong Create(ushort shaderId, ushort modelId, uint materialId, ushort meshId)
-        {
-            return (((ulong)shaderId) << 43) | (((ulong)modelId) << 27) | (((ulong)materialId) << 10) | (ulong)meshId;
+                    using (new ProfilingScope("Combine"))
+                    {
+                        RenderList.CombineBatches(chunkBatchers.AsSpan());
+                    }
+                }
+            }
         }
     }
 
-    public readonly record struct UnbatchedRenderFlag(MaterialAsset Material, IRawRenderMesh Mesh, Matrix4x4 Model);
-    public readonly record struct ShaderKeyRange(int FlagIdxStart, int FlagIdxEnd);
-
-    public readonly ref struct ShaderRenderSection(ShaderAsset Shader, ReadOnlySpan<RenderSegment> Segments, ReadOnlySpan<RenderFlag> Flags)
-    {
-        public readonly ShaderAsset Shader { get; init; } = Shader;
-        public readonly ReadOnlySpan<RenderSegment> Segments { get; init; } = Segments;
-        public readonly ReadOnlySpan<RenderFlag> Flags { get; init; } = Flags;
-    }
-
-    public readonly record struct RenderFlag(Matrix4x4 Matrix, uint DataId);
-    public readonly record struct RenderSegment(MaterialAsset Material, uint MaterialIndex, IRawRenderMesh Mesh, int FlagIndexStart, int FlagIndexEnd);
+    public readonly record struct RenderListRange(MaterialPass Pass, ModelAsset Model, MeshAsset Mesh, int MatrixOffset, int InstanceCount);
 }

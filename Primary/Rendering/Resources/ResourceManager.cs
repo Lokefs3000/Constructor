@@ -432,6 +432,15 @@ namespace Primary.Rendering.Resources
                 shouldThrow = true;
             }
 
+            if (bufferDesc.Target.HasFlags(FGBufferTarget.Raw))
+            {
+                if (bufferDesc.Stride != 4)
+                {
+                    EngLog.Render.Error("[{name}]: A raw buffer must have a stride of 4 bytes", bufferDesc.Name);
+                    shouldThrow = true;
+                }
+            }
+
             if (bufferDesc.Target.HasFlags(FGBufferTarget.Constant))
             {
                 if (bufferDesc.ElementCount * bufferDesc.Stride > 65535)

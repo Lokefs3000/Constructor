@@ -1,0 +1,9 @@
+shader = "Content/Materials/Sets/LitTriplanar.shaderset"
+
+[resources]
+Diffuse = "Content/Materials/Testing/Ground/Ground037_1K-JPG_Color.jpg"
+Normal = "Content/Materials/Testing/Ground/Ground037_1K-JPG_NormalGL.jpg"
+Mask = "Content/Materials/Testing/Ground/Ground037_Mask.texcomp"
+
+[properties]
+"UV Scale" = "[0.2, 0.2]"

@@ -163,6 +163,24 @@ namespace Primary.Rendering.Recording
                                             barrierState.CurrentSync, barrierState.CurrentAccess, barrierState.CurrentQueueSpec,
                                             nextSync, currentRequest.Access, BarrierQueueSpec.None));
 
+                                        if (nextSync == ResourceBarrierSync.RenderTarget || currentRequest.Access == ResourceBarrierAccess.RenderTarget ||
+                                            nextSync == ResourceBarrierSync.DepthStencil || currentRequest.Access == ResourceBarrierAccess.DepthStencilWrite || currentRequest.Access == ResourceBarrierAccess.DepthStencilRead)
+                                        {
+                                            if (eventInfo.RenderPass1!.UninitializedTextures.Contains(currentRequest.Resource.Index))
+                                            {
+                                                if (nextSync == ResourceBarrierSync.RenderTarget || currentRequest.Access == ResourceBarrierAccess.RenderTarget)
+                                                {
+                                                    eventInfos[k].RenderPass1!.AddUninitializedRenderTarget(currentRequest.Resource.AsTexture());
+                                                }
+                                                else
+                                                {
+                                                    eventInfos[k].RenderPass1!.AddUninitializedDepthStencil(currentRequest.Resource.AsTexture());
+                                                }
+
+                                                eventInfo.RenderPass1.RemoveUninitializedTexture(currentRequest.Resource.AsTexture());
+                                            }
+                                        }
+
                                         barrierState.CurrentSync = nextSync;
                                         didFindEarlierGroup = true;
                                         break;

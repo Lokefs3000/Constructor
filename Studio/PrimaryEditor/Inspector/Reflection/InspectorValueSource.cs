@@ -5,7 +5,7 @@ using PrimaryEditor.Inspector.Values;
 
 namespace PrimaryEditor.Inspector.Reflection
 {
-    public readonly record struct InspectorValueSource(Delegate SetDelegate, Delegate GetDelegate, string LocalName, string TargetName)
+    public readonly record struct InspectorValueSource(Delegate SetDelegate, Delegate GetDelegate, Type DeclaringType, string LocalName, string TargetName)
     {
         public void SetValueFromValueType<T, TValueType>(ref TValueType valueType, T? value)
         {

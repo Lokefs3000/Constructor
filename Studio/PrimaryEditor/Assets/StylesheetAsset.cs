@@ -19,7 +19,7 @@ namespace PrimaryEditor.Assets
     {
         private Stylesheet? _stylesheet;
 
-        public StylesheetData(AssetId id) : base(id)
+        public StylesheetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
             _stylesheet = null;
         }

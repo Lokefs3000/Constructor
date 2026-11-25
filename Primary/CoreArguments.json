@@ -44,6 +44,11 @@
             "name": "render-draw-gizmos",
             "shorthand": null,
             "type": null
+        },
+        {
+            "name": "phys-trace-allocs",
+            "shorthand": null,
+            "type": null
         }
     ],
     "includes": []

@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
+using Primary.Scripting;
+using VoxelizationDemo.Core;
 
 namespace VoxelizationDemo.Editor.Serialization
 {
@@ -19,6 +22,15 @@ namespace VoxelizationDemo.Editor.Serialization
             _converterDatabase = new ConverterDatabase();
 
             _objectSerializer = new ObjectSerializer(this);
+
+            ScriptingManager scripting = VoxelRuntime.Instance.ScriptingManager;
+            scripting.AssemblyUnloading += OnAssemblyUnloading;
+        }
+
+        private void OnAssemblyUnloading(Assembly assembly)
+        {
+            _propertyDatabase.RemoveEntriesFromAssembly(assembly);
+            _converterDatabase.RemoveEntriesFromAssembly(assembly);
         }
 
         internal PropertyDatabase PropertyDatabase => _propertyDatabase;

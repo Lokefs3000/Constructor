@@ -58,5 +58,8 @@ namespace Primary.Rendering
 
         public T AddBlackboard<T>() where T : class, IBlackboardData, new() => _blackboard.Add<T>();
         public T? GetBlackboard<T>() where T : class, IBlackboardData, new() => _blackboard.Get<T>();
+
+        public ref readonly FGBufferDesc GetDescription(in BufferHandle buffer) => ref _frameGraph.ResourceManager.GetDescription(in buffer);
+        public ref readonly FGTextureDesc GetDescription(in TextureHandle texture) => ref _frameGraph.ResourceManager.GetDescription(in texture);
     }
 }

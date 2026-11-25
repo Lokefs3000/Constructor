@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Xml.Linq;
+using Primary.Collections;
 
 namespace VoxelizationDemo.Editor.Serialization
 {
@@ -18,6 +19,26 @@ namespace VoxelizationDemo.Editor.Serialization
         internal PropertyDatabase()
         {
             _entries = new ConcurrentDictionary<Type, PropertyList>();
+        }
+
+        internal void RemoveEntriesFromAssembly(Assembly assembly)
+        {
+            using RentedList<Type> keysToRemove = new RentedList<Type>();
+            foreach (var (type, _) in _entries)
+            {
+                if (type.Assembly == assembly)
+                {
+                    keysToRemove.Add(type);
+                }
+            }
+
+            if (!keysToRemove.IsEmpty)
+            {
+                foreach (Type key in keysToRemove)
+                {
+                    _entries.TryRemove(key, out _);
+                }
+            }
         }
 
         internal PropertyList QueryProperties(Type type)

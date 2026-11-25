@@ -19,6 +19,7 @@ namespace Primary.Assets
         IRenderMeshSource? IRawRenderMesh.MeshSource => IsLoaded && (ParentAsset?.IsLoaded ?? false) ? ParentAsset.InternalAssetData : null;
         public AABB Boundaries => AssetData.Boundaries;
         public ref readonly RenderMeshDrawArgs Args => ref AssetData.Args;
+        public int MeshIndex => AssetData.MeshIndex;
 
         int IRawRenderMesh.UniqueId => Id.LocalId;
     }
@@ -30,15 +31,19 @@ namespace Primary.Assets
         private AABB _boundaries;
         private RenderMeshDrawArgs _drawArgs;
 
-        internal MeshAssetData(AssetId id) : base(id)
+        private ushort _meshIndex;
+
+        internal MeshAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
             _parentAsset = null;
 
             _boundaries = AABB.Zero;
             _drawArgs = default;
+
+            _meshIndex = ushort.MaxValue;
         }
 
-        public void UpdateAssetData(MeshAsset asset, ModelAsset parentAsset, AABB boundaries, RenderMeshDrawArgs drawArgs)
+        public void UpdateAssetData(MeshAsset asset, ModelAsset parentAsset, AABB boundaries, RenderMeshDrawArgs drawArgs, ushort meshIndex)
         {
             base.UpdateAssetData(asset);
 
@@ -46,11 +51,15 @@ namespace Primary.Assets
 
             _boundaries = boundaries;
             _drawArgs = drawArgs;
+
+            _meshIndex = meshIndex;
         }
 
         public ModelAsset? ParentAsset => _parentAsset;
 
         public AABB Boundaries => _boundaries;
         public ref readonly RenderMeshDrawArgs Args => ref _drawArgs;
+
+        public ushort MeshIndex => _meshIndex;
     }
 }

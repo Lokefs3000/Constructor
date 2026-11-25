@@ -56,6 +56,8 @@ namespace Primary.Assets
 
         public ImmutableArray<LazyMesh> Meshes => IsLoaded ? AssetData.Meshes : ImmutableArray<LazyMesh>.Empty;
         public ModelNode? RootNode => IsLoaded ? AssetData.Root : null;
+
+        public IRenderMeshSource MeshSource => AssetData;
     }
 
     public sealed class ModelAssetData : BaseInternalAssetData<ModelAsset>, IRenderMeshSource
@@ -66,7 +68,7 @@ namespace Primary.Assets
         private RHIBuffer? _vertexBuffer;
         private RHIBuffer? _indexBuffer;
 
-        internal ModelAssetData(AssetId id) : base(id)
+        internal ModelAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
             _meshes = ImmutableArray<LazyMesh>.Empty;
             _node = null;

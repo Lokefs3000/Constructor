@@ -1,27 +1,45 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
-using System.Text;
 using CommunityToolkit.Diagnostics;
+using Primary.Collections;
 using Sigil.NonGeneric;
 
 namespace PrimaryEditor.Inspector.Reflection
 {
     public sealed class ValueSourceGenerator
     {
-        private readonly AssemblyBuilder _assembly;
-        private readonly ModuleBuilder _module;
-
+        private Dictionary<Assembly, DynamicAssembly> _dynamicAssemblies;
         private Dictionary<object, InspectorValueSource> _valueSources;
 
         internal ValueSourceGenerator()
         {
-            _assembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("PrimaryEditor.Inspector.IL"), AssemblyBuilderAccess.RunAndCollect);
-            _module = _assembly.DefineDynamicModule("PrimaryEditor.Inspector.IL");
-
+            _dynamicAssemblies = new Dictionary<Assembly, DynamicAssembly>();
             _valueSources = new Dictionary<object, InspectorValueSource>();
+        }
+
+        internal void RemoveAllSourcesReferencing(Assembly assembly)
+        {
+            using RentedList<object> keysToRemove = new RentedList<object>();
+            foreach (var (key, valueSource) in _valueSources)
+            {
+                if (key.GetType().Assembly == assembly ||
+                    valueSource.SetDelegate.Method.ReturnType.Assembly == assembly ||
+                    valueSource.GetDelegate.Method.ReturnType.Assembly == assembly)
+                {
+                    keysToRemove.Add(key);
+                }
+            }
+
+            if (!keysToRemove.IsEmpty)
+            {
+                foreach (object key in keysToRemove)
+                {
+                    _valueSources.Remove(key);
+                }
+            }
+
+            _dynamicAssemblies.Remove(assembly);
         }
 
         internal InspectorValueSource GetValueSource(FieldInfo field)
@@ -48,6 +66,8 @@ namespace PrimaryEditor.Inspector.Reflection
 
         private InspectorValueSource CreateValueSourceForField(FieldInfo field)
         {
+            DynamicAssembly assembly = GetDynamicAssembly(field.DeclaringType!.Assembly);
+
             Delegate getDelegate;
             Delegate setDelegate;
 
@@ -60,7 +80,7 @@ namespace PrimaryEditor.Inspector.Reflection
             {
                 if (declaringType.IsClass)
                 {
-                    Emit emit = Emit.NewDynamicMethod(targetType, [declaringType], $"GetObject_{fullFieldName}", _module);
+                    Emit emit = Emit.NewDynamicMethod(targetType, [declaringType], $"GetObject_{fullFieldName}", assembly.Module);
 
                     emit.LoadArgument(0);
                     emit.LoadField(field);
@@ -70,7 +90,7 @@ namespace PrimaryEditor.Inspector.Reflection
                 }
                 else
                 {
-                    Emit emit = Emit.NewDynamicMethod(targetType, [declaringType.MakeByRefType()], $"GetValueType_{fullFieldName}", _module);
+                    Emit emit = Emit.NewDynamicMethod(targetType, [declaringType.MakeByRefType()], $"GetValueType_{fullFieldName}", assembly.Module);
 
                     emit.LoadArgument(0);
                     emit.LoadField(field);
@@ -84,7 +104,7 @@ namespace PrimaryEditor.Inspector.Reflection
             {
                 if (declaringType.IsClass)
                 {
-                    Emit emit = Emit.NewDynamicMethod(typeof(void), [declaringType, targetType], $"SetObject_{fullFieldName}", _module);
+                    Emit emit = Emit.NewDynamicMethod(typeof(void), [declaringType, targetType], $"SetObject_{fullFieldName}", assembly.Module);
 
                     emit.LoadArgument(0);
                     emit.LoadArgument(1);
@@ -95,7 +115,7 @@ namespace PrimaryEditor.Inspector.Reflection
                 }
                 else
                 {
-                    Emit emit = Emit.NewDynamicMethod(typeof(void), [declaringType.MakeByRefType(), targetType], $"SetValueType_{fullFieldName}", _module);
+                    Emit emit = Emit.NewDynamicMethod(typeof(void), [declaringType.MakeByRefType(), targetType], $"SetValueType_{fullFieldName}", assembly.Module);
 
                     emit.LoadArgument(0);
                     emit.LoadArgument(1);
@@ -106,13 +126,15 @@ namespace PrimaryEditor.Inspector.Reflection
                 }
             }
 
-            return new InspectorValueSource(setDelegate, getDelegate, field.Name, fullFieldName);
+            return new InspectorValueSource(setDelegate, getDelegate, declaringType, field.Name, fullFieldName);
         }
 
         private InspectorValueSource CreateValueSourceForProperty(PropertyInfo property)
         {
             Guard.IsNotNull(property.GetMethod);
             Guard.IsNotNull(property.SetMethod);
+
+            DynamicAssembly assembly = GetDynamicAssembly(property.DeclaringType!.Assembly);
 
             Delegate getDelegate;
             Delegate setDelegate;
@@ -126,7 +148,7 @@ namespace PrimaryEditor.Inspector.Reflection
             {
                 if (declaringType.IsClass)
                 {
-                    Emit emit = Emit.NewDynamicMethod(targetType, [declaringType], $"GetObject_{fullPropertyName}", _module);
+                    Emit emit = Emit.NewDynamicMethod(targetType, [declaringType], $"GetObject_{fullPropertyName}", assembly.Module);
 
                     emit.LoadArgument(0);
                     emit.Call(property.GetMethod!);
@@ -136,7 +158,7 @@ namespace PrimaryEditor.Inspector.Reflection
                 }
                 else
                 {
-                    Emit emit = Emit.NewDynamicMethod(targetType, [declaringType.MakeByRefType()], $"GetValueType_{fullPropertyName}", _module);
+                    Emit emit = Emit.NewDynamicMethod(targetType, [declaringType.MakeByRefType()], $"GetValueType_{fullPropertyName}", assembly.Module);
 
                     emit.LoadArgument(0);
                     emit.Call(property.GetMethod!);
@@ -150,7 +172,7 @@ namespace PrimaryEditor.Inspector.Reflection
             {
                 if (declaringType.IsClass)
                 {
-                    Emit emit = Emit.NewDynamicMethod(typeof(void), [declaringType, targetType], $"SetObject_{fullPropertyName}", _module);
+                    Emit emit = Emit.NewDynamicMethod(typeof(void), [declaringType, targetType], $"SetObject_{fullPropertyName}", assembly.Module);
 
                     emit.LoadArgument(0);
                     emit.LoadArgument(1);
@@ -161,7 +183,7 @@ namespace PrimaryEditor.Inspector.Reflection
                 }
                 else
                 {
-                    Emit emit = Emit.NewDynamicMethod(typeof(void), [declaringType.MakeByRefType(), targetType], $"SetValueType_{fullPropertyName}", _module);
+                    Emit emit = Emit.NewDynamicMethod(typeof(void), [declaringType.MakeByRefType(), targetType], $"SetValueType_{fullPropertyName}", assembly.Module);
 
                     emit.LoadArgument(0);
                     emit.LoadArgument(1);
@@ -172,10 +194,26 @@ namespace PrimaryEditor.Inspector.Reflection
                 }
             }
 
-            return new InspectorValueSource(setDelegate, getDelegate, property.Name, fullPropertyName);
+            return new InspectorValueSource(setDelegate, getDelegate, declaringType, property.Name, fullPropertyName);
+        }
+
+        private DynamicAssembly GetDynamicAssembly(Assembly assembly)
+        {
+            ref DynamicAssembly value = ref CollectionsMarshal.GetValueRefOrAddDefault(_dynamicAssemblies, assembly, out bool exists);
+            if (!exists)
+            {
+                AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName($"InspectorIL.{(uint)assembly.GetHashCode()}"), AssemblyBuilderAccess.RunAndCollect);
+                ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule("Main");
+
+                value = new DynamicAssembly(assemblyBuilder, moduleBuilder);
+            }
+
+            return value;
         }
 
         private static string GetFullFieldName(FieldInfo field) => $"{field.DeclaringType!.FullName}.{field.Name}";
         private static string GetFullPropertyName(PropertyInfo property) => $"{property.DeclaringType!.FullName}.{property.Name}";
+
+        private readonly record struct DynamicAssembly(AssemblyBuilder Assembly, ModuleBuilder Module);
     }
 }

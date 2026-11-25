@@ -1,10 +1,13 @@
 ﻿using Arch.Core;
 using Arch.Core.Extensions;
+using CommunityToolkit.Diagnostics;
+using Primary.Collections;
 using Primary.Common;
 using Primary.Components;
 using Primary.Scenes.Entities;
 using Primary.Scripting;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
@@ -13,6 +16,8 @@ namespace Primary.Scenes.Components
     public sealed class SceneEntityManager
     {
         private static readonly WeakReference s_instance = new WeakReference(null);
+
+        private bool _hasModifiedRegistry;
 
         private readonly ComponentRegistry _registry;
         private readonly ComponentDependencyGraph _dependencyGraph;
@@ -30,6 +35,8 @@ namespace Primary.Scenes.Components
         {
             s_instance.Target = this;
 
+            _hasModifiedRegistry = false;
+
             _registry = new ComponentRegistry(this);
             _dependencyGraph = new ComponentDependencyGraph(_registry);
             _relationshipManager = new RelationshipManager();
@@ -43,12 +50,93 @@ namespace Primary.Scenes.Components
             _events = EntityEvents.None;
 
             ScriptingManager scripting = Engine.GlobalSingleton.ScriptingManager;
-            scripting.ContextUnloading += OnScriptContextUnloading;
+            scripting.AssemblyUnloading += OnAssemblyUnloading;
+            scripting.NewAssemblyLoaded += OnNewAssemblyLoaded;
+
+            scripting.TypeLoader.AddCallbackForTypeLoad<ComponentAttribute>(OnComponentTypeLoaded);
         }
 
-        private void OnScriptContextUnloading(ScriptContext context)
+        private void OnAssemblyUnloading(Assembly assembly)
         {
-            _callbacks.RemoveListenersFrom(context.LoadedAssemblies);
+            _behaviourManager.DestroyBehavioursFrom(assembly);
+
+            _registry.UnregisterComponentsFrom(assembly);
+            _callbacks.RemoveListenersFrom(assembly);
+            _behaviourManager.UnregisterBehavioursFrom(assembly);
+
+            _dependencyGraph.BuildDependencyGraph();
+
+            SceneManager sceneManager = Engine.GlobalSingleton.SceneManager;
+            for (int i = 0; i < Arch.Core.ComponentRegistry.Types.Length; ++i)
+            {
+                Type? type = Arch.Core.ComponentRegistry.Types[i];
+                if (type?.Assembly == assembly)
+                {
+                    Arch.Core.ComponentRegistry.Remove(type);
+                }
+            }
+
+            sceneManager.World.TrimExcess();
+
+            {
+                Dictionary<QueryDescription, Query> queryCache = World_GetQueryCache(sceneManager.World);
+
+                using RentedList<QueryDescription> keysToRemove = new RentedList<QueryDescription>();
+                foreach (var (key, _) in queryCache)
+                {
+                    if (DoesSignatureHaveReferences(key.All, assembly) ||
+                        DoesSignatureHaveReferences(key.Any, assembly) ||
+                        DoesSignatureHaveReferences(key.None, assembly) ||
+                        DoesSignatureHaveReferences(key.Exclusive, assembly))
+                    {
+                        keysToRemove.Add(key);
+                    }
+
+                    static bool DoesSignatureHaveReferences(Signature signature, Assembly assembly)
+                    {
+                        if (signature == Signature.Null)
+                            return false;
+
+                        foreach (var type in signature.Components)
+                        {
+                            if (type.Type.Assembly == assembly)
+                            {
+                                return true;
+                            }
+                        }
+
+                        return false;
+                    }
+                }
+
+                if (!keysToRemove.IsEmpty)
+                {
+                    foreach (QueryDescription key in keysToRemove)
+                    {
+                        queryCache.Remove(key);
+                    }
+                }
+            }
+
+            [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "get_QueryCache")]
+            extern static Dictionary<QueryDescription, Query> World_GetQueryCache(World world);
+        }
+
+        private void OnNewAssemblyLoaded(Assembly assembly)
+        {
+            if (_hasModifiedRegistry)
+            {
+                _dependencyGraph.BuildDependencyGraph();
+            }
+        }
+
+        private void OnComponentTypeLoaded(Type type, Attribute attribute, ReadOnlySpan<Attribute> allAttributes)
+        {
+            if (type.IsAssignableTo(typeof(IComponent)) && type.GetConstructor(BindingFlags.Instance | BindingFlags.Public, Type.EmptyTypes) != null)
+            {
+                _registry.RegisterComponent(type);
+                _hasModifiedRegistry = true;
+            }
         }
 
         internal void HandleRemovedEntities()
@@ -145,8 +233,7 @@ namespace Primary.Scenes.Components
                 return null;
             }
 
-            IComponent? comp = (IComponent?)entity.Get(entry.NativeType);
-            if (comp == null)
+            if (!entity.TryGet(entry.NativeType, out object? comp) || comp == null)
             {
                 comp = entry.AddClassImpl(in entity);
 
@@ -169,7 +256,7 @@ namespace Primary.Scenes.Components
                     ComponentAdded?.Invoke(entity, type);
             }
 
-            return comp;
+            return (IComponent?)comp;
         }
 
         private bool RemoveComponentImpl(ref readonly Entity entity, Type type)
@@ -354,12 +441,18 @@ namespace Primary.Scenes.Components
                 return null;
             }
 
-            return entry.BoxImpl(ref AddComponentImpl(in entity, type));
+            if (type.IsClass)
+                return AddComponentClassImpl(in entity, type);
+            else
+                return entry.BoxImpl(ref AddComponentImpl(in entity, type));
         }
 
         internal bool RemoveComponent(ref readonly Entity entity, Type type)
         {
-            return RemoveComponentImpl(in entity, type);
+            if (type.IsClass)
+                return RemoveComponentClassImpl(in entity, type);
+            else
+                return RemoveComponentImpl(in entity, type);
         }
 
         internal IComponent SetComponent(ref readonly Entity entity, Type type, IComponent value)

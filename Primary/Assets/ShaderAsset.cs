@@ -43,7 +43,7 @@ namespace Primary.Assets
 
         private int _resourceCount;
 
-        internal ShaderAssetData(AssetId id) : base(id)
+        internal ShaderAssetData(AssetId id, int uniqueIndex) : base(id, uniqueIndex)
         {
             _properties = Array.Empty<ShaderProperty>();
             _remappingTable = FrozenDictionary<int, int>.Empty;

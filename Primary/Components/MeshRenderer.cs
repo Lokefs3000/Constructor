@@ -12,6 +12,7 @@ namespace Primary.Components
     [ComponentUsage(HasSelfReference: true)]
     public struct MeshRenderer : IComponent
     {
+        [IgnoreDataMember]
         private long _updateIndex;
 
         private MeshAsset? _mesh;
@@ -21,7 +22,10 @@ namespace Primary.Components
 
         public MeshRenderer()
         {
-            _updateIndex = Time.FrameIndex;
+            _updateIndex = -1;
+
+            _mesh = null;
+            _material = null;
 
             _layers = ulong.MaxValue;
         }

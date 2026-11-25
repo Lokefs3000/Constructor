@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using CommunityToolkit.Diagnostics;
 
 namespace Editor.Processors.Texture
 {
@@ -71,7 +72,7 @@ namespace Editor.Processors.Texture
 
                             TexInterop.FreePNG(ref bitmap);
 
-                            return new RawTextureData(pixelData, (int)bitmap.Width, (int)bitmap.Height, bitmap.Stride);
+                            return new RawTextureData(pixelData, (int)bitmap.Width, (int)bitmap.Height, bitmap.Stride, false);
                         }
                     case ".jpeg":
                     case ".jpg":
@@ -84,7 +85,7 @@ namespace Editor.Processors.Texture
                                 string str = GetErrorAsString(errorOutput);
                                 TexInterop.FreeJPEGError(errorOutput);
 
-                                throw new Exception($"Failed to load png: {filePath} because: {str}");
+                                throw new Exception($"Failed to load jpg: {filePath} because: {str}");
                             }
 
                             ScopedPtr<Vector128<float>> pixelData = ScopedMemory.Allocate<Vector128<float>>(64, bitmap.Width * bitmap.Height);
@@ -103,7 +104,33 @@ namespace Editor.Processors.Texture
 
                             TexInterop.FreeJPEG(ref bitmap);
 
-                            return new RawTextureData(pixelData, (int)bitmap.Width, (int)bitmap.Height, bitmap.Stride);
+                            return new RawTextureData(pixelData, (int)bitmap.Width, (int)bitmap.Height, bitmap.Stride, false);
+                        }
+                    case ".exr":
+                        {
+                            TexInterop.ImageBitmapHDR bitmap = default;
+                            sbyte* errorOutput = null;
+
+                            if (!TexInterop.LoadEXRHDR(ref imageData, ref bitmap, &errorOutput))
+                            {
+                                string str = GetErrorAsString(errorOutput);
+                                TexInterop.FreeEXRError(errorOutput);
+
+                                throw new Exception($"Failed to load exr: {filePath} because: {str}");
+                            }
+
+                            ScopedPtr<Vector128<float>> pixelData = ScopedMemory.Allocate<Vector128<float>>(64, bitmap.Width * bitmap.Height);
+                            Guard.IsEqualTo(bitmap.Stride, (byte)4);
+
+                            int count = (int)(bitmap.Width * bitmap.Height);
+                            for (int i = 0, j = 0; i < count; ++i, j += bitmap.Stride)
+                            {
+                                pixelData[i] = Vector128.Create(bitmap.Pixels[j], bitmap.Pixels[j + 1], bitmap.Pixels[j + 2], bitmap.Pixels[j + 3]);
+                            }
+
+                            TexInterop.FreeEXR(ref bitmap);
+
+                            return new RawTextureData(pixelData, (int)bitmap.Width, (int)bitmap.Height, bitmap.Stride, true);
                         }
                     default: throw new Exception($"Unknown image file type: {filePath}");
                 }
@@ -278,7 +305,22 @@ namespace Editor.Processors.Texture
                                 string str = GetErrorAsString(errorOutput);
                                 TexInterop.FreeJPEGError(errorOutput);
 
-                                throw new Exception($"Failed to query jpeg: {filePath} because: {str}");
+                                throw new Exception($"Failed to query jpg: {filePath} because: {str}");
+                            }
+
+                            return new Int2((int)metrics.Width, (int)metrics.Height);
+                        }
+                    case ".exr":
+                        {
+                            TexInterop.ImageMetrics metrics = default;
+                            sbyte* errorOutput = null;
+
+                            if (!TexInterop.QueryEXR(ref imageData, ref metrics, &errorOutput))
+                            {
+                                string str = GetErrorAsString(errorOutput);
+                                TexInterop.FreeEXRError(errorOutput);
+
+                                throw new Exception($"Failed to query exr: {filePath} because: {str}");
                             }
 
                             return new Int2((int)metrics.Width, (int)metrics.Height);
@@ -286,6 +328,15 @@ namespace Editor.Processors.Texture
                     default: throw new Exception($"Unknown image file type: {filePath}");
                 }
             }
+        }
+
+        internal static RawTextureData CreateTexture(int width, int height, int stride, bool isHDR = false)
+        {
+            Guard.IsGreaterThan(width, 0);
+            Guard.IsGreaterThan(height, 0);
+
+            ScopedPtr<Vector128<float>> pixelData = ScopedMemory.Allocate<Vector128<float>>(64, (nuint)(width * height));
+            return new RawTextureData(pixelData, width, height, stride, isHDR);
         }
 
         private static string GetErrorAsString(sbyte* ptr)

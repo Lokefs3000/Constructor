@@ -1,0 +1,5 @@
+shader = "Content/Materials/Sets/Lit.shaderset"
+
+[resources]
+Diffuse = "Engine/Textures/Default/DefaultGrid.png"
+Normal = "Engine/Textures/Default/DefaultGrid_Normal.png"

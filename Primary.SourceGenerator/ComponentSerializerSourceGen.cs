@@ -42,51 +42,55 @@ namespace Primary.SourceGenerator
                 
             string structName = structSymbol.ToString();
 
-            ImmutableArray<ISymbol> structMembers = structSymbol.GetMembers();
-            List<ComponentField> fields = new List<ComponentField>(structMembers.Length);
+            List<ComponentField> fields = new List<ComponentField>();
 
-            foreach (ISymbol member in structMembers)
+            INamedTypeSymbol? currentStructSymbol = structSymbol;
+            do
             {
-                if (member is IFieldSymbol field)
+                ImmutableArray<ISymbol> structMembers = currentStructSymbol.GetMembers();
+                foreach (ISymbol member in structMembers)
                 {
-                    string? customSerializer = null;
-
-                    bool isValidField = true;
-                    foreach (AttributeData attributeData in field.GetAttributes())
+                    if (member is IFieldSymbol field)
                     {
-                        INamedTypeSymbol? typeSymbol = attributeData.AttributeClass;
-                        if (typeSymbol != null)
+                        string? customSerializer = null;
+
+                        bool isValidField = true;
+                        foreach (AttributeData attributeData in field.GetAttributes())
                         {
-                            if (typeSymbol.Name == "IgnoreDataMemberAttribute")
+                            INamedTypeSymbol? typeSymbol = attributeData.AttributeClass;
+                            if (typeSymbol != null)
                             {
-                                isValidField = false;
-                                break;
-                            }
-                            else if (typeSymbol.Name == "CustomComponentSerializerAttribute")
-                            {
-                                foreach (var kvp in attributeData.NamedArguments)
+                                if (typeSymbol.Name == "IgnoreDataMemberAttribute")
                                 {
-                                    if (kvp.Key == "Type")
+                                    isValidField = false;
+                                    break;
+                                }
+                                else if (typeSymbol.Name == "CustomComponentSerializerAttribute")
+                                {
+                                    foreach (var kvp in attributeData.NamedArguments)
                                     {
-                                        ITypeSymbol? argSymbol = kvp.Value.Type;
-                                        if (argSymbol != null)
+                                        if (kvp.Key == "Type")
                                         {
-                                            customSerializer = argSymbol.ToDisplayString(s_serializerArgFormat);
-                                            break;
+                                            ITypeSymbol? argSymbol = kvp.Value.Type;
+                                            if (argSymbol != null)
+                                            {
+                                                customSerializer = argSymbol.ToDisplayString(s_serializerArgFormat);
+                                                break;
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    if (isValidField)
-                    {
-                        ComponentFieldType fieldType = ComponentFieldType.Generic;
-                        fields.Add(new ComponentField(field.Name, field.Type.ToString(), fieldType, customSerializer));
+                        if (isValidField)
+                        {
+                            ComponentFieldType fieldType = ComponentFieldType.Generic;
+                            fields.Add(new ComponentField(field.Name, field.Type.ToString(), fieldType, customSerializer));
+                        }
                     }
                 }
-            }
+            } while ((currentStructSymbol = currentStructSymbol.BaseType) != null);
 
             return new ComponentToGenerate(structName, structSymbol.ContainingNamespace.ToString(), structSymbol.Name, fields.Count > 0 ? fields.ToArray() : Array.Empty<ComponentField>());
         }
@@ -150,6 +154,7 @@ namespace Primary.SourceGenerator
                         SceneJsonSerializer.PrintWarning($""Invalid json at: {reader.BytesConsumed}: Unknown field name for component {Encoding.UTF8.GetString(reader.ValueSpan)} ({reader.ValueSpan.GetDjb2HashCode()})"", entity, typeof(");
                 sb.Append(value.Name);
                 sb.AppendLine(@"));
+                        reader.Skip();
                         break;
                 }
             }
@@ -177,7 +182,9 @@ namespace Primary.SourceGenerator
                 sb.Append(@" comp = ref entity.AddComponent<");
                 sb.Append(value.Name);
                 sb.Append(@">();
-            if (!Unsafe.IsNullRef(in comp))
+            if (!Unsafe.IsNullRef(in comp) && !typeof(");
+                sb.Append(value.Name);
+                sb.Append(@").IsClass)
                 comp = new ");
                 sb.Append(value.Name);
                 sb.Append(@"();
@@ -234,7 +241,9 @@ public sealed class ComponentAttribute : System.Attribute
 {
 }";
 
-        private const string GeneratedSourceStart = @"using CommunityToolkit.HighPerformance;
+        private const string GeneratedSourceStart = @"#nullable enable
+
+using CommunityToolkit.HighPerformance;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;

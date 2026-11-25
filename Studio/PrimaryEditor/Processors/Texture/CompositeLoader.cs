@@ -91,7 +91,7 @@ namespace Editor.Processors.Texture
                 }
             }
 
-            return [new RawTextureData(pixelData, size.X, size.Y, stride)];
+            return [new RawTextureData(pixelData, size.X, size.Y, stride, false)];
         }
     }
 }

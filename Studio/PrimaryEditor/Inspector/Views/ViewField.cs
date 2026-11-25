@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using PrimaryEditor.Inspector.Views.IO;
 
@@ -20,6 +21,23 @@ namespace PrimaryEditor.Inspector.Views
         {
             _fieldSource = typeResolver.ResolveSource(typeName);
             _displayName = displayName ?? typeName;
+        }
+
+        internal override bool HasReferencesTo(Assembly assembly)
+        {
+            if (_fieldSource.Type.Assembly == assembly)
+                return true;
+
+            if (_fieldSource.Opaque is FieldInfo)
+            {
+                FieldInfo fieldInfo = _fieldSource.Field!;
+                return fieldInfo.FieldType.Assembly == assembly || fieldInfo.DeclaringType?.Assembly == assembly;
+            }
+            else
+            {
+                PropertyInfo propertyInfo = _fieldSource.Property!;
+                return propertyInfo.PropertyType.Assembly == assembly || propertyInfo.DeclaringType?.Assembly == assembly;
+            }
         }
 
         public ViewSource FieldSource => _fieldSource;

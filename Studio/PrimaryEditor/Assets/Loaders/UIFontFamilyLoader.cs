@@ -16,9 +16,9 @@ namespace PrimaryEditor.Assets.Loaders
 {
     public sealed class UIFontFamilyLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new UIFontFamilyData(id);
+            return new UIFontFamilyData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)

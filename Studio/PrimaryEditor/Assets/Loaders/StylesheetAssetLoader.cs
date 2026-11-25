@@ -17,9 +17,9 @@ namespace PrimaryEditor.Assets.Loaders
 {
     public sealed class StylesheetAssetLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new StylesheetData(id);
+            return new StylesheetData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)

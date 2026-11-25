@@ -91,17 +91,18 @@ namespace Primary.RHI.Direct3D12
             RHIFormatInfo fi = RHIFormatInfo.Query(texture.Description.Format);
 
             (int arrayIndex, int mipLevel) = ResourceHelper.DecodeSubresource(subresource, desc.MipLevels);
+            int depth = desc.Dimension == RHIDimension.Texture3D ? desc.DepthOrArraySize : 1;
 
             desc.Width = Math.Max(desc.Width / (1 << mipLevel), 1);
             desc.Height = Math.Max(desc.Height / (1 << mipLevel), 1);
-            desc.DepthOrArraySize = Math.Max(desc.DepthOrArraySize / (ushort)(1 << mipLevel), 1);
+            desc.DepthOrArraySize = Math.Max(depth / (ushort)(1 << mipLevel), 1);
 
             long resourcePitch = fi.CalculatePitch(desc.Width);
             long alignedPitch = ResourceHelper.Align(resourcePitch, D3D12.TextureDataPitchAlignment);
 
-            Guard.IsEqualTo(fi.CalculateSize(desc.Width, desc.Height, desc.DepthOrArraySize), data.Length);
+            Guard.IsEqualTo(fi.CalculateSize(desc.Width, desc.Height, depth), data.Length);
 
-            long alignedUploadByteSize = fi.CalculateSizeWithPitch(alignedPitch, desc.Height, desc.DepthOrArraySize);
+            long alignedUploadByteSize = fi.CalculateSizeWithPitch(alignedPitch, desc.Height, depth);
 
             ArrayPtr<byte> rawData = new ArrayPtr<byte>((byte*)NativeMemory.Alloc((nuint)alignedUploadByteSize), (int)alignedUploadByteSize);
             if (resourcePitch == alignedPitch)
@@ -110,7 +111,7 @@ namespace Primary.RHI.Direct3D12
             }
             else
             {
-                int rowCount = desc.Height * desc.DepthOrArraySize;
+                int rowCount = desc.Height * depth;
                 if (fi.IsBlockCompressed)
                     rowCount /= fi.BlockWidth;
 
@@ -184,7 +185,7 @@ namespace Primary.RHI.Direct3D12
                                 Format = texture.Description.Format.ToTextureFormat(),
                                 Width = (uint)Math.Max(texture.Description.Width / (1 << mipLevel), 1),
                                 Height = (uint)Math.Max(texture.Description.Height / (1 << mipLevel), 1),
-                                Depth = (uint)Math.Max(texture.Description.DepthOrArraySize / (1 << mipLevel), 1),
+                                Depth = (uint)Math.Max((texture.Description.Dimension == RHIDimension.Texture3D ? texture.Description.DepthOrArraySize : 1) / (1 << mipLevel), 1),
                                 RowPitch = (uint)upload.RowPitch
                             }
                         });

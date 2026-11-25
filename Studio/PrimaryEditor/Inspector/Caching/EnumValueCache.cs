@@ -18,6 +18,26 @@ namespace PrimaryEditor.Inspector.Caching
             _enumValues = new Dictionary<Type, EnumValueData>();
         }
 
+        internal void RemoveEntriesReferencing(Assembly assembly)
+        {
+            using RentedList<Type> keysToRemove = new RentedList<Type>();
+            foreach (var (type, _) in _enumValues)
+            {
+                if (type.Assembly == assembly)
+                {
+                    keysToRemove.Add(type);
+                }
+            }
+
+            if (!keysToRemove.IsEmpty)
+            {
+                foreach (Type key in keysToRemove)
+                {
+                    _enumValues.Remove(key);
+                }
+            }
+        }
+
         public EnumValueData GetEnumData(Type type)
         {
             Guard.IsTrue(type.IsEnum);

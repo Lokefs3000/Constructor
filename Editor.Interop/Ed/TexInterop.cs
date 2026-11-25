@@ -43,6 +43,16 @@ namespace Editor.Interop.Ed
         [LibraryImport(ModuleName)]
         [return: MarshalAs(UnmanagedType.I1)]
         public static partial bool QueryJPEG(ref ImageLoadData imageData, ref ImageMetrics metrics, sbyte** errorOutput);
+        [LibraryImport(ModuleName)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static partial bool LoadEXRHDR(ref ImageLoadData imageData, ref ImageBitmapHDR bitmap, sbyte** errorOutput);
+        [LibraryImport(ModuleName)]
+        public static partial void FreeEXR(ref ImageBitmapHDR bitmap);
+        [LibraryImport(ModuleName)]
+        public static partial void FreeEXRError(sbyte* errorOutput);
+        [LibraryImport(ModuleName)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public static partial bool QueryEXR(ref ImageLoadData imageData, ref ImageMetrics metrics, sbyte** errorOutput);
 
         public const string ModuleName = "texinterop";
 
@@ -67,6 +77,17 @@ namespace Editor.Interop.Ed
 
             public byte* Pixels;
             public byte Effort;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct ImageBitmapHDR
+        {
+            public uint Width;
+            public uint Height;
+
+            public byte Stride;
+
+            public float* Pixels;
         }
 
         [StructLayout(LayoutKind.Sequential, Pack = 1)]

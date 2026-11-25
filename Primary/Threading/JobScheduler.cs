@@ -1,20 +1,16 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
+﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Text;
+using System.Runtime.InteropServices;
 using CommunityToolkit.Diagnostics;
 using Primary.Common;
-using Primary.Components;
 using Primary.Threading.Scheduling;
 using Primary.Threading.Statistics;
-using TerraFX.Interop.Windows;
 
 namespace Primary.Threading
 {
-    public sealed class JobScheduler : IDisposable
+    public sealed partial class JobScheduler : IDisposable
     {
         private readonly int _mainThreadId;
 
@@ -29,6 +25,9 @@ namespace Primary.Threading
         private readonly WaitHandle[] _waitHandlesToWait;
 
         private int _nextWorkerIndex;
+
+        private readonly JobTemplatePool<MethodJob> _methodJobPool;
+        private readonly ThreadLocal<Dictionary<Type, IJobTemplatePool>> _structJobPools;
 
         private bool _disposedValue;
 
@@ -67,6 +66,9 @@ namespace Primary.Threading
                 ];
 
             _nextWorkerIndex = 0;
+
+            _methodJobPool = new JobTemplatePool<MethodJob>();
+            _structJobPools = new ThreadLocal<Dictionary<Type, IJobTemplatePool>>(() => new Dictionary<Type, IJobTemplatePool>());
 
             // Start all workers now
             foreach (ThreadWorker worker in _workers)
@@ -246,7 +248,7 @@ namespace Primary.Threading
 
         public SchedulerStatistics Statistics => new SchedulerStatistics(this);
 
-        public static JobHandle Schedule(IJob job, JobPriority priority = JobPriority.Normal)
+        public static JobHandle Schedule(IJob job, JobPriority priority = JobPriority.Normal, bool autoFlush = false)
         {
             JobScheduler scheduler = Instance;
             JobData jobData = scheduler._jobDataPool.GetPooledJob();
@@ -254,6 +256,8 @@ namespace Primary.Threading
             JobHandle jobHandle = jobData.SetupForNewJob(priority, job, JobFlags.None);
 
             jobData.Finish();
+            if (autoFlush)
+                jobData.TrySchedule();
 
             return jobHandle;
         }
@@ -309,6 +313,15 @@ namespace Primary.Threading
 
         public static JobHandle CombineAll(ReadOnlySpan<JobHandle> jobs, JobPriority priority = JobPriority.Realtime)
         {
+            if (jobs.IsEmpty)
+            {
+                return JobHandle.Completed;
+            }
+            else if (jobs.Length == 1)
+            {
+                return jobs[0];
+            }
+
             JobScheduler scheduler = Instance;
 
             JobData jobData = scheduler._jobDataPool.GetPooledJob();
@@ -396,6 +409,66 @@ namespace Primary.Threading
         public static JobScheduler Instance => Unsafe.As<JobScheduler>(s_instance.Target)!;
 
         public static int WorkerCount => Instance._workers.Length;
+    }
+
+    public sealed partial class JobScheduler
+    {
+        public static JobHandle Schedule(Action method, JobPriority priority = JobPriority.Normal, bool autoFlush = false)
+            => Schedule(method, JobHandle.Completed, priority, autoFlush);
+
+        public static JobHandle Schedule(Action method, JobHandle parentJob, JobPriority priority = JobPriority.Normal, bool autoFlush = false)
+        {
+            JobScheduler scheduler = Instance;
+            JobData jobData = scheduler._jobDataPool.GetPooledJob();
+
+            MethodJob methodJob = scheduler._methodJobPool.Take();
+            methodJob.SetMethod(method, scheduler._methodJobPool);
+
+            JobHandle jobHandle = jobData.SetupForNewJob(priority, methodJob, parentJob.Version < long.MaxValue - 2 ? JobFlags.HasDependencies : JobFlags.None);
+            if (parentJob.IsValid && !parentJob.HasCompleted)
+            {
+                jobData.AddDependency(parentJob);
+                autoFlush = true;
+            }
+
+            jobData.Finish();
+            if (autoFlush)
+                jobData.TrySchedule();
+
+            return jobHandle;
+        }
+
+        public static JobHandle Schedule<T>(T @struct, JobPriority priority = JobPriority.Normal, bool autoFlush = false) where T : struct, IJob
+            => Schedule(@struct, JobHandle.Completed, priority, autoFlush);
+
+        public static JobHandle Schedule<T>(T @struct, JobHandle parentJob, JobPriority priority = JobPriority.Normal, bool autoFlush = false) where T : struct, IJob
+        {
+            JobScheduler scheduler = Instance;
+            JobData jobData = scheduler._jobDataPool.GetPooledJob();
+
+            Dictionary<Type, IJobTemplatePool> dict = scheduler._structJobPools.Value!;
+            ref IJobTemplatePool? pool = ref CollectionsMarshal.GetValueRefOrAddDefault(dict, typeof(T), out bool exists);
+            if (pool == null || !exists)
+            {
+                pool = new JobTemplatePool<StructJob<T>>();
+            }
+
+            StructJob<T> structJob = (StructJob<T>)pool.Take();
+            structJob.SetStruct((JobTemplatePool<StructJob<T>>)pool, @struct);
+
+            JobHandle jobHandle = jobData.SetupForNewJob(priority, structJob, parentJob.Version < long.MaxValue - 2 ? JobFlags.HasDependencies : JobFlags.None);
+            if (parentJob.IsValid && !parentJob.HasCompleted)
+            {
+                jobData.AddDependency(parentJob);
+                autoFlush = true;
+            }
+
+            jobData.Finish();
+            if (autoFlush)
+                jobData.TrySchedule();
+
+            return jobHandle;
+        }
     }
 
     public enum JobPriority : byte

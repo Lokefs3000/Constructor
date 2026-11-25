@@ -130,6 +130,19 @@
             }
         }
 
+        public static bool TryCopy(string sourceFileName, string destFileName, bool overwrite = true)
+        {
+            try
+            {
+                File.Copy(sourceFileName, destFileName, overwrite);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         public static bool TryWriteAllText(string fullPath, ReadOnlySpan<char> contents, int maxTries = 10, int timeoutMs = 250)
         {
             for (int i = 0; i < maxTries; i++)
@@ -137,6 +150,24 @@
                 try
                 {
                     File.WriteAllText(fullPath, contents);
+                    return true;
+                }
+                catch (Exception)
+                {
+                    Thread.Sleep(timeoutMs);
+                }
+            }
+
+            return false;
+        }
+
+        public static bool TryWriteAllBytes(string fullPath, ReadOnlySpan<byte> contents, int maxTries = 10, int timeoutMs = 250)
+        {
+            for (int i = 0; i < maxTries; i++)
+            {
+                try
+                {
+                    File.WriteAllBytes(fullPath, contents);
                     return true;
                 }
                 catch (Exception)

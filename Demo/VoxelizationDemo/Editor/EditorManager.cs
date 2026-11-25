@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Text;
 using Hexa.NET.ImGui;
 using Primary.Common;
+using Primary.Physics;
 using Primary.Profiling;
 using Primary.Rendering.Diagnostics;
 using Primary.Scenes;
@@ -13,10 +14,13 @@ using PrimaryEditor.Inspector.Contexts.Entity;
 using PrimaryEditor.Search;
 using PrimaryEditor.Selection;
 using VoxelizationDemo.Core;
+using VoxelizationDemo.Editor.History;
 using VoxelizationDemo.Editor.Rendering;
 using VoxelizationDemo.Editor.Rendering.Icons;
+using VoxelizationDemo.Editor.Runner;
 using VoxelizationDemo.Editor.Serialization;
 using VoxelizationDemo.Editor.Tools;
+using VoxelizationDemo.Editor.Tracking;
 using VoxelizationDemo.Editor.Windows;
 
 namespace VoxelizationDemo.Editor
@@ -25,6 +29,7 @@ namespace VoxelizationDemo.Editor
     {
         private readonly SearchManager _searchManager;
         private readonly SelectionManager _selectionManager;
+        private readonly HistoryManager _historyManager;
 
         private readonly ContextManager _contextManager;
         private readonly EditorWindowManager _windowManager;
@@ -40,6 +45,10 @@ namespace VoxelizationDemo.Editor
         private readonly PickingManager _pickingManager;
         private readonly SerializationManager _serializationManager;
         private readonly KeybindManager _keybindManager;
+        private readonly ReloadManager _reloadManager;
+        private readonly RuntimeManager _runtimeManager;
+
+        private readonly EntityTracker _entityTracker;
 
         private bool _isEnabled;
 
@@ -49,6 +58,7 @@ namespace VoxelizationDemo.Editor
         {
             _searchManager = new SearchManager();
             _selectionManager = new SelectionManager();
+            _historyManager = new HistoryManager();
 
             _contextManager = new ContextManager();
             _windowManager = new EditorWindowManager();
@@ -64,6 +74,10 @@ namespace VoxelizationDemo.Editor
             _pickingManager = new PickingManager();
             _serializationManager = new SerializationManager();
             _keybindManager = new KeybindManager();
+            _reloadManager = new ReloadManager();
+            _runtimeManager = new RuntimeManager();
+
+            _entityTracker = new EntityTracker();
 
             _isEnabled = false;
 
@@ -71,6 +85,7 @@ namespace VoxelizationDemo.Editor
             _windowManager.AddOpenWindow(new WorldAxisWindow());
             _windowManager.AddOpenWindow(new ToolsWindow());
             _windowManager.AddOpenWindow(new SceneWindow());
+            _windowManager.AddOpenWindow(new AssemblyWindow());
 
             InspectorManager inspectorManager = VoxelRuntime.Instance.InspectorManager;
             inspectorManager.OnInspectStart += (context) =>
@@ -83,6 +98,8 @@ namespace VoxelizationDemo.Editor
 
             _selectionManager.OnObjectSelected += OnObjectSelectedCallback;
             _selectionManager.OnObjectDeselected += OnObjectDeselectedCallback;
+
+            ConfigureEngine();
         }
 
         private void Dispose(bool disposing)
@@ -94,8 +111,11 @@ namespace VoxelizationDemo.Editor
                     if (_isEnabled)
                         Disable();
 
+                    _runtimeManager.Dispose();
+
                     _selectionManager.Dispose();
 
+                    _historyManager.Dispose();
                     _handleAllocator.Dispose();
                     _sceneTracker.Dispose();
                     _shortcutsManager.Dispose();
@@ -112,6 +132,14 @@ namespace VoxelizationDemo.Editor
         {
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
+        }
+
+        private void ConfigureEngine()
+        {
+            {
+                PhysicsConfig config = PhysicsConfig.Instance;
+                config.ShareStaticShapes = false;
+            }
         }
 
         private void OnObjectSelectedCallback(object obj)
@@ -143,6 +171,7 @@ namespace VoxelizationDemo.Editor
 
             runtime.EventManager.AddHandler(_contextManager);
             runtime.RenderingManager.InstallRenderStage(_renderStage);
+            _viewportManager.Enable();
 
             runtime.RenderingManager.DebugManager.Enable();
 
@@ -158,6 +187,7 @@ namespace VoxelizationDemo.Editor
 
             runtime.EventManager.RemoveHandler(_contextManager);
             runtime.RenderingManager.UninstallRenderStage(_renderStage);
+            _viewportManager.Disable();
 
             _isEnabled = true;
         }
@@ -193,6 +223,8 @@ namespace VoxelizationDemo.Editor
 
                 _viewportManager.UpdateViewport();
                 _contextManager.EndFrame();
+
+                _reloadManager.Update();
             }
         }
 
@@ -209,9 +241,14 @@ namespace VoxelizationDemo.Editor
         public PickingManager PickingManager => _pickingManager;
         public SerializationManager SerializationManager => _serializationManager;
         public KeybindManager KeybindManager => _keybindManager;
+        public ReloadManager ReloadManager => _reloadManager;
+        public RuntimeManager RuntimeManager => _runtimeManager;
 
         public SearchManager SearchManager => _searchManager;
         public SelectionManager SelectionManager => _selectionManager;
+        public HistoryManager HistoryManager => _historyManager;
+
+        public EntityTracker EntityTracker => _entityTracker;
 
         public static EditorManager Instance => VoxelRuntime.Instance.EditorManager;
     }

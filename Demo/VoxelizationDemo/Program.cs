@@ -1,4 +1,7 @@
-﻿using VoxelizationDemo.Core;
+﻿using System.Diagnostics;
+using Primary;
+using VoxelizationDemo.Core;
+using VoxelizationDemo.Runtime;
 
 namespace VoxelizationDemo
 {
@@ -6,9 +9,19 @@ namespace VoxelizationDemo
     {
         static void Main(string[] args)
         {
-            using (VoxelRuntime runtime = new VoxelRuntime(args))
+            if (args.Contains("--runtime"))
             {
-                runtime.Run();
+                using (PlayRuntime runtime = new PlayRuntime(args))
+                {
+                    runtime.Run();
+                }
+            }
+            else
+            {
+                using (VoxelRuntime runtime = new VoxelRuntime(args))
+                {
+                    runtime.Run();
+                }
             }
         }
     }

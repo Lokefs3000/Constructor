@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Primary.Scenes;
 using VoxelizationDemo.Core;
+using VoxelizationDemo.Editor.Tracking;
 
 namespace VoxelizationDemo.Editor
 {

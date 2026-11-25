@@ -20,9 +20,9 @@ namespace Primary.Assets.Loaders
 {
     internal sealed class MaterialAssetLoader : IAssetLoader
     {
-        public IInternalAssetData FactoryCreateNull(AssetId id)
+        public IInternalAssetData FactoryCreateNull(AssetId id, int uniqueIndex)
         {
-            return new MaterialAssetData(id);
+            return new MaterialAssetData(id, uniqueIndex);
         }
 
         public IAssetDefinition FactoryCreateDef(IInternalAssetData assetData)
@@ -302,14 +302,14 @@ namespace Primary.Assets.Loaders
             static bool Vector3TryParse(string serialized, out Vector3 value)
             {
                 Unsafe.SkipInit(out value);
-                Span<float> values = MemoryMarshal.CreateSpan(ref Unsafe.As<Vector3, float>(ref value), 2);
+                Span<float> values = MemoryMarshal.CreateSpan(ref Unsafe.As<Vector3, float>(ref value), 3);
                 return TryParseGenericSpan(serialized, ref values);
             }
 
             static bool Vector4TryParse(string serialized, out Vector4 value)
             {
                 Unsafe.SkipInit(out value);
-                Span<float> values = MemoryMarshal.CreateSpan(ref Unsafe.As<Vector4, float>(ref value), 2);
+                Span<float> values = MemoryMarshal.CreateSpan(ref Unsafe.As<Vector4, float>(ref value), 4);
                 return TryParseGenericSpan(serialized, ref values);
             }
 

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -76,6 +76,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>physx_interop_$(Platform)</TargetName>
+    <OutDir>$(ProjectDir)$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -131,6 +132,7 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>$(SolutionDir)Native\External\PhysX\Include\;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/d1reportSingleClassLayoutLayer %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -142,6 +144,10 @@
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>copy $(OutDir)$(TargetFileName) $(SolutionDir)Interop.PhysX\runtimes\win-x64\native\$(TargetFileName)
+copy $(OutDir)$(TargetName).pdb $(SolutionDir)Interop.PhysX\runtimes\win-x64\native\$(TargetName).pdb</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -159,6 +165,7 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <AdditionalIncludeDirectories>$(SolutionDir)Native\External\PhysX\Include\;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/d1reportSingleClassLayoutLayer %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -170,24 +177,56 @@
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Command>copy $(OutDir)$(TargetFileName) $(SolutionDir)Interop.PhysX\runtimes\win-x64\native\$(TargetFileName)
+copy $(OutDir)$(TargetName).pdb $(SolutionDir)Interop.PhysX\runtimes\win-x64\native\$(TargetName).pdb</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="core\AllocatorLayer.hpp" />
-    <ClInclude Include="core\ErrorLayer.hpp" />
-    <ClInclude Include="core\PhysicsLayer.hpp" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="bridge_types.hpp" />
+    <ClInclude Include="bridge_conversions.hpp" />
+    <ClInclude Include="public\bridge_PxMaterial.hpp" />
+    <ClInclude Include="public\bridge_PxRefCounted.hpp" />
+    <ClInclude Include="public\bridge_PxRigidActor.hpp" />
+    <ClInclude Include="public\bridge_PxActor.hpp" />
+    <ClInclude Include="public\bridge_PxBase.hpp" />
+    <ClInclude Include="public\bridge_PxFoundation.hpp" />
+    <ClInclude Include="public\bridge_PxPhysics.hpp" />
+    <ClInclude Include="public\bridge_PxRigidDynamic.hpp" />
+    <ClInclude Include="public\bridge_PxRigidStatic.hpp" />
+    <ClInclude Include="public\bridge_PxScene.hpp" />
+    <ClInclude Include="public\bridge_PxSceneQuerySystemBase.hpp" />
+    <ClInclude Include="public\bridge_PxShape.hpp" />
+    <ClInclude Include="public\bridge_Utility.hpp" />
+    <ClInclude Include="shared.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="core\AllocatorLayer.cpp" />
-    <ClCompile Include="core\ErrorLayer.cpp" />
-    <ClCompile Include="core\PhysicsLayer.cpp" />
+    <ClCompile Include="bridge_PxPhysics.cpp" />
+    <ClCompile Include="bridge_PxRigidDynamic.cpp" />
+    <ClCompile Include="bridge_PxScene.cpp" />
+    <ClCompile Include="bridge_types.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="bridge_PxFoundation.cpp" />
+    <ClCompile Include="bridge_PxShape.cpp" />
+    <ClCompile Include="bridge_PxBase.cpp" />
+    <ClCompile Include="bridge_PxActor.cpp" />
+    <ClCompile Include="bridge_PxRigidActor.cpp" />
+    <ClCompile Include="bridge_PxRigidStatic.cpp" />
+    <ClCompile Include="bridge_PxMaterial.cpp" />
+    <ClCompile Include="bridge_PxRefCounted.cpp" />
+    <ClCompile Include="bridge_PxSceneQuerySystemBase.cpp" />
+    <ClCompile Include="bridge_Utility.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
+    <None Include="bridge.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

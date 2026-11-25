@@ -6,6 +6,7 @@ using System.Text;
 using CommunityToolkit.HighPerformance;
 using Primary.Assets;
 using Primary.Assets.Types;
+using Primary.Collections.ReadOnly;
 using Primary.Profiling;
 using Primary.Scenes;
 using PrimaryEditor.Assets.Database;
@@ -14,7 +15,7 @@ namespace PrimaryEditor.Assets
 {
     public sealed class AssetDatabase
     {
-        private readonly FrozenDictionary<Type, AssetCategory> _categories;
+        private readonly Dictionary<Type, AssetCategory> _categories;
         private bool _hasDatabaseChanges;
 
         internal AssetDatabase()
@@ -30,7 +31,7 @@ namespace PrimaryEditor.Assets
                 { typeof(TextureAsset), new AssetCategory(typeof(TextureAsset))},
                 { typeof(TextureAtlasAsset), new AssetCategory(typeof(TextureAtlasAsset))},
                 { typeof(Sprite), new AssetCategory(typeof(Sprite))},
-            }.ToFrozenDictionary();
+            };
 
             foreach (var (type, category) in _categories)
             {
@@ -57,11 +58,17 @@ namespace PrimaryEditor.Assets
 
         public void AddEntry(Type type, DatabaseEntry id)
         {
-            if (_categories.TryGetValue(type, out AssetCategory? category))
+            if (!_categories.TryGetValue(type, out AssetCategory? category))
             {
-                category.AddEntry(id);
-                _hasDatabaseChanges = true;
+                category = new AssetCategory(type);
+                _categories.Add(type, category);
+
+                category.OnEntryAdded += (id) => OnEntryAdded?.Invoke(type, id);
+                category.OnEntryRemoved += (id) => OnEntryRemoved?.Invoke(type, id);
             }
+
+            category.AddEntry(id);
+            _hasDatabaseChanges = true;
         }
 
         public void RemoveEntry(Type type, DatabaseEntry id)
@@ -82,7 +89,7 @@ namespace PrimaryEditor.Assets
             }
         }
 
-        public FrozenDictionary<Type, AssetCategory> Categories => _categories;
+        public RODictionary<Type, AssetCategory> Categories => _categories;
 
         public event Action<Type, DatabaseEntry>? OnEntryAdded;
         public event Action<Type, DatabaseEntry>? OnEntryRemoved;

@@ -52,6 +52,21 @@ namespace Primary.Scenes.Json
             {
                 value = default;
 
+                if (type == typeof(bool)) { value = Unsafe.BitCast<bool, T>(reader.GetBoolean()); ; return true; }
+                if (type == typeof(sbyte)) { value = Unsafe.BitCast<sbyte, T>(reader.GetSByte()); ; return true; }
+                if (type == typeof(byte)) { value = Unsafe.BitCast<byte, T>(reader.GetByte()); ; return true; }
+                if (type == typeof(short)) { value = Unsafe.BitCast<short, T>(reader.GetInt16()); ; return true; }
+                if (type == typeof(ushort)) { value = Unsafe.BitCast<ushort, T>(reader.GetUInt16()); ; return true; }
+                if (type == typeof(int)) { value = Unsafe.BitCast<int, T>(reader.GetInt32()); ; return true; }
+                if (type == typeof(uint)) { value = Unsafe.BitCast<uint, T>(reader.GetUInt32()); ; return true; }
+                if (type == typeof(long)) { value = Unsafe.BitCast<long, T>(reader.GetInt64()); ; return true; }
+                if (type == typeof(ulong)) { value = Unsafe.BitCast<ulong, T>(reader.GetUInt64()); ; return true; }
+
+                if (type == typeof(float)) { value = Unsafe.BitCast<float, T>(reader.GetSingle()); ; return true; }
+                if (type == typeof(double)) { value = Unsafe.BitCast<double, T>(reader.GetDouble()); ; return true; }
+
+                // if (type == typeof(string)) { value = (reader.GetString() ?? string.Empty) as T; ; return true; }
+
                 if (type == typeof(Vector2)) return Vector2Converter.TryDeserialize(ref reader, ref Unsafe.As<T, Vector2>(ref value!));
                 if (type == typeof(Vector3)) return Vector3Converter.TryDeserialize(ref reader, ref Unsafe.As<T, Vector3>(ref value!));
                 if (type == typeof(Vector4)) return Vector4Converter.TryDeserialize(ref reader, ref Unsafe.As<T, Vector4>(ref value!));
@@ -73,10 +88,11 @@ namespace Primary.Scenes.Json
                 string? str = Enum.ToObject(type, value).ToString();
                 if (str == null)
                 {
+                    writer.WriteNullValue();
                     return false;
                 }
 
-                writer.WriteRawValue(str);
+                writer.WriteStringValue(str);
                 return true;
             }
             else

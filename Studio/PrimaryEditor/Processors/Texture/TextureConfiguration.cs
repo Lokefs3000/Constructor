@@ -69,7 +69,7 @@ namespace Editor.Processors.Texture
     }
     //}
 
-    [TomlPolymorphic(UnknownDerivedTypeHandling = TomlUnknownDerivedTypeHandling.Fail)]
+    [TomlPolymorphic(TypeDiscriminatorPropertyName = "type", UnknownDerivedTypeHandling = TomlUnknownDerivedTypeHandling.Fail)]
     [TomlDerivedType(typeof(CompositeConfiguration), "composite")]
     [TomlDerivedType(typeof(CubemapConfiguration), "cubemap")]
     public class TextureConfiguration
@@ -112,7 +112,7 @@ namespace Editor.Processors.Texture
         {
             public bool GenerateMipmaps { get; set; } = true;
 
-            public TextureMipmapFilter MipmapFilter { get; set; } = TextureMipmapFilter.Box;
+            public TextureMipmapFilter MipmapFilter { get; set; } = TextureMipmapFilter.Kaiser;
 
             public int MaxMipMapCount { get; set; } = int.MaxValue;
             public int MinMipMapSize { get; set; } = 1;
@@ -179,11 +179,17 @@ namespace Editor.Processors.Texture
         public Cubemap CubemapInfo { get; set; } = new Cubemap();
         [TomlPropertyName("composited")]
         public Composited CompositedInfo { get; set; } = new Composited();
+        [TomlPropertyName("panorama")]
+        public Panorama PanoramaInfo { get; set; } = new Panorama();
 
         public struct Cubemap()
         {
             [TomlRequired]
             public TextureCubemapSource Source { get; set; }
+
+            [TomlPropertyName("include_shl2")]
+            public bool IncludeSHL2 { get; set; } = false;
+            public bool IncludeRadianceMap { get; set; } = false;
         }
 
         public struct Composited()
@@ -195,6 +201,11 @@ namespace Editor.Processors.Texture
             [TomlRequired, TomlConverter(typeof(EarlyFileIdTomlConverter))] public FileId NegativeX { get; set; }
             [TomlRequired, TomlConverter(typeof(EarlyFileIdTomlConverter))] public FileId NegativeY { get; set; }
             [TomlRequired, TomlConverter(typeof(EarlyFileIdTomlConverter))] public FileId NegativeZ { get; set; }
+        }
+
+        public struct Panorama()
+        {
+            [TomlRequired, TomlConverter(typeof(EarlyFileIdTomlConverter))] public FileId Source { get; set; }
         }
     }
 
@@ -274,6 +285,8 @@ namespace Editor.Processors.Texture
 
     public enum TextureCubemapSource : byte
     {
-        Composited = 0
+        Composited = 0,
+        Panorama,
+        Sequential
     }
 }

@@ -86,6 +86,7 @@ namespace PrimaryEditor.Inspector.Contexts.Entity
         }
 
         public override ROList<InspectorGroup> Groups => _groups;
+        public override Type ContextType => _entity.GetType();
 
         public SceneEntity Entity => _entity;
 

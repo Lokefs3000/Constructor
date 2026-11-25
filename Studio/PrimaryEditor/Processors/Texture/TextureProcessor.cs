@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -14,7 +15,7 @@ using Primary.Common;
 using Primary.Mathematics;
 using Primary.Memory.Native;
 using Primary.RHI;
-using TerraFX.Interop.Windows;
+using PrimaryEditor.Processors.Texture;
 
 namespace Editor.Processors.Texture
 {
@@ -35,24 +36,34 @@ namespace Editor.Processors.Texture
             TextureSwizzle textureSwizzle = config.VisualInfo.Swizzle;
             TextureSwizzle swizzleRemap = TextureSwizzle.Default;
 
-            if (config is CubemapConfiguration cubemap)
-            {
-                switch (cubemap.CubemapInfo.Source)
-                {
-                    case TextureCubemapSource.Composited: rawData = CubemapLoader.LoadComposited(cubemap); break;
-                    default: throw new Exception($"Invalid cubemap source: {cubemap.CubemapInfo.Source}");
-                }
-            }
-            else if (config is CompositeConfiguration composite)
-            {
-                rawData = CompositeLoader.Load(composite, ref swizzleRemap);
+            TextureDataFeatures features = TextureDataFeatures.None;
 
-                Update_RemapSwizzle(ref textureSwizzle, swizzleRemap);
-                swizzleRemap = TextureSwizzle.Default;
-            }
-            else
             {
-                rawData = TextureLoader.Load(config);
+                if (config is CubemapConfiguration cubemap)
+                {
+                    switch (cubemap.CubemapInfo.Source)
+                    {
+                        case TextureCubemapSource.Composited: rawData = CubemapLoader.LoadComposited(cubemap); break;
+                        case TextureCubemapSource.Sequential: rawData = CubemapLoader.LoadSequential(cubemap); break;
+                        default: throw new Exception($"Invalid cubemap source: {cubemap.CubemapInfo.Source}");
+                    }
+
+                    if (cubemap.CubemapInfo.IncludeSHL2)
+                        features |= TextureDataFeatures.SphericalHarmonicsL2;
+                    if (cubemap.CubemapInfo.IncludeRadianceMap)
+                        features |= TextureDataFeatures.RadianceIBLMap;
+                }
+                else if (config is CompositeConfiguration composite)
+                {
+                    rawData = CompositeLoader.Load(composite, ref swizzleRemap);
+
+                    Update_RemapSwizzle(ref textureSwizzle, swizzleRemap);
+                    swizzleRemap = TextureSwizzle.Default;
+                }
+                else
+                {
+                    rawData = TextureLoader.Load(config);
+                }
             }
 
             ScopedPtr<Vector128<float>> tempMipMapData = ScopedPtr<Vector128<float>>.Null;
@@ -74,7 +85,7 @@ namespace Editor.Processors.Texture
                     int newHeight = Math.Min(textureData.Height, handling.MaxHeight);
 
                     ScopedPtr<Vector128<float>> memory = ScopedMemory.Allocate<Vector128<float>>(64, (nuint)(newWidth * newHeight));
-                    RawTextureData newTextureData = new RawTextureData(memory, newWidth, newHeight, textureData.Stride);
+                    RawTextureData newTextureData = new RawTextureData(memory, newWidth, newHeight, textureData.Stride, textureData.IsHDR);
 
                     Process_GenerateMipmap_Box(ref textureData, memory, newWidth, newHeight, textureData.Width);
                 }
@@ -99,19 +110,31 @@ namespace Editor.Processors.Texture
                                         Process_CopyChannel(ref textureData, 0, 3);
 
                                         if (handling.ImageFormat == TextureImageFormat.Automatic)
-                                            handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC3 : TextureImageFormat.RGBA8;
+                                            handling.ImageFormat = textureData.IsHDR ?
+                                                TextureImageFormat.RGBA16 :
+                                                isBlockCompressable ? TextureImageFormat.BC3 : TextureImageFormat.RGBA8;
                                     }
                                     else if (handling.AlphaSource != TextureAlphaSource.Source)
                                     {
-                                        textureData.Stride = 3;
+                                        if (textureData.IsHDR)
+                                        {
+                                            handling.ImageFormat = TextureImageFormat.RGBA16;
+                                            swizzleRemap.A = TextureSwizzleChannel.One;
+                                        }
+                                        else
+                                        {
+                                            textureData.Stride = 3;
 
-                                        if (handling.ImageFormat == TextureImageFormat.Automatic)
-                                            handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC1 : TextureImageFormat.RGB8;
+                                            if (handling.ImageFormat == TextureImageFormat.Automatic)
+                                                handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC1 : TextureImageFormat.RGB8;
+                                        }
                                     }
                                     else
                                     {
                                         if (handling.ImageFormat == TextureImageFormat.Automatic)
-                                            handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC3 : TextureImageFormat.RGBA8;
+                                            handling.ImageFormat = textureData.IsHDR ? 
+                                                TextureImageFormat.RGBA16 :
+                                                isBlockCompressable ? TextureImageFormat.BC3 : TextureImageFormat.RGBA8;
                                     }
                                 }
                                 else if (textureData.Stride == 3)
@@ -137,25 +160,33 @@ namespace Editor.Processors.Texture
                                         Process_CopyChannel(ref textureData, 0, 1);
 
                                         if (handling.ImageFormat == TextureImageFormat.Automatic)
-                                            handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC5u : TextureImageFormat.RG8;
+                                            handling.ImageFormat = textureData.IsHDR ?
+                                                TextureImageFormat.RG16 :
+                                                isBlockCompressable ? TextureImageFormat.BC5u : TextureImageFormat.RG8;
                                     }
                                     else if (handling.AlphaSource != TextureAlphaSource.Source)
                                     {
                                         textureData.Stride = 1;
 
                                         if (handling.ImageFormat == TextureImageFormat.Automatic)
-                                            handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC4u : TextureImageFormat.R8a;
+                                            handling.ImageFormat = textureData.IsHDR ?
+                                                TextureImageFormat.R16 :
+                                                isBlockCompressable ? TextureImageFormat.BC4u : TextureImageFormat.R8a;
                                     }
                                     else
                                     {
                                         if (handling.ImageFormat == TextureImageFormat.Automatic)
-                                            handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC4u : TextureImageFormat.R8a;
+                                            handling.ImageFormat = textureData.IsHDR ?
+                                                TextureImageFormat.RG16 :
+                                                isBlockCompressable ? TextureImageFormat.BC4u : TextureImageFormat.RG8;
                                     }
                                 }
                                 else
                                 {
                                     if (handling.ImageFormat == TextureImageFormat.Automatic)
-                                        handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC4u : TextureImageFormat.R8a;
+                                        handling.ImageFormat = textureData.IsHDR ?
+                                            TextureImageFormat.RG16 :
+                                            isBlockCompressable ? TextureImageFormat.BC4u : TextureImageFormat.R8a;
                                 }
 
                                 break;
@@ -179,12 +210,16 @@ namespace Editor.Processors.Texture
                                 {
                                     if (handling.AlphaSource == TextureAlphaSource.Source && !wasGrayscaleBefore)
                                     {
-                                        handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC5u : TextureImageFormat.RG8;
+                                        handling.ImageFormat = textureData.IsHDR ? 
+                                            TextureImageFormat.RG16 :
+                                            isBlockCompressable ? TextureImageFormat.BC5u : TextureImageFormat.RG8;
                                         textureData.Stride = 2;
                                     }
                                     else
                                     {
-                                        handling.ImageFormat = isBlockCompressable ? TextureImageFormat.BC4u : TextureImageFormat.R8a;
+                                        handling.ImageFormat = textureData.IsHDR ?
+                                            TextureImageFormat.R16 :
+                                            isBlockCompressable ? TextureImageFormat.BC4u : TextureImageFormat.R8a;
                                     }
                                 }
 
@@ -259,6 +294,11 @@ namespace Editor.Processors.Texture
                     Guard.IsFalse(handling.ImageFormat == TextureImageFormat.Automatic);
                 }
 
+                if (textureData.IsHDR && !IsFormatHDRCapable(handling.ImageFormat))
+                {
+                    Process_TonemapHDR(ref textureData);
+                }
+
                 {
                     if (!mipmaps.GenerateMipmaps)
                         mipmaps.MaxMipMapCount = 1;
@@ -279,6 +319,9 @@ namespace Editor.Processors.Texture
                             TextureImageFormat.R8a => RHIFormat.R8_UNorm,
                             TextureImageFormat.RG8 => RHIFormat.RG8_UNorm,
                             TextureImageFormat.RGBA8 => RHIFormat.RGBA8_UNorm,
+                            TextureImageFormat.R16 => RHIFormat.R16_Float,
+                            TextureImageFormat.RG16 => RHIFormat.RG16_Float,
+                            TextureImageFormat.RGBA16 => RHIFormat.RGBA16_Float,
                             _ => RHIFormat.Unknown
                         });
                     }
@@ -340,7 +383,7 @@ namespace Editor.Processors.Texture
                         if (outputData.IsNull)
                             outputData = ScopedMemory.Allocate((nuint)outputDataSize, 64);
                         if (bitmapData.IsNull)
-                            bitmapData = ScopedMemory.Allocate((nuint)(textureData.Width * textureData.Height * workingStride));
+                            bitmapData = ScopedMemory.Allocate((nuint)(textureData.Width * textureData.Height * fi.BytesPerPixel));
 
                         //TODO: use larger registers such as Vector256 or Vector512 for faster conversion
                         int count = mipWidth * mipHeight;
@@ -348,29 +391,64 @@ namespace Editor.Processors.Texture
                         {
                             case 1:
                                 {
-                                    for (int j = 0, k = 0; j < count; ++j, k += workingStride)
+                                    if (IsFormatHDRCapable(handling.ImageFormat))
                                     {
-                                        float pixel = MathF.Min(MathF.Max(textureData.Pixels[j][0], 0.0f), 1.0f) * 255.0f;
-                                        bitmapData[k] = (byte)(int)pixel;
+                                        float min = (float)Half.MinValue;
+                                        float max = (float)Half.MaxValue;
+
+                                        ScopedPtr<Half> bitmapDataHDR = bitmapData.As<Half>();
+                                        for (int j = 0, k = 0; j < count; ++j, k += workingStride)
+                                        {
+                                            float pixel = MathF.Min(MathF.Max(textureData.Pixels[j][0], min), max);
+                                            bitmapDataHDR[k] = (Half)pixel;
+                                        }
                                     }
+                                    else
+                                    {
+                                        for (int j = 0, k = 0; j < count; ++j, k += workingStride)
+                                        {
+                                            float pixel = MathF.Min(MathF.Max(textureData.Pixels[j][0], 0.0f), 1.0f) * 255.0f;
+                                            bitmapData[k] = (byte)(int)pixel;
+                                        }
+                                    }
+                                    
 
                                     break;
                                 }
                             case 2:
                                 {
-                                    for (int j = 0, k = 0; j < count; ++j, k += workingStride)
+                                    if (IsFormatHDRCapable(handling.ImageFormat))
                                     {
-                                        Vector128<float> pixel = Vector128.Clamp(textureData.Pixels[j], Vector128<float>.Zero, Vector128<float>.One) * 255.0f;
-                                        Vector128<int> integral = Vector128.ConvertToInt32(pixel);
+                                        Vector128<float> min = Vector128.Create((float)Half.MinValue);
+                                        Vector128<float> max = Vector128.Create((float)Half.MaxValue);
 
-                                        bitmapData[k] = (byte)integral[0];
-                                        bitmapData[k + 1] = (byte)integral[1];
+                                        ScopedPtr<Half> bitmapDataHDR = bitmapData.As<Half>();
+                                        for (int j = 0, k = 0; j < count; ++j, k += workingStride)
+                                        {
+                                            Vector128<float> pixel = Vector128.Clamp(textureData.Pixels[j], min, max);
+
+                                            bitmapDataHDR[k] = (Half)pixel[0];
+                                            bitmapDataHDR[k + 1] = (Half)pixel[1];
+                                        }
+                                    }
+                                    else
+                                    {
+                                        for (int j = 0, k = 0; j < count; ++j, k += workingStride)
+                                        {
+                                            Vector128<float> pixel = Vector128.Clamp(textureData.Pixels[j], Vector128<float>.Zero, Vector128<float>.One) * 255.0f;
+                                            Vector128<int> integral = Vector128.ConvertToInt32(pixel);
+
+                                            bitmapData[k] = (byte)integral[0];
+                                            bitmapData[k + 1] = (byte)integral[1];
+                                        }
                                     }
 
                                     break;
                                 }
                             case 3:
                                 {
+                                    Guard.IsFalse(IsFormatHDRCapable(handling.ImageFormat));
+
                                     for (int j = 0, k = 0; j < count; ++j, k += workingStride)
                                     {
                                         Vector128<float> pixel = Vector128.Clamp(textureData.Pixels[j], Vector128<float>.Zero, Vector128<float>.One) * 255.0f;
@@ -385,15 +463,34 @@ namespace Editor.Processors.Texture
                                 }
                             case 4:
                                 {
-                                    for (int j = 0, k = 0; j < count; ++j, k += workingStride)
+                                    if (IsFormatHDRCapable(handling.ImageFormat))
                                     {
-                                        Vector128<float> pixel = Vector128.Clamp(textureData.Pixels[j], Vector128<float>.Zero, Vector128<float>.One) * 255.0f;
-                                        Vector128<int> integral = Vector128.ConvertToInt32(pixel);
+                                        Vector128<float> min = Vector128.Create((float)Half.MinValue);
+                                        Vector128<float> max = Vector128.Create((float)Half.MaxValue);
 
-                                        bitmapData[k] = (byte)integral[0];
-                                        bitmapData[k + 1] = (byte)integral[1];
-                                        bitmapData[k + 2] = (byte)integral[2];
-                                        bitmapData[k + 3] = (byte)integral[3];
+                                        ScopedPtr<Half> bitmapDataHDR = bitmapData.As<Half>();
+                                        for (int j = 0, k = 0; j < count; ++j, k += workingStride)
+                                        {
+                                            Vector128<float> pixel = Vector128.Clamp(textureData.Pixels[j], min, max);
+
+                                            bitmapDataHDR[k] = (Half)pixel[0];
+                                            bitmapDataHDR[k + 1] = (Half)pixel[1];
+                                            bitmapDataHDR[k + 2] = (Half)pixel[2];
+                                            bitmapDataHDR[k + 3] = (Half)pixel[3];
+                                        }
+                                    }
+                                    else
+                                    {
+                                        for (int j = 0, k = 0; j < count; ++j, k += workingStride)
+                                        {
+                                            Vector128<float> pixel = Vector128.Clamp(textureData.Pixels[j], Vector128<float>.Zero, Vector128<float>.One) * 255.0f;
+                                            Vector128<int> integral = Vector128.ConvertToInt32(pixel);
+
+                                            bitmapData[k] = (byte)integral[0];
+                                            bitmapData[k + 1] = (byte)integral[1];
+                                            bitmapData[k + 2] = (byte)integral[2];
+                                            bitmapData[k + 3] = (byte)integral[3];
+                                        }
                                     }
 
                                     break;
@@ -429,7 +526,10 @@ namespace Editor.Processors.Texture
                             case TextureImageFormat.R8a:
                             case TextureImageFormat.RG8:
                             case TextureImageFormat.RGB8:
-                            case TextureImageFormat.RGBA8: (outputData, bitmapData) = (bitmapData, outputData); break;
+                            case TextureImageFormat.RGBA8:
+                            case TextureImageFormat.R16:
+                            case TextureImageFormat.RG16:
+                            case TextureImageFormat.RGBA16: (outputData, bitmapData) = (bitmapData, outputData); break;
                             default: throw new NotImplementedException($"Image format not supported: {handling.ImageFormat}");
                         }
 
@@ -441,11 +541,49 @@ namespace Editor.Processors.Texture
                 if (i == 0)
                 {
                     Update_RemapSwizzle(ref textureSwizzle, swizzleRemap);
-                    outputTextureData = new ProcessedTextureData(sourceSize.X, sourceSize.Y, mipCount, rawData.Length, handling.ImageFormat, textureSwizzle);
+                    outputTextureData = new ProcessedTextureData(sourceSize.X, sourceSize.Y, mipCount, rawData.Length, handling.ImageFormat, textureSwizzle, features);
+                }
+            }
+
+            {
+                if (config is CubemapConfiguration cubemap)
+                {
+                    CubemapConfiguration.Cubemap info = cubemap.CubemapInfo;
+                    if (info.IncludeSHL2)
+                    {
+                        InlineArray9<Vector128<float>> shl2 = Process_GenerateSH(rawData);
+
+                        TextureSHL2Info blobData = default;
+                        for (int i = 0; i < 9; ++i)
+                        {
+                            ref Vector128<float> src = ref shl2[i];
+                            blobData.Values[i] = new TextureSHL2Info.Color
+                            {
+                                R = src[0],
+                                G = src[1],
+                                B = src[2],
+                            };
+                        }
+
+                        stream.Write(blobData);
+                    }
                 }
             }
 
             return outputTextureData;
+
+            static bool IsFormatHDRCapable(TextureImageFormat imageFormat) => imageFormat switch
+            {
+                TextureImageFormat.BC6s => true,
+                TextureImageFormat.BC6u => true,
+                TextureImageFormat.R16 => true,
+                TextureImageFormat.RG16 => true,
+                TextureImageFormat.RGBA16 => true,
+                TextureImageFormat.R32 => true,
+                TextureImageFormat.RG32 => true,
+                TextureImageFormat.RGBA32 => true,
+                _ => false,
+            };
         }
 
         private static void Update_RemapSwizzle(ref TextureSwizzle swizzle, TextureSwizzle remap)
@@ -515,6 +653,42 @@ namespace Editor.Processors.Texture
             }
 
             textureData.Stride = 1;
+        }
+
+        private static void Process_TonemapHDR(ref RawTextureData textureData)
+        {
+            int count = textureData.Width * textureData.Height;
+
+            // https://github.com/KhronosGroup/ToneMapping/blob/main/PBR_Neutral/pbrNeutral.glsl
+            for (int i = 0; i < count; ++i)
+            {
+                ref Vector128<float> pixel = ref textureData.Pixels[i];
+                Vector128<float> color = pixel;
+
+                const float startCompression = 0.8f - 0.04f;
+                const float desaturation = 0.15f;
+
+                float x = Math.Min(color[0], Math.Min(color[1], color[2]));
+                float offset = x < 0.08f ? x - 6.25f * x * x : 0.04f;
+                color -= Vector128.Create(offset);
+
+                float peak = Math.Max(color[0], Math.Max(color[1], color[2]));
+                if (peak < startCompression)
+                {
+                    pixel = color;
+                }
+                else
+                {
+                    const float d = 1.0f - startCompression;
+                    float newPeak = 1.0f - d * d / (peak + d - startCompression);
+                    color *= newPeak / peak;
+
+                    float g = 1.0f - 1.0f / (desaturation * (peak - newPeak) + 1.0f);
+                    pixel = Vector128.Lerp(color, Vector128.Create(newPeak), Vector128.Create(g));
+                }
+            }
+
+            textureData.IsHDR = false;
         }
 
         private static void Process_ObjectToTangent(ref RawTextureData textureData)
@@ -702,49 +876,88 @@ namespace Editor.Processors.Texture
 
         private static void Process_GenerateMipmap_Kaiser(ref RawTextureData textureData, ScopedPtr<Vector128<float>> outputData, int mipWidth, int mipHeight)
         {
-            int srcWidth = mipWidth * 2;
+            KaiserFilter filter = new KaiserFilter(0.25f, 4.0f, 1.0f);
 
-            Vector128<int> srcUpperBound = Vector128.Create(mipWidth, mipHeight, mipWidth, mipHeight) * 2 - Vector128<int>.One;
-            Vector128<int> sliceMultiplier = Vector128.Create(1, srcWidth, 1, srcWidth);
+            using PolyphaseKernel xKernel = new PolyphaseKernel(in filter, textureData.Width, mipWidth);
+            using PolyphaseKernel yKernel = new PolyphaseKernel(in filter, textureData.Height, mipHeight);
 
-            for (int dstY = 0, srcY = 0; dstY < mipHeight; ++dstY, srcY += 2)
+            using var _ = ScopedMemory.PushScope();
+
+            ScopedPtr<Vector128<float>> tmp = ScopedMemory.Allocate<Vector128<float>>(64, (nuint)(mipWidth * textureData.Height));
+
+            for (int y = 0; y < textureData.Height; ++y)
             {
-                int srcYSlice = srcY * srcWidth;
-                int dstYSlice = dstY * mipWidth;
+                ApplyKernelX(in xKernel, textureData.Width, textureData.Height, y, textureData.Pixels.AsSpan(textureData.Width * textureData.Height), tmp.AsSpan(y * mipWidth, (textureData.Height - y) * mipWidth));
+            }
 
-                for (int dstX = 0, srcX = 0; dstX < mipWidth; ++dstX, srcX += 2)
+            for (int x = 0; x < mipWidth; ++x)
+            {
+                ApplyKernelY(in yKernel, mipWidth, textureData.Height, x, mipWidth, tmp.AsSpan(textureData.Width * textureData.Height), outputData.AsSpan(x, mipWidth * mipHeight - x));
+            }
+
+            static void ApplyKernelX(in PolyphaseKernel kernel, int srcWidth, int srcHeight, int y, Span<Vector128<float>> src, Span<Vector128<float>> dst)
+            {
+                int length = kernel.Length;
+                float scale = length / (float)srcWidth;
+                float iScale = 1.0f / scale;
+
+                float width = kernel.Width;
+                int windowSize = kernel.WindowSize;
+
+                Int2 maxIndex = new Int2(srcWidth, srcHeight) - Int2.One;
+
+                for (int i = 0; i < length; ++i)
                 {
-                    Vector128<int> positions = Vector128.Create(srcX, srcY, srcX, srcY) + Vector128.Create(-1, -1, 1, 1);
+                    float center = (i + 0.5f) * iScale;
 
-                    positions = Vector128.ConditionalSelect(Vector128.LessThan(positions, Vector128<int>.Zero), srcUpperBound, positions);
-                    positions = Vector128.ConditionalSelect(Vector128.GreaterThan(positions, srcUpperBound), Vector128<int>.Zero, positions);
-                    positions = positions * sliceMultiplier;
+                    int left = (int)MathF.Floor(center - width);
+                    int right = (int)MathF.Ceiling(center + width);
 
+                    float norm = 0.0f;
                     Vector128<float> sum = Vector128<float>.Zero;
+                    for (int j = 0; j < windowSize; ++j)
+                    {
+                        int index = Math.Clamp(left + j, 0, maxIndex.X) + y * srcWidth;
 
-                    //[1, 1, 1]
-                    //[1, 1, 1] / 9 = f(X)
-                    //[1, 1, 1]
+                        float w = kernel[i, j] * (src[index][3] + (1.0f / 256.0f));
+                        norm += w;
+                        sum += w * src[index];
+                    }
 
-                    sum += textureData.Pixels[positions[0] + positions[1]];
-                    sum += textureData.Pixels[srcX + positions[1]];
-                    sum += textureData.Pixels[positions[2] + positions[1]];
+                    dst[i] = sum / norm;
+                }
+            }
 
-                    sum += textureData.Pixels[positions[0] + srcYSlice];
-                    sum += textureData.Pixels[srcX + srcYSlice];
-                    sum += textureData.Pixels[positions[2] + srcYSlice];
+            static void ApplyKernelY(in PolyphaseKernel kernel, int srcWidth, int srcHeight, int x, int stride, Span<Vector128<float>> src, Span<Vector128<float>> dst)
+            {
+                int length = kernel.Length;
+                float scale = length / (float)srcHeight;
+                float iScale = 1.0f / scale;
 
-                    sum += textureData.Pixels[positions[0] + positions[3]];
-                    sum += textureData.Pixels[srcX + positions[3]];
-                    sum += textureData.Pixels[positions[2] + positions[3]];
+                float width = kernel.Width;
+                int windowSize = kernel.WindowSize;
 
-                    //source from: https://computergraphics.stackexchange.com/questions/6393/kaiser-windowed-sinc-filter-for-mip-mapping
+                Int2 maxIndex = new Int2(srcWidth, srcHeight) - Int2.One;
 
-                    sum *= 1.0f / 9.0f;
-                    sum = Vector128.Sqrt(Vector128<float>.One - sum * sum) * KaiserAlpha;
-                    sum = Vector128.Create(MathUtil.BesselI0(sum[0]), MathUtil.BesselI0(sum[1]), MathUtil.BesselI0(sum[2]), MathUtil.BesselI0(sum[3])) * KaiserBessel;
+                for (int i = 0; i < length; ++i)
+                {
+                    float center = (i + 0.5f) * iScale;
 
-                    outputData[dstX + dstYSlice] = Vector128<float>.One - sum;
+                    int left = (int)MathF.Floor(center - width);
+                    int right = (int)MathF.Ceiling(center + width);
+
+                    float norm = 0.0f;
+                    Vector128<float> sum = Vector128<float>.Zero;
+                    for (int j = 0; j < windowSize; ++j)
+                    {
+                        int index = x + Math.Clamp(left + j, 0, maxIndex.Y) * srcWidth;
+
+                        float w = kernel[i, j] * (src[index][3] + (1.0f / 256.0f));
+                        norm += w;
+                        sum += w * src[index];
+                    }
+
+                    dst[i * stride] = sum / norm;
                 }
             }
         }
@@ -923,12 +1136,92 @@ namespace Editor.Processors.Texture
             }
         }
 
+        private static InlineArray9<Vector128<float>> Process_GenerateSH(RawTextureData[] faces)
+        {
+            // https://web.archive.org/web/20231108115516/https://andrew-pham.blog/2019/08/26/spherical-harmonics/
+            // https://www.rorydriscoll.com/2012/01/15/cubemap-texel-solid-angle/
+
+            InlineArray9<Vector128<float>> sh = default;
+            float weightSum = 0.0f;
+
+            for (int i = 0; i < 6; ++i)
+            {
+                RawTextureData textureData = faces[i];
+                int pixelCount = textureData.Width * textureData.Height;
+
+                float widthScale = 1.0f / (textureData.Width - 1) * 2.0f;
+                float heightScale = 1.0f / (textureData.Height - 1) * 2.0f;
+                Vector4 invXY = new Vector4(-widthScale, -heightScale, widthScale, heightScale);
+
+                (Vector3 right, Vector3 up) = s_cubemapViews[i];
+                for (int j = 0; j < pixelCount; ++j)
+                {
+                    int y = j / textureData.Width;
+                    int x = j - y * textureData.Width;
+
+                    float u = (x + 0.5f) * widthScale - 1.0f;
+                    float v = (y + 0.5f) * heightScale - 1.0f;
+
+                    Vector4 x01 = new Vector4(u, v, u, v) + invXY;
+                    float weight = AreaElement(x01.X, x01.Y) - AreaElement(x01.X, x01.W) - AreaElement(x01.Z, x01.Y) + AreaElement(x01.Z, x01.W);
+
+                    Vector3 normal = Vector3.Normalize(right * (x * widthScale - 1.0f) + up * (y * heightScale - 1.0f));
+
+                    Vector128<float> pixel = textureData.Pixels[j] * weight;
+                    sh[0] += pixel * (0.282095f);
+                    sh[1] += pixel * (0.488603f * normal.Y);
+                    sh[2] += pixel * (0.488603f * normal.Z);
+                    sh[3] += pixel * (0.488603f * normal.X);
+                    sh[4] += pixel * (1.092548f * normal.X * normal.Y);
+                    sh[5] += pixel * (1.092548f * normal.Y * normal.Z);
+                    sh[6] += pixel * (0.315392f * (3.0f * normal.Z * normal.Z - 1.0f));
+                    sh[7] += pixel * (1.092548f * normal.X * normal.Z);
+                    sh[8] += pixel * (0.546274f * (normal.X * normal.X - normal.Y * normal.Y));
+
+                    weightSum += weight;
+
+                    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                    static float AreaElement(float x, float y)
+                    {
+                        return float.Atan2(x * y, float.Sqrt(x * x + y * y + 1.0f));
+                    }
+                }
+            }
+
+            float finalMul = 4.0f * float.Pi / weightSum;
+            for (int i = 0; i < 9; ++i)
+            {
+                sh[i] *= finalMul;
+            }
+
+            return sh;
+        }
+
+        private static readonly Matrix4x4 s_cubemapProjection = Matrix4x4.CreatePerspectiveFieldOfView(float.DegreesToRadians(90.0f), 1.0f, 0.1f, 10.0f);
+        private static readonly ImmutableArray<(Vector3 Right, Vector3 Up)> s_cubemapViews = [
+            (Vector3.UnitX, -Vector3.UnitY),
+            (-Vector3.UnitX, -Vector3.UnitY),
+            (Vector3.UnitY, Vector3.UnitZ),
+            (-Vector3.UnitY, Vector3.UnitZ),
+            (Vector3.UnitZ, -Vector3.UnitY),
+            (-Vector3.UnitZ, -Vector3.UnitY),
+            ];
+
         private static readonly Vector128<float> KaiserBessel = Vector128<float>.One / Vector128.Create(MathUtil.BesselI0(KaiserAlpha));
 
         private const float KaiserAlpha = 4.0f * MathF.PI;
     }
 
-    internal record struct RawTextureData(ScopedPtr<Vector128<float>> Pixels, int Width, int Height, int Stride);
+    internal record struct RawTextureData(ScopedPtr<Vector128<float>> Pixels, int Width, int Height, int Stride, bool IsHDR);
 
-    public readonly record struct ProcessedTextureData(int Width, int Height, int MipCount, int ArraySize, TextureImageFormat Format, TextureSwizzle Swizzle);
+    public readonly record struct ProcessedTextureData(int Width, int Height, int MipCount, int ArraySize, TextureImageFormat Format, TextureSwizzle Swizzle, TextureDataFeatures Featues);
+
+    [Flags]
+    public enum TextureDataFeatures : byte
+    {
+        None = 0,
+
+        SphericalHarmonicsL2 = 1 << 0,
+        RadianceIBLMap = 1 << 1
+    }
 }

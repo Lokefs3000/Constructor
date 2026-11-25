@@ -35,7 +35,7 @@ namespace PrimaryEditor.Inspector.Views
                     else
                     {
                         type =
-                            currentType.GetField(currentValue)?.FieldType ??
+                            currentType.GetField(currentValue, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.FieldType ??
                             currentType.GetProperty(currentValue)?.PropertyType;
 
                         if (type != null)
@@ -51,7 +51,7 @@ namespace PrimaryEditor.Inspector.Views
                 }
                 else
                 {
-                    FieldInfo? field = currentType.GetField(currentValue);
+                    FieldInfo? field = currentType.GetField(currentValue, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                     if (field != null)
                     {
                         return new ViewSource(field.FieldType, name, field);

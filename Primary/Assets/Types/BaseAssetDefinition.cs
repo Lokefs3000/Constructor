@@ -7,6 +7,7 @@ namespace Primary.Assets.Types
     public abstract class BaseAssetDefinition : IAssetDefinition
     {
         public abstract AssetId Id { get; }
+        public abstract int UniqueIndex { get; }
         public abstract ResourceStatus Status { get; }
         public abstract string Name { get; }
     }
@@ -34,11 +35,13 @@ namespace Primary.Assets.Types
         protected T AssetData => _assetData;
 
         public override AssetId Id => _assetData.Id;
+        public override int UniqueIndex => _assetData.UniqueIndex;
         public override ResourceStatus Status => _assetData.Status;
         public override string Name => _assetData.Name;
 
         public bool IsLoaded => _assetData.Status > ResourceStatus.Running;
         public bool IsReady => _assetData.Status == ResourceStatus.Success;
+        public bool IsBad => _assetData.Status == ResourceStatus.Bad;
 
         public int LoadIndex => _assetData.LoadIndex;
     }

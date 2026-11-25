@@ -1,29 +1,67 @@
-﻿using CommunityToolkit.HighPerformance;
+﻿using System.Collections.Concurrent;
+using System.Numerics;
+using CommunityToolkit.HighPerformance;
 using Primary.Collections;
 using Primary.Common;
 using Primary.Mathematics;
 using Primary.Profiling;
 using Primary.Rendering;
-using Primary.Rendering.Tree;
+using Primary.Rendering.Configuration;
+using Primary.Rendering.Partitioning;
+using Primary.Services;
 using Primary.Threading;
 
 namespace Primary.Rendering.Batching
 {
-    public sealed class BatchingManager
+    public sealed class BatchingManager : IService
     {
+        private readonly BatchingGlobalOptions _options;
+
         private readonly RenderingManager _manager;
-        private readonly List<OctreeRenderBatcher> _subBatchers;
-        private int _subBatchersIndex;
+        private readonly ConcurrentBag<GridChunkBatcher> _idleGridBatchers;
 
         private List<RenderList> _activeLists;
+        private List<JobHandle> _activeJobs;
 
         internal BatchingManager(RenderingManager manager)
         {
+            _options = new BatchingGlobalOptions();
+
             _manager = manager;
-            _subBatchers = new List<OctreeRenderBatcher>();
-            _subBatchersIndex = 0;
+            _idleGridBatchers = new ConcurrentBag<GridChunkBatcher>();
 
             _activeLists = new List<RenderList>();
+            _activeJobs = new List<JobHandle>();
+        }
+
+        internal void ClearAllRenderLists()
+        {
+            if (_activeJobs.Count > 0)
+            {
+                JobScheduler.CombineAll(_activeJobs.AsSpan()).WaitForCompletion();
+                _activeJobs.Clear();
+            }
+
+            foreach (RenderList renderList in _activeLists)
+            {
+                renderList.Clear();
+            }
+        }
+
+        internal GridChunkBatcher GetGridChunkBatcher()
+        {
+            return _idleGridBatchers.TryTake(out GridChunkBatcher? result) ? result : new GridChunkBatcher();
+        }
+
+        internal void ReturnGridChunkBatcher(GridChunkBatcher gridChunkBatcher)
+        {
+            gridChunkBatcher.ClearBatchData();
+            _idleGridBatchers.Add(gridChunkBatcher);
+        }
+
+        internal void RemoveRenderList(RenderList renderList)
+        {
+            _activeLists.Remove(renderList);
         }
 
         public RenderList CreateRenderList()
@@ -34,119 +72,57 @@ namespace Primary.Rendering.Batching
             return list;
         }
 
-        public void BatchWorld(RenderList output, in BatchWorldSetup setup)
+        internal JobHandle BatchWorld(RenderList output, BatchingOptions options, JobHandle parentJob)
         {
-            using (new ProfilingScope("BatchWorld"))
+            JobHandle prepareChunks = JobScheduler.Schedule(new PrepareChunks(_manager, options, output), parentJob, JobPriority.Realtime, true);
+            JobHandle combineGridBatches = JobScheduler.Schedule(new RenderList.CombineGridBatches(output), prepareChunks, JobPriority.Realtime, true);
+
+            _activeJobs.Add(combineGridBatches);
+            return combineGridBatches;
+        }
+
+        public BatchingGlobalOptions Options => _options;
+
+        private readonly record struct PrepareChunks(RenderingManager Manager, BatchingOptions Options, RenderList RenderList) : IJob
+        {
+            public void Execute()
             {
-                using (new ProfilingScope("Dispatch"))
+                using (new ProfilingScope("PrepareChunks"))
                 {
-                    output.ClearFrameData();
-                    foreach (OctreeRenderBatcher batcher in _subBatchers.AsSpan()[.._subBatchersIndex])
+                    BatchingManager batchingManager = Manager.Services.GetService<BatchingManager>();
+
+                    float viewDistanceSqr = Options.MaxViewingDistance * Options.MaxViewingDistance;
+
+                    using RentedList<JobHandle> scheduledJobs = new RentedList<JobHandle>();
+                    foreach (var (_, chunk) in Manager.PartitioningManager.Regions)
                     {
-                        batcher.ClearFrameData();
-                    }
+                        if (chunk.IsEmpty)
+                            continue;
+                        if (Vector3.DistanceSquared(Options.Origin, chunk.CurrentExtents.Center) - chunk.CurrentExtents.SqrRadius > viewDistanceSqr)
+                            continue;
 
-                    BatchingOptions options = setup.Options;
-
-                    using RentedList<JobHandle> jobs = new RentedList<JobHandle>();
-
-                    _subBatchersIndex = 0;
-                    foreach (var (_, tree) in setup.Octree.Regions)
-                    {
-                        OctreeRenderBatcher renderBatcher;
-                        if (_subBatchersIndex >= _subBatchers.Count)
+                        FrustrumIntersection intersection = batchingManager._options.FrustrumCulling ? chunk.CurrentExtents.Intersect(Options.ViewFrustrum) : FrustrumIntersection.Inside;
+                        if (intersection != FrustrumIntersection.Outside)
                         {
-                            renderBatcher = new OctreeRenderBatcher((byte)_subBatchersIndex, _manager);
-                            _subBatchers.Add(renderBatcher);
-                        }
-                        else
-                        {
-                            renderBatcher = _subBatchers[_subBatchersIndex];
-                        }
+                            GridChunkBatcher chunkBatcher = batchingManager.GetGridChunkBatcher();
+                            chunkBatcher.Manager = batchingManager;
+                            chunkBatcher.Options = Options;
+                            chunkBatcher.RenderList = RenderList;
+                            chunkBatcher.GridChunk = chunk;
+                            chunkBatcher.DoFineFrustrumCulling = batchingManager._options.ForceFrustrumCull || intersection == FrustrumIntersection.Partial;
 
-                        renderBatcher.AddToQueue(output, tree, options);
-
-                        JobHandle job = JobScheduler.Schedule(renderBatcher, JobPriority.Realtime);
-                        JobScheduler.Flush(job);
-
-                        jobs.Add(job);
-
-                        ++_subBatchersIndex;
-                    }
-
-                    if (!jobs.IsEmpty)
-                    {
-                        if (jobs.Count == 1)
-                            jobs[0].WaitForCompletion();
-                        else
-                            JobScheduler.CombineAll(jobs.AsSpan()).WaitForCompletion();
-                    }
-
-                    output.FinishDispatch(options.ShaderType);
-                }
-
-                int totalKeys = 0;
-                Span<RenderKey> keys = default;
-
-                using (new ProfilingScope("Group"))
-                {
-                    foreach (OctreeRenderBatcher batcher in _subBatchers.AsSpan()[.._subBatchersIndex])
-                    {
-                        totalKeys += batcher.Keys.Length;
-                    }
-
-                    keys = output.RentKeys(totalKeys);
-
-                    Span<RenderKey> tempKeys = keys;
-                    foreach (OctreeRenderBatcher batcher in _subBatchers.AsSpan()[.._subBatchersIndex])
-                    {
-                        batcher.Keys.CopyTo(tempKeys);
-                        tempKeys = tempKeys.Slice(batcher.Keys.Length);
-                    }
-                }
-
-                using (new ProfilingScope("Sort"))
-                {
-                    keys.Sort();
-                }
-
-                using (new ProfilingScope("FindShaders"))
-                {
-                    int previousLastIndex = 0;
-                    ushort lastShaderIdx = ushort.MaxValue;
-
-                    for (int i = 0; i < keys.Length; ++i)
-                    {
-                        ref readonly RenderKey key = ref keys[i];
-                        if (key.ShaderId != lastShaderIdx)
-                        {
-                            OctreeRenderBatcher batcher = _subBatchers[key.Batcher];
-                            if (lastShaderIdx != ushort.MaxValue)
-                                output.AddRange(batcher.Flags[keys[previousLastIndex].Index].Material.GetShaderOrNull(setup.Options.ShaderType)!, new ShaderKeyRange(previousLastIndex, i));
-
-                            previousLastIndex = i;
-                            lastShaderIdx = key.ShaderId;
+                            if (batchingManager._options.ThreadedCulling)
+                                scheduledJobs.Add(JobScheduler.Schedule(chunkBatcher, JobPriority.Realtime, true));
+                            else
+                                ((IJob)chunkBatcher).Execute();
                         }
                     }
 
-                    if (lastShaderIdx != ushort.MaxValue && previousLastIndex < keys.Length)
-                    {
-                        ref readonly RenderKey key = ref keys[previousLastIndex];
-                        OctreeRenderBatcher batcher = _subBatchers[key.Batcher];
-                        output.AddRange(batcher.Flags[key.Index].Material.GetShaderOrNull(setup.Options.ShaderType)!, new ShaderKeyRange(previousLastIndex, keys.Length));
-                    }
+                    JobScheduler.CombineAll(scheduledJobs.AsSpan()).WaitForCompletion();
                 }
-
-                using (new ProfilingScope("Batch"))
-                {
-                    output.SetupShaderBatchers();
-                    output.ExecuteActiveBatchers(_subBatchers.AsSpan()[.._subBatchersIndex]);
-                }
-
-                output.ReturnKeys();
             }
         }
     }
 
-    public readonly record struct BatchWorldSetup(OctreeManager Octree, BatchingOptions Options);
+    public readonly record struct BatchWorldSetup(PartitioningManager Octree, BatchingOptions Options);
 }

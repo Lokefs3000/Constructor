@@ -20,7 +20,7 @@ using Primary.Rendering.Datatypes;
 
 namespace VoxelizationDemo.Rendering.Diagnostics
 {
-    public sealed class LightHeatmapPass : IRenderPass
+    public sealed class LightHeatmapPass : IRenderPass, IDisposable
     {
         private readonly ShaderAsset _lightHeatmap;
         private readonly PropertyBlock _lightHeatmapBlock;
@@ -29,6 +29,11 @@ namespace VoxelizationDemo.Rendering.Diagnostics
         {
             _lightHeatmap = AssetManager.LoadAsset<ShaderAsset>("Content/Shaders/Diagnostic/LightHeatmap.shader");
             _lightHeatmapBlock = _lightHeatmap.CreatePropertyBlock();
+        }
+
+        public void Dispose()
+        {
+            _lightHeatmapBlock.Dispose();
         }
 
         public void SetupPasses(FrameGraphBuilder frameGraph)

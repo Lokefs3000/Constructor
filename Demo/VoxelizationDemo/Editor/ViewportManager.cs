@@ -6,11 +6,13 @@ using Primary.Common;
 using Primary.Components;
 using Primary.Input;
 using Primary.Input.Devices;
+using Primary.Rendering;
 using Primary.Scenes;
 using Primary.Threading;
 using VoxelizationDemo.Core;
 using VoxelizationDemo.Editor.Input;
 using VoxelizationDemo.Editor.Utility;
+using VoxelizationDemo.Editor.Viewports;
 using VoxelizationDemo.Editor.Windows;
 
 namespace VoxelizationDemo.Editor
@@ -18,6 +20,7 @@ namespace VoxelizationDemo.Editor
     internal sealed class ViewportManager
     {
         private readonly KeybindContext _keybindContext;
+        private readonly CameraManager _cameraManager;
 
         private bool _openViewMenu;
 
@@ -26,10 +29,30 @@ namespace VoxelizationDemo.Editor
             _keybindContext = new KeybindContext();
             _keybindContext.DeclareBinding("Open view menu", OnViewKeybindPressed, KeyModifier.Shift, KeyCode.V);
 
+            _cameraManager = new CameraManager();
+
             ThreadHelper.ExecuteOnMainThread(() => EditorManager.Instance.KeybindManager.FocusContext(_keybindContext));
         }
 
         private void OnViewKeybindPressed() => _openViewMenu = true;
+
+        internal void Enable()
+        {
+            RenderingManager manager = VoxelRuntime.Instance.RenderingManager;
+            manager.RenderWorld.TransformOutput.Subscribe(OnTransformOutput);
+        }
+
+        internal void Disable()
+        {
+            RenderingManager manager = VoxelRuntime.Instance.RenderingManager;
+            manager.RenderWorld.TransformOutput.Unsubscribe(OnTransformOutput);
+        }
+
+        private void OnTransformOutput(List<RenderOutputData> outputData)
+        {
+            outputData.Clear();
+            _cameraManager.SubmitOutput(outputData);
+        }
 
         internal void UpdateViewport()
         {
@@ -101,8 +124,28 @@ namespace VoxelizationDemo.Editor
                     }
                 }
 
+                if (ImGui.MenuItem("Assemblies"u8))
+                {
+                    if (!EditorManager.Instance.WindowManager.HasWindowOpen<AssemblyWindow>())
+                    {
+                        EditorManager.Instance.WindowManager.AddOpenWindow(new AssemblyWindow());
+                    }
+                }
+
+                if (ImGui.MenuItem("Component registry"u8))
+                {
+                    if (!EditorManager.Instance.WindowManager.HasWindowOpen<ComponentRegistryWindow>())
+                    {
+                        EditorManager.Instance.WindowManager.AddOpenWindow(new ComponentRegistryWindow());
+                    }
+                }
+
                 ImGui.EndPopup();
             }
+
+            _cameraManager.UpdateCamera();
         }
+
+        public CameraManager Camera => _cameraManager;
     }
 }

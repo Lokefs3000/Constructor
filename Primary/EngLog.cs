@@ -16,6 +16,7 @@ namespace Primary
         internal static readonly ILogger Script = Create("Script");
         internal static readonly ILogger Thread = Create("Thread");
         internal static readonly ILogger Core = Create("Core");
+        internal static readonly ILogger Physics = Create("Physics");
 
         internal static void ThrowFatal() => throw new FatalException();
 

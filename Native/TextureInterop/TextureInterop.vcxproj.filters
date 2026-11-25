@@ -54,6 +54,18 @@
     <ClInclude Include="bc7enc_rdo\dds_defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="tinyexr\tinyexr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tinyexr\exr_reader.hh">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tinyexr\streamreader.hh">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="miniz\miniz.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="bc7enc_rdo\bc7enc.cpp">
@@ -75,6 +87,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Image.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="miniz\miniz.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

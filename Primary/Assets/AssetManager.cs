@@ -1,8 +1,10 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Diagnostics;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Arch.LowLevel.Jagged;
 using Primary.Assets.Loaders;
 using Primary.Assets.Types;
 using Primary.Common;
@@ -10,6 +12,7 @@ using Primary.Common.Streams;
 using Primary.Profiling;
 using Primary.Threading;
 using Primary.Timing;
+using Primary.Utility;
 
 namespace Primary.Assets
 {
@@ -22,19 +25,22 @@ namespace Primary.Assets
         private readonly AssetLoadTimings _timings;
         private readonly AssetLoadScheduler _scheduler;
 
-        private ConcurrentQueue<AssetLoadCallback> _loadCallbacks;
+        private readonly ConcurrentQueue<AssetLoadCallback> _loadCallbacks;
 
         private IAssetIdProvider? _assetIdProvider;
         private IAssetCacheProvider? _assetCacheProvider;
 
-        private Dictionary<AssetId, LoadedAsset> _loadedAssets;
+        private readonly Dictionary<AssetId, LoadedAsset> _loadedAssets;
         private FrozenDictionary<Type, IAssetLoader> _loaders;
 
-        private Dictionary<Type, (IAssetDefinition, IInternalAssetData)> _invalidAssets;
+        private readonly Dictionary<Type, (IAssetDefinition, IInternalAssetData, int)> _invalidAssets;
 
-        private Lock _loadLock;
+        private readonly SparseJaggedArray<AssetId> _assetWithUniqueId;
+        private readonly IdCounter _assetUniqueIdCounter;
 
-        private Lazy<ImmutableAssets> _immutableAssets;
+        private readonly Lock _loadLock;
+
+        private readonly Lazy<ImmutableAssets> _immutableAssets;
 
         private bool _disposedValue;
 
@@ -60,7 +66,10 @@ namespace Primary.Assets
                 { typeof(ShaderSetAsset), new ShaderSetAssetLoader() }
             }.ToFrozenDictionary();
 
-            _invalidAssets = new Dictionary<Type, (IAssetDefinition, IInternalAssetData)>();
+            _invalidAssets = new Dictionary<Type, (IAssetDefinition, IInternalAssetData, int)>();
+            
+            _assetWithUniqueId = new SparseJaggedArray<AssetId>(64);
+            _assetUniqueIdCounter = new IdCounter();
 
             _loadLock = new Lock();
 
@@ -182,7 +191,7 @@ namespace Primary.Assets
 
             if (id.IsInvalid)
             {
-                if (_invalidAssets.TryGetValue(type, out ValueTuple<IAssetDefinition, IInternalAssetData> invalidTuple))
+                if (_invalidAssets.TryGetValue(type, out ValueTuple<IAssetDefinition, IInternalAssetData, int> invalidTuple))
                     return invalidTuple.Item1;
 
                 ref readonly IAssetLoader loader = ref _loaders.GetValueRefOrNullRef(type);
@@ -191,10 +200,15 @@ namespace Primary.Assets
                     throw new NotSupportedException(type.Name);
                 }
 
-                IInternalAssetData assetData = loader.FactoryCreateNull(id);
+                int uniqueId = _assetUniqueIdCounter.Take();
+
+                IInternalAssetData assetData = loader.FactoryCreateNull(id, uniqueId);
                 IAssetDefinition assetDef = loader.FactoryCreateDef(assetData);
 
-                _invalidAssets[type] = (assetDef, assetData);
+                _invalidAssets[type] = (assetDef, assetData, uniqueId);
+
+                _assetWithUniqueId.EnsureCapacity(_invalidAssets.Count + _loadedAssets.Count);
+                _assetWithUniqueId.Add(uniqueId, id);
 
                 assetData.SetAssetInternalStatus(ResourceStatus.Bad);
                 return assetDef;
@@ -209,11 +223,16 @@ namespace Primary.Assets
                     throw new NotSupportedException(type.Name);
                 }
 
-                IInternalAssetData assetData = loader.FactoryCreateNull(id);
+                int uniqueId = _assetUniqueIdCounter.Take();
+
+                IInternalAssetData assetData = loader.FactoryCreateNull(id, uniqueId);
                 IAssetDefinition assetDef = loader.FactoryCreateDef(assetData);
 
-                LoadedAsset newAsset = new LoadedAsset(assetDef, assetData);
+                LoadedAsset newAsset = new LoadedAsset(assetDef, assetData, uniqueId);
                 _loadedAssets[id] = newAsset;
+
+                _assetWithUniqueId.EnsureCapacity(_invalidAssets.Count + _loadedAssets.Count);
+                _assetWithUniqueId.Add(uniqueId, id);
 
                 assetData.SetAssetInternalStatus(ResourceStatus.Error);
                 return assetDef;
@@ -268,11 +287,16 @@ namespace Primary.Assets
                     return CreateBadAsset(type, id);
                 }
 
-                IInternalAssetData assetData = loader.FactoryCreateNull(id);
+                int uniqueId = _assetUniqueIdCounter.Take();
+
+                IInternalAssetData assetData = loader.FactoryCreateNull(id, uniqueId);
                 IAssetDefinition assetDef = loader.FactoryCreateDef(assetData);
 
-                LoadedAsset newAsset = new LoadedAsset(assetDef, assetData);
+                LoadedAsset newAsset = new LoadedAsset(assetDef, assetData, uniqueId);
                 _loadedAssets[id] = newAsset;
+
+                _assetWithUniqueId.EnsureCapacity(_invalidAssets.Count + _loadedAssets.Count);
+                _assetWithUniqueId.Add(uniqueId, id);
 
                 assetData.SetAssetInternalName(Path.GetFileNameWithoutExtension(sourcePath));
                 assetData.SetAssetInternalStatus(ResourceStatus.Running);
@@ -393,6 +417,36 @@ namespace Primary.Assets
 
             @this._assetIdProvider.TryGetAssetPathForId(id, out string? assetPath);
             return @this.LoadAssetImpl(type, sourcePath.ToString(), assetPath, new AssetId(id, localId), synchronous, null);
+        }
+
+        /// <summary>Thread-safe</summary>
+        public static T? GetAssetFromIndex<T>(int uniqueIndex) where T : class, IAssetDefinition
+        {
+            AssetManager @this = NullableUtility.ThrowIfNull(s_instance);
+            using (@this._loadLock.EnterScope())
+            {
+                if (@this._assetWithUniqueId.TryGetValue(uniqueIndex, out AssetId id) && !id.IsInvalid)
+                {
+                    return @this._loadedAssets[id].AssetReference.Target as T;
+                }
+
+                return null;
+            }
+        }
+
+        /// <summary>Thread-safe</summary>
+        public static IAssetDefinition? GetAssetFromIndex(int uniqueIndex)
+        {
+            AssetManager @this = NullableUtility.ThrowIfNull(s_instance);
+            using (@this._loadLock.EnterScope())
+            {
+                if (@this._assetWithUniqueId.TryGetValue(uniqueIndex, out AssetId id) && !id.IsInvalid)
+                {
+                    return @this._loadedAssets[id].AssetReference.Target as IAssetDefinition;
+                }
+
+                return null;
+            }
         }
 
         /// <summary>Thread-safe</summary>
@@ -519,11 +573,13 @@ namespace Primary.Assets
         {
             public readonly WeakReference AssetReference;
             public readonly IInternalAssetData AssetData;
+            public readonly int UniqueIndex;
 
-            public LoadedAsset(IAssetDefinition asset, IInternalAssetData assetData)
+            public LoadedAsset(IAssetDefinition asset, IInternalAssetData assetData, int uniqueIndex)
             {
                 AssetReference = new WeakReference(asset);
                 AssetData = assetData;
+                UniqueIndex = uniqueIndex;
             }
         }
 

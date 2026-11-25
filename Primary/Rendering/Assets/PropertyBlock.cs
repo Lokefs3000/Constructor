@@ -177,14 +177,17 @@ namespace Primary.Rendering.Assets
                         {
                             if (remapData.Type == property.Type)
                             {
-                                ref PropertyData propertyData = ref oldProperties[remapData.IndexOrByteOffset];
-                                _properties[property.IndexOrByteOffset] = new PropertyData(property.IndexOrByteOffset, propertyData.FGResource, propertyData.ObjResource, propertyData.Intent);
-
                                 switch (remapData.Type)
                                 {
                                     case ShPropertyType.Buffer:
                                     case ShPropertyType.Texture:
-                                    case ShPropertyType.Sampler: continue;
+                                    case ShPropertyType.Sampler:
+                                        {
+                                            ref PropertyData propertyData = ref oldProperties[remapData.IndexOrByteOffset];
+                                            _properties[property.IndexOrByteOffset] = new PropertyData(property.IndexOrByteOffset, propertyData.FGResource, propertyData.ObjResource, propertyData.Intent);
+
+                                            continue;
+                                        }
 
                                     case ShPropertyType.Single:
                                     case ShPropertyType.Double:
@@ -195,7 +198,7 @@ namespace Primary.Rendering.Assets
                                     case ShPropertyType.Vector4:
                                     case ShPropertyType.Matrix4x4:
                                         {
-                                            if (!oldPropertyData.IsNull && remapData.IndexOrByteOffset + remapData.ByteWidthOrChildIndex < oldPropertyDataSize && remapData.ByteWidthOrChildIndex == property.ByteWidth)
+                                            if (!oldPropertyData.IsNull && remapData.IndexOrByteOffset + remapData.ByteWidthOrChildIndex <= oldPropertyDataSize && remapData.ByteWidthOrChildIndex == property.ByteWidth)
                                             {
                                                 oldPropertyData.Copy(_propertyData.Pointer + property.IndexOrByteOffset, remapData.ByteWidthOrChildIndex);
                                             }
@@ -209,7 +212,7 @@ namespace Primary.Rendering.Assets
                         }
 
                         if (property.Type <= ShPropertyType.Sampler)
-                            _properties[property.IndexOrByteOffset] = new PropertyData(property.IndexOrByteOffset, ResourceHandle.Null);
+                            _properties[property.IndexOrByteOffset] = new PropertyData((ushort)i, ResourceHandle.Null);
                     }
 
                     foreach (ref readonly ShaderProperty property in _shader.Properties)

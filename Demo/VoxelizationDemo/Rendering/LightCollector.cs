@@ -31,7 +31,7 @@ namespace VoxelizationDemo.Rendering
             CollectPointLightsJob.Instance.PointLights = _pointLights;
             CollectPointLightsJob.Instance.Frustrum = frustrum;
             CollectPointLightsJob.Instance.Focus = focus;
-            jobHandleList.Add(JobScheduler.Schedule(CollectPointLightsJob.Instance, JobPriority.Realtime));
+            jobHandleList.Add(JobScheduler.Schedule(CollectPointLightsJob.Instance, JobPriority.Realtime, true));
 
             FindDirectionalLight();
         }

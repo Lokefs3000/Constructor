@@ -26,6 +26,16 @@ struct ImageBitmap
 	uint8_t Effort;
 };
 
+struct ImageBitmapHDR
+{
+	uint32_t Width;
+	uint32_t Height;
+
+	uint8_t Stride;
+
+	float* Pixels;
+};
+
 struct ImageOutput
 {
 	uint32_t BlocksX;

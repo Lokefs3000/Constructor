@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Reflection;
 using System.Text;
 using Primary.Common;
 using PrimaryEditor.Inspector.Views.IO;
@@ -33,6 +34,17 @@ namespace PrimaryEditor.Inspector.Views
         internal ViewDescription(ReadOnlySpan<ViewObject> viewObjects)
         {
             _values = [.. viewObjects];
+        }
+
+        internal bool HasReferencesTo(Assembly assembly)
+        {
+            foreach (ViewObject obj in _values)
+            {
+                if (obj.HasReferencesTo(assembly))
+                    return true;
+            }
+
+            return false;
         }
 
         public ImmutableArray<ViewObject> Values => _values;

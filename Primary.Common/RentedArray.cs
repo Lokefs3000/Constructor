@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 
 namespace Primary.Common
 {
-    public readonly ref struct RentedArray<T> : IDisposable, IArrayIterator<T>, IEnumerable<T>
+    public readonly record struct RentedArray<T> : IDisposable, IArrayIterator<T>, IEnumerable<T>
     {
         private readonly ArrayPool<T> _pool;
         private readonly int _count;
@@ -21,6 +21,16 @@ namespace Primary.Common
         }
 
         public RentedArray(int count, bool clearOnReturn = false) : this(count, ArrayPool<T>.Shared, clearOnReturn) { }
+
+        public RentedArray(Span<T> span, ArrayPool<T> pool, bool clearOnReturn = false) : this(span.Length, pool, clearOnReturn)
+        {
+            span.CopyTo(_array);
+        }
+
+        public RentedArray(Span<T> span, bool clearOnReturn = false) : this(span.Length, ArrayPool<T>.Shared, clearOnReturn)
+        {
+            span.CopyTo(_array);
+        }
 
         #region Interface
         public void Dispose()

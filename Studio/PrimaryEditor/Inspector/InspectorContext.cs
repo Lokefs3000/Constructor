@@ -11,6 +11,7 @@ namespace PrimaryEditor.Inspector
         public abstract bool MatchesContext<T>(ref T value);
 
         public abstract ROList<InspectorGroup> Groups { get; }
+        public abstract Type ContextType { get; }
 
         public abstract event Action<InspectorGroup>? OnGroupAdded;
         public abstract event Action<InspectorGroup>? OnGroupRemoved;

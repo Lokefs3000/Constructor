@@ -69,7 +69,7 @@ namespace VoxelizationDemo.Editor.Tools
                                 Vector3 currentMax = default;
 
                                 bool isTransformFirst = true;
-                                bool hasFoundRotation = false;
+                                bool hasFoundRotation = manager.RelativeMode == ToolRelativeMode.Absolute;
 
                                 foreach (EntityToolTransform transform in manager.Transforms)
                                 {
@@ -98,6 +98,8 @@ namespace VoxelizationDemo.Editor.Tools
                                 }
 
                                 _gizmo.Origin = (currentMin + currentMax) * 0.5f;
+                                if (manager.RelativeMode == ToolRelativeMode.Absolute)
+                                    _gizmo.Rotation = Quaternion.Identity;
                                 break;
                             }
                         case ToolOriginMode.First:
@@ -105,11 +107,18 @@ namespace VoxelizationDemo.Editor.Tools
                                 EntityToolTransform transform = manager.Transforms[0];
                                 _gizmo.Origin = transform.Position;
 
-                                Matrix4x4 matrix = manager.RelativeMode == ToolRelativeMode.Local ? transform.LocalModel : transform.WorldModel;
-                                if (Matrix4x4.Decompose(matrix, out _, out Quaternion quaternion, out _))
-                                    _gizmo.Rotation = quaternion;
+                                if (manager.RelativeMode != ToolRelativeMode.Absolute)
+                                {
+                                    Matrix4x4 matrix = manager.RelativeMode == ToolRelativeMode.Local ? transform.LocalModel : transform.WorldModel;
+                                    if (Matrix4x4.Decompose(matrix, out _, out Quaternion quaternion, out _))
+                                        _gizmo.Rotation = quaternion;
+                                    else
+                                        _gizmo.Rotation = Quaternion.Identity;
+                                }
                                 else
+                                {
                                     _gizmo.Rotation = Quaternion.Identity;
+                                }
 
                                 break;
                             }
@@ -118,11 +127,18 @@ namespace VoxelizationDemo.Editor.Tools
                                 EntityToolTransform transform = manager.Transforms[^1];
                                 _gizmo.Origin = transform.Position;
 
-                                Matrix4x4 matrix = manager.RelativeMode == ToolRelativeMode.Local ? transform.LocalModel : transform.WorldModel;
-                                if (Matrix4x4.Decompose(matrix, out _, out Quaternion quaternion, out _))
-                                    _gizmo.Rotation = quaternion;
+                                if (manager.RelativeMode != ToolRelativeMode.Absolute)
+                                {
+                                    Matrix4x4 matrix = manager.RelativeMode == ToolRelativeMode.Local ? transform.LocalModel : transform.WorldModel;
+                                    if (Matrix4x4.Decompose(matrix, out _, out Quaternion quaternion, out _))
+                                        _gizmo.Rotation = quaternion;
+                                    else
+                                        _gizmo.Rotation = Quaternion.Identity;
+                                }
                                 else
+                                {
                                     _gizmo.Rotation = Quaternion.Identity;
+                                }
 
                                 break;
                             }
