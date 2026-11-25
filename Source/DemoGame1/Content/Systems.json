@@ -1,8 +1,0 @@
-[
-    "Primary.Systems.FlagTransformsSystem, Primary",
-    "Primary.Systems.TransformSystem, Primary",
-    "Primary.Systems.CameraSystem, Primary",
-    "Primary.Systems.RenderBoundsSystem, Primary",
-    "Editor.Systems.GeoSceneSystem, Editor",
-    "Editor.Systems.GizmoSystem, Editor"
-]
